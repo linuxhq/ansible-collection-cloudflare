@@ -2,6 +2,10 @@
 
 A collection of cloudflare roles
 
-## Usage
+## Build
+
+    ansible-galaxy collection build
+
+## Install
 
     ansible-galaxy collection install linuxhq.cloudflare
