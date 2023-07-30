@@ -5,7 +5,7 @@ galaxy_info:
   author: Taylor Kimball
   description: Gather information about cloudflare zones
   license: GPLv3
-  min_ansible_version: 8.0
+  min_ansible_version: '8.0'
   platforms:
     - name: Cloudflare
       versions:
