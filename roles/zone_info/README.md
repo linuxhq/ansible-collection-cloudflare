@@ -30,7 +30,7 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.zone_info
-          cf_auth_token: d41d8cd98f00b204e9800998ecf8427e
+          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
 
 ## License
 
