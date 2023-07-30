@@ -6,11 +6,11 @@ galaxy_info:
   author: Taylor Kimball
   description: Create and update cloudflare rule lists
   license: GPLv3
-  min_ansible_version: '8.0'
+  min_ansible_version: 2.14.0
   platforms:
-    - name: Cloudflare
+    - name: Ubuntu
       versions:
-        - all
+        - focal
   galaxy_tags:
     - cloudflare
     - list
