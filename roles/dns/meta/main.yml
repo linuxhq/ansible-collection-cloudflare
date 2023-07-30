@@ -1,0 +1,16 @@
+---
+dependencies: []
+galaxy_info:
+  role_name: dns
+  author: Taylor Kimball
+  description: Manage cloudflare dns records
+  license: GPLv3
+  min_ansible_version: 8.0
+  platforms:
+    - name: Cloudflare
+      versions:
+        - all
+  galaxy_tags:
+    - cloudflare
+    - dns
+...
