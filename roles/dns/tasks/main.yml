@@ -1,0 +1,36 @@
+---
+- name: Ensure cloudflare dns records are present
+  tags:
+    - dns
+  community.general.cloudflare_dns:
+    algorithm: "{{ _dns.1.algorithm | default(omit) }}"
+    api_token: "{{ cf_auth_token }}"
+    cert_usage: "{{ _dns.1.cert_usage | default(omit) }}"
+    hash_type: "{{ _dns.1.hash_type | default(omit) }}"
+    key_tag: "{{ _dns.1.key_tag | default(omit) }}"
+    port: "{{ _dns.1.port | default(omit) }}"
+    priority: "{{ _dns.1.priority | default(omit) }}"
+    proto: "{{ _dns.1.proto | default(omit) }}"
+    proxied: "{{ _dns.1.proxied | default(false) }}"
+    record: "{{ _dns.1.record }}"
+    selector: "{{ _dns.1.selector | default(omit) }}"
+    service: "{{ _dns.1.service | default(omit) }}"
+    solo: "{{ _dns.1.solo | default(omit) }}"
+    state: present
+    timeout: "{{ _dns.0.timeout | default(30) }}"
+    ttl: "{{ _dns.1.ttl | default(1) }}"
+    type: "{{ _dns.1.type }}"
+    value: "{{ _dns.1.value }}"
+    weight: "{{ _dns.1.weight | default(omit) }}"
+    zone: "{{ _dns.0.zone }}"
+  loop: "{{ q('ansible.builtin.subelements', cf_dns, 'records', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ _dns.1.record | default(none) }}"
+    loop_var: _dns
+  when:
+    - cf_auth_token is not none
+    - _dns.0.zone is defined
+    - _dns.1.record is defined
+    - _dns.1.type is defined
+    - _dns.1.value is defined
+...
