@@ -53,7 +53,9 @@ The use of these roles will require an api token which can be generated using th
 
 If you plan to utilize all the roles in this collection you'll need the following permissions
 
-| Account | Account Filter Lists | Edit |
-| Account | Account Settings     | Read |
-| Zone    | DNS                  | Edit |
-| Zone    | Zone Settings        | Edit |
+| Type    | Permission           | Value |
+| ------- | -------------------- | ----- |
+| Account | Account Filter Lists | Edit  |
+| Account | Account Settings     | Read  |
+| Zone    | DNS                  | Edit  |
+| Zone    | Zone Settings        | Edit  |
