@@ -1,0 +1,17 @@
+---
+dependencies: []
+galaxy_info:
+  role_name: account_info
+  author: Taylor Kimball
+  description: Gather information about cloudflare account
+  license: GPLv3
+  min_ansible_version: 8.0
+  platforms:
+    - name: Cloudflare
+      versions:
+        - all
+  galaxy_tags:
+    - account
+    - cloudflare
+    - info
+...
