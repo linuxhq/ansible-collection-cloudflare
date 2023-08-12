@@ -1,0 +1,9 @@
+---
+exclude_paths:
+  - molecule
+  - venv
+offline: false
+skip_list:
+  - package-latest
+  - var-naming[no-role-prefix]
+...
