@@ -18,6 +18,7 @@ An example playbook utilizing all roles available in this collection
 
     - hosts: localhost
       connection: local
+
       vars:
         cf_account_id: "{{ _cf_account_id }}"
         cf_account_name: linuxhq
