@@ -1,0 +1,21 @@
+---
+dependencies:
+  - { role: linuxhq.cloudflare.zone_info, tags: page_rule }
+galaxy_info:
+  role_name: page_rule
+  author: Taylor Kimball
+  description: Create and update cloudflare page rules
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: GenericLinux
+      versions:
+        - all
+    - name: macOS
+      versions:
+        - all
+  galaxy_tags:
+    - cloudflare
+    - page
+    - rule
+...
