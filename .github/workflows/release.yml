@@ -1,20 +1,20 @@
 ---
-name: ansible-galaxy
+name: release
 'on':
   push:
     tags:
       - '*'
 
 jobs:
-  ansible-galaxy:
-    name: ansible-galaxy
+  release:
+    name: release
     runs-on: ubuntu-latest
     steps:
       - name: Ensure codebase is present
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Ensure python3 is present
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
