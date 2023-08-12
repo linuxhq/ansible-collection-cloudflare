@@ -1,6 +1,6 @@
 ---
 name: ansible-galaxy
-on:
+'on':
   push:
     tags:
       - '*'
