@@ -1,0 +1,17 @@
+---
+dependencies:
+  - { role: linuxhq.cloudflare.zone_info, tags: ipv6 }
+galaxy_info:
+  role_name: ipv6
+  author: Taylor Kimball
+  description: Enable or disable cloudflare ipv6 settings
+  license: GPLv3
+  min_ansible_version: 8.0
+  platforms:
+    - name: Cloudflare
+      versions:
+        - all
+  galaxy_tags:
+    - cloudflare
+    - ipv6
+...
