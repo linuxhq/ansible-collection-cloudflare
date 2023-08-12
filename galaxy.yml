@@ -5,7 +5,7 @@ build_ignore:
   - .gitignore
 description: A collection of cloudflare roles
 dependencies:
-  - community.general
+  community.general: '*'
 documentation: https://github.com/linuxhq/ansible-collection-cloudflare/README.md
 homepage: https://www.linuxhq.org
 issues: https://github.com/linuxhq/ansible-collection-cloudflare/issues
