@@ -1,8 +1,9 @@
 ---
 name: linting
 'on':
-  - push
-  - pull_request
+  push:
+    branches: '*'
+  pull_request:
 
 jobs:
   ansible-lint:
@@ -15,7 +16,7 @@ jobs:
           fetch-depth: 0
 
       - name: Ensure ansible-lint-action is present
-        uses: ansible/ansible-lint-action@main
+        uses: ansible/ansible-lint-action@v6
 
   yamllint:
     name: yamllint
