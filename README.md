@@ -1,5 +1,8 @@
 # linuxhq.cloudflare
 
+[![Ansible Galaxy](https://img.shields.io/badge/ansible--galaxy-kmod_tpe-blue.svg?style=flat)](https://galaxy.ansible.com/linuxhq/cloudflare)
+[![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
+
 A collection of cloudflare roles
 
 # Collection
