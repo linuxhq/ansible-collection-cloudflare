@@ -1,0 +1,77 @@
+---
+- name: Ensure cloudflare page rule details are gathered
+  tags:
+    - page_rule
+  ansible.builtin.uri:
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: GET
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _rule.zone_id +
+             '/pagerules' }}"
+  loop: "{{ cf_page_rules }}"
+  loop_control:
+    label: "{{ _rule.zone_id }}"
+    loop_var: _rule
+  register: _page_rules
+  when:
+    - cf_auth_token is not none
+    - _rule.zone_id is defined
+
+- name: Ensure cloudflare page rules are absent
+  tags:
+    - page_rule
+  ansible.builtin.uri:
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: DELETE
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _rule_id.0._rule.zone_id +
+             '/pagerules/' +
+             _rule_id.1.id }}"
+  loop: "{{ q('ansible.builtin.subelements', _page_rules.results, 'json.result', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ _rule_id.1.id }}"
+    loop_var: _rule_id
+  when:
+    - cf_auth_token is not none
+    - _rule_id.0._rule.zone_id is defined
+    - _rule_id.1.id is defined
+
+- name: Ensure cloudflare page rules are present
+  tags:
+    - page_rule
+  ansible.builtin.uri:
+    body:
+      actions: "{{ _rule.1.actions }}"
+      priority: "{{ _rule.1.priority }}"
+      targets: "{{ _rule.1.targets }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: POST
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _rule.0.zone_id +
+             '/pagerules' }}"
+  loop: "{{ q('ansible.builtin.subelements', cf_page_rules, 'rules', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ _rule.0.zone_id }}"
+    loop_var: _rule
+  when:
+    - cf_auth_token is not none
+    - _rule.0.zone_id is defined
+    - _rule.1.actions is defined
+    - _rule.1.actions | length > 0
+    - _rule.1.priority is defined
+    - _rule.1.targets is defined
+    - _rule.1.targets | length > 0
+...
