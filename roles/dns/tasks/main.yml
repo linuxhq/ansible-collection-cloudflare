@@ -19,14 +19,18 @@
     state: present
     timeout: "{{ _dns.0.timeout | default(30) }}"
     ttl: "{{ _dns.1.ttl | default(1) }}"
-    type: "{{ _dns.1.type }}"
+    type: "{{ _dns.1.type | upper }}"
     value: "{{ _dns.1.value }}"
     weight: "{{ _dns.1.weight | default(omit) }}"
     zone: "{{ _dns.0.zone }}"
   loop: "{{ q('ansible.builtin.subelements', cf_dns, 'records', {'skip_missing': true}) }}"
   loop_control:
-    label: "{{ _dns.1.record | default(none) }}"
+    label: "{{ _label | default(none) }}"
     loop_var: _dns
+  vars:
+    _label: "{{ _dns.1.type + ':' +
+                _dns.1.record + '.' +
+                _dns.0.zone }}"
   when:
     - cf_auth_token is not none
     - _dns.0.zone is defined
