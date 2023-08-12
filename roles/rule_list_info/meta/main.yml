@@ -1,4 +1,5 @@
 ---
+allow_duplicates: true
 dependencies:
   - { role: linuxhq.cloudflare.account_info, tags: rule_list_info }
 galaxy_info:
