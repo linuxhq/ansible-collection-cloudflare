@@ -16,9 +16,6 @@ jobs:
 
       - name: Ensure ansible-lint-action is present
         uses: ansible/ansible-lint-action@main
-        with:
-          targets: ""
-          args: ""
 
   yamllint:
     name: yamllint
