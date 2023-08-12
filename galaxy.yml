@@ -1,0 +1,18 @@
+---
+authors:
+  - Taylor Kimball (https://github.com/tkimball83)
+build_ignore:
+  - .gitignore
+description: A collection of cloudflare roles
+documentation: https://github.com/linuxhq/ansible-collection-cloudflare/README.md
+homepage: https://www.linuxhq.org
+issues: https://github.com/linuxhq/ansible-collection-cloudflare/issues
+license_file: GPLv3
+name: cloudflare
+namespace: linuxhq
+readme: README.md
+repository: https://github.com/linuxhq/ansible-collection-cloudflare
+tags:
+  - cloudflare
+version: 0.0.1
+...
