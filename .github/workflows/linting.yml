@@ -1,0 +1,38 @@
+---
+name: linting
+'on':
+  - push
+  - pull_request
+
+jobs:
+  ansible-lint:
+    name: ansible-lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure codebase is present
+        uses: actions/checkout@v2
+
+      - name: Ensure ansible-lint-action is present
+        uses: ansible/ansible-lint-action@main
+        with:
+          targets: ""
+          args: ""
+
+  yamllint:
+    name: yamllint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure codebase is present
+        uses: actions/checkout@v2
+
+      - name: Ensure python3 is present
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Ensure yamllint is present
+        run: pip install yamllint
+
+      - name: Ensure yamllint is executed
+        run: yamllint -s .
+...
