@@ -1,5 +1,8 @@
 ---
+<<<<<<< HEAD
 allow_duplicates: true
+=======
+>>>>>>> refs/rewritten/main
 dependencies: []
 galaxy_info:
   role_name: account_info
