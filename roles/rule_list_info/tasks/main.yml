@@ -1,0 +1,38 @@
+---
+- name: Ensure cloudflare rule list details are gathered
+  tags:
+    - rule_list_info
+  ansible.builtin.uri:
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: GET
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
+             '/rules/lists' }}"
+  register: _rule_lists
+  when:
+    - cf_account_id is not none
+    - cf_auth_token is not none
+
+- name: Ensure dictionary of cloudflare rule lists is generated
+  tags:
+    - rule_list_info
+  ansible.builtin.set_fact:
+    _cf_rule_list_id: "{{ _cf_rule_list_id |
+                          default({}) |
+                          combine({_name: _id}) }}"
+  loop: "{{ _rule_lists.json.result }}"
+  loop_control:
+    label: "{{ _list.name | default(none) }}"
+    loop_var: _list
+  vars:
+    _id: "{{ _list.id }}"
+    _name: "{{ _list.name }}"
+  when:
+    - _rule_lists.json.result is defined
+    - _list.id is defined
+    - _list.name is defined
+...

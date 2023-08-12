@@ -1,0 +1,135 @@
+---
+- name: Ensure cloudflare rule lists are present
+  tags:
+    - rule_list
+  ansible.builtin.uri:
+    body:
+      description: "{{ _list.description | default(_list.name) }}"
+      kind: "{{ _list.kind }}"
+      name: "{{ _list.name }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: POST
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
+             '/rules/lists' }}"
+  register: _lists_post
+  loop: "{{ cf_rule_lists }}"
+  loop_control:
+    label: "{{ _list.name | default(none) }}"
+    loop_var: _list
+  when:
+    - cf_account_id is not none
+    - cf_auth_token is not none
+    - _list.kind is defined
+    - _list.name is defined
+    - _cf_rule_list_id is not defined or
+      _list.name not in _cf_rule_list_id.keys()
+
+- name: Ensure cloudflare rule lists are appended to dictionary
+  tags:
+    - rule_list
+  ansible.builtin.set_fact:
+    _cf_rule_list_id: "{{ _cf_rule_list_id |
+                          default({}) |
+                          combine({_name: _id}) }}"
+  loop: "{{ _lists_post.results }}"
+  loop_control:
+    label: "{{ _name | default(none) }}"
+    loop_var: _post
+  vars:
+    _id: "{{ _post.json.result.id }}"
+    _name: "{{ _post.json.result.name }}"
+  when:
+    - _lists_post.results is defined
+    - _lists_post.results | length > 0
+    - _post.json.result.id is defined
+    - _post.json.result.name is defined
+
+- name: Ensure cloudflare rule lists are updated
+  tags:
+    - rule_list
+  ansible.builtin.uri:
+    body:
+      description: "{{ _list.description | default(_item.name) }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: PUT
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
+             '/rules/lists/' +
+             _cf_rule_list_id[_list.name] }}"
+  loop: "{{ cf_rule_lists }}"
+  loop_control:
+    label: "{{ _list.name | default(none) }}"
+    loop_var: _list
+  when:
+    - cf_account_id is not none
+    - cf_auth_token is not none
+    - _list.description is defined
+    - _list.name is defined
+    - _list.name in _cf_rule_list_id.keys()
+
+- name: Ensure cloudflare rule lists are populated
+  tags:
+    - rule_list
+  ansible.builtin.uri:
+    body: "{{ _list.ips }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: POST
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
+             '/rules/lists/' +
+             _cf_rule_list_id[_list.name] +
+             '/items' }}"
+  register: _cf_list_items
+  loop: "{{ cf_rule_lists }}"
+  loop_control:
+    label: "{{ _list.name | default(none) }}"
+    loop_var: _list
+  when:
+    - cf_account_id is not none
+    - cf_auth_token is not none
+    - _list.ips is defined
+    - _list.ips | length > 0
+    - _list.name in _cf_rule_list_id.keys()
+
+- name: Ensure cloudflare rule lists bulk operations are completed
+  tags:
+    - rule_list
+  ansible.builtin.uri:
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: GET
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
+             '/rules/lists/bulk_operations/' +
+             _operation.json.result.operation_id }}"
+  register: _bulk_operations
+  loop: "{{ _cf_list_items.results }}"
+  loop_control:
+    label: "{{ _operation.json.result.operation_id | default(none) }}"
+    loop_var: _operation
+  when:
+    - cf_account_id is not none
+    - cf_auth_token is not none
+    - _operation.json.result.operation_id is defined
+  until:
+    - _bulk_operations.json.result.status == 'completed'
+...
