@@ -1,12 +1,12 @@
-# rule\_list
+# zone
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create and update cloudflare rule lists
+Create and modify cloudflare zones
 
 ## Requirements
 
-* Cloudflare api `Token` with `Edit` permissions to `Account Filter Lists`
+* Cloudflare api `Token` with `Edit` permissions to `Zone`
 
 ## Role Variables
 
@@ -14,26 +14,23 @@ Available variables are listed below, along with default values:
 
     cf_account_id: null
     cf_auth_token: null
-    cf_rule_lists: []
+    cf_zones: []
 
 ## Dependencies
 
-* linuxhq.cloudflare.rule\_list\_info
+* linuxhq.cloudflare.account\_info
+* linuxhq.cloudflare.zone\_info
 
 ## Example Playbook
 
     - hosts: localhost
       connection: local
       roles:
-        - role: linuxhq.cloudflare.rule_list
+        - role: linuxhq.cloudflare.zone
           cf_account_id: "{{ _cf_account_id }}"
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_rule_lists:
-            - kind: ip
-              name: cloudflare
-              ips:
-                - ip: 1.1.1.1/32
-                - ip: 1.1.1.2/32
+          cf_zones:
+            - name: linuxhq.net
 
 ## License
 
