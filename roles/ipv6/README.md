@@ -25,7 +25,7 @@ Available variables are listed below, along with default values:
       connection: local
       roles:
         - role: linuxhq.cloudflare.ipv6
-          cf_auth_token: d41d8cd98f00b204e9800998ecf8427e
+          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           cf_ipv6:
             - zone_identifier: "{{ _cf_zone_id['linuxhq.net'] }}"
               value: off

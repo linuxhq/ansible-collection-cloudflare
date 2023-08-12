@@ -30,7 +30,7 @@ None
       roles:
         - role: linuxhq.cloudflare.rule_list_info
           cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: d41d8cd98f00b204e9800998ecf8427e
+          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
 
 ## License
 

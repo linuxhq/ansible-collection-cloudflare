@@ -38,7 +38,11 @@ An example playbook utilizing all roles available in this collection
             ips:
               - ip: 1.1.1.1/32
               - ip: 1.1.1.2/32
+        cf_zones:
+          - name: linuxhq.net
+
       roles:
+        - linuxhq.cloudflare.zone
         - linuxhq.cloudflare.dns
         - linuxhq.cloudflare.ipv6
         - linuxhq.cloudflare.rule_list
@@ -58,4 +62,5 @@ If you plan to utilize all the roles in this collection you'll need the followin
 | Account | Account Filter Lists | Edit  |
 | Account | Account Settings     | Read  |
 | Zone    | DNS                  | Edit  |
+| Zone    | Zone                 | Edit  |
 | Zone    | Zone Settings        | Edit  |
