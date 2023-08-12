@@ -38,6 +38,10 @@ An example playbook utilizing all roles available in this collection
             ips:
               - ip: 1.1.1.1/32
               - ip: 1.1.1.2/32
+      roles:
+        - linuxhq.cloudflare.dns
+        - linuxhq.cloudflare.ipv6
+        - linuxhq.cloudflare.rule_list
 
 # Tokens
 
