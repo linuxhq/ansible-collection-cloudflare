@@ -1,6 +1,5 @@
 ---
-dependencies:
-  - { role: linuxhq.cloudflare.rule_list_info, tags: rule_list }
+dependencies: []
 galaxy_info:
   role_name: rule_list
   author: Taylor Kimball

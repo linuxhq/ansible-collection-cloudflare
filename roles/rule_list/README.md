@@ -18,7 +18,7 @@ Available variables are listed below, along with default values:
 
 ## Dependencies
 
-* linuxhq.cloudflare.rule\_list\_info
+None
 
 ## Example Playbook
 
@@ -31,7 +31,7 @@ Available variables are listed below, along with default values:
           cf_rule_lists:
             - kind: ip
               name: cloudflare
-              ips:
+              elements:
                 - ip: 1.1.1.1/32
                 - ip: 1.1.1.2/32
 
