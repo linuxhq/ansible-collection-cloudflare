@@ -7,7 +7,8 @@ description: A collection of cloudflare roles
 documentation: https://github.com/linuxhq/ansible-collection-cloudflare/README.md
 homepage: https://www.linuxhq.org
 issues: https://github.com/linuxhq/ansible-collection-cloudflare/issues
-license_file: GPLv3
+license: GPLv3
+license_file: COPYING
 name: cloudflare
 namespace: linuxhq
 readme: README.md
