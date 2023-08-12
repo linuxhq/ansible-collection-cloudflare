@@ -6,7 +6,7 @@ Manage cloudflare dns records
 
 ## Requirements
 
-* Cloudflare api `token` with `edit` permissions to `dns`
+* Cloudflare api `Token` with `Edit` permissions to `DNS`
 
 ## Role Variables
 

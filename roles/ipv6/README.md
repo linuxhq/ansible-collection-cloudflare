@@ -6,7 +6,7 @@ Enable or disable cloudflare ipv6 settings
 
 ## Requirements
 
-* Cloudflare api `token` with `edit` permissions to `zone settings`
+* Cloudflare api `Token` with `Edit` permissions to `Zone Settings`
 
 ## Role Variables
 
