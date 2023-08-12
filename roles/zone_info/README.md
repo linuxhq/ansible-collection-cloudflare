@@ -21,6 +21,7 @@ None
 ## Return Values
 
     _cf_zone_id
+    _cf_zone_list
     _cf_zone_name_servers
 
 ## Example Playbook
