@@ -1,8 +1,5 @@
 ---
-<<<<<<< HEAD
 allow_duplicates: true
-=======
->>>>>>> refs/rewritten/main
 dependencies:
   - { role: linuxhq.cloudflare.account_info, tags: rule_list_info }
 galaxy_info:
