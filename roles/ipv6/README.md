@@ -17,11 +17,11 @@ Available variables are listed below, along with default values:
 
 ## Dependencies
 
-* linuxhq.cloudflare.zone\_info
+* [linuxhq.cloudflare.zone_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
 
 ## Example Playbook
 
-    - hosts: localhost
+    - hosts: cloudflare
       connection: local
       roles:
         - role: linuxhq.cloudflare.ipv6

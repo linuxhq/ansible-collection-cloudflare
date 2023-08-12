@@ -27,7 +27,7 @@ None
 
 ## Example Playbook
 
-    - hosts: localhost
+    - hosts: cloudflare
       connection: local
       roles:
         - role: linuxhq.cloudflare.account_info
