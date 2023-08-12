@@ -51,6 +51,7 @@
     body:
       actions: "{{ _rule.1.actions }}"
       priority: "{{ _rule.1.priority }}"
+      status: "{{ _rule.1.status | default('active') }}"
       targets: "{{ _rule.1.targets }}"
     body_format: json
     follow_redirects: false
