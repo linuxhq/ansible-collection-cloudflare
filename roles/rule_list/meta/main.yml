@@ -1,0 +1,18 @@
+---
+dependencies:
+  - { role: linuxhq.cloudflare.rule_list_info, tags: rule_list }
+galaxy_info:
+  role_name: rule_list
+  author: Taylor Kimball
+  description: Create and update cloudflare rule lists
+  license: GPLv3
+  min_ansible_version: 8.0
+  platforms:
+    - name: Cloudflare
+      versions:
+        - all
+  galaxy_tags:
+    - cloudflare
+    - list
+    - rule
+...
