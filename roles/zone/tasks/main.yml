@@ -1,0 +1,56 @@
+---
+- name: Ensure cloudflare zones are present
+  tags:
+    - zone
+  ansible.builtin.uri:
+    body:
+      account:
+        id: "{{ cf_account_id }}"
+      jump_start: "{{ _zone.jump_start | default('false') }}"
+      name: "{{ _zone.name }}"
+      type: "{{ _zone.type | default('full') }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: POST
+    status_code:
+      - 200
+    url: 'https://api.cloudflare.com/client/v4/zones'
+  loop: "{{ cf_zones }}"
+  loop_control:
+    label: "{{ _zone.name | default(none) }}"
+    loop_var: _zone
+  when:
+    - cf_account_id is not none
+    - cf_auth_token is not none
+    - _zone.name is defined
+    - _zone.name not in _cf_zone_list
+
+- name: Ensure cloudflare zones are patched
+  tags:
+    - zone
+  ansible.builtin.uri:
+    body:
+      type: "{{ _zone.type | default('full') }}"
+      vanity_name_servers: "{{ _zone.vanity_name_servers | default(omit) }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: PATCH
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _cf_zone_id[_zone.name] }}"
+  loop: "{{ cf_zones }}"
+  loop_control:
+    label: "{{ _zone.name | default(none) }}"
+    loop_var: _zone
+  when:
+    - cf_account_id is not none
+    - cf_auth_token is not none
+    - _zone.name is defined
+    - _zone.name in _cf_zone_list
+    - _cf_zone_id[_zone.name] is defined
+...
