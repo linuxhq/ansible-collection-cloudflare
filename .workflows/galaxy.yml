@@ -1,0 +1,20 @@
+---
+name: ansible-galaxy
+on:
+  push:
+    paths:
+      - galaxy.yml
+    branches:
+      - main
+
+jobs:
+  ansible-galaxy:
+    name: ansible-galaxy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - run: pip install ansible-core==2.14.0
+      - run: ansible-galaxy collection build
+      - run: ansible-galaxy collection publish --api-key ${{ secrets.GALAXY_API_KEY }} linuxhq-cloudflare-*.tar.gz
+...
