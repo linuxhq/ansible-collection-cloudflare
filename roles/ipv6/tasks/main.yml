@@ -1,0 +1,26 @@
+---
+- name: Ensure cloudflare ipv6 settings are patched
+  tags:
+    - ipv6
+  ansible.builtin.uri:
+    body:
+      value: "{{ _ipv6.value }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: PATCH
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _ipv6.zone_identifier +
+             '/settings/ipv6' }}"
+  loop: "{{ cf_ipv6 }}"
+  loop_control:
+    label: "{{ _ipv6.zone_identifier | default(none) }}"
+    loop_var: _ipv6
+  when:
+    - cf_auth_token is not none
+    - _ipv6.value is defined
+    - _ipv6.zone_identifier is defined
+...
