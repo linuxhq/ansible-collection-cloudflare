@@ -55,7 +55,7 @@
     - rule_list
   ansible.builtin.uri:
     body:
-      description: "{{ _list.description | default(_item.name) }}"
+      description: "{{ _list.description | default(_list.name) }}"
     body_format: json
     follow_redirects: false
     headers:
@@ -74,9 +74,9 @@
   when:
     - cf_account_id is not none
     - cf_auth_token is not none
-    - _list.description is defined
-    - _list.name is defined
     - _list.name in _cf_rule_list_id.keys()
+    - _list.description is defined or
+      _list.name is defined
 
 - name: Ensure cloudflare rule lists are populated
   tags:
