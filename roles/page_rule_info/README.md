@@ -6,7 +6,7 @@ Gather information about cloudflare page rules
 
 ## Requirements
 
-* Cloudflare api `Token` with `View` permissions to `Account Filter Lists`
+* Cloudflare api `Token` with `View` permissions to `Zone Settings`
 
 ## Role Variables
 
