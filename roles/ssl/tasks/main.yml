@@ -1,10 +1,10 @@
 ---
-- name: Ensure cloudflare ssl settings are present
+- name: Ensure cloudflare ssl mode is present
   tags:
     - ssl
   ansible.builtin.uri:
     body:
-      value: "{{ _ssl.setting }}"
+      value: "{{ _ssl.mode }}"
     body_format: json
     follow_redirects: false
     headers:
@@ -21,6 +21,56 @@
     loop_var: _ssl
   when:
     - cf_auth_token is not none
-    - _ssl.setting is defined
+    - _ssl.mode is defined
+    - _ssl.zone_id is defined
+
+- name: Ensure cloudflare always use https is present
+  tags:
+    - ssl
+  ansible.builtin.uri:
+    body:
+      value: "{{ 'on' if _ssl.always_use_https | bool else 'off' }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: PATCH
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _ssl.zone_id +
+             '/settings/always_use_https' }}"
+  loop: "{{ cf_ssl }}"
+  loop_control:
+    label: "{{ _ssl.zone_id }}"
+    loop_var: _ssl
+  when:
+    - cf_auth_token is not none
+    - _ssl.always_use_https is defined
+    - _ssl.zone_id is defined
+
+- name: Ensure cloudflare minimum tls version is present
+  tags:
+    - ssl
+  ansible.builtin.uri:
+    body:
+      value: "{{ _ssl.min_tls_version }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: PATCH
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _ssl.zone_id +
+             '/settings/min_tls_version' }}"
+  loop: "{{ cf_ssl }}"
+  loop_control:
+    label: "{{ _ssl.zone_id }}"
+    loop_var: _ssl
+  when:
+    - cf_auth_token is not none
+    - _ssl.min_tls_version is defined
     - _ssl.zone_id is defined
 ...

@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Change ssl setting
+Change ssl settings
 
 ## Requirements
 
@@ -32,13 +32,13 @@ None
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           cf_ssl:
             - zone_id: "{{ _cf_zone_id['linuxheadquarters.net'] }}"
-              setting: strict
+              always_use_https: true
+              min_tls_version: 1.3
+              mode: strict
             - zone_id: "{{ _cf_zone_id['linuxheadquarters.org'] }}"
-              setting: strict
-            - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
-              setting: strict
-            - zone_id: "{{ _cf_zone_id['linuxhq.org'] }}"
-              setting: strict
+              always_use_https: true
+              min_tls_version: 1.3
+              mode: strict
 
 ## License
 
