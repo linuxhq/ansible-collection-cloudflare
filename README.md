@@ -43,10 +43,10 @@ An example playbook utilizing roles available in this collection
                   type: CNAME
                   value: ansible.com
 
-        - role: linuxhq.cloudflare.ipv6
+        - role: linuxhq.cloudflare.network
           cf_ipv6:
-            - zone_identifier: "{{ _cf_zone_id['linuxhq.net'] }}"
-              value: off
+            - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
+              ipv6: false
 
         - role: linuxhq.cloudflare.rule_list
           cf_rule_lists:
