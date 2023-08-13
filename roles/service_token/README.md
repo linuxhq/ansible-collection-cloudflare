@@ -15,7 +15,6 @@ Available variables are listed below, along with default values:
     cf_auth_token: null
     cf_debug: false
     cf_service_tokens: []
-    cf_zone_id: null
 
 ## Dependencies
 
@@ -33,9 +32,9 @@ None
         - role: linuxhq.cloudflare.service_token
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           cf_debug: true
-          cf_zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
           cf_service_tokens:
-            - name: linuxhq
+            - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
+              name: linuxhq
               duration: 60m
 
 ## License

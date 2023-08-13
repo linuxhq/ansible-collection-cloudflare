@@ -2,5 +2,4 @@
 cf_auth_token: null
 cf_debug: false
 cf_service_tokens: []
-cf_zone_id: null
 ...
