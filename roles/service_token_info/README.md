@@ -1,42 +1,34 @@
-# service\_token
+# service\_token\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create cloudflare service tokens
+Gather information about cloudflare service tokens
 
 ## Requirements
 
-* Cloudflare api `Token` with `Edit` permissions to `Access: Service Tokens`
+* Cloudflare api `Token` with `Read` permissions to `Access: Service Tokens`
 
 ## Role Variables
 
 Available variables are listed below, along with default values:
 
     cf_auth_token: null
-    cf_debug: false
-    cf_service_tokens: []
-    cf_zone_id: null
 
 ## Dependencies
 
-* [linuxhq.cloudflare.zone_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
+None
 
 ## Return Values
 
-None
+    _cf_service_token_id
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.service_token
+        - role: linuxhq.cloudflare.service_token_info
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_debug: true
-          cf_zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
-          cf_service_tokens:
-            - name: linuxhq
-              duration: 60m
 
 ## License
 
