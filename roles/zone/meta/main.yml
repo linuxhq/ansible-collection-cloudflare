@@ -1,7 +1,6 @@
 ---
 dependencies:
   - { role: linuxhq.cloudflare.account_info, tags: zone }
-  - { role: linuxhq.cloudflare.zone_info, tags: zone }
 galaxy_info:
   role_name: zone
   author: Taylor Kimball
