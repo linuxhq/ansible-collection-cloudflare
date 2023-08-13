@@ -1,0 +1,21 @@
+---
+dependencies:
+  - { role: linuxhq.cloudflare.zone_info, tags: scrape_shield }
+galaxy_info:
+  role_name: scrape_shield
+  author: Taylor Kimball
+  description: Configure scrape shield settings
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: GenericLinux
+      versions:
+        - all
+    - name: macOS
+      versions:
+        - all
+  galaxy_tags:
+    - cloudflare
+    - scrape
+    - shield
+...
