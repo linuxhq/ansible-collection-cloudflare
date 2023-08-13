@@ -1,5 +1,6 @@
 ---
-dependencies: []
+dependencies:
+  - { role: linuxhq.cloudflare.tunnel_info, tags: dns }
 galaxy_info:
   role_name: dns
   author: Taylor Kimball
