@@ -70,6 +70,7 @@ If you plan to utilize all the roles in this collection you'll need the followin
 | ------- | -------------------- | ----- |
 | Account | Account Filter Lists | Edit  |
 | Account | Account Settings     | Read  |
+| Account | Cloudflare Tunnel    | Edit  |
 | Zone    | DNS                  | Edit  |
 | Zone    | Zone                 | Edit  |
 | Zone    | Zone Settings        | Edit  |
