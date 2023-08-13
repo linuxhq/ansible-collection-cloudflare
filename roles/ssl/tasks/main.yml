@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare ssl mode is present
+- name: Ensure cloudflare ssl mode is patched
   tags:
     - ssl
   ansible.builtin.uri:
@@ -24,7 +24,7 @@
     - _ssl.mode is defined
     - _ssl.zone_id is defined
 
-- name: Ensure cloudflare always use https is present
+- name: Ensure cloudflare always use https is patched
   tags:
     - ssl
   ansible.builtin.uri:
@@ -49,7 +49,7 @@
     - _ssl.always_use_https is defined
     - _ssl.zone_id is defined
 
-- name: Ensure cloudflare minimum tls version is present
+- name: Ensure cloudflare minimum tls version is patched
   tags:
     - ssl
   ansible.builtin.uri:
@@ -74,7 +74,7 @@
     - _ssl.min_tls_version is defined
     - _ssl.zone_id is defined
 
-- name: Ensure cloudflare opportunistic encryption is present
+- name: Ensure cloudflare opportunistic encryption is patched
   tags:
     - ssl
   ansible.builtin.uri:
@@ -99,7 +99,7 @@
     - _ssl.opportunistic_encryption is defined
     - _ssl.zone_id is defined
 
-- name: Ensure cloudflare automatic https rewrites is present
+- name: Ensure cloudflare automatic https rewrites is patched
   tags:
     - ssl
   ansible.builtin.uri:
