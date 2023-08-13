@@ -6,7 +6,7 @@ Create and update cloudflare page rules
 
 ## Requirements
 
-* Cloudflare api `Token` with `Edit` permissions to `Account Filter Lists`
+* Cloudflare api `Token` with `Edit` permissions to `Zone Settings`
 
 ## Role Variables
 
