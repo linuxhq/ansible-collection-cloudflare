@@ -12,6 +12,8 @@
     method: GET
     status_code:
       - 200
+      - 401
+      - 403
     url: 'https://api.cloudflare.com/client/v4/accounts'
   register: _accounts
   when:
@@ -27,5 +29,7 @@
     _cf_account_type: "{{ _accounts.json.result[0].type }}"
   when:
     - _accounts.json.result is defined
-    - _accounts.json.result | length > 0
+    - _accounts.json.result[0].name is defined
+    - _accounts.json.result[0].id is defined
+    - _accounts.json.result[0].type is defined
 ...

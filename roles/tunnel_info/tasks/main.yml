@@ -12,6 +12,8 @@
     method: GET
     status_code:
       - 200
+      - 401
+      - 403
     url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
              cf_account_id +
              '/cfd_tunnel' }}"
@@ -30,7 +32,7 @@
     _cf_tunnel_id: "{{ _cf_tunnel_id |
                        default({}) |
                        combine({_name: _id}) }}"
-  loop: "{{ _tunnels.json.result }}"
+  loop: "{{ _tunnels.json.result | d([], true) }}"
   loop_control:
     label: "{{ _tunnel.name | default(none) }}"
     loop_var: _tunnel
@@ -39,7 +41,6 @@
     _id: "{{ _tunnel.id }}"
     _name: "{{ _tunnel.name }}"
   when:
-    - _tunnels.json.result is defined
     - _tunnel.account_tag is defined
     - _tunnel.id is defined
     - _tunnel.name is defined

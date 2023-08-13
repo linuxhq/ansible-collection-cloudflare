@@ -9,6 +9,8 @@
     method: GET
     status_code:
       - 200
+      - 401
+      - 403
     url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
              cf_zone_id +
              '/pagerules' }}"
@@ -28,7 +30,7 @@
                             'priority': _priority,
                             'actions': _actions,
                             'targets': _targets } ] }}"
-  loop: "{{ _page_rules.json.result | sort(attribute='priority') }}"
+  loop: "{{ _page_rules.json.result | d([], true) }}"
   loop_control:
     label: "{{ _rule.id | default(none) }}"
     loop_var: _rule
@@ -39,8 +41,6 @@
     _status: "{{ _rule.status }}"
     _targets: "{{ _rule.targets }}"
   when:
-    - _page_rules.json.result is defined
-    - _page_rules.json.result | length > 0
     - _rule.actions is defined
     - _rule.id is defined
     - _rule.priority is defined
