@@ -9,6 +9,8 @@
     method: GET
     status_code:
       - 200
+      - 401
+      - 403
     url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
              cf_account_id +
              '/rules/lists' }}"
@@ -24,7 +26,7 @@
     _cf_rule_list_id: "{{ _cf_rule_list_id |
                           default({}) |
                           combine({_name: _id}) }}"
-  loop: "{{ _rule_lists.json.result }}"
+  loop: "{{ _rule_lists.json.result | d([], true) }}"
   loop_control:
     label: "{{ _list.name | default(none) }}"
     loop_var: _list
@@ -32,7 +34,6 @@
     _id: "{{ _list.id }}"
     _name: "{{ _list.name }}"
   when:
-    - _rule_lists.json.result is defined
     - _list.id is defined
     - _list.name is defined
 ...
