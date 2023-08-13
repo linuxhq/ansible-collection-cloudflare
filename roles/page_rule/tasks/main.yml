@@ -50,7 +50,7 @@
   ansible.builtin.uri:
     body:
       actions: "{{ _rule.1.actions }}"
-      priority: "{{ _rule.1.priority }}"
+      priority: "{{ _rule.1.priority | int }}"
       status: "{{ _rule.1.status | default('active') }}"
       targets: "{{ _rule.1.targets }}"
     body_format: json
