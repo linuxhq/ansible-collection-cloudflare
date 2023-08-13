@@ -19,7 +19,7 @@ A collection of cloudflare roles
 
 # Playbook
 
-An example playbook utilizing all roles available in this collection
+An example playbook utilizing roles available in this collection
 
     - hosts: localhost
       connection: local
@@ -28,30 +28,33 @@ An example playbook utilizing all roles available in this collection
         cf_account_id: "{{ _cf_account_id }}"
         cf_account_name: linuxhq
         cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-        cf_dns:
-          - zone: linuxhq.net
-            records:
-              - record: tkimball
-                proxied: false
-                type: CNAME
-                value: ansible.com
-        cf_ipv6:
-          - zone_identifier: "{{ _cf_zone_id['linuxhq.net'] }}"
-            value: off
-        cf_rule_lists:
-          - kind: ip
-            name: cloudflare
-            ips:
-              - ip: 1.1.1.1/32
-              - ip: 1.1.1.2/32
-        cf_zones:
-          - name: linuxhq.net
 
       roles:
-        - linuxhq.cloudflare.zone
-        - linuxhq.cloudflare.dns
-        - linuxhq.cloudflare.ipv6
-        - linuxhq.cloudflare.rule_list
+        - role: linuxhq.cloudflare.zone
+          cf_zones:
+            - name: linuxhq.net
+
+        - role: linuxhq.cloudflare.dns
+          cf_dns:
+            - zone: linuxhq.net
+              records:
+                - record: tkimball
+                  proxied: false
+                  type: CNAME
+                  value: ansible.com
+
+        - role: linuxhq.cloudflare.ipv6
+          cf_ipv6:
+            - zone_identifier: "{{ _cf_zone_id['linuxhq.net'] }}"
+              value: off
+
+        - role: linuxhq.cloudflare.rule_list
+          cf_rule_lists:
+            - kind: ip
+              name: cloudflare
+              elements:
+                - ip: 1.1.1.1/32
+                - ip: 1.1.1.2/32
 
 # Tokens
 
