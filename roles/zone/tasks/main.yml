@@ -1,4 +1,48 @@
 ---
+- name: Ensure cloudflare zone details are gathered
+  tags:
+    - zone
+  ansible.builtin.uri:
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: GET
+    status_code:
+      - 200
+    url: 'https://api.cloudflare.com/client/v4/zones'
+  register: _zones
+  when:
+    - cf_auth_token is not none
+
+- name: Ensure list of zone ids is generated
+  tags:
+    - zone
+  ansible.builtin.set_fact:
+    _cf_zone_list: "{{ _zones.json.result |
+                       json_query('[].name') |
+                       list |
+                       default([]) }}"
+
+- name: Ensure dictionary of zone ids generated
+  tags:
+    - zone
+  ansible.builtin.set_fact:
+    _cf_zone_id: "{{ _cf_zone_id |
+                     default({}) |
+                     combine({_name: _id}) }}"
+  loop: "{{ _zones.json.result }}"
+  loop_control:
+    label: "{{ _name | default(none) }}"
+    loop_var: _zone
+  vars:
+    _id: "{{ _zone.id }}"
+    _name: "{{ _zone.name }}"
+  when:
+    - _zones.json.result is defined
+    - _zones.json.result | length > 0
+    - _zone.id is defined
+    - _zone.name is defined
+
 - name: Ensure cloudflare zones are present
   tags:
     - zone
