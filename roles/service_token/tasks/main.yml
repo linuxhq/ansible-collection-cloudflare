@@ -1,0 +1,80 @@
+---
+- name: Ensure cloudflare service token details are gathered
+  tags:
+    - service_token
+  ansible.builtin.uri:
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: GET
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _token.zone_id +
+             '/access/service_tokens' }}"
+  loop: "{{ cf_service_tokens }}"
+  loop_control:
+    label: "{{ _token.zone_id }}"
+    loop_var: _token
+  register: _token_get
+  when:
+    - cf_auth_token is not none
+    - _token.zone_id is defined
+
+- name: Ensure dictionary of service tokens is generated
+  tags:
+    - service_token
+  ansible.builtin.set_fact:
+    _cf_tokens: "{{ _cf_tokens |
+                    default({}) |
+                    combine({_zone: _name}) }}"
+  loop: "{{ _token_get.results | d([], true) }}"
+  loop_control:
+    label: "{{ _zone | default(none) }}"
+    loop_var: _token
+  vars:
+    _name: "{{ _token.json.result | json_query('[].name') | list | default([]) }}"
+    _zone: "{{ _token._token.zone_id }}"
+
+- name: Ensure cloudflare service tokens are present
+  tags:
+    - service_token
+  ansible.builtin.uri:
+    body:
+      duration: "{{ _token.duration | default(omit) }}"
+      name: "{{ _token.name }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: POST
+    status_code:
+      - 201
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _token.zone_id +
+             '/access/service_tokens' }}"
+  register: _token_post
+  loop: "{{ cf_service_tokens }}"
+  loop_control:
+    label: "{{ _token.zone_id }}"
+    loop_var: _token
+  when:
+    - cf_auth_token is not none
+    - _token.name is defined
+    - _token.zone_id is defined
+    - _cf_tokens[_token.zone_id] is not defined or
+      _token.name not in _cf_tokens[_token.zone_id]
+
+- name: Ensure cloudflare service tokens are displayed
+  tags:
+    - service_token
+  ansible.builtin.debug:
+    msg: |
+      {{ _token_post.results |
+         json_query('[].json[].result') |
+         list |
+         default([]) |
+         to_nice_yaml(indent=2) }}
+  when:
+    - cf_debug | bool
+...
