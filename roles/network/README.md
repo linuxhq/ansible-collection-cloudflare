@@ -1,8 +1,8 @@
-# ipv6
+# network
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Enable or disable cloudflare ipv6 settings
+Configure network settings
 
 ## Requirements
 
@@ -13,7 +13,7 @@ Enable or disable cloudflare ipv6 settings
 Available variables are listed below, along with default values:
 
     cf_auth_token: null
-    cf_ipv6: []
+    cf_network: []
 
 ## Dependencies
 
@@ -24,11 +24,15 @@ Available variables are listed below, along with default values:
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.ipv6
+        - role: linuxhq.cloudflare.network
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_ipv6:
-            - zone_identifier: "{{ _cf_zone_id['linuxhq.net'] }}"
-              value: off
+          cf_network:
+            - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
+              ip_geolocation: true
+              ipv6: false
+              opportunistic_onion: false
+              pseudo_ipv4: 'off'
+              websockets: true
 
 ## License
 
