@@ -41,7 +41,7 @@
     - application
   ansible.builtin.uri:
     body:
-      allowed_ips: "{{ _app.allowed_ips | default(omit) }}"
+      allowed_idps: "{{ _app.allowed_idps | default(omit) }}"
       app_launcher_visible: "{{ _app.app_launcher_visible | default(true) }}"
       auto_redirect_to_identity: "{{ _app.auto_redirect_to_identity | default(false) }}"
       cors_headers: "{{ _app.cors_headers | default(omit) }}"
@@ -85,7 +85,7 @@
     - application
   ansible.builtin.uri:
     body:
-      allowed_ips: "{{ _app.allowed_ips | default(omit) }}"
+      allowed_idps: "{{ _app.allowed_idps | default(omit) }}"
       app_launcher_visible: "{{ _app.app_launcher_visible | default(true) }}"
       auto_redirect_to_identity: "{{ _app.auto_redirect_to_identity | default(false) }}"
       cors_headers: "{{ _app.cors_headers | default(omit) }}"
