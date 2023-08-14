@@ -3,8 +3,6 @@
   tags:
     - tunnel_info
   ansible.builtin.uri:
-    body:
-      is_deleted: 'false'
     body_format: json
     follow_redirects: false
     headers:
@@ -16,7 +14,7 @@
       - 403
     url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
              cf_account_id +
-             '/cfd_tunnel' }}"
+             '/cfd_tunnel?is_deleted=false' }}"
   register: _tunnels
   when:
     - cf_account_id is not none
