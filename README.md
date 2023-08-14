@@ -19,7 +19,7 @@ A collection of cloudflare roles
 
 # Playbook
 
-An example playbook utilizing roles available in this collection
+An example playbook utilizing roles available to create a cloudflare tunnel
 
     - hosts: localhost
       connection: local
@@ -34,27 +34,43 @@ An example playbook utilizing roles available in this collection
           cf_zones:
             - name: linuxhq.net
 
+        - role: linuxhq.cloudflare.tunnel
+          cf_tunnels:
+            - name: linuxhq-net-tunnel
+              config_src: local
+              tunnel_secret: ZGtjVXdzRWJramFYVVduYm0zd2VSalhVaE5IZWppNGQ=
+
+        - role: linuxhq.cloudflare.service_token
+          cf_service_tokens:
+            - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
+              name: linuxhq-net-token
+              duration: forever
+
+        - role: linuxhq.cloudflare.application
+          cf_applications:
+            - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
+              domain: tunnel.linuxhq.net
+              name: linuxhq-net-app
+              type: self_hosted
+
+        - role: linuxhq.cloudflare.policy
+          cf_policies:
+            - application_id: "{{ _cf_application_id['linuxhq-net-app'] }}"
+              zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
+              decision: non_identity
+              name: linuxhq-net-policy
+              include:
+                - service_token:
+                    token_id: "{{ _cf_service_token_id['linuxhq-net-token'] }}"
+
         - role: linuxhq.cloudflare.dns
           cf_dns:
             - zone: linuxhq.net
               records:
-                - record: tkimball
-                  proxied: false
+                - record: tunnel
+                  proxied: true
                   type: CNAME
-                  value: ansible.com
-
-        - role: linuxhq.cloudflare.network
-          cf_ipv6:
-            - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
-              ipv6: false
-
-        - role: linuxhq.cloudflare.rule_list
-          cf_rule_lists:
-            - kind: ip
-              name: cloudflare
-              elements:
-                - ip: 1.1.1.1/32
-                - ip: 1.1.1.2/32
+                  value: "{{ _cf_tunnel_id['linuxhq-net-tunnel'] ~ '.cfargotunnel.com' }}"
 
 # Tokens
 
