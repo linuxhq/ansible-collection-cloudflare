@@ -82,12 +82,13 @@ The use of these roles will require an api token which can be generated using th
 
 If you plan to utilize all the roles in this collection you'll need the following permissions
 
-| Type    | Permission             | Value |
-| ------- | --------------------   | ----- |
-| Account | Access: Service Tokens | Edit  |
-| Account | Account Filter Lists   | Edit  |
-| Account | Account Settings       | Read  |
-| Account | Cloudflare Tunnel      | Edit  |
-| Zone    | DNS                    | Edit  |
-| Zone    | Zone                   | Edit  |
-| Zone    | Zone Settings          | Edit  |
+| Type    | Permission                | Value |
+| ------- | ------------------------- | ----- |
+| Account | Access: Apps and Policies | Edit  |
+| Account | Access: Service Tokens    | Edit  |
+| Account | Account Filter Lists      | Edit  |
+| Account | Account Settings          | Read  |
+| Account | Cloudflare Tunnel         | Edit  |
+| Zone    | DNS                       | Edit  |
+| Zone    | Zone                      | Edit  |
+| Zone    | Zone Settings             | Edit  |
