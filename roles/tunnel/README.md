@@ -35,7 +35,7 @@ None
           cf_tunnels:
             - name: linuxhq
               config_src: local
-              tunnel_secret: wTK4f3Ns7WKHy4wTcwyTrzrdpPuq7JsjKtrsaW3FgaowALFmWqEnAPVbAHJkLaXa
+              tunnel_secret: ckNzQVhSVHhhVXF5SmU3S0xnY2ZON1ZxVVdYQVhiSgo=
 
 ## License
 
