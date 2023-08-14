@@ -1,0 +1,122 @@
+---
+- name: Ensure cloudflare policy details are gathered
+  tags:
+    - policy
+  ansible.builtin.uri:
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: GET
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _policy.zone_id +
+             '/access/apps/' +
+             _policy.application_id +
+             '/policies' }}"
+  loop: "{{ cf_policies }}"
+  loop_control:
+    label: "{{ _policy.application_id }}"
+    loop_var: _policy
+  register: _policy_get
+  when:
+    - cf_auth_token is not none
+    - _policy.application_id is defined
+    - _policy.zone_id is defined
+
+- name: Ensure dictionary of policies is generated
+  tags:
+    - policy
+  ansible.builtin.set_fact:
+    _cf_policies: "{{ _cf_policies |
+                      default({}) |
+                      combine({_name: _id}) }}"
+  loop: "{{ q('ansible.builtin.subelements', _policy_get.results, 'json.result', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ _name | default(none) }}"
+    loop_var: _policy
+  vars:
+    _id: "{{ _policy.1.id }}"
+    _name: "{{ _policy.1.name }}"
+
+- name: Ensure cloudflare policies are present
+  tags:
+    - policy
+  ansible.builtin.uri:
+    body:
+      approval_groups: "{{ _policy.approval_groups | default(omit) }}"
+      approval_required: "{{ _policy.approval_required | default(false) }}"
+      decision: "{{ _policy.decision }}"
+      exclude: "{{ _policy.exclude | default(omit) }}"
+      include: "{{ _policy.include }}"
+      isolation_required: "{{ _policy.isolation_required | default(false) }}"
+      name: "{{ _policy.name }}"
+      precedence: "{{ _policy.precedence | default(omit) }}"
+      purpose_justification_prompt: "{{ _policy.purpose_justification_prompt | default(omit) }}"
+      purpose_justification_required: "{{ _policy.purpose_justification_required | default(false) }}"
+      require: "{{_policy.require | default(omit) }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: POST
+    status_code:
+      - 201
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _policy.zone_id +
+             '/access/apps/' +
+             _policy.application_id +
+             '/policies' }}"
+  loop: "{{ cf_policies }}"
+  loop_control:
+    label: "{{ _policy.name | default(none) }}"
+    loop_var: _policy
+  when:
+    - cf_auth_token is not none
+    - _policy.decision is defined
+    - _policy.include is defined
+    - _policy.name is defined
+    - _cf_policies is not defined or
+      _policy.name not in _cf_policies.keys()
+
+- name: Ensure cloudflare policies are updated
+  tags:
+    - policy
+  ansible.builtin.uri:
+    body:
+      approval_groups: "{{ _policy.approval_groups | default(omit) }}"
+      approval_required: "{{ _policy.approval_required | default(false) }}"
+      decision: "{{ _policy.decision }}"
+      exclude: "{{ _policy.exclude | default(omit) }}"
+      include: "{{ _policy.include }}"
+      isolation_required: "{{ _policy.isolation_required | default(false) }}"
+      name: "{{ _policy.name }}"
+      precedence: "{{ _policy.precedence | default(omit) }}"
+      purpose_justification_prompt: "{{ _policy.purpose_justification_prompt | default(omit) }}"
+      purpose_justification_required: "{{ _policy.purpose_justification_required | default(false) }}"
+      require: "{{_policy.require | default(omit) }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: PUT
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _policy.zone_id +
+             '/access/apps/' +
+             _policy.application_id +
+             '/policies/' +
+             _cf_policies[_policy.name] }}"
+  loop: "{{ cf_policies }}"
+  loop_control:
+    label: "{{ _policy.name | default(none) }}"
+    loop_var: _policy
+  when:
+    - cf_auth_token is not none
+    - _policy.decision is defined
+    - _policy.include is defined
+    - _policy.name is defined
+    - _cf_policies is defined and
+      _policy.name in _cf_policies.keys()
+...
