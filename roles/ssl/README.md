@@ -28,7 +28,7 @@ None
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.page_rule
+        - role: linuxhq.cloudflare.ssl
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           cf_ssl:
             - zone_id: "{{ _cf_zone_id['linuxheadquarters.net'] }}"
