@@ -35,7 +35,7 @@ None
           cf_service_tokens:
             - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
               name: linuxhq
-              duration: 60m
+              duration: forever
 
 ## License
 

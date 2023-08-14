@@ -33,10 +33,13 @@ None
         - role: linuxhq.cloudflare.application
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           cf_policies:
-            - application_id: "{{ _cf_application_id['tunnel-linuxhq-org' }}"
-              zone_id: "{{ _cf_zone_id['linuxhq.org'] }}"
-              name: tunnel-linuxhq-org
-              type: self_hosted
+            - application_id: "{{ _cf_application_id['linuxhq.net'] }}"
+              zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
+              decision: non_identity
+              name: linuxhq.net
+              include:
+                - service_token:
+                    token_id: "{{ _cf_service_token_id['linuxhq.net'] }}"
 
 ## License
 
