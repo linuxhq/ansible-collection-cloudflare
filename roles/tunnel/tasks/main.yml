@@ -3,9 +3,6 @@
   tags:
     - tunnel
   ansible.builtin.uri:
-    body:
-      is_deleted: 'false'
-    body_format: json
     follow_redirects: false
     headers:
       Authorization: "Bearer {{ cf_auth_token }}"
@@ -14,7 +11,7 @@
       - 200
     url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
              cf_account_id +
-             '/cfd_tunnel' }}"
+             '/cfd_tunnel?is_deleted=false' }}"
   register: _tunnels
   when:
     - cf_account_id is not none
@@ -46,7 +43,7 @@
     body:
       config_src: "{{ _tunnel.config_src }}"
       name: "{{ _tunnel.name }}"
-      tunnel_secret: "{{ _tunnel.tunnel_secret }}"
+      tunnel_secret: "{{ _tunnel.tunnel_secret | trim }}"
     body_format: json
     follow_redirects: false
     headers:

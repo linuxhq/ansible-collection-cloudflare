@@ -1,0 +1,22 @@
+---
+dependencies:
+  - { role: linuxhq.cloudflare.application_info, tags: policy }
+  - { role: linuxhq.cloudflare.service_token_info, tags: policy }
+  - { role: linuxhq.cloudflare.zone_info, tags: policy }
+galaxy_info:
+  role_name: policy
+  author: Taylor Kimball
+  description: Create cloudflare access policies
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: GenericLinux
+      versions:
+        - all
+    - name: macOS
+      versions:
+        - all
+  galaxy_tags:
+    - cloudflare
+    - policy
+...

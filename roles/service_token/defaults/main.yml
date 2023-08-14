@@ -1,5 +1,5 @@
 ---
 cf_auth_token: null
-cf_debug: false
+cf_debug: true
 cf_service_tokens: []
 ...

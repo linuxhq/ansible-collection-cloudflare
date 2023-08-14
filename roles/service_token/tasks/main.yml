@@ -27,14 +27,14 @@
   ansible.builtin.set_fact:
     _cf_tokens: "{{ _cf_tokens |
                     default({}) |
-                    combine({_zone: _name}) }}"
-  loop: "{{ _token_get.results | d([], true) }}"
+                    combine({_name: _id}) }}"
+  loop: "{{ q('ansible.builtin.subelements', _token_get.results, 'json.result', {'skip_missing': true}) }}"
   loop_control:
-    label: "{{ _zone | default(none) }}"
+    label: "{{ _name | default(none) }}"
     loop_var: _token
   vars:
-    _name: "{{ _token.json.result | json_query('[].name') | list | default([]) }}"
-    _zone: "{{ _token._token.zone_id }}"
+    _id: "{{ _token.1.id }}"
+    _name: "{{ _token.1.name }}"
 
 - name: Ensure cloudflare service tokens are present
   tags:
@@ -62,8 +62,37 @@
     - cf_auth_token is not none
     - _token.name is defined
     - _token.zone_id is defined
-    - _cf_tokens[_token.zone_id] is not defined or
-      _token.name not in _cf_tokens[_token.zone_id]
+    - _cf_tokens is not defined or
+      _token.name not in _cf_tokens.keys()
+
+- name: Ensure cloudflare service tokens are updated
+  tags:
+    - service_token
+  ansible.builtin.uri:
+    body:
+      duration: "{{ _token.duration | default(omit) }}"
+      name: "{{ _token.name }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: PUT
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _token.zone_id +
+             '/access/service_tokens/' +
+             _cf_tokens[_token.name] }}"
+  loop: "{{ cf_service_tokens }}"
+  loop_control:
+    label: "{{ _token.zone_id }}"
+    loop_var: _token
+  when:
+    - cf_auth_token is not none
+    - _token.name is defined
+    - _token.zone_id is defined
+    - _cf_tokens is defined and
+      _token.name in _cf_tokens.keys()
 
 - name: Ensure cloudflare service tokens are displayed
   tags:

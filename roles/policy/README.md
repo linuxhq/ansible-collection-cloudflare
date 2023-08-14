@@ -1,23 +1,24 @@
-# service\_token
+# policy
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create cloudflare service tokens
+Create cloudflare access policies
 
 ## Requirements
 
-* Cloudflare api `Token` with `Edit` permissions to `Access: Service Tokens`
+* Cloudflare api `Token` with `Edit` permissions to `Access: Apps and Policies`
 
 ## Role Variables
 
 Available variables are listed below, along with default values:
 
     cf_auth_token: null
-    cf_debug: true
-    cf_service_tokens: []
+    cf_policies: []
 
 ## Dependencies
 
+* [linuxhq.cloudflare.application_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/application_info)
+* [linuxhq.cloudflare.service_token_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/service_token_info)
 * [linuxhq.cloudflare.zone_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
 
 ## Return Values
@@ -29,13 +30,13 @@ None
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.service_token
+        - role: linuxhq.cloudflare.application
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_debug: true
-          cf_service_tokens:
-            - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
-              name: linuxhq
-              duration: 60m
+          cf_policies:
+            - application_id: "{{ _cf_application_id['tunnel-linuxhq-org' }}"
+              zone_id: "{{ _cf_zone_id['linuxhq.org'] }}"
+              name: tunnel-linuxhq-org
+              type: self_hosted
 
 ## License
 
