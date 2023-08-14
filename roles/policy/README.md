@@ -30,7 +30,7 @@ None
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.application
+        - role: linuxhq.cloudflare.policy
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           cf_policies:
             - application_id: "{{ _cf_application_id['linuxhq.net'] }}"
