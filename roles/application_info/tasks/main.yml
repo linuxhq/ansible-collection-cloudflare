@@ -1,0 +1,62 @@
+---
+- name: Ensure cloudflare zone details are gathered
+  tags:
+    - application_info
+  ansible.builtin.uri:
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: GET
+    status_code:
+      - 200
+      - 401
+      - 403
+    url: 'https://api.cloudflare.com/client/v4/zones'
+  register: _zones_get
+  when:
+    - cf_auth_token is not none
+
+- name: Ensure cloudflare application details are gathered
+  tags:
+    - application_info
+  ansible.builtin.uri:
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: GET
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             _id +
+             '/access/apps' }}"
+  register: _apps_get
+  loop: "{{ _zones_get.json.result |
+            map(attribute='id') |
+            list |
+            default([], true) }}"
+  loop_control:
+    label: "{{ _id }}"
+    loop_var: _id
+  when:
+    - cf_auth_token is not none
+
+- name: Ensure dictionary of application ids is generated
+  tags:
+    - application_info
+  ansible.builtin.set_fact:
+    _cf_application_id: "{{ _cf_application_id |
+                            default({}) |
+                            combine({_name: _id}) }}"
+  loop: "{{ q('ansible.builtin.subelements', _apps_get.results, 'json.result', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ _name | default(none) }}"
+    loop_var: _app
+  vars:
+    _name: "{{ _app.1.name }}"
+    _id: "{{ _app.1.id }}"
+  when:
+    - _apps_get.results is defined
+    - _apps_get.results | length > 0
+    - _app.1.id is defined
+    - _app.1.name is defined
+...
