@@ -1,0 +1,36 @@
+---
+- name: Ensure cloudflare rulesets details are gathered
+  tags:
+    - ruleset_entrypoint_info
+  ansible.builtin.uri:
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: GET
+    status_code:
+      - 200
+      - 404
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             cf_zone_id +
+             '/rulesets/phases/' +
+             cf_ruleset_phase +
+             '/entrypoint' }}"
+  register: _ruleset_list
+  when:
+    - cf_auth_token is not none
+    - cf_zone_id is not none
+
+- name: Ensure dictionary of cloudflare rulesets is generated
+  tags:
+    - ruleset_entrypoint_info
+  ansible.builtin.set_fact:
+    _cf_ruleset_id: "{{ { _name: _id } }}"
+    _cf_ruleset_rules: "{{ { _name: _rules } }}"
+  vars:
+    _id: "{{ _ruleset_list.json.result.id }}"
+    _name: "{{ _ruleset_list.json.result.name }}"
+    _rules: "{{ _ruleset_list.json.result.rules | default(none) }}"
+  when:
+    - _ruleset_list.json.result.id is defined
+    - _ruleset_list.json.result.name is defined
+...
