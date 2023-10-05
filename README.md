@@ -93,3 +93,4 @@ If you plan to utilize all the roles in this collection you'll need the followin
 | Zone    | Page Rules                | Edit  |
 | Zone    | Zone                      | Edit  |
 | Zone    | Zone Settings             | Edit  |
+| Zone    | Zone WAF                  | Edit  |
