@@ -91,10 +91,10 @@
   when:
     - cf_account_id is not none
     - cf_auth_token is not none
-    - _cf_rule_list_id is defined and
-      _list.name in _cf_rule_list_id.keys()
     - _list.description is defined or
       _list.name is defined
+    - _cf_rule_list_id is defined and
+      _list.name in _cf_rule_list_id.keys()
 
 - name: Ensure cloudflare rule lists are populated
   tags:

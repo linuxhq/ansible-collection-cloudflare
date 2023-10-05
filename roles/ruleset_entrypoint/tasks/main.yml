@@ -1,0 +1,78 @@
+---
+- name: Ensure cloudflare rulesets details are gathered
+  tags:
+    - ruleset_entrypoint
+  ansible.builtin.uri:
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: GET
+    status_code:
+      - 200
+      - 404
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             cf_zone_id +
+             '/rulesets/phases/' +
+             cf_ruleset_phase +
+             '/entrypoint' }}"
+  register: _ruleset
+  when:
+    - cf_auth_token is not none
+    - cf_zone_id is not none
+
+- tags: ruleset_entrypoint
+  debug:
+    msg: "{{ _ruleset.status }}"
+
+- name: Ensure cloudflare rulesets are present
+  tags:
+    - ruleset_entrypoint
+  ansible.builtin.uri:
+    body:
+      description: "{{ cf_ruleset_description | default(omit) }}"
+      kind: "{{ cf_ruleset_kind }}"
+      name: "{{ cf_ruleset_name }}"
+      phase: "{{ cf_ruleset_phase }}"
+      rules: "{{ cf_ruleset_rules }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: POST
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             cf_zone_id +
+             '/rulesets' }}"
+  when:
+    - cf_auth_token is not none
+    - cf_zone_id is not none
+    - cf_ruleset_rules | length > 0
+    - _ruleset.status == 404
+
+- name: Ensure cloudflare rulesets are updated
+  tags:
+    - ruleset_entrypoint
+  ansible.builtin.uri:
+    body:
+      description: "{{ cf_ruleset_description | default(omit) }}"
+      name: "{{ cf_ruleset_name }}"
+      rules: "{{ cf_ruleset_rules }}"
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: PUT
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
+             cf_zone_id +
+             '/rulesets/phases/' +
+             cf_ruleset_phase +
+             '/entrypoint' }}"
+  when:
+    - cf_auth_token is not none
+    - cf_zone_id is not none
+    - cf_ruleset_rules | length > 0
+    - _ruleset.status == 200
+...
