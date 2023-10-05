@@ -54,7 +54,7 @@
       precedence: "{{ _policy.precedence | default(omit) }}"
       purpose_justification_prompt: "{{ _policy.purpose_justification_prompt | default(omit) }}"
       purpose_justification_required: "{{ _policy.purpose_justification_required | default(false) }}"
-      require: "{{_policy.require | default(omit) }}"
+      require: "{{ _policy.require | default(omit) }}"
     body_format: json
     follow_redirects: false
     headers:
@@ -94,7 +94,7 @@
       precedence: "{{ _policy.precedence | default(omit) }}"
       purpose_justification_prompt: "{{ _policy.purpose_justification_prompt | default(omit) }}"
       purpose_justification_required: "{{ _policy.purpose_justification_required | default(false) }}"
-      require: "{{_policy.require | default(omit) }}"
+      require: "{{ _policy.require | default(omit) }}"
     body_format: json
     follow_redirects: false
     headers:

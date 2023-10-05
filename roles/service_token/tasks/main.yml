@@ -94,7 +94,7 @@
     - _cf_tokens is defined and
       _token.name in _cf_tokens.keys()
 
-- name: Ensure cloudflare service tokens are displayed
+- name: Ensure cloudflare service tokens are displayed  # noqa: jinja[invalid]
   tags:
     - service_token
   ansible.builtin.debug:
