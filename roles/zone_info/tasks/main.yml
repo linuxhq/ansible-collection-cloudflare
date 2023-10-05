@@ -16,7 +16,7 @@
   when:
     - cf_auth_token is not none
 
-- name: Ensure list of zone ids is generated
+- name: Ensure list of zone ids is generated  # noqa: jinja[invalid]
   tags:
     - zone_info
   ansible.builtin.set_fact:

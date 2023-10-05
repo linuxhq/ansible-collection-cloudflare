@@ -25,11 +25,11 @@
   ansible.builtin.set_fact:
     _cf_page_rules: "{{ _cf_page_rules |
                         default([]) +
-                        [ { 'id': _id,
-                            'status': _status,
-                            'priority': _priority,
-                            'actions': _actions,
-                            'targets': _targets } ] }}"
+                        [{'id': _id,
+                          'status': _status,
+                          'priority': _priority,
+                          'actions': _actions,
+                          'targets': _targets}] }}"
   loop: "{{ _page_rules.json.result | d([], true) }}"
   loop_control:
     label: "{{ _rule.id | default(none) }}"

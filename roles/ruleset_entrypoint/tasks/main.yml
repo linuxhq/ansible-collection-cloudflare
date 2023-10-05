@@ -20,10 +20,6 @@
     - cf_auth_token is not none
     - cf_zone_id is not none
 
-- tags: ruleset_entrypoint
-  debug:
-    msg: "{{ _ruleset.status }}"
-
 - name: Ensure cloudflare rulesets are present
   tags:
     - ruleset_entrypoint

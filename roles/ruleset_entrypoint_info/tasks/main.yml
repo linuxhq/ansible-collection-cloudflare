@@ -24,8 +24,8 @@
   tags:
     - ruleset_entrypoint_info
   ansible.builtin.set_fact:
-    _cf_ruleset_id: "{{ { _name: _id } }}"
-    _cf_ruleset_rules: "{{ { _name: _rules } }}"
+    _cf_ruleset_id: "{{ {_name: _id} }}"
+    _cf_ruleset_rules: "{{ {_name: _rules} }}"
   vars:
     _id: "{{ _ruleset.json.result.id }}"
     _name: "{{ _ruleset.json.result.name }}"
