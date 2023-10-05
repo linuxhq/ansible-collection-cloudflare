@@ -15,7 +15,7 @@
              '/rulesets/phases/' +
              cf_ruleset_phase +
              '/entrypoint' }}"
-  register: _ruleset_list
+  register: _ruleset
   when:
     - cf_auth_token is not none
     - cf_zone_id is not none
@@ -27,10 +27,10 @@
     _cf_ruleset_id: "{{ { _name: _id } }}"
     _cf_ruleset_rules: "{{ { _name: _rules } }}"
   vars:
-    _id: "{{ _ruleset_list.json.result.id }}"
-    _name: "{{ _ruleset_list.json.result.name }}"
-    _rules: "{{ _ruleset_list.json.result.rules | default(none) }}"
+    _id: "{{ _ruleset.json.result.id }}"
+    _name: "{{ _ruleset.json.result.name }}"
+    _rules: "{{ _ruleset.json.result.rules | default(none) }}"
   when:
-    - _ruleset_list.json.result.id is defined
-    - _ruleset_list.json.result.name is defined
+    - _ruleset.json.result.id is defined
+    - _ruleset.json.result.name is defined
 ...
