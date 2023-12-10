@@ -35,8 +35,7 @@ None
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           cf_debug: true
           cf_service_tokens:
-            - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
-              name: linuxhq
+            - name: linuxhq
               duration: forever
 
 ## License
