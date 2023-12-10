@@ -34,7 +34,7 @@ Available variables are listed below, along with default values:
 
 ## License
 
-Copyright (C) 2023 Linux HeadQuarters
+Copyright (c) Linux HeadQuarters
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
