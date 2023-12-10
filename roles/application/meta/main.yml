@@ -1,6 +1,6 @@
 ---
 dependencies:
-  - { role: linuxhq.cloudflare.zone_info, tags: application }
+  - { role: linuxhq.cloudflare.account_info, tags: application }
 galaxy_info:
   role_name: application
   author: Taylor Kimball

@@ -12,12 +12,13 @@ Create cloudflare access application
 
 Available variables are listed below, along with default values:
 
+    cf_account_id: null
     cf_auth_token: null
     cf_applications: []
 
 ## Dependencies
 
-* [linuxhq.cloudflare.zone_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
+* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
 
 ## Return Values
 
@@ -29,10 +30,10 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.application
+          cf_account_id: "{{ _cf_account_id }}"
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           cf_applications:
-            - zone_id: "{{ _cf_zone_id['linuxhq.org'] }}"
-              domain: tunnel.linuxhq.org
+            - domain: tunnel.linuxhq.org
               name: tunnel-linuxhq-org
               type: self_hosted
 
