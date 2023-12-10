@@ -21,7 +21,11 @@ Available variables are listed below, along with default values:
 
 ## Return Values
 
+    _cf_access_group_default
+    _cf_access_group_exclude
     _cf_access_group_id
+    _cf_access_group_include
+    _cf_access_group_require
 
 ## Example Playbook
 

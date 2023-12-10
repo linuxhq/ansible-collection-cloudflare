@@ -21,16 +21,32 @@
   tags:
     - access_group_info
   ansible.builtin.set_fact:
+    _cf_access_group_default: "{{ _cf_access_group_default |
+                                  default({}) |
+                                  combine({_name: _default}) }}"
+    _cf_access_group_exclude: "{{ _cf_access_group_exclude |
+                                  default({}) |
+                                  combine({_name: _exclude}) }}"
     _cf_access_group_id: "{{ _cf_access_group_id |
                              default({}) |
                              combine({_name: _id}) }}"
+    _cf_access_group_include: "{{ _cf_access_group_include |
+                                  default({}) |
+                                  combine({_name: _include}) }}"
+    _cf_access_group_require: "{{ _cf_access_group_require |
+                                  default({}) |
+                                  combine({_name: _require}) }}"
   loop: "{{ _access_group_get.json.result }}"
   loop_control:
     label: "{{ _name | default(none) }}"
     loop_var: _group
   vars:
-    _name: "{{ _group.name }}"
     _id: "{{ _group.id }}"
+    _name: "{{ _group.name }}"
+    _default: "{{ _group.is_default | default(false) }}"
+    _exclude: "{{ _group.exclude | default([]) }}"
+    _include: "{{ _group.include | default([]) }}"
+    _require: "{{ _group.require | default([]) }}"
   when:
     - _access_group_get.json.result is defined
     - _access_group_get.json.result | length > 0
