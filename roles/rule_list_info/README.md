@@ -22,6 +22,9 @@ Available variables are listed below, along with default values:
 ## Return Values
 
     _cf_rule_list_id
+    _cf_rule_list_items
+    _cf_rule_list_kind
+    _cf_rule_list_referencing_filters
 
 ## Example Playbook
 

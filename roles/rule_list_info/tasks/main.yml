@@ -26,6 +26,15 @@
     _cf_rule_list_id: "{{ _cf_rule_list_id |
                           default({}) |
                           combine({_name: _id}) }}"
+    _cf_rule_list_kind: "{{ _cf_rule_list_kind |
+                            default({}) |
+                            combine({_name: _kind}) }}"
+    _cf_rule_list_items: "{{ _cf_rule_list_items |
+                             default({}) |
+                             combine({_name: _items}) }}"
+    _cf_rule_list_referencing_filters: "{{ _cf_rule_list_referencing_filters |
+                                           default({}) |
+                                           combine({_name: _referencing_filters}) }}"
   loop: "{{ _rule_lists.json.result | d([], true) }}"
   loop_control:
     label: "{{ _list.name | default(none) }}"
@@ -33,6 +42,9 @@
   vars:
     _id: "{{ _list.id }}"
     _name: "{{ _list.name }}"
+    _items: "{{ _list.num_items | default(none) }}"
+    _kind: "{{ _list.kind | default(none) }}"
+    _referencing_filters: "{{ _list.num_referencing_filters | default(none) }}"
   when:
     - _list.id is defined
     - _list.name is defined
