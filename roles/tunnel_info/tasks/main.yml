@@ -49,7 +49,7 @@
   vars:
     _id: "{{ _tunnel.id }}"
     _name: "{{ _tunnel.name }}"
-    _account_tag: "{{ _tunnel.account_tag | default(none)  }}"
+    _account_tag: "{{ _tunnel.account_tag | default(none) }}"
     _connections: "{{ _tunnel.connections | default([]) }}"
     _remote_config: "{{ _tunnel.remote_config | default(none) }}"
     _status: "{{ _tunnel.status | default(none) }}"
