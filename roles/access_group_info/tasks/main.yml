@@ -1,0 +1,39 @@
+---
+- name: Ensure cloudflare access group details are gathered
+  tags:
+    - access_group_info
+  ansible.builtin.uri:
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ cf_auth_token }}"
+    method: GET
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
+             '/access/groups' }}"
+  register: _access_group_get
+  when:
+    - cf_account_id is not none
+    - cf_auth_token is not none
+
+- name: Ensure dictionary of access group ids is generated
+  tags:
+    - access_group_info
+  ansible.builtin.set_fact:
+    _cf_access_group_id: "{{ _cf_access_group_id |
+                             default({}) |
+                             combine({_name: _id}) }}"
+  loop: "{{ _access_group_get.json.result }}"
+  loop_control:
+    label: "{{ _name | default(none) }}"
+    loop_var: _group
+  vars:
+    _name: "{{ _group.name }}"
+    _id: "{{ _group.id }}"
+  when:
+    - _access_group_get.json.result is defined
+    - _access_group_get.json.result | length > 0
+    - _group.id is defined
+    - _group.name is defined
+...
