@@ -22,7 +22,11 @@ Available variables are listed below, along with default values:
 ## Return Values
 
     _cf_tunnel_account_tag
+    _cf_tunnel_connections
     _cf_tunnel_id
+    _cf_tunnel_remote_config
+    _cf_tunnel_status
+    _cf_tunnel_type
 
 ## Example Playbook
 

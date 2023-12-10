@@ -27,17 +27,33 @@
     _cf_tunnel_account_tag: "{{ _cf_tunnel_account_tag |
                                 default({}) |
                                 combine({_name: _account_tag}) }}"
+    _cf_tunnel_connections: "{{ _cf_tunnel_connections |
+                                default({}) |
+                                combine({_name: _connections}) }}"
     _cf_tunnel_id: "{{ _cf_tunnel_id |
                        default({}) |
                        combine({_name: _id}) }}"
+    _cf_tunnel_remote_config: "{{ _cf_tunnel_remote_config |
+                                  default({}) |
+                                  combine({_name: _remote_config}) }}"
+    _cf_tunnel_status: "{{ _cf_tunnel_status |
+                           default({}) |
+                           combine({_name: _status}) }}"
+    _cf_tunnel_type: "{{ _cf_tunnel_type |
+                         default({}) |
+                         combine({_name: _type}) }}"
   loop: "{{ _tunnels.json.result | d([], true) }}"
   loop_control:
     label: "{{ _tunnel.name | default(none) }}"
     loop_var: _tunnel
   vars:
-    _account_tag: "{{ _tunnel.account_tag }}"
     _id: "{{ _tunnel.id }}"
     _name: "{{ _tunnel.name }}"
+    _account_tag: "{{ _tunnel.account_tag | default(none)  }}"
+    _connections: "{{ _tunnel.connections | default([]) }}"
+    _remote_config: "{{ _tunnel.remote_config | default(none) }}"
+    _status: "{{ _tunnel.status | default(none) }}"
+    _type: "{{ _tunnel.tun_type | default(none) }}"
   when:
     - _tunnel.account_tag is defined
     - _tunnel.id is defined
