@@ -2,7 +2,9 @@
 authors:
   - Taylor Kimball (https://github.com/tkimball83)
 build_ignore:
+  - .ansible-lint
   - .gitignore
+  - .yamllint
 description: A collection of cloudflare roles
 dependencies:
   community.general: '*'
