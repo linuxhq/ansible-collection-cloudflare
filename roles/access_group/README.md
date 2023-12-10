@@ -33,8 +33,12 @@ None
         - role: linuxhq.cloudflare.access_group
           cf_account_id: "{{ _cf_account_id }}"
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_access_group:
-            -
+          cf_access_groups:
+            - name: linuxhq.net
+              include:
+                - service_token:
+                    token_id: "{{ _cf_service_token_id['linuxhq.net'] }}"
+              is_default: false
 
 ## License
 

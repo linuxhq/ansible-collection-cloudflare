@@ -1,5 +1,4 @@
 ---
-allow_duplicates: true
 dependencies:
   - { role: linuxhq.cloudflare.account_info, tags: access_group }
   - { role: linuxhq.cloudflare.service_token_info, tags: access_group }
