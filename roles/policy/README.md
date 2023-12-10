@@ -12,14 +12,16 @@ Create cloudflare access policies
 
 Available variables are listed below, along with default values:
 
+    cf_account_id: null
     cf_auth_token: null
     cf_policies: []
 
 ## Dependencies
 
+* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.access_group_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_group_info)
 * [linuxhq.cloudflare.application_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/application_info)
 * [linuxhq.cloudflare.service_token_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/service_token_info)
-* [linuxhq.cloudflare.zone_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
 
 ## Return Values
 
@@ -31,15 +33,15 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.policy
+          cf_account_id: "{{ _cf_account_id }}"
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           cf_policies:
             - application_id: "{{ _cf_application_id['linuxhq.net'] }}"
-              zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
               decision: non_identity
               name: linuxhq.net
               include:
-                - service_token:
-                    token_id: "{{ _cf_service_token_id['linuxhq.net'] }}"
+                - group:
+                    id: "{{ _cf_access_group_id['linuxhq.net'] }}"
 
 ## License
 

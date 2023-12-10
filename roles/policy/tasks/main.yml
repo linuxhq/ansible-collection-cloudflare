@@ -9,8 +9,8 @@
     method: GET
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _policy.zone_id +
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
              '/access/apps/' +
              _policy.application_id +
              '/policies' }}"
@@ -20,9 +20,9 @@
     loop_var: _policy
   register: _policy_get
   when:
+    - cf_account_id is not none
     - cf_auth_token is not none
     - _policy.application_id is defined
-    - _policy.zone_id is defined
 
 - name: Ensure dictionary of policies is generated
   tags:
@@ -38,6 +38,11 @@
   vars:
     _id: "{{ _policy.1.id }}"
     _name: "{{ _policy.1.name }}"
+  when:
+    - _policy_get.results is defined
+    - _policy_get.results | length > 0
+    - _policy.1.id is defined
+    - _policy.1.name is defined
 
 - name: Ensure cloudflare policies are present
   tags:
@@ -62,8 +67,8 @@
     method: POST
     status_code:
       - 201
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _policy.zone_id +
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
              '/access/apps/' +
              _policy.application_id +
              '/policies' }}"
@@ -72,6 +77,7 @@
     label: "{{ _policy.name | default(none) }}"
     loop_var: _policy
   when:
+    - cf_account_id is not none
     - cf_auth_token is not none
     - _policy.decision is defined
     - _policy.include is defined
@@ -102,8 +108,8 @@
     method: PUT
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _policy.zone_id +
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
              '/access/apps/' +
              _policy.application_id +
              '/policies/' +
@@ -113,6 +119,7 @@
     label: "{{ _policy.name | default(none) }}"
     loop_var: _policy
   when:
+    - cf_account_id is not none
     - cf_auth_token is not none
     - _policy.decision is defined
     - _policy.include is defined
