@@ -12,6 +12,7 @@ Gather information about cloudflare access applications
 
 Available variables are listed below, along with default values:
 
+    cf_account_id: null
     cf_auth_token: null
 
 ## Dependencies
@@ -28,6 +29,7 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.application_info
+          cf_account_id: "{{ _cf_account_id }}"
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
 
 ## License

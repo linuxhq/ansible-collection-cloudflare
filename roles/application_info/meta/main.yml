@@ -1,6 +1,7 @@
 ---
 allow_duplicates: true
-dependencies: []
+dependencies:
+  - { role: linuxhq.cloudflare.account_info, tags: application_info }
 galaxy_info:
   role_name: application_info
   author: Taylor Kimball
