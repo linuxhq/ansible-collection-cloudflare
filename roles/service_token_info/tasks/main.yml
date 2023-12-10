@@ -21,6 +21,9 @@
   tags:
     - service_token_info
   ansible.builtin.set_fact:
+    _cf_service_token_duration: "{{ _cf_service_token_duration |
+                                    default({}) |
+                                    combine({_name: _duration}) }}"
     _cf_service_token_id: "{{ _cf_service_token_id |
                               default({}) |
                               combine({_name: _id}) }}"
@@ -29,8 +32,9 @@
     label: "{{ _name | default(none) }}"
     loop_var: _token
   vars:
-    _name: "{{ _token.name }}"
     _id: "{{ _token.id }}"
+    _name: "{{ _token.name }}"
+    _duration: "{{ _token.duration | default(none) }}"
   when:
     - _service_tokens_get.json.result is defined
     - _service_tokens_get.json.result | length > 0

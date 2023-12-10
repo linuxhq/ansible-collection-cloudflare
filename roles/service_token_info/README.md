@@ -21,6 +21,7 @@ Available variables are listed below, along with default values:
 
 ## Return Values
 
+    _cf_service_token_duration
     _cf_service_token_id
 
 ## Example Playbook
