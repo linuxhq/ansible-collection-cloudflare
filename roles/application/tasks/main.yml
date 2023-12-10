@@ -9,17 +9,13 @@
     method: GET
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _app.zone_id +
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
              '/access/apps' }}"
-  loop: "{{ cf_applications }}"
-  loop_control:
-    label: "{{ _app.zone_id }}"
-    loop_var: _app
   register: _app_get
   when:
+    - cf_account_id is not none
     - cf_auth_token is not none
-    - _app.zone_id is defined
 
 - name: Ensure dictionary of applications is generated
   tags:
@@ -28,13 +24,18 @@
     _cf_apps: "{{ _cf_apps |
                   default({}) |
                   combine({_name: _id}) }}"
-  loop: "{{ q('ansible.builtin.subelements', _app_get.results, 'json.result', {'skip_missing': true}) }}"
+  loop: "{{ _app_get.json.result }}"
   loop_control:
     label: "{{ _name | default(none) }}"
     loop_var: _app
   vars:
-    _id: "{{ _app.1.id }}"
-    _name: "{{ _app.1.name }}"
+    _id: "{{ _app.id }}"
+    _name: "{{ _app.name }}"
+  when:
+    - _app_get.json.result is defined
+    - _app_get.json.result | length > 0
+    - _app.id is defined
+    - _app.name is defined
 
 - name: Ensure cloudflare applications are present
   tags:
@@ -64,19 +65,19 @@
     method: POST
     status_code:
       - 201
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _app.zone_id +
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
              '/access/apps' }}"
   loop: "{{ cf_applications }}"
   loop_control:
     label: "{{ _app.name | default(none) }}"
     loop_var: _app
   when:
+    - cf_account_id is not none
     - cf_auth_token is not none
     - _app.domain is defined
     - _app.name is defined
     - _app.type is defined
-    - _app.zone_id is defined
     - _cf_apps is not defined or
       _app.name not in _cf_apps.keys()
 
@@ -108,8 +109,8 @@
     method: PUT
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _app.zone_id +
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
              '/access/apps/' +
              _cf_apps[_app.name] }}"
   loop: "{{ cf_applications }}"
@@ -117,11 +118,11 @@
     label: "{{ _app.name | default(none) }}"
     loop_var: _app
   when:
+    - cf_account_id is not none
     - cf_auth_token is not none
     - _app.domain is defined
     - _app.name is defined
     - _app.type is defined
-    - _app.zone_id is defined
     - _cf_apps is defined and
       _app.name in _cf_apps.keys()
 ...
