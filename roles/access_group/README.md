@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create cloudflare access groups
+Create and update cloudflare access groups
 
 ## Requirements
 

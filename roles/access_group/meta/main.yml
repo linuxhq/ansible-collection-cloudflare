@@ -6,7 +6,7 @@ dependencies:
 galaxy_info:
   role_name: access_group
   author: Taylor Kimball
-  description: Create cloudflare access groups
+  description: Create and update cloudflare access groups
   license: GPLv3
   min_ansible_version: 2.15.0
   platforms:
