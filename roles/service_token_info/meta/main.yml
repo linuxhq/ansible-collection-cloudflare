@@ -1,6 +1,7 @@
 ---
 allow_duplicates: true
-dependencies: []
+dependencies:
+  - { role: linuxhq.cloudflare.account_info, tags: service_token_info }
 galaxy_info:
   role_name: service_token_info
   author: Taylor Kimball
