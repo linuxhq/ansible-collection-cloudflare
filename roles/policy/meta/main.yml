@@ -1,8 +1,9 @@
 ---
 dependencies:
+  - { role: linuxhq.cloudflare.account_info, tags: policy }
+  - { role: linuxhq.cloudflare.access_group_info, tags: policy }
   - { role: linuxhq.cloudflare.application_info, tags: policy }
   - { role: linuxhq.cloudflare.service_token_info, tags: policy }
-  - { role: linuxhq.cloudflare.zone_info, tags: policy }
 galaxy_info:
   role_name: policy
   author: Taylor Kimball
