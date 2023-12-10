@@ -21,16 +21,36 @@
   tags:
     - application_info
   ansible.builtin.set_fact:
+    _cf_application_aud: "{{ _cf_application_aud |
+                             default({}) |
+                             combine({_name: _aud}) }}"
+    _cf_application_domain_type: "{{ _cf_application_domain_type |
+                                     default({}) |
+                                     combine({_name: _domain_type}) }}"
     _cf_application_id: "{{ _cf_application_id |
                             default({}) |
                             combine({_name: _id}) }}"
+    _cf_application_policies: "{{ _cf_application_policies |
+                                  default({}) |
+                                  combine({_name: _policies}) }}"
+    _cf_application_session_duration: "{{ _cf_application_session_duration |
+                                          default({}) |
+                                          combine({_name: _session_duration}) }}"
+    _cf_application_type: "{{ _cf_application_type |
+                              default({}) |
+                              combine({_name: _type}) }}"
   loop: "{{ _apps_get.json.result }}"
   loop_control:
     label: "{{ _name | default(none) }}"
     loop_var: _app
   vars:
-    _name: "{{ _app.name }}"
     _id: "{{ _app.id }}"
+    _name: "{{ _app.name }}"
+    _aud: "{{ _app.aud | default(none) }}"
+    _domain_type: "{{ _app.domain_type | default(none) }}"
+    _policies: "{{ _app.policies | default(none) }}"
+    _session_duration: "{{ _app.session_duration | default(none) }}"
+    _type: "{{ _app.type | default(none) }}"
   when:
     - _apps_get.json.result is defined
     - _apps_get.json.result | length > 0
