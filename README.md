@@ -42,21 +42,18 @@ An example playbook utilizing roles available to create a cloudflare tunnel
 
         - role: linuxhq.cloudflare.service_token
           cf_service_tokens:
-            - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
-              name: linuxhq-net-token
+            - name: linuxhq-net-token
               duration: forever
 
         - role: linuxhq.cloudflare.application
           cf_applications:
-            - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
-              domain: tunnel.linuxhq.net
+            - domain: tunnel.linuxhq.net
               name: linuxhq-net-app
               type: self_hosted
 
         - role: linuxhq.cloudflare.policy
           cf_policies:
             - application_id: "{{ _cf_application_id['linuxhq-net-app'] }}"
-              zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
               decision: non_identity
               name: linuxhq-net-policy
               include:
