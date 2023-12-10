@@ -1,6 +1,6 @@
 ---
 dependencies:
-  - { role: linuxhq.cloudflare.zone_info, tags: service_token }
+  - { role: linuxhq.cloudflare.account_info, tags: service_token }
 galaxy_info:
   role_name: service_token
   author: Taylor Kimball

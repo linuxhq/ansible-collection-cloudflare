@@ -9,17 +9,13 @@
     method: GET
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _token.zone_id +
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
              '/access/service_tokens' }}"
-  loop: "{{ cf_service_tokens }}"
-  loop_control:
-    label: "{{ _token.zone_id }}"
-    loop_var: _token
   register: _token_get
   when:
+    - cf_account_id is not none
     - cf_auth_token is not none
-    - _token.zone_id is defined
 
 - name: Ensure dictionary of service tokens is generated
   tags:
@@ -28,13 +24,13 @@
     _cf_tokens: "{{ _cf_tokens |
                     default({}) |
                     combine({_name: _id}) }}"
-  loop: "{{ q('ansible.builtin.subelements', _token_get.results, 'json.result', {'skip_missing': true}) }}"
+  loop: "{{ _token_get.json.result }}"
   loop_control:
     label: "{{ _name | default(none) }}"
     loop_var: _token
   vars:
-    _id: "{{ _token.1.id }}"
-    _name: "{{ _token.1.name }}"
+    _id: "{{ _token.id }}"
+    _name: "{{ _token.name }}"
 
 - name: Ensure cloudflare service tokens are present
   tags:
@@ -50,18 +46,18 @@
     method: POST
     status_code:
       - 201
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _token.zone_id +
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
              '/access/service_tokens' }}"
   register: _token_post
   loop: "{{ cf_service_tokens }}"
   loop_control:
-    label: "{{ _token.zone_id }}"
+    label: "{{ _token.name }}"
     loop_var: _token
   when:
+    - cf_account_id is not none
     - cf_auth_token is not none
     - _token.name is defined
-    - _token.zone_id is defined
     - _cf_tokens is not defined or
       _token.name not in _cf_tokens.keys()
 
@@ -79,18 +75,18 @@
     method: PUT
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _token.zone_id +
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             cf_account_id +
              '/access/service_tokens/' +
              _cf_tokens[_token.name] }}"
   loop: "{{ cf_service_tokens }}"
   loop_control:
-    label: "{{ _token.zone_id }}"
+    label: "{{ _token.name }}"
     loop_var: _token
   when:
+    - cf_account_id is not none
     - cf_auth_token is not none
     - _token.name is defined
-    - _token.zone_id is defined
     - _cf_tokens is defined and
       _token.name in _cf_tokens.keys()
 

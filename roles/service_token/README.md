@@ -12,6 +12,7 @@ Create cloudflare service tokens
 
 Available variables are listed below, along with default values:
 
+    cf_account_id: null
     cf_auth_token: null
     cf_debug: true
     cf_service_tokens: []
@@ -30,6 +31,7 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.service_token
+          cf_account_id: "{{ _cf_account_id }}"
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           cf_debug: true
           cf_service_tokens:
