@@ -19,8 +19,8 @@ Available variables are listed below, along with default values:
 ## Dependencies
 
 * [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.access_app_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_app_info)
 * [linuxhq.cloudflare.access_group_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_group_info)
-* [linuxhq.cloudflare.application_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/application_info)
 * [linuxhq.cloudflare.service_token_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/service_token_info)
 
 ## Return Values
@@ -36,7 +36,7 @@ None
           cf_account_id: "{{ _cf_account_id }}"
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           cf_policies:
-            - application_id: "{{ _cf_application_id['linuxhq.net'] }}"
+            - application_id: "{{ _cf_access_app_id['linuxhq.net'] }}"
               decision: non_identity
               name: linuxhq.net
               include:

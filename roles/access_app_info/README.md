@@ -1,12 +1,12 @@
-# application
+# access\_app\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create cloudflare access application
+Gather information about cloudflare access applications
 
 ## Requirements
 
-* Cloudflare api `Token` with `Edit` permissions to `Access: Apps and Policies`
+* Cloudflare api `Token` with `Read` permissions to `Access: Apps and Policies`
 
 ## Role Variables
 
@@ -14,7 +14,6 @@ Available variables are listed below, along with default values:
 
     cf_account_id: null
     cf_auth_token: null
-    cf_applications: []
 
 ## Dependencies
 
@@ -22,20 +21,21 @@ Available variables are listed below, along with default values:
 
 ## Return Values
 
-None
+    _cf_access_app_aud
+    _cf_access_app_domain_type
+    _cf_access_app_id
+    _cf_access_app_policies
+    _cf_access_app_session_duration
+    _cf_access_app_type
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.application
+        - role: linuxhq.cloudflare.access_app_info
           cf_account_id: "{{ _cf_account_id }}"
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_applications:
-            - domain: tunnel.linuxhq.org
-              name: tunnel-linuxhq-org
-              type: self_hosted
 
 ## License
 

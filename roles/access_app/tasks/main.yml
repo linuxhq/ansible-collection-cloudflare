@@ -1,7 +1,7 @@
 ---
-- name: Ensure cloudflare application details are gathered
+- name: Ensure cloudflare access app details are gathered
   tags:
-    - application
+    - access_app
   ansible.builtin.uri:
     follow_redirects: false
     headers:
@@ -12,19 +12,19 @@
     url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
              cf_account_id +
              '/access/apps' }}"
-  register: _app_get
+  register: _apps_get
   when:
     - cf_account_id is not none
     - cf_auth_token is not none
 
-- name: Ensure dictionary of applications is generated
+- name: Ensure dictionary of access apps is generated
   tags:
-    - application
+    - access_app
   ansible.builtin.set_fact:
     _cf_apps: "{{ _cf_apps |
                   default({}) |
                   combine({_name: _id}) }}"
-  loop: "{{ _app_get.json.result }}"
+  loop: "{{ _apps_get.json.result }}"
   loop_control:
     label: "{{ _name | default(none) }}"
     loop_var: _app
@@ -32,14 +32,14 @@
     _id: "{{ _app.id }}"
     _name: "{{ _app.name }}"
   when:
-    - _app_get.json.result is defined
-    - _app_get.json.result | length > 0
+    - _apps_get.json.result is defined
+    - _apps_get.json.result | length > 0
     - _app.id is defined
     - _app.name is defined
 
-- name: Ensure cloudflare applications are present
+- name: Ensure cloudflare access apps are present
   tags:
-    - application
+    - access_app
   ansible.builtin.uri:
     body:
       allowed_idps: "{{ _app.allowed_idps | default(omit) }}"
@@ -68,7 +68,7 @@
     url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
              cf_account_id +
              '/access/apps' }}"
-  loop: "{{ cf_applications }}"
+  loop: "{{ cf_access_apps }}"
   loop_control:
     label: "{{ _app.name | default(none) }}"
     loop_var: _app
@@ -81,9 +81,9 @@
     - _cf_apps is not defined or
       _app.name not in _cf_apps.keys()
 
-- name: Ensure cloudflare applications are updated
+- name: Ensure cloudflare access apps are updated
   tags:
-    - application
+    - access_app
   ansible.builtin.uri:
     body:
       allowed_idps: "{{ _app.allowed_idps | default(omit) }}"
@@ -113,7 +113,7 @@
              cf_account_id +
              '/access/apps/' +
              _cf_apps[_app.name] }}"
-  loop: "{{ cf_applications }}"
+  loop: "{{ cf_access_apps }}"
   loop_control:
     label: "{{ _app.name | default(none) }}"
     loop_var: _app
