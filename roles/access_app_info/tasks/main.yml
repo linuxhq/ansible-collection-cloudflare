@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare application details are gathered
+- name: Ensure cloudflare access app details are gathered
   tags:
     - access_app_info
   ansible.builtin.uri:
@@ -17,7 +17,7 @@
     - cf_account_id is not none
     - cf_auth_token is not none
 
-- name: Ensure dictionary of application ids is generated
+- name: Ensure dictionary of access app ids is generated
   tags:
     - access_app_info
   ansible.builtin.set_fact:

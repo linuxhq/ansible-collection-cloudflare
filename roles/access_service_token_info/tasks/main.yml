@@ -1,7 +1,7 @@
 ---
-- name: Ensure cloudflare service token details are gathered
+- name: Ensure cloudflare access service token details are gathered
   tags:
-    - service_token_info
+    - access_service_token_info
   ansible.builtin.uri:
     follow_redirects: false
     headers:
@@ -17,16 +17,16 @@
     - cf_account_id is not none
     - cf_auth_token is not none
 
-- name: Ensure dictionary of service tokens is generated
+- name: Ensure dictionary of access service tokens is generated
   tags:
-    - service_token_info
+    - access_service_token_info
   ansible.builtin.set_fact:
-    _cf_service_token_duration: "{{ _cf_service_token_duration |
-                                    default({}) |
-                                    combine({_name: _duration}) }}"
-    _cf_service_token_id: "{{ _cf_service_token_id |
-                              default({}) |
-                              combine({_name: _id}) }}"
+    _cf_access_service_token_duration: "{{ _cf_access_service_token_duration |
+                                           default({}) |
+                                           combine({_name: _duration}) }}"
+    _cf_access_service_token_id: "{{ _cf_access_service_token_id |
+                                     default({}) |
+                                     combine({_name: _id}) }}"
   loop: "{{ _service_tokens_get.json.result }}"
   loop_control:
     label: "{{ _name | default(none) }}"

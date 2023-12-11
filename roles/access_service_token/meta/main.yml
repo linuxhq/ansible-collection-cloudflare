@@ -1,11 +1,10 @@
 ---
-allow_duplicates: true
 dependencies:
-  - { role: linuxhq.cloudflare.account_info, tags: service_token_info }
+  - { role: linuxhq.cloudflare.account_info, tags: access_service_token }
 galaxy_info:
-  role_name: service_token_info
+  role_name: access_service_token
   author: Taylor Kimball
-  description: Gather information about cloudflare service tokens
+  description: Create and update cloudflare access service tokens
   license: GPLv3
   min_ansible_version: 2.15.0
   platforms:
@@ -16,8 +15,8 @@ galaxy_info:
       versions:
         - all
   galaxy_tags:
+    - access
     - cloudflare
-    - info
     - service
     - token
 ...

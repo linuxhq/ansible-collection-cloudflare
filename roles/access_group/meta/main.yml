@@ -1,7 +1,7 @@
 ---
 dependencies:
   - { role: linuxhq.cloudflare.account_info, tags: access_group }
-  - { role: linuxhq.cloudflare.service_token_info, tags: access_group }
+  - { role: linuxhq.cloudflare.access_service_token_info, tags: access_group }
 galaxy_info:
   role_name: access_group
   author: Taylor Kimball

@@ -1,7 +1,7 @@
 ---
-- name: Ensure cloudflare service token details are gathered
+- name: Ensure cloudflare access service token details are gathered
   tags:
-    - service_token
+    - access_service_token
   ansible.builtin.uri:
     follow_redirects: false
     headers:
@@ -12,19 +12,19 @@
     url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
              cf_account_id +
              '/access/service_tokens' }}"
-  register: _token_get
+  register: _service_tokens_get
   when:
     - cf_account_id is not none
     - cf_auth_token is not none
 
-- name: Ensure dictionary of service tokens is generated
+- name: Ensure dictionary of access service tokens is generated
   tags:
-    - service_token
+    - access_service_token
   ansible.builtin.set_fact:
     _cf_tokens: "{{ _cf_tokens |
                     default({}) |
                     combine({_name: _id}) }}"
-  loop: "{{ _token_get.json.result }}"
+  loop: "{{ _service_tokens_get.json.result }}"
   loop_control:
     label: "{{ _name | default(none) }}"
     loop_var: _token
@@ -32,9 +32,9 @@
     _id: "{{ _token.id }}"
     _name: "{{ _token.name }}"
 
-- name: Ensure cloudflare service tokens are present
+- name: Ensure cloudflare access service tokens are present
   tags:
-    - service_token
+    - access_service_token
   ansible.builtin.uri:
     body:
       duration: "{{ _token.duration | default(omit) }}"
@@ -49,8 +49,8 @@
     url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
              cf_account_id +
              '/access/service_tokens' }}"
-  register: _token_post
-  loop: "{{ cf_service_tokens }}"
+  register: _service_tokens_post
+  loop: "{{ cf_access_service_tokens }}"
   loop_control:
     label: "{{ _token.name }}"
     loop_var: _token
@@ -61,9 +61,9 @@
     - _cf_tokens is not defined or
       _token.name not in _cf_tokens.keys()
 
-- name: Ensure cloudflare service tokens are updated
+- name: Ensure cloudflare access service tokens are updated
   tags:
-    - service_token
+    - access_service_token
   ansible.builtin.uri:
     body:
       duration: "{{ _token.duration | default(omit) }}"
@@ -79,7 +79,7 @@
              cf_account_id +
              '/access/service_tokens/' +
              _cf_tokens[_token.name] }}"
-  loop: "{{ cf_service_tokens }}"
+  loop: "{{ cf_access_service_tokens }}"
   loop_control:
     label: "{{ _token.name }}"
     loop_var: _token
@@ -90,12 +90,12 @@
     - _cf_tokens is defined and
       _token.name in _cf_tokens.keys()
 
-- name: Ensure cloudflare service tokens are displayed  # noqa: jinja[invalid]
+- name: Ensure cloudflare access service tokens are displayed  # noqa: jinja[invalid]
   tags:
-    - service_token
+    - access_service_token
   ansible.builtin.debug:
     msg: |
-      {{ _token_post.results |
+      {{ _service_tokens_post.results |
          json_query('[].json[].result') |
          list |
          default([]) |
