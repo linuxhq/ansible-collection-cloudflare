@@ -22,7 +22,7 @@
     - pages_project
   ansible.builtin.set_fact:
     _cf_projects: "{{ _pages_projects_get.json.result |
-                      json_query('[].name') |
+                      map(attribute='name') |
                       list |
                       default([]) }}"
   when:
