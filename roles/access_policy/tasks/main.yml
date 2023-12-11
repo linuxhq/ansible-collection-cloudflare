@@ -1,7 +1,7 @@
 ---
-- name: Ensure cloudflare policy details are gathered
+- name: Ensure cloudflare access policy details are gathered
   tags:
-    - policy
+    - access_policy
   ansible.builtin.uri:
     follow_redirects: false
     headers:
@@ -14,24 +14,24 @@
              '/access/apps/' +
              _policy.application_id +
              '/policies' }}"
-  loop: "{{ cf_policies }}"
+  loop: "{{ cf_access_policies }}"
   loop_control:
     label: "{{ _policy.application_id }}"
     loop_var: _policy
-  register: _policy_get
+  register: _policies_get
   when:
     - cf_account_id is not none
     - cf_auth_token is not none
     - _policy.application_id is defined
 
-- name: Ensure dictionary of policies is generated
+- name: Ensure dictionary of access policies is generated
   tags:
-    - policy
+    - access_policy
   ansible.builtin.set_fact:
     _cf_policies: "{{ _cf_policies |
                       default({}) |
                       combine({_name: _id}) }}"
-  loop: "{{ q('ansible.builtin.subelements', _policy_get.results, 'json.result', {'skip_missing': true}) }}"
+  loop: "{{ q('ansible.builtin.subelements', _policies_get.results, 'json.result', {'skip_missing': true}) }}"
   loop_control:
     label: "{{ _name | default(none) }}"
     loop_var: _policy
@@ -39,14 +39,14 @@
     _id: "{{ _policy.1.id }}"
     _name: "{{ _policy.1.name }}"
   when:
-    - _policy_get.results is defined
-    - _policy_get.results | length > 0
+    - _policies_get.results is defined
+    - _policies_get.results | length > 0
     - _policy.1.id is defined
     - _policy.1.name is defined
 
-- name: Ensure cloudflare policies are present
+- name: Ensure cloudflare access policies are present
   tags:
-    - policy
+    - access_policy
   ansible.builtin.uri:
     body:
       approval_groups: "{{ _policy.approval_groups | default(omit) }}"
@@ -72,7 +72,7 @@
              '/access/apps/' +
              _policy.application_id +
              '/policies' }}"
-  loop: "{{ cf_policies }}"
+  loop: "{{ cf_access_policies }}"
   loop_control:
     label: "{{ _policy.name | default(none) }}"
     loop_var: _policy
@@ -85,9 +85,9 @@
     - _cf_policies is not defined or
       _policy.name not in _cf_policies.keys()
 
-- name: Ensure cloudflare policies are updated
+- name: Ensure cloudflare access policies are updated
   tags:
-    - policy
+    - access_policy
   ansible.builtin.uri:
     body:
       approval_groups: "{{ _policy.approval_groups | default(omit) }}"
@@ -114,7 +114,7 @@
              _policy.application_id +
              '/policies/' +
              _cf_policies[_policy.name] }}"
-  loop: "{{ cf_policies }}"
+  loop: "{{ cf_access_policies }}"
   loop_control:
     label: "{{ _policy.name | default(none) }}"
     loop_var: _policy
