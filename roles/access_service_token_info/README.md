@@ -1,12 +1,12 @@
-# service\_token
+# access\_service\_token\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create cloudflare service tokens
+Gather information about cloudflare access service tokens
 
 ## Requirements
 
-* Cloudflare api `Token` with `Edit` permissions to `Access: Service Tokens`
+* Cloudflare api `Token` with `Read` permissions to `Access: Service Tokens`
 
 ## Role Variables
 
@@ -14,8 +14,6 @@ Available variables are listed below, along with default values:
 
     cf_account_id: null
     cf_auth_token: null
-    cf_debug: true
-    cf_service_tokens: []
 
 ## Dependencies
 
@@ -23,20 +21,17 @@ Available variables are listed below, along with default values:
 
 ## Return Values
 
-None
+    _cf_access_service_token_duration
+    _cf_access_service_token_id
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.service_token
+        - role: linuxhq.cloudflare.access_service_token_info
           cf_account_id: "{{ _cf_account_id }}"
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_debug: true
-          cf_service_tokens:
-            - name: linuxhq
-              duration: forever
 
 ## License
 

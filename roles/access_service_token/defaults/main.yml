@@ -2,5 +2,5 @@
 cf_account_id: null
 cf_auth_token: null
 cf_debug: true
-cf_service_tokens: []
+cf_access_service_tokens: []
 ...

@@ -19,7 +19,7 @@ Available variables are listed below, along with default values:
 ## Dependencies
 
 * [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
-* [linuxhq.cloudflare.service_token_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/service_token_info)
+* [linuxhq.cloudflare.access_service_token_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_service_token_info)
 
 ## Return Values
 
@@ -37,7 +37,7 @@ None
             - name: linuxhq.net
               include:
                 - service_token:
-                    token_id: "{{ _cf_service_token_id['linuxhq.net'] }}"
+                    token_id: "{{ _cf_access_service_token_id['linuxhq.net'] }}"
               is_default: false
 
 ## License

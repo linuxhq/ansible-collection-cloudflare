@@ -21,7 +21,7 @@ Available variables are listed below, along with default values:
 * [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
 * [linuxhq.cloudflare.access_app_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_app_info)
 * [linuxhq.cloudflare.access_group_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_group_info)
-* [linuxhq.cloudflare.service_token_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/service_token_info)
+* [linuxhq.cloudflare.access_service_token_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_service_token_info)
 
 ## Return Values
 
