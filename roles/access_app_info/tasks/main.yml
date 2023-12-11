@@ -1,7 +1,7 @@
 ---
 - name: Ensure cloudflare application details are gathered
   tags:
-    - application_info
+    - access_app_info
   ansible.builtin.uri:
     follow_redirects: false
     headers:
@@ -19,26 +19,26 @@
 
 - name: Ensure dictionary of application ids is generated
   tags:
-    - application_info
+    - access_app_info
   ansible.builtin.set_fact:
-    _cf_application_aud: "{{ _cf_application_aud |
-                             default({}) |
-                             combine({_name: _aud}) }}"
-    _cf_application_domain_type: "{{ _cf_application_domain_type |
-                                     default({}) |
-                                     combine({_name: _domain_type}) }}"
-    _cf_application_id: "{{ _cf_application_id |
+    _cf_access_app_aud: "{{ _cf_access_app_aud |
                             default({}) |
-                            combine({_name: _id}) }}"
-    _cf_application_policies: "{{ _cf_application_policies |
-                                  default({}) |
-                                  combine({_name: _policies}) }}"
-    _cf_application_session_duration: "{{ _cf_application_session_duration |
-                                          default({}) |
-                                          combine({_name: _session_duration}) }}"
-    _cf_application_type: "{{ _cf_application_type |
-                              default({}) |
-                              combine({_name: _type}) }}"
+                            combine({_name: _aud}) }}"
+    _cf_access_app_domain_type: "{{ _cf_access_app_domain_type |
+                                    default({}) |
+                                    combine({_name: _domain_type}) }}"
+    _cf_access_app_id: "{{ _cf_access_app_id |
+                           default({}) |
+                           combine({_name: _id}) }}"
+    _cf_access_app_policies: "{{ _cf_access_app_policies |
+                                 default({}) |
+                                 combine({_name: _policies}) }}"
+    _cf_access_app_session_duration: "{{ _cf_access_app_session_duration |
+                                         default({}) |
+                                         combine({_name: _session_duration}) }}"
+    _cf_access_app_type: "{{ _cf_access_app_type |
+                             default({}) |
+                             combine({_name: _type}) }}"
   loop: "{{ _apps_get.json.result }}"
   loop_control:
     label: "{{ _name | default(none) }}"

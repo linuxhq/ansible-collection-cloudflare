@@ -1,10 +1,11 @@
 ---
+allow_duplicates: true
 dependencies:
-  - { role: linuxhq.cloudflare.account_info, tags: application }
+  - { role: linuxhq.cloudflare.account_info, tags: access_app_info }
 galaxy_info:
-  role_name: application
+  role_name: access_app_info
   author: Taylor Kimball
-  description: Create cloudflare access application
+  description: Gather information about cloudflare access applications
   license: GPLv3
   min_ansible_version: 2.15.0
   platforms:
@@ -15,6 +16,8 @@ galaxy_info:
       versions:
         - all
   galaxy_tags:
-    - application
+    - access
+    - app
     - cloudflare
+    - info
 ...
