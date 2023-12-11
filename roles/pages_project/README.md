@@ -29,7 +29,7 @@ None
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.pages_projects
+        - role: linuxhq.cloudflare.pages_project
           cf_account_id: "{{ _cf_account_id }}"
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           cf_pages_projects:
