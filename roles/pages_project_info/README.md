@@ -31,7 +31,7 @@ Available variables are listed below, along with default values:
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.pages_projects
+        - role: linuxhq.cloudflare.pages_project_info
           cf_account_id: "{{ _cf_account_id }}"
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
 
