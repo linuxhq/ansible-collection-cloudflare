@@ -1,8 +1,8 @@
-# policy
+# access\_policy
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create cloudflare access policies
+Create and update cloudflare access policies
 
 ## Requirements
 
@@ -14,7 +14,7 @@ Available variables are listed below, along with default values:
 
     cf_account_id: null
     cf_auth_token: null
-    cf_policies: []
+    cf_access_policies: []
 
 ## Dependencies
 
@@ -32,10 +32,10 @@ None
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.policy
+        - role: linuxhq.cloudflare.access_policy
           cf_account_id: "{{ _cf_account_id }}"
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_policies:
+          cf_access_policies:
             - application_id: "{{ _cf_access_app_id['linuxhq.net'] }}"
               decision: non_identity
               name: linuxhq.net
