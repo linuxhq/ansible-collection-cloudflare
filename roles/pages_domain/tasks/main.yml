@@ -19,7 +19,7 @@
              _domain.project_name +
              '/domains' }}"
   register: _domains_post
-  loop: "{{ pages_domains }}"
+  loop: "{{ cf_pages_domains }}"
   loop_control:
     label: "{{ _domain.project_name | default(none) }}"
     loop_var: _domain
