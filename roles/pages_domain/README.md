@@ -33,8 +33,8 @@ None
           cf_account_id: "{{ _cf_account_id }}"
           cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           cf_pages_domains:
-            - name: linuxhq-net
-              production_branch: main
+            - name: linuxhq.net
+              project_name: linuxhq-net
 
 ## License
 
