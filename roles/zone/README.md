@@ -15,6 +15,9 @@ Available variables are listed below, along with default values:
     cf_account_id: null
     cf_auth_token: null
     cf_zones: []
+    cf_zones_match: all
+    cf_zones_page: 1
+    cf_zones_per_page: 20
 
 ## Dependencies
 
