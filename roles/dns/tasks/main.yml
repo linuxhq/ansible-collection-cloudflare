@@ -6,6 +6,7 @@
     algorithm: "{{ _dns.1.algorithm | default(omit) }}"
     api_token: "{{ cf_auth_token }}"
     cert_usage: "{{ _dns.1.cert_usage | default(omit) }}"
+    flag: "{{ _dns.1.flag | default(omit) }}"
     hash_type: "{{ _dns.1.hash_type | default(omit) }}"
     key_tag: "{{ _dns.1.key_tag | default(omit) }}"
     port: "{{ _dns.1.port | default(omit) }}"
@@ -17,6 +18,7 @@
     service: "{{ _dns.1.service | default(omit) }}"
     solo: "{{ _dns.1.solo | default(omit) }}"
     state: present
+    tag: "{{ _dns.1.tag | default(omit) }}"
     timeout: "{{ _dns.0.timeout | default(30) }}"
     ttl: "{{ _dns.1.ttl | default(1) }}"
     type: "{{ _dns.1.type | upper }}"
