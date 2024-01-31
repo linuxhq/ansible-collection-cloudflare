@@ -11,7 +11,13 @@
       - 200
       - 401
       - 403
-    url: 'https://api.cloudflare.com/client/v4/zones'
+    url: "{{ 'https://api.cloudflare.com/client/v4/zones' ~
+             '?match=' ~
+             cf_zones_match ~
+             '&page=' ~
+             cf_zones_page ~
+             '&per_page=' ~
+             cf_zones_per_page }}"
   register: _zones
   when:
     - cf_auth_token is not none
