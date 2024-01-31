@@ -7,7 +7,7 @@ build_ignore:
   - .yamllint
 description: A collection of cloudflare roles
 dependencies:
-  community.general: '*'
+  community.general: '>=8.0.0'
 documentation: https://github.com/linuxhq/ansible-collection-cloudflare/blob/main/README.md
 homepage: https://www.linuxhq.org
 issues: https://github.com/linuxhq/ansible-collection-cloudflare/issues
