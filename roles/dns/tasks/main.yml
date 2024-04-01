@@ -17,7 +17,7 @@
     selector: "{{ _dns.1.selector | default(omit) }}"
     service: "{{ _dns.1.service | default(omit) }}"
     solo: "{{ _dns.1.solo | default(omit) }}"
-    state: present
+    state: "{{ _dns.1.state | default('present') }}"
     tag: "{{ _dns.1.tag | default(omit) }}"
     timeout: "{{ _dns.0.timeout | default(30) }}"
     ttl: "{{ _dns.1.ttl | default(1) }}"
