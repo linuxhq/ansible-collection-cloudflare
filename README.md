@@ -2,7 +2,7 @@
 
 ![License](https://img.shields.io/badge/license-GPLv3-lightgreen)
 [![Ansible Galaxy](https://img.shields.io/badge/collection-linuxhq.cloudflare-blue)](https://galaxy.ansible.com/linuxhq/cloudflare)
-[![Lint](https://github.com/linuxhq/ansible-collection-cloudflare/actions/workflows/linting.yml/badge.svg)](https://github.com/linuxhq/ansible-collection-cloudflare/actions/workflows/linting.yml)
+[![Lint](https://github.com/linuxhq/ansible-collection-cloudflare/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/linuxhq/ansible-collection-cloudflare/actions/workflows/pre-commit.yml)
 [![Release](https://github.com/linuxhq/ansible-collection-cloudflare/actions/workflows/release.yml/badge.svg)](https://github.com/linuxhq/ansible-collection-cloudflare/actions/workflows/release.yml)
 
 A collection of cloudflare roles
