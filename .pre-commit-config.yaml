@@ -1,0 +1,20 @@
+---
+default_stages:
+  - pre-commit
+
+repos:
+  - repo: https://github.com/ansible/ansible-lint.git
+    rev: v24.12.2
+    hooks:
+      - id: ansible-lint
+        files: \.(yaml|yml)$
+        verbose: true
+
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        files: \.(yaml|yml)$
+        types: [file, yaml]
+        entry: yamllint --strict
+...

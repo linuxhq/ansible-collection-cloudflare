@@ -5,11 +5,13 @@ ignore:
   - venv
 rules:
   braces:
-    min-spaces-inside: 1
     max-spaces-inside: 1
-    min-spaces-inside-empty: 0
-    max-spaces-inside-empty: 0
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: false
   line-length:
     max: 180
-    level: warning
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
 ...
