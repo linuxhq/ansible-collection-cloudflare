@@ -17,7 +17,7 @@ Available variables are listed below, along with default values:
 
 ## Dependencies
 
-None
+* [linuxhq.cloudflare.tunnel_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/tunnel_info)
 
 ## Example Playbook
 
