@@ -1,4 +1,16 @@
 ---
+- name: Initialize tunnel_info return variables
+  tags:
+    - tunnel_info
+  ansible.builtin.set_fact:
+    _cf_tunnel_account_tag: {}
+    _cf_tunnel_connections: {}
+    _cf_tunnel_id: {}
+    _cf_tunnel_remote_config: {}
+    _cf_tunnel_status: {}
+    _cf_tunnel_type: {}
+    _cf_tunnel_token: {}
+
 - name: Ensure cloudflare tunnel details are gathered
   tags:
     - tunnel_info
@@ -25,22 +37,16 @@
     - tunnel_info
   ansible.builtin.set_fact:
     _cf_tunnel_account_tag: "{{ _cf_tunnel_account_tag |
-                                default({}) |
                                 combine({_name: _account_tag}) }}"
     _cf_tunnel_connections: "{{ _cf_tunnel_connections |
-                                default({}) |
                                 combine({_name: _connections}) }}"
     _cf_tunnel_id: "{{ _cf_tunnel_id |
-                       default({}) |
                        combine({_name: _id}) }}"
     _cf_tunnel_remote_config: "{{ _cf_tunnel_remote_config |
-                                  default({}) |
                                   combine({_name: _remote_config}) }}"
     _cf_tunnel_status: "{{ _cf_tunnel_status |
-                           default({}) |
                            combine({_name: _status}) }}"
     _cf_tunnel_type: "{{ _cf_tunnel_type |
-                         default({}) |
                          combine({_name: _type}) }}"
   loop: "{{ _tunnels.json.result | d([], true) }}"
   loop_control:
@@ -58,4 +64,33 @@
     - _tunnel.account_tag is defined
     - _tunnel.id is defined
     - _tunnel.name is defined
-...
+
+- name: Fetch tunnel tokens if requested
+  tags:
+    - tunnel_info
+  block:
+    - name: "Determine target tunnels for token fetching"
+      ansible.builtin.set_fact:
+        _target_tunnels_for_tokens: "{{ (cf_tunnel_names is defined and cf_tunnel_names | length > 0) | ternary(_cf_tunnel_id | dict2items | selectattr('key', 'in', cf_tunnel_names) | items2dict, _cf_tunnel_id) }}"
+
+    - name: "Ensure cloudflare tunnel tokens are gathered"
+      ansible.builtin.uri:
+        body_format: json
+        follow_redirects: false
+        headers:
+          Authorization: "Bearer {{ cf_auth_token }}"
+        method: GET
+        status_code: 200
+        url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' + cf_account_id + '/cfd_tunnel/' + item + '/token' }}"
+      register: _tokens
+      loop: "{{ _target_tunnels_for_tokens.values() | list }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: "Ensure dict of cloudflare tunnel tokens is generated"
+      ansible.builtin.set_fact:
+        _cf_tunnel_token: "{{ _cf_tunnel_token | combine({ item[0]: item[1] }) }}"
+      loop: "{{ _target_tunnels_for_tokens.keys() | list | zip(_tokens.results | map(attribute='json.result')) | list }}"
+      loop_control:
+        label: "{{ item.0 }}"
+  when: cf_fetch_tunnel_token
