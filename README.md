@@ -40,6 +40,12 @@ An example playbook utilizing roles available to create a cloudflare tunnel
               config_src: local
               tunnel_secret: ZGtjVXdzRWJramFYVVduYm0zd2VSalhVaE5IZWppNGQ=
 
+        - role: linuxhq.cloudflare.tunnel_info
+          vars:
+            cf_fetch_tunnel_token: true
+            cf_tunnel_names:
+              - "linuxhq-tunnel"
+          
         - role: linuxhq.cloudflare.access_service_token
           cf_access_service_tokens:
             - name: linuxhq-net-token
