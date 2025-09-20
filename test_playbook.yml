@@ -1,0 +1,50 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_prompt:
+    - name: cf_account_id
+      prompt: "Acc ID"
+      private: no
+    - name: cf_auth_token
+      prompt: "API token"
+      private: yes
+    - name: specific_tunnel_name
+      prompt: "enter a specific tunnel for a targeted test"
+      private: no
+
+  tasks:
+    - name: "TEST 1: verify default behavior (fetching ALL tokens)"
+      block:
+        - name: "Gather info"
+          ansible.builtin.include_role:
+            name: linuxhq.cloudflare.tunnel_info
+          vars:
+            cf_fetch_tunnel_token: true
+
+        - name: "Display all"
+          ansible.builtin.debug:
+            var: _cf_tunnel_token
+
+        - name: "success 1?"
+          ansible.builtin.debug:
+            msg: "only if dict above contains tokens for ALL tunnels on your account"
+
+    - name: "TEST 2: verify filtered behavior (fetching ONE specific token)"
+      block:
+        - name: "Gather tunnel info providing a SPECIFIC tunnel name"
+          ansible.builtin.include_role:
+            name: linuxhq.cloudflare.tunnel_info
+          vars:
+            cf_fetch_tunnel_token: true
+            cf_tunnel_names:
+              - "{{ specific_tunnel_name }}"
+
+        - name: "Display specific tunnel token"
+          ansible.builtin.debug:
+            var: _cf_tunnel_token
+
+        - name: "success 2?"
+          ansible.builtin.debug:
+            msg: "only if dict above contains tokens only for tunnel in specific_tunnel_name"
