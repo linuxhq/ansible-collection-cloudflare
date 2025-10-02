@@ -3,8 +3,8 @@
   hosts: all
   roles:
     - role: account_info
-      account_info_account_name: null
       account_info_api_token: null
+      account_info_name: null
       tags:
         - molecule-idempotence-notest
 

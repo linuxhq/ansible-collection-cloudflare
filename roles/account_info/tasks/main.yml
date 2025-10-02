@@ -4,7 +4,7 @@
     - account_info
   ansible.builtin.uri:
     body:
-      name: "{{ account_info_account_name }}"
+      name: "{{ account_info_name }}"
     body_format: json
     headers:
       Authorization: "Bearer {{ account_info_api_token }}"
@@ -16,17 +16,17 @@
     url: 'https://api.cloudflare.com/client/v4/accounts'
   register: __account_info
   when:
-    - account_info_account_name is not none
     - account_info_api_token is not none
+    - account_info_name is not none
 
 - name: Ensure cloudflare account information is generated
   tags:
     - account_info
   ansible.builtin.set_fact:
-    _account_info_account_id: "{{ __account_info.json.result[0].id }}"
-    _account_info_account_name: "{{ __account_info.json.result[0].name }}"
-    _account_info_account_settings: "{{ __account_info.json.result[0].settings }}"
-    _account_info_account_type: "{{ __account_info.json.result[0].type }}"
+    _account_info_id: "{{ __account_info.json.result[0].id }}"
+    _account_info_name: "{{ __account_info.json.result[0].name }}"
+    _account_info_settings: "{{ __account_info.json.result[0].settings }}"
+    _account_info_type: "{{ __account_info.json.result[0].type }}"
   when:
     - __account_info.json.result is defined
     - __account_info.json.result[0].name is defined
