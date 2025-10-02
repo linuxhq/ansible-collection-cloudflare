@@ -1,4 +1,4 @@
 ---
-cf_account_name: null
-cf_auth_token: null
+account_info_account_name: null
+account_info_api_token: null
 ...

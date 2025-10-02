@@ -4,7 +4,6 @@
     - tunnel_info
   ansible.builtin.uri:
     body_format: json
-    follow_redirects: false
     headers:
       Authorization: "Bearer {{ tunnel_info_api_token }}"
     method: GET
@@ -35,7 +34,6 @@
     - tunnel_info
   ansible.builtin.uri:
     body_format: json
-    follow_redirects: false
     headers:
       Authorization: "Bearer {{ tunnel_info_api_token }}"
     method: GET
@@ -59,7 +57,7 @@
     - tunnel_info_api_token is not none
     - _token.id is defined
 
-- name: Ensure list of cloudflare tunnel token information is gathered
+- name: Ensure list of cloudflare tunnel token information is generated
   tags:
     - tunnel_info
   ansible.builtin.set_fact:
