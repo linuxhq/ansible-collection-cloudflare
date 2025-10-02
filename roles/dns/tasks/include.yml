@@ -31,7 +31,7 @@
     label: "{{ _dns.1.record | d(none) }}"
     loop_var: _dns
   when:
-    - dns_apih_token is not none
+    - dns_api_token is not none
     - _dns.0.zone is defined
     - _dns.1.record is defined
     - _dns.1.type is defined
