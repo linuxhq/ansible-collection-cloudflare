@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - tunnel_info
+
+  post_tasks:
+    - name: Ensure cloudflare tunnel information is verified
+      tags:
+        - tunnel_info
+      ansible.builtin.assert:
+        that:
+          - _tunnel_info_dict | length > 0
+          - _tunnel_info_list | length > 0
+...
