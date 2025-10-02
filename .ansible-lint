@@ -3,6 +3,4 @@ exclude_paths:
   - molecule
   - venv
 offline: false
-skip_list:
-  - var-naming[no-role-prefix]
 ...
