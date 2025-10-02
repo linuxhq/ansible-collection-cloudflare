@@ -1,4 +1,9 @@
 ---
-cf_auth_token: null
-cf_dns: []
+dns_api_token: null
+dns_async: 300
+dns_batch: 10
+dns_delay: 3
+dns_poll: 0
+dns_records: []
+dns_retries: 100
 ...

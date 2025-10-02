@@ -12,8 +12,8 @@ Gather information about cloudflare account
 
 Available variables are listed below, along with default values:
 
-    cf_account_name: null
-    cf_auth_token: null
+    account_info_account_name: null
+    account_info_api_token: null
 
 ## Dependencies
 
@@ -21,9 +21,10 @@ None
 
 ## Return Values
 
-    _cf_account_name
-    _cf_account_id
-    _cf_account_type
+    _account_info_account_id
+    _account_info_account_name
+    _account_info_account_settings
+    _account_info_account_type
 
 ## Example Playbook
 
@@ -31,8 +32,8 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.account_info
-          cf_account_name: linuxhq
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          account_info_account_name: linuxhq
+          account_info_api_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
 
 ## License
 

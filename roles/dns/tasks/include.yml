@@ -1,0 +1,59 @@
+---
+- name: Ensure cloudflare dns records are managed
+  tags:
+    - dns
+  community.general.cloudflare_dns:
+    algorithm: "{{ _dns.1.algorithm | d(omit) }}"
+    api_token: "{{ dns_api_token }}"
+    cert_usage: "{{ _dns.1.cert_usage | d(omit) }}"
+    flag: "{{ _dns.1.flag | d(omit) }}"
+    hash_type: "{{ _dns.1.hash_type | d(omit) }}"
+    key_tag: "{{ _dns.1.key_tag | d(omit) }}"
+    port: "{{ _dns.1.port | d(omit) }}"
+    priority: "{{ _dns.1.priority | d(omit) }}"
+    proto: "{{ _dns.1.proto | d(omit) }}"
+    proxied: "{{ _dns.1.proxied | d(false) }}"
+    record: "{{ _dns.1.record }}"
+    selector: "{{ _dns.1.selector | d(omit) }}"
+    service: "{{ _dns.1.service | d(omit) }}"
+    solo: "{{ _dns.1.solo | d(omit) }}"
+    state: "{{ _dns.1.state | d('present') }}"
+    tag: "{{ _dns.1.tag | d(omit) }}"
+    timeout: "{{ _dns.0.timeout | d(30) }}"
+    ttl: "{{ _dns.1.ttl | d(1) }}"
+    type: "{{ _dns.1.type | upper }}"
+    value: "{{ _dns.1.value }}"
+    weight: "{{ _dns.1.weight | d(omit) }}"
+    zone: "{{ _dns.0.zone }}"
+  register: __dns_result
+  loop: "{{ __dns_records }}"
+  loop_control:
+    label: "{{ _dns.1.record | d(none) }}"
+    loop_var: _dns
+  when:
+    - dns_apih_token is not none
+    - _dns.0.zone is defined
+    - _dns.1.record is defined
+    - _dns.1.type is defined
+    - _dns.1.value is defined
+  changed_when: false
+  async: "{{ ansible_check_mode | ternary(0, dns_async) }}"
+  poll: "{{ dns_poll }}"
+
+- name: Ensure managed cloudflare dns record jobs are complete
+  tags:
+    - dns
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __dns_status
+  loop: "{{ __dns_result.results }}"
+  loop_control:
+    label: "{{ _jid._dns.1.record | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __dns_status.finished
+  retries: "{{ dns_retries }}"
+  delay: "{{ dns_delay }}"
+...
