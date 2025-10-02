@@ -25,9 +25,9 @@ An example playbook utilizing roles available to create a cloudflare tunnel
       connection: local
 
       vars:
-        account_id: "{{ _account_info_account_id }}"
-        account_info_account_name: linuxhq
+        account_id: "{{ _account_info_id }}"
         account_info_api_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+        account_info_name: linuxhq
 
       roles:
         - role: linuxhq.cloudflare.zone
