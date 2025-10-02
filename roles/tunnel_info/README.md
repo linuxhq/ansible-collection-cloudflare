@@ -11,7 +11,7 @@ Gather information about cloudflare tunnels
 ## Role Variables
 
     tunnel_info_account_id: null
-    tunnel_info_auth_token: null
+    tunnel_info_api_token: null
 
 ## Dependencies
 
@@ -29,7 +29,7 @@ Gather information about cloudflare tunnels
       roles:
         - role: linuxhq.cloudflare.tunnel_info
           tunnel_info_account_id: "{{ _cf_account_id }}"
-          tunnel_info_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          tunnel_info_api_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
 
 ## License
 

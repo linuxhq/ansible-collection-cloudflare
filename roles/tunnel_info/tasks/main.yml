@@ -6,7 +6,7 @@
     body_format: json
     follow_redirects: false
     headers:
-      Authorization: "Bearer {{ tunnel_info_auth_token }}"
+      Authorization: "Bearer {{ tunnel_info_api_token }}"
     method: GET
     status_code:
       - 200
@@ -19,16 +19,16 @@
   register: __tunnel_info_query
   when:
     - tunnel_info_account_id is not none
-    - tunnel_info_auth_token is not none
+    - tunnel_info_api_token is not none
 
 - name: Ensure list of cloudflare tunnel information is generated
   tags:
     - tunnel_info
   ansible.builtin.set_fact:
     __tunnel_info_list:
-      "{{ (__tunnel_info_query.json.result |
-          selectattr('name', 'defined')) |
-          d([]) }}"
+      "{{ __tunnel_info_query.json.result |
+          d([]) |
+          selectattr('name', 'defined') }}"
 
 - name: Ensure cloudflare tunnel token information is gathered
   tags:
@@ -37,7 +37,7 @@
     body_format: json
     follow_redirects: false
     headers:
-      Authorization: "Bearer {{ tunnel_info_auth_token }}"
+      Authorization: "Bearer {{ tunnel_info_api_token }}"
     method: GET
     status_code:
       - 200
@@ -56,7 +56,7 @@
     loop_var: _token
   when:
     - tunnel_info_account_id is not none
-    - tunnel_info_auth_token is not none
+    - tunnel_info_api_token is not none
     - _token.id is defined
 
 - name: Ensure list of cloudflare tunnel token information is gathered
@@ -64,28 +64,31 @@
     - tunnel_info
   ansible.builtin.set_fact:
     __tunnel_info_token_list:
-      "{{ __tunnel_info_token_query.results |
+      "{{ (__tunnel_info_token_query.results |
           json_query('[].{
             name: _token.name,
             token: json.result
-          }') }}"
+          }')) |
+          d([]) }}"
 
 - name: Ensure lists of cloudflare information are merged
   tags:
     - tunnel_info
   ansible.builtin.set_fact:
     _tunnel_info_list:
-      "{{ __tunnel_info_list |
+      "{{ (__tunnel_info_list |
           community.general.lists_mergeby(
             __tunnel_info_token_list,
-            'name') }}"
+            'name')) |
+          d([]) }}"
 
 - name: Ensure dict of cloudflare tunnel information is generated
   tags:
     - tunnel_info
   ansible.builtin.set_fact:
     _tunnel_info_dict:
-      "{{ dict(_tunnel_info_list |
+      "{{ (dict(_tunnel_info_list |
                json_query('[].name') |
-               zip(_tunnel_info_list)) }}"
+               zip(_tunnel_info_list))) |
+          d({}) }}"
 ...
