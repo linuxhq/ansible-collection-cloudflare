@@ -4,7 +4,7 @@ default_stages:
 
 repos:
   - repo: https://github.com/ansible/ansible-lint.git
-    rev: v24.12.2
+    rev: v25.1.3
     hooks:
       - id: ansible-lint
         files: \.(yaml|yml)$

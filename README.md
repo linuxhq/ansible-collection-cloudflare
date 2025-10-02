@@ -67,7 +67,7 @@ An example playbook utilizing roles available to create a cloudflare tunnel
                 - record: tunnel
                   proxied: true
                   type: CNAME
-                  value: "{{ _cf_tunnel_id['linuxhq-net-tunnel'] ~ '.cfargotunnel.com' }}"
+                  value: "{{ _tunnel_info_dict['linuxhq-net-tunnel'].id ~ '.cfargotunnel.com' }}"
 
 # Tokens
 

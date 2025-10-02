@@ -6,27 +6,21 @@ Gather information about cloudflare tunnels
 
 ## Requirements
 
-* Cloudflare api `Token` with `Read` permissions to `Cloudflare Tunnel`
+* Cloudflare api `Token` with `Edit` permissions to `Cloudflare Tunnel`
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
+    tunnel_info_account_id: null
+    tunnel_info_auth_token: null
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
 
 ## Return Values
 
-    _cf_tunnel_account_tag
-    _cf_tunnel_connections
-    _cf_tunnel_id
-    _cf_tunnel_remote_config
-    _cf_tunnel_status
-    _cf_tunnel_type
+    _tunnel_info_dict
+    _tunnel_info_list
 
 ## Example Playbook
 
@@ -34,8 +28,8 @@ Available variables are listed below, along with default values:
       connection: local
       roles:
         - role: linuxhq.cloudflare.tunnel_info
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          tunnel_info_account_id: "{{ _cf_account_id }}"
+          tunnel_info_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
 
 ## License
 

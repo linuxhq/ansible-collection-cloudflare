@@ -1,61 +1,91 @@
 ---
-- name: Ensure cloudflare tunnel details are gathered
+- name: Ensure cloudflare tunnel information is gathered
   tags:
     - tunnel_info
   ansible.builtin.uri:
     body_format: json
     follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ tunnel_info_auth_token }}"
     method: GET
     status_code:
       - 200
       - 401
       - 403
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             cf_account_id +
-             '/cfd_tunnel?is_deleted=false' }}"
-  register: _tunnels
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          tunnel_info_account_id ~
+          '/cfd_tunnel?is_deleted=false' }}"
+  register: __tunnel_info_query
   when:
-    - cf_account_id is not none
-    - cf_auth_token is not none
+    - tunnel_info_account_id is not none
+    - tunnel_info_auth_token is not none
 
-- name: Ensure dictionary of cloudflare tunnels is generated
+- name: Ensure list of cloudflare tunnel information is generated
   tags:
     - tunnel_info
   ansible.builtin.set_fact:
-    _cf_tunnel_account_tag: "{{ _cf_tunnel_account_tag |
-                                default({}) |
-                                combine({_name: _account_tag}) }}"
-    _cf_tunnel_connections: "{{ _cf_tunnel_connections |
-                                default({}) |
-                                combine({_name: _connections}) }}"
-    _cf_tunnel_id: "{{ _cf_tunnel_id |
-                       default({}) |
-                       combine({_name: _id}) }}"
-    _cf_tunnel_remote_config: "{{ _cf_tunnel_remote_config |
-                                  default({}) |
-                                  combine({_name: _remote_config}) }}"
-    _cf_tunnel_status: "{{ _cf_tunnel_status |
-                           default({}) |
-                           combine({_name: _status}) }}"
-    _cf_tunnel_type: "{{ _cf_tunnel_type |
-                         default({}) |
-                         combine({_name: _type}) }}"
-  loop: "{{ _tunnels.json.result | d([], true) }}"
+    __tunnel_info_list:
+      "{{ (__tunnel_info_query.json.result |
+          selectattr('name', 'defined')) |
+          d([]) }}"
+
+- name: Ensure cloudflare tunnel token information is gathered
+  tags:
+    - tunnel_info
+  ansible.builtin.uri:
+    body_format: json
+    follow_redirects: false
+    headers:
+      Authorization: "Bearer {{ tunnel_info_auth_token }}"
+    method: GET
+    status_code:
+      - 200
+      - 401
+      - 403
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          tunnel_info_account_id ~
+          '/cfd_tunnel/' ~
+          _token.id ~
+          '/token' }}"
+  register: __tunnel_info_token_query
+  loop: "{{ __tunnel_info_list }}"
   loop_control:
-    label: "{{ _tunnel.name | default(none) }}"
-    loop_var: _tunnel
-  vars:
-    _id: "{{ _tunnel.id }}"
-    _name: "{{ _tunnel.name }}"
-    _account_tag: "{{ _tunnel.account_tag | default(none) }}"
-    _connections: "{{ _tunnel.connections | default([]) }}"
-    _remote_config: "{{ _tunnel.remote_config | default(none) }}"
-    _status: "{{ _tunnel.status | default(none) }}"
-    _type: "{{ _tunnel.tun_type | default(none) }}"
+    label: "{{ _token.name | d(none) }}"
+    loop_var: _token
   when:
-    - _tunnel.account_tag is defined
-    - _tunnel.id is defined
-    - _tunnel.name is defined
+    - tunnel_info_account_id is not none
+    - tunnel_info_auth_token is not none
+    - _token.id is defined
+
+- name: Ensure list of cloudflare tunnel token information is gathered
+  tags:
+    - tunnel_info
+  ansible.builtin.set_fact:
+    __tunnel_info_token_list:
+      "{{ __tunnel_info_token_query.results |
+          json_query('[].{
+            name: _token.name,
+            token: json.result
+          }') }}"
+
+- name: Ensure lists of cloudflare information are merged
+  tags:
+    - tunnel_info
+  ansible.builtin.set_fact:
+    _tunnel_info_list:
+      "{{ __tunnel_info_list |
+          community.general.lists_mergeby(
+            __tunnel_info_token_list,
+            'name') }}"
+
+- name: Ensure dict of cloudflare tunnel information is generated
+  tags:
+    - tunnel_info
+  ansible.builtin.set_fact:
+    _tunnel_info_dict:
+      "{{ dict(_tunnel_info_list |
+               json_query('[].name') |
+               zip(_tunnel_info_list)) }}"
 ...
