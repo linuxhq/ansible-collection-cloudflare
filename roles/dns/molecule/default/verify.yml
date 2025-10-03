@@ -1,0 +1,19 @@
+---
+- name: Verify
+  hosts: all
+
+  pre_tasks:
+    - name: Ensure inventory lists are formatted
+      tags:
+        - dns
+      ansible.builtin.set_fact:
+        dns_records:
+          - zone: "{{ lookup('env', 'CLOUDFLARE_ZONE') }}"
+            records:
+              "{{ dns_records[0].records |
+                  map('combine', {'state': 'absent'}) |
+                  list }}"
+
+  roles:
+    - dns
+...

@@ -25,9 +25,9 @@ An example playbook utilizing roles available to create a cloudflare tunnel
       connection: local
 
       vars:
-        cf_account_id: "{{ _cf_account_id }}"
-        cf_account_name: linuxhq
-        cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+        account_id: "{{ _account_info_id }}"
+        account_info_api_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+        account_info_name: linuxhq
 
       roles:
         - role: linuxhq.cloudflare.zone
@@ -61,13 +61,13 @@ An example playbook utilizing roles available to create a cloudflare tunnel
                     token_id: "{{ _cf_access_service_token_id['linuxhq-net-token'] }}"
 
         - role: linuxhq.cloudflare.dns
-          cf_dns:
+          dns_records:
             - zone: linuxhq.net
               records:
                 - record: tunnel
                   proxied: true
                   type: CNAME
-                  value: "{{ _cf_tunnel_id['linuxhq-net-tunnel'] ~ '.cfargotunnel.com' }}"
+                  value: "{{ _tunnel_info_dict['linuxhq-net-tunnel'].id ~ '.cfargotunnel.com' }}"
 
 # Tokens
 

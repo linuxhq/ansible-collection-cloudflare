@@ -1,7 +1,8 @@
 ---
 allow_duplicates: true
 dependencies:
-  - { role: linuxhq.cloudflare.account_info, tags: tunnel_info }
+  - role: account_info
+    tags: tunnel_info
 galaxy_info:
   role_name: tunnel_info
   author: Taylor Kimball
