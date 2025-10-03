@@ -1,4 +1,6 @@
 ---
 cf_account_id: null
 cf_auth_token: null
+cf_fetch_tunnel_token: false
+cf_tunnel_names: []
 ...
