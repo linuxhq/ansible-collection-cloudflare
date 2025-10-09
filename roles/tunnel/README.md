@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create cloudflare tunnels
+Manage cloudflare tunnels
 
 ## Requirements
 
@@ -10,15 +10,13 @@ Create cloudflare tunnels
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
-    cf_tunnels: []
+    tunnel_account_id: null
+    tunnel_api_token: null
+    tunnel_list: []
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
 
 ## Return Values
 
@@ -30,9 +28,9 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.tunnel
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_tunnels:
+          tunnel_account_id: "{{ _cf_account_id }}"
+          tunnel_api_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          tunnel_list:
             - name: linuxhq
               config_src: local
               tunnel_secret: ckNzQVhSVHhhVXF5SmU3S0xnY2ZON1ZxVVdYQVhiSgo=

@@ -98,7 +98,6 @@
   tags:
     - zone
   ansible.builtin.uri:
-    body_format: json
     headers:
       Authorization: "Bearer {{ zone_api_token }}"
     method: DELETE

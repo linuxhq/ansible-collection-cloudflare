@@ -1,5 +1,5 @@
 ---
-cf_account_id: null
-cf_auth_token: null
-cf_tunnels: []
+tunnel_account_id: null
+tunnel_api_token: null
+tunnel_list: []
 ...

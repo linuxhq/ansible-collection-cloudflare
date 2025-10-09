@@ -26,8 +26,7 @@
   ansible.builtin.set_fact:
     __tunnel_info_list:
       "{{ __tunnel_info_query.json.result |
-          d([]) |
-          selectattr('name', 'defined') }}"
+          d([]) }}"
 
 - name: Ensure cloudflare tunnel token information is gathered
   tags:
