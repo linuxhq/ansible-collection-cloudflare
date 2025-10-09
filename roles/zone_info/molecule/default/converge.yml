@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: zone_info
+      tags:
+        - molecule-idempotence-notest
+
+    - role: zone_info
+      zone_info_api_key: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+...

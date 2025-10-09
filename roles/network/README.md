@@ -10,14 +10,12 @@ Configure network settings
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_auth_token: null
-    cf_network: []
+    network_api_key: null
+    network_list: []
 
 ## Dependencies
 
-* [linuxhq.cloudflare.zone_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
+* [linuxhq.cloudflare.zone\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
 
 ## Example Playbook
 
@@ -25,8 +23,8 @@ Available variables are listed below, along with default values:
       connection: local
       roles:
         - role: linuxhq.cloudflare.network
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_network:
+          network_api_key: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          network_list:
             - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
               ip_geolocation: true
               ipv6: false
