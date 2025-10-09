@@ -1,126 +1,126 @@
 ---
-- name: Ensure cloudflare ipv6 is patched
+- name: Ensure cloudflare ipv6 setting is managed
   tags:
     - network
   ansible.builtin.uri:
     body:
-      value: "{{ 'on' if _network.ipv6 | bool else 'off' }}"
+      value: "{{ 'on' if _ipv6.ipv6 | bool else 'off' }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ network_api_key }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _network.zone_id +
-             '/settings/ipv6' }}"
-  loop: "{{ cf_network }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _ipv6.zone_id ~
+          '/settings/ipv6' }}"
+  loop: "{{ network_list }}"
   loop_control:
-    label: "{{ _network.zone_id | default(none) }}"
-    loop_var: _network
+    label: "{{ _ipv6.zone_id | d(none) }}"
+    loop_var: _ipv6
   when:
-    - cf_auth_token is not none
-    - _network.ipv6 is defined
-    - _network.zone_id is defined
+    - network_api_key is not none
+    - _ipv6.ipv6 is defined
+    - _ipv6.zone_id is defined
 
-- name: Ensure cloudflare websockets is patched
+- name: Ensure cloudflare websockets setting is managed
   tags:
     - network
   ansible.builtin.uri:
     body:
-      value: "{{ 'on' if _network.websockets | bool else 'off' }}"
+      value: "{{ 'on' if _websockets.websockets | bool else 'off' }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ network_api_key }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _network.zone_id +
-             '/settings/websockets' }}"
-  loop: "{{ cf_network }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _websockets.zone_id ~
+          '/settings/websockets' }}"
+  loop: "{{ network_list }}"
   loop_control:
-    label: "{{ _network.zone_id | default(none) }}"
-    loop_var: _network
+    label: "{{ _websockets.zone_id | d(none) }}"
+    loop_var: _websockets
   when:
-    - cf_auth_token is not none
-    - _network.websockets is defined
-    - _network.zone_id is defined
+    - network_api_key is not none
+    - _websockets.websockets is defined
+    - _websockets.zone_id is defined
 
-- name: Ensure cloudflare opportunistic onion is patched
+- name: Ensure cloudflare opportunistic onion setting is managed
   tags:
     - network
   ansible.builtin.uri:
     body:
-      value: "{{ 'on' if _network.opportunistic_onion | bool else 'off' }}"
+      value: "{{ 'on' if _oo.opportunistic_onion | bool else 'off' }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ network_api_key }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _network.zone_id +
-             '/settings/opportunistic_onion' }}"
-  loop: "{{ cf_network }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _oo.zone_id ~
+          '/settings/opportunistic_onion' }}"
+  loop: "{{ network_list }}"
   loop_control:
-    label: "{{ _network.zone_id | default(none) }}"
-    loop_var: _network
+    label: "{{ _oo.zone_id | d(none) }}"
+    loop_var: _oo
   when:
-    - cf_auth_token is not none
-    - _network.opportunistic_onion is defined
-    - _network.zone_id is defined
+    - network_api_key is not none
+    - _oo.opportunistic_onion is defined
+    - _oo.zone_id is defined
 
-- name: Ensure cloudflare pseudo ipv4 is patched
+- name: Ensure cloudflare pseudo ipv4 setting is managed
   tags:
     - network
   ansible.builtin.uri:
     body:
-      value: "{{ _network.pseudo_ipv4 }}"
+      value: "{{ _pipv4.pseudo_ipv4 }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ network_api_key }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _network.zone_id +
-             '/settings/pseudo_ipv4' }}"
-  loop: "{{ cf_network }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _pipv4.zone_id ~
+          '/settings/pseudo_ipv4' }}"
+  loop: "{{ network_list }}"
   loop_control:
-    label: "{{ _network.zone_id | default(none) }}"
-    loop_var: _network
+    label: "{{ _pipv4.zone_id | d(none) }}"
+    loop_var: _pipv4
   when:
-    - cf_auth_token is not none
-    - _network.pseudo_ipv4 is defined
-    - _network.zone_id is defined
+    - network_api_key is not none
+    - _pipv4.pseudo_ipv4 is defined
+    - _pipv4.zone_id is defined
 
-- name: Ensure cloudflare ip geolocation is patched
+- name: Ensure cloudflare ip geolocation setting is managed
   tags:
     - network
   ansible.builtin.uri:
     body:
-      value: "{{ 'on' if _network.ip_geolocation | bool else 'off' }}"
+      value: "{{ 'on' if _ipg.ip_geolocation | bool else 'off' }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ network_api_key }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _network.zone_id +
-             '/settings/ip_geolocation' }}"
-  loop: "{{ cf_network }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _ipg.zone_id ~
+          '/settings/ip_geolocation' }}"
+  loop: "{{ network_list }}"
   loop_control:
-    label: "{{ _network.zone_id | default(none) }}"
-    loop_var: _network
+    label: "{{ _ipg.zone_id | d(none) }}"
+    loop_var: _ipg
   when:
-    - cf_auth_token is not none
-    - _network.ip_geolocation is defined
-    - _network.zone_id is defined
+    - network_api_key is not none
+    - _ipg.ip_geolocation is defined
+    - _ipg.zone_id is defined
 ...

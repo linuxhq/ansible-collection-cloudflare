@@ -1,4 +1,4 @@
 ---
-cf_auth_token: null
-cf_network: []
+network_api_token: null
+network_list: []
 ...

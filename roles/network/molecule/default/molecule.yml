@@ -1,0 +1,24 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../requirements.yml
+
+driver:
+  name: vagrant
+
+platforms:
+  - name: almalinux9
+    box: bento/almalinux-9
+
+provisioner:
+  name: ansible
+  log: true
+  options:
+    diff: true
+
+verifier:
+  name: ansible
+  options:
+    diff: true
+...
