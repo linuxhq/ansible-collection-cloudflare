@@ -10,12 +10,10 @@ Gather information about cloudflare zones
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_auth_token: null
-    cf_zones_match: all
-    cf_zones_page: 1
-    cf_zones_per_page: 20
+    zone_info_api_key: null
+    zone_info_match: all
+    zone_info_page: 1
+    zone_info_per_page: 20
 
 ## Dependencies
 
@@ -23,9 +21,8 @@ None
 
 ## Return Values
 
-    _cf_zone_id
-    _cf_zone_list
-    _cf_zone_name_servers
+    _zone_info_dict
+    _zone_info_list
 
 ## Example Playbook
 
@@ -33,7 +30,7 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.zone_info
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          zone_info_api_key: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
 
 ## License
 

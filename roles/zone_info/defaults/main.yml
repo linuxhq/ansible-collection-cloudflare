@@ -1,6 +1,6 @@
 ---
-cf_auth_token: null
-cf_zones_match: all
-cf_zones_page: 1
-cf_zones_per_page: 20
+zone_info_api_key: null
+zone_info_match: all
+zone_info_page: 1
+zone_info_per_page: 20
 ...

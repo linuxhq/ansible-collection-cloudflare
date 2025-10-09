@@ -1,58 +1,42 @@
 ---
-- name: Ensure cloudflare zone details are gathered
+- name: Ensure cloudflare zone information is gathered
   tags:
     - zone_info
   ansible.builtin.uri:
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ zone_info_api_key }}"
     method: GET
     status_code:
       - 200
       - 401
       - 403
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones' ~
-             '?match=' ~
-             cf_zones_match ~
-             '&page=' ~
-             cf_zones_page ~
-             '&per_page=' ~
-             cf_zones_per_page }}"
-  register: _zones
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones' ~
+          '?match=' ~
+          zone_info_match ~
+          '&page=' ~
+          zone_info_page ~
+          '&per_page=' ~
+          zone_info_per_page }}"
+  register: __zone_info_query
   when:
-    - cf_auth_token is not none
+    - zone_info_api_key is not none
 
-- name: Ensure list of zone ids is generated  # noqa: jinja[invalid]
+- name: Ensure list of cloudflare zone information is generated
   tags:
     - zone_info
   ansible.builtin.set_fact:
-    _cf_zone_list: "{{ _zones.json.result |
-                       json_query('[].name') |
-                       list }}"
-  when:
-    - _zones.json.result is defined
-    - _zones.json.result is not none
+    _zone_info_list:
+      "{{ __zone_info_query.json.result |
+          d([]) }}"
 
-- name: Ensure dictionaries of zone details are generated
+- name: Ensure dict of cloudflare zone information is generated
   tags:
     - zone_info
   ansible.builtin.set_fact:
-    _cf_zone_id: "{{ _cf_zone_id |
-                     default({}) |
-                     combine({_name: _id}) }}"
-    _cf_zone_name_servers: "{{ _cf_zone_name_servers |
-                               default({}) |
-                               combine({_name: _name_servers}) }}"
-  loop: "{{ _zones.json.result | d([], true) }}"
-  loop_control:
-    label: "{{ _name | default(none) }}"
-    loop_var: _zone
-  vars:
-    _id: "{{ _zone.id }}"
-    _name: "{{ _zone.name }}"
-    _name_servers: "{{ _zone.name_servers }}"
-  when:
-    - _zone.id is defined
-    - _zone.name is defined
-    - _zone.name_servers is defined
+    _zone_info_dict:
+      "{{ (dict(_zone_info_list |
+               json_query('[].name') |
+               zip(_zone_info_list))) |
+          d({}) }}"
 ...
