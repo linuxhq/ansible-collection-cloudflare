@@ -10,7 +10,7 @@ Configure network settings
 
 ## Role Variables
 
-    network_api_key: null
+    network_api_token: null
     network_list: []
 
 ## Dependencies
@@ -23,13 +23,13 @@ Configure network settings
       connection: local
       roles:
         - role: linuxhq.cloudflare.network
-          network_api_key: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          network_api_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
           network_list:
             - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
               ip_geolocation: true
               ipv6: false
               opportunistic_onion: false
-              pseudo_ipv4: 'off'
+              pseudo_ipv4: false
               websockets: true
 
 ## License

@@ -4,7 +4,7 @@
     - zone_info
   ansible.builtin.uri:
     headers:
-      Authorization: "Bearer {{ zone_info_api_key }}"
+      Authorization: "Bearer {{ zone_info_api_token }}"
     method: GET
     status_code:
       - 200
@@ -20,7 +20,7 @@
           zone_info_per_page }}"
   register: __zone_info_query
   when:
-    - zone_info_api_key is not none
+    - zone_info_api_token is not none
 
 - name: Ensure list of cloudflare zone information is generated
   tags:

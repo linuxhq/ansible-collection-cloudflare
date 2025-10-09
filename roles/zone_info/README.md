@@ -10,7 +10,7 @@ Gather information about cloudflare zones
 
 ## Role Variables
 
-    zone_info_api_key: null
+    zone_info_api_token: null
     zone_info_match: all
     zone_info_page: 1
     zone_info_per_page: 20
@@ -30,7 +30,7 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.zone_info
-          zone_info_api_key: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          zone_info_api_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
 
 ## License
 
