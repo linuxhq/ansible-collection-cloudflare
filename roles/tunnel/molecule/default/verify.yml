@@ -1,0 +1,16 @@
+---
+- name: Verify
+  hosts: all
+
+  pre_tasks:
+    - name: Ensure inventory lists are formatted
+      tags:
+        - tunnel
+      ansible.builtin.set_fact:
+        tunnel_list:
+          "{{ tunnel_list |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - tunnel
+...

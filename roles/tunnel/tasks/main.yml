@@ -1,69 +1,130 @@
 ---
-- name: Ensure cloudflare tunnel details are gathered
+- name: Ensure cloudflare tunnel information is gathered
   tags:
     - tunnel
   ansible.builtin.uri:
-    follow_redirects: false
+    body_format: json
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ tunnel_api_token }}"
     method: GET
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             cf_account_id +
-             '/cfd_tunnel?is_deleted=false' }}"
-  register: _tunnels
+      - 401
+      - 403
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          tunnel_account_id ~
+          '/cfd_tunnel?is_deleted=false' }}"
+  register: __tunnel_query
   when:
-    - cf_account_id is not none
-    - cf_auth_token is not none
+    - tunnel_account_id is not none
+    - tunnel_api_token is not none
 
-- name: Ensure dictionary of cloudflare tunnels is generated
+- name: Ensure list of cloudflare tunnel information is generated
   tags:
     - tunnel
   ansible.builtin.set_fact:
-    _cf_tunnel_id: "{{ _cf_tunnel_id |
-                       default({}) |
-                       combine({_name: _id}) }}"
-  loop: "{{ _tunnels.json.result }}"
-  loop_control:
-    label: "{{ _tunnel.name | default(none) }}"
-    loop_var: _tunnel
-  vars:
-    _id: "{{ _tunnel.id }}"
-    _name: "{{ _tunnel.name }}"
-  when:
-    - _tunnels.json.result is defined
-    - _tunnel.id is defined
-    - _tunnel.name is defined
+    __tunnel_list:
+      "{{ __tunnel_query.json.result |
+          d([]) }}"
+
+- name: Ensure dict of cloudflare tunnel information is generated
+  tags:
+    - tunnel
+  ansible.builtin.set_fact:
+    __tunnel_dict:
+      "{{ (dict(__tunnel_list |
+               json_query('[].name') |
+               zip(__tunnel_list))) |
+          d({}) }}"
 
 - name: Ensure cloudflare tunnels are present
   tags:
     - tunnel
   ansible.builtin.uri:
     body:
-      config_src: "{{ _tunnel.config_src }}"
-      name: "{{ _tunnel.name }}"
-      tunnel_secret: "{{ _tunnel.tunnel_secret | trim }}"
+      config_src: "{{ _post.config_src | d('local') }}"
+      name: "{{ _post.name }}"
+      tunnel_secret: "{{ _post.tunnel_secret | trim }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ tunnel_api_token }}"
     method: POST
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             cf_account_id +
-             '/cfd_tunnel' }}"
-  loop: "{{ cf_tunnels }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          tunnel_account_id ~
+          '/cfd_tunnel' }}"
+  loop: "{{ tunnel_list }}"
   loop_control:
-    label: "{{ _tunnel.name }}"
-    loop_var: _tunnel
+    label: "{{ _post.name | d(none) }}"
+    loop_var: _post
   when:
-    - cf_account_id is not none
-    - cf_auth_token is not none
-    - _tunnel.config_src is defined
-    - _tunnel.name is defined
-    - _tunnel.tunnel_secret is defined
-    - _cf_tunnel_id is not defined or
-      _tunnel.name not in _cf_tunnel_id.keys()
+    - tunnel_account_id is not none
+    - tunnel_api_token is not none
+    - _post.name is defined
+    - _post.name not in __tunnel_dict.keys()
+    - _post.state is not defined or
+      _post.state == 'present'
+    - _post.tunnel_secret is defined
+
+- name: Ensure cloudflare tunnels are patched
+  tags:
+    - tunnel
+  ansible.builtin.uri:
+    body:
+      name: "{{ _patch.name }}"
+      tunnel_secret: "{{ _patch.tunnel_secret | trim }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ tunnel_api_token }}"
+    method: PATCH
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          tunnel_account_id ~
+          '/cfd_tunnel/' ~
+          __tunnel_dict[_patch.name].id }}"
+  loop: "{{ tunnel_list }}"
+  loop_control:
+    label: "{{ _patch.name | d(none) }}"
+    loop_var: _patch
+  when:
+    - tunnel_account_id is not none
+    - tunnel_api_token is not none
+    - _patch.name is defined
+    - _patch.name in __tunnel_dict.keys()
+    - _patch.state is not defined or
+      _patch.state == 'present'
+    - _patch.tunnel_secret is defined
+    - __tunnel_dict[_patch.name].id is defined
+
+- name: Ensure cloudflare tunnels are absent
+  tags:
+    - tunnel
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ tunnel_api_token }}"
+    method: DELETE
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          tunnel_account_id ~
+          '/cfd_tunnel/' ~
+          __tunnel_dict[_delete.name].id }}"
+  loop: "{{ tunnel_list }}"
+  loop_control:
+    label: "{{ _delete.name | d(none) }}"
+    loop_var: _delete
+  when:
+    - tunnel_account_id is not none
+    - tunnel_api_token is not none
+    - _delete.name is defined
+    - _delete.name in __tunnel_dict.keys()
+    - _delete.state is defined and
+      _delete.state == 'absent'
+    - __tunnel_dict[_delete.name].id is defined
 ...
