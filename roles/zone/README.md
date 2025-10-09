@@ -27,8 +27,8 @@ Manage cloudflare zones
       connection: local
       roles:
         - role: linuxhq.cloudflare.zone
-          account_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-          account_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          account_info_name: linuxhq
           zone_account_id: "{{ _account_info_id }}"
           zone_api_token: "{{ account_info_api_token }}"
           zone_list:

@@ -30,7 +30,7 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.zone_info
-          zone_info_api_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          zone_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
 
 ## License
 

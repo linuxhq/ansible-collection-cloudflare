@@ -28,12 +28,13 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.tunnel
-          tunnel_account_id: "{{ _cf_account_id }}"
-          tunnel_api_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          account_info_name: linuxhq
+          tunnel_account_id: "{{ _account_info_id }}"
+          tunnel_api_token: "{{ account_info_api_token }}"
           tunnel_list:
-            - name: linuxhq
-              config_src: local
-              tunnel_secret: ckNzQVhSVHhhVXF5SmU3S0xnY2ZON1ZxVVdYQVhiSgo=
+            - name: lhqcfv2
+              tunnel_secret: YjNhS3ZzQ0puNzNxdFljY0VmbkpGdWlOb3M3dWNxUlJ5YmhVUkx6S2NUNFBZN3k3bUZUb21McnUzd1BhTkh2aQo=
 
 ## License
 

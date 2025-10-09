@@ -28,7 +28,7 @@ Manage cloudflare dns records
       connection: local
       roles:
         - role: linuxhq.cloudflare.dns
-          dns_api_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          dns_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           dns_records:
             - zone: linuxhq.net
               records:
