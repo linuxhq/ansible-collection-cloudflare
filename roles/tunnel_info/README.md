@@ -28,8 +28,8 @@ Gather information about cloudflare tunnels
       connection: local
       roles:
         - role: linuxhq.cloudflare.tunnel_info
-          tunnel_info_account_id: "{{ _cf_account_id }}"
-          tunnel_info_api_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          tunnel_info_account_id: "{{ _account_info_id }}"
+          tunnel_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
 
 ## License
 

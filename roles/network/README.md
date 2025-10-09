@@ -23,9 +23,10 @@ Configure network settings
       connection: local
       roles:
         - role: linuxhq.cloudflare.network
-          network_api_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          zone_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          network_api_token: "{{ zone_info_api_token }}"
           network_list:
-            - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
+            - zone_id: "{{ _zone_info_dict[network_zone].id }}"
               ip_geolocation: true
               ipv6: false
               opportunistic_onion: false

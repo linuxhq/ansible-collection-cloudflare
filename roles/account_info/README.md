@@ -32,7 +32,7 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.account_info
-          account_info_api_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           account_info_name: linuxhq
 
 ## License
