@@ -1,8 +1,8 @@
 ---
-cf_account_id: null
-cf_auth_token: null
-cf_zones: []
-cf_zones_match: all
-cf_zones_page: 1
-cf_zones_per_page: 20
+zone_account_id: null
+zone_api_token: null
+zone_list: []
+zone_match: all
+zone_page: 1
+zone_per_page: 20
 ...

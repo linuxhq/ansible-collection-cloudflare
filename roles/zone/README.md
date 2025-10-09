@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create and modify cloudflare zones
+Manage cloudflare zones
 
 ## Requirements
 
@@ -10,18 +10,16 @@ Create and modify cloudflare zones
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
-    cf_zones: []
-    cf_zones_match: all
-    cf_zones_page: 1
-    cf_zones_per_page: 20
+    zone_account_id: null
+    zone_api_token: null
+    zone_list: []
+    zone_match: all
+    zone_page: 1
+    zone_per_page: 20
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
 
 ## Example Playbook
 
@@ -29,10 +27,13 @@ Available variables are listed below, along with default values:
       connection: local
       roles:
         - role: linuxhq.cloudflare.zone
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_zones:
-            - name: linuxhq.net
+          account_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          account_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+          zone_account_id: "{{ _account_info_id }}"
+          zone_api_token: "{{ account_info_api_token }}"
+          zone_list:
+            - name: lhqcfv2.net
+              type: full
 
 ## License
 

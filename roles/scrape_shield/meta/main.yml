@@ -1,11 +1,12 @@
 ---
 dependencies:
-  - { role: linuxhq.cloudflare.zone_info, tags: scrape_shield }
+  - role: zone_info
+    tags: scrape_shield
 galaxy_info:
   role_name: scrape_shield
   author: Taylor Kimball
   description: Configure scrape shield settings
-  license: GPLv3
+  license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   platforms:
     - name: GenericLinux

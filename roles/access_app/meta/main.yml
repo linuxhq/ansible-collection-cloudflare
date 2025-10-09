@@ -1,11 +1,12 @@
 ---
 dependencies:
-  - { role: linuxhq.cloudflare.account_info, tags: access_app }
+  - role: account_info
+    tags: access_app
 galaxy_info:
   role_name: application
   author: Taylor Kimball
   description: Create and update cloudflare access apps
-  license: GPLv3
+  license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   platforms:
     - name: GenericLinux
