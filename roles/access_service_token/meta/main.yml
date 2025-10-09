@@ -1,11 +1,12 @@
 ---
 dependencies:
-  - { role: linuxhq.cloudflare.account_info, tags: access_service_token }
+  - role: account_info
+    tags: access_service_token
 galaxy_info:
   role_name: access_service_token
   author: Taylor Kimball
   description: Create and update cloudflare access service tokens
-  license: GPLv3
+  license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   platforms:
     - name: GenericLinux

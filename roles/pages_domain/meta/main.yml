@@ -1,11 +1,12 @@
 ---
 dependencies:
-  - { role: linuxhq.cloudflare.account_info, tags: pages_domain }
+  - role: account_info
+    tags: pages_domain
 galaxy_info:
   role_name: pages_domain
   author: Taylor Kimball
   description: Create and update cloudflare pages domains
-  license: GPLv3
+  license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   platforms:
     - name: GenericLinux

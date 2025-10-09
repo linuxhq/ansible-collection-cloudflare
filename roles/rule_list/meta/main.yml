@@ -1,11 +1,12 @@
 ---
 dependencies:
-  - { role: linuxhq.cloudflare.account_info, tags: rule_list }
+  - role: account_info
+    tags: rule_list
 galaxy_info:
   role_name: rule_list
   author: Taylor Kimball
   description: Create and update cloudflare rule lists
-  license: GPLv3
+  license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   platforms:
     - name: GenericLinux

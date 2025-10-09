@@ -1,11 +1,12 @@
 ---
 dependencies:
-  - { role: linuxhq.cloudflare.account_info, tags: tunnel }
+  - role: account_info
+    tags: tunnel
 galaxy_info:
   role_name: tunnel
   author: Taylor Kimball
   description: Create cloudflare tunnels
-  license: GPLv3
+  license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   platforms:
     - name: GenericLinux

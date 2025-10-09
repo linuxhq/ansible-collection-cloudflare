@@ -1,11 +1,12 @@
 ---
 dependencies:
-  - { role: linuxhq.cloudflare.account_info, tags: zone }
+  - role: account_info
+    tags: zone
 galaxy_info:
   role_name: zone
   author: Taylor Kimball
-  description: Create and modify cloudflare zones
-  license: GPLv3
+  description: Manage cloudflare zones
+  license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   platforms:
     - name: GenericLinux

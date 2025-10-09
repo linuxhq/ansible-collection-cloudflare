@@ -1,11 +1,12 @@
 ---
 dependencies:
-  - { role: linuxhq.cloudflare.account_info, tags: pages_project }
+  - role: account_info
+    tags: pages_project
 galaxy_info:
   role_name: pages_project
   author: Taylor Kimball
   description: Create and update cloudflare pages projects
-  license: GPLv3
+  license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   platforms:
     - name: GenericLinux
