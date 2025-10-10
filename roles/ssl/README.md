@@ -10,14 +10,12 @@ Configure ssl settings
 
 ## Role Variables
 
-Available variables are ruleed below, along with default values:
-
-    cf_auth_token: null
-    cf_ssl: []
+    ssl_api_token: null
+    ssl_list: []
 
 ## Dependencies
 
-* [linuxhq.cloudflare.zone_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
+* [linuxhq.cloudflare.zone\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
 
 ## Return Values
 
@@ -27,17 +25,23 @@ None
 
     - hosts: cloudflare
       connection: local
+      vars:
+        account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+        account_info_name: linuxhq
+        zone_info_api_token: "{{ account_info_api_token }}"
+
       roles:
+        - role: zone
+          zone_account_id: "{{ _account_info_id }}"
+          zone_api_token: "{{ account_info_api_token }}"
+          zone_list:
+            - name: lhqcfv2.net
+              type: full
+
         - role: linuxhq.cloudflare.ssl
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_ssl:
-            - zone_id: "{{ _cf_zone_id['linuxheadquarters.net'] }}"
-              always_use_https: true
-              automatic_https_rewrites: true
-              min_tls_version: 1.3
-              mode: strict
-              opportunistic_encryption: true
-            - zone_id: "{{ _cf_zone_id['linuxheadquarters.org'] }}"
+          ssl_api_token: "{{ account_info_api_token }}"
+          ssl_list:
+            - zone_id: "{{ _zone_info_dict['lhqcfv2.net'].id }}"
               always_use_https: true
               automatic_https_rewrites: true
               min_tls_version: 1.3
