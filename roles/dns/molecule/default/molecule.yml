@@ -19,9 +19,15 @@ provisioner:
   inventory:
     group_vars:
       all:
-        dns_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+        account_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+        account_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+        tunnel_info_account_id: "{{ _account_info_id }}"
+        tunnel_info_api_token: "{{ account_info_api_token }}"
+        zone_info_api_token: "{{ account_info_api_token }}"
+
+        dns_api_token: "{{ account_info_api_token }}"
         dns_records:
-          - zone: "{{ lookup('env', 'CLOUDFLARE_ZONE') }}"
+          - zone: lhqcfv2.net
             records:
               - record: one
                 proxied: true
@@ -75,6 +81,12 @@ provisioner:
                 proxied: true
                 type: A
                 value: 8.8.8.13
+
+        zone_account_id: "{{ _account_info_id }}"
+        zone_api_token: "{{ account_info_api_token }}"
+        zone_list:
+          - name: lhqcfv2.net
+            type: full
 
 verifier:
   name: ansible

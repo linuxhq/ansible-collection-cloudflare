@@ -2,21 +2,12 @@
 - name: Converge
   hosts: all
   vars:
-    network_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-    network_zone: "{{ lookup('env', 'CLOUDFLARE_ZONE') }}"
-    zone_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-
   roles:
     - role: network
+      network_list: []
       tags:
         - molecule-idempotence-notest
 
-    - role: network
-      network_list:
-        - zone_id: "{{ _zone_info_dict[network_zone].id }}"
-          ip_geolocation: true
-          ipv6: false
-          opportunistic_onion: false
-          pseudo_ipv4: false
-          websockets: true
+    - zone
+    - network
 ...

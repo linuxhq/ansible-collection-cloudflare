@@ -21,12 +21,23 @@ Configure network settings
 
     - hosts: cloudflare
       connection: local
+      vars:
+        account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+        account_info_name: linuxhq
+        zone_info_api_token: "{{ account_info_api_token }}"
+
       roles:
+        - role: linuxhq.cloudflare.zone
+          zone_account_id: "{{ _account_info_id }}"
+          zone_api_token: "{{ account_info_api_token }}"
+          zone_list:
+            - name: lhqcfv2.net
+              type: full
+
         - role: linuxhq.cloudflare.network
-          zone_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          network_api_token: "{{ zone_info_api_token }}"
+          network_api_token: "{{ account_info_api_token }}"
           network_list:
-            - zone_id: "{{ _zone_info_dict[network_zone].id }}"
+            - zone_id: "{{ _zone_info_dict['lhqcfv2.net'].id }}"
               ip_geolocation: true
               ipv6: false
               opportunistic_onion: false

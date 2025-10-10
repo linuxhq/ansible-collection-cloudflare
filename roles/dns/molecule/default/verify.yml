@@ -8,12 +8,16 @@
         - dns
       ansible.builtin.set_fact:
         dns_records:
-          - zone: "{{ lookup('env', 'CLOUDFLARE_ZONE') }}"
+          - zone: lhqcfv2.net
             records:
               "{{ dns_records[0].records |
                   map('combine', {'state': 'absent'}) |
                   list }}"
+        zone_list:
+          "{{ zone_list |
+              map('combine', {'state': 'absent'}) }}"
 
   roles:
     - dns
+    - zone
 ...
