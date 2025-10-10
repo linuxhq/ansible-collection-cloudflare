@@ -31,7 +31,7 @@ None
         zone_info_api_token: "{{ account_info_api_token }}"
 
       roles:
-        - role: zone
+        - role: linuxhq.cloudflare.zone
           zone_account_id: "{{ _account_info_id }}"
           zone_api_token: "{{ account_info_api_token }}"
           zone_list:
