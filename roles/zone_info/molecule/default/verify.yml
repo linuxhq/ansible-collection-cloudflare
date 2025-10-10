@@ -2,8 +2,7 @@
 - name: Verify
   hosts: all
   roles:
-    - role: zone_info
-      zone_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+    - zone_info
 
   post_tasks:
     - name: Ensure cloudflare zone information is verified

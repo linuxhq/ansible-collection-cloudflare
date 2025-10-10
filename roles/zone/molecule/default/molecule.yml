@@ -21,6 +21,7 @@ provisioner:
       all:
         account_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
         account_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+
         zone_account_id: "{{ _account_info_id }}"
         zone_api_token: "{{ account_info_api_token }}"
         zone_list:
