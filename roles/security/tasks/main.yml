@@ -1,76 +1,76 @@
 ---
-- name: Ensure cloudflare security level is patched
+- name: Ensure cloudflare security level setting is managed
   tags:
     - security
   ansible.builtin.uri:
     body:
-      value: "{{ _security.security_level }}"
+      value: "{{ _sl.security_level }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ security_api_token }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _security.zone_id +
-             '/settings/security_level' }}"
-  loop: "{{ cf_security }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _sl.zone_id ~
+          '/settings/security_level' }}"
+  loop: "{{ security_list }}"
   loop_control:
-    label: "{{ _security.zone_id | default(none) }}"
-    loop_var: _security
+    label: "{{ _sl.zone_id | d(none) }}"
+    loop_var: _sl
   when:
-    - cf_auth_token is not none
-    - _security.security_level is defined
-    - _security.zone_id is defined
+    - security_api_token is not none
+    - _sl.security_level is defined
+    - _sl.zone_id is defined
 
-- name: Ensure cloudflare challenge ttl is patched
+- name: Ensure cloudflare challenge ttl setting is managed
   tags:
     - security
   ansible.builtin.uri:
     body:
-      value: "{{ _security.challenge_ttl | int }}"
+      value: "{{ _ct.challenge_ttl | int }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ security_api_token }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _security.zone_id +
-             '/settings/challenge_ttl' }}"
-  loop: "{{ cf_security }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _ct.zone_id ~
+          '/settings/challenge_ttl' }}"
+  loop: "{{ security_list }}"
   loop_control:
-    label: "{{ _security.zone_id | default(none) }}"
-    loop_var: _security
+    label: "{{ _ct.zone_id | d(none) }}"
+    loop_var: _ct
   when:
-    - cf_auth_token is not none
-    - _security.challenge_ttl is defined
-    - _security.zone_id is defined
+    - security_api_token is not none
+    - _ct.challenge_ttl is defined
+    - _ct.zone_id is defined
 
-- name: Ensure cloudflare browser check is patched
+- name: Ensure cloudflare browser check setting is managed
   tags:
     - security
   ansible.builtin.uri:
     body:
-      value: "{{ 'on' if _security.browser_check | bool else 'off' }}"
+      value: "{{ 'on' if _bc.browser_check | bool else 'off' }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ security_api_token }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _security.zone_id +
-             '/settings/browser_check' }}"
-  loop: "{{ cf_security }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _bc.zone_id ~
+          '/settings/browser_check' }}"
+  loop: "{{ security_list }}"
   loop_control:
-    label: "{{ _security.zone_id | default(none) }}"
-    loop_var: _security
+    label: "{{ _bc.zone_id | d(none) }}"
+    loop_var: _bc
   when:
-    - cf_auth_token is not none
-    - _security.browser_check is defined
-    - _security.zone_id is defined
+    - security_api_token is not none
+    - _bc.browser_check is defined
+    - _bc.zone_id is defined
 ...

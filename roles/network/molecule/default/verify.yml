@@ -5,7 +5,7 @@
   pre_tasks:
     - name: Ensure inventory lists are formatted
       tags:
-        - zone
+        - network
       ansible.builtin.set_fact:
         zone_list:
           "{{ zone_list |
