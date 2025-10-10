@@ -1,0 +1,12 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: ssl
+      ssl_list: []
+      tags:
+        - molecule-idempotence-notest
+
+    - zone
+    - ssl
+...

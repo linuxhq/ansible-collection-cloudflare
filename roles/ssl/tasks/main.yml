@@ -1,126 +1,126 @@
 ---
-- name: Ensure cloudflare ssl mode is patched
+- name: Ensure cloudflare ssl mode setting is managed
   tags:
     - ssl
   ansible.builtin.uri:
     body:
       value: "{{ _ssl.mode }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ ssl_api_token }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _ssl.zone_id +
-             '/settings/ssl' }}"
-  loop: "{{ cf_ssl }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _ssl.zone_id ~
+          '/settings/ssl' }}"
+  loop: "{{ ssl_list }}"
   loop_control:
     label: "{{ _ssl.zone_id }}"
     loop_var: _ssl
   when:
-    - cf_auth_token is not none
+    - ssl_api_token is not none
     - _ssl.mode is defined
     - _ssl.zone_id is defined
 
-- name: Ensure cloudflare always use https is patched
+- name: Ensure cloudflare always use https setting is managed
   tags:
     - ssl
   ansible.builtin.uri:
     body:
-      value: "{{ 'on' if _ssl.always_use_https | bool else 'off' }}"
+      value: "{{ 'on' if _auh.always_use_https | bool else 'off' }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ ssl_api_token }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _ssl.zone_id +
-             '/settings/always_use_https' }}"
-  loop: "{{ cf_ssl }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _auh.zone_id ~
+          '/settings/always_use_https' }}"
+  loop: "{{ ssl_list }}"
   loop_control:
-    label: "{{ _ssl.zone_id }}"
-    loop_var: _ssl
+    label: "{{ _auh.zone_id }}"
+    loop_var: _auh
   when:
-    - cf_auth_token is not none
-    - _ssl.always_use_https is defined
-    - _ssl.zone_id is defined
+    - ssl_api_token is not none
+    - _auh.always_use_https is defined
+    - _auh.zone_id is defined
 
-- name: Ensure cloudflare minimum tls version is patched
+- name: Ensure cloudflare minimum tls version setting is managed
   tags:
     - ssl
   ansible.builtin.uri:
     body:
-      value: "{{ _ssl.min_tls_version }}"
+      value: "{{ _mtv.min_tls_version }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ ssl_api_token }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _ssl.zone_id +
-             '/settings/min_tls_version' }}"
-  loop: "{{ cf_ssl }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _mtv.zone_id ~
+          '/settings/min_tls_version' }}"
+  loop: "{{ ssl_list }}"
   loop_control:
-    label: "{{ _ssl.zone_id }}"
-    loop_var: _ssl
+    label: "{{ _mtv.zone_id }}"
+    loop_var: _mtv
   when:
-    - cf_auth_token is not none
-    - _ssl.min_tls_version is defined
-    - _ssl.zone_id is defined
+    - ssl_api_token is not none
+    - _mtv.min_tls_version is defined
+    - _mtv.zone_id is defined
 
-- name: Ensure cloudflare opportunistic encryption is patched
+- name: Ensure cloudflare opportunistic encryption setting is managed
   tags:
     - ssl
   ansible.builtin.uri:
     body:
-      value: "{{ 'on' if _ssl.opportunistic_encryption | bool else 'off' }}"
+      value: "{{ 'on' if _oe.opportunistic_encryption | bool else 'off' }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ ssl_api_token }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _ssl.zone_id +
-             '/settings/opportunistic_encryption' }}"
-  loop: "{{ cf_ssl }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _oe.zone_id ~
+          '/settings/opportunistic_encryption' }}"
+  loop: "{{ ssl_list }}"
   loop_control:
-    label: "{{ _ssl.zone_id }}"
-    loop_var: _ssl
+    label: "{{ _oe.zone_id }}"
+    loop_var: _oe
   when:
-    - cf_auth_token is not none
-    - _ssl.opportunistic_encryption is defined
-    - _ssl.zone_id is defined
+    - ssl_api_token is not none
+    - _oe.opportunistic_encryption is defined
+    - _oe.zone_id is defined
 
-- name: Ensure cloudflare automatic https rewrites is patched
+- name: Ensure cloudflare automatic https rewrites setting is managed
   tags:
     - ssl
   ansible.builtin.uri:
     body:
-      value: "{{ 'on' if _ssl.automatic_https_rewrites | bool else 'off' }}"
+      value: "{{ 'on' if _ahr.automatic_https_rewrites | bool else 'off' }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ ssl_api_token }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _ssl.zone_id +
-             '/settings/automatic_https_rewrites' }}"
-  loop: "{{ cf_ssl }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _ahr.zone_id ~
+          '/settings/automatic_https_rewrites' }}"
+  loop: "{{ ssl_list }}"
   loop_control:
-    label: "{{ _ssl.zone_id }}"
-    loop_var: _ssl
+    label: "{{ _ahr.zone_id }}"
+    loop_var: _ahr
   when:
-    - cf_auth_token is not none
-    - _ssl.automatic_https_rewrites is defined
-    - _ssl.zone_id is defined
+    - ssl_api_token is not none
+    - _ahr.automatic_https_rewrites is defined
+    - _ahr.zone_id is defined
 ...
