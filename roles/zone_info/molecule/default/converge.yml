@@ -3,9 +3,9 @@
   hosts: all
   roles:
     - role: zone_info
+      zone_info_api_token: null
       tags:
         - molecule-idempotence-notest
 
-    - role: zone_info
-      zone_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+    - zone_info
 ...

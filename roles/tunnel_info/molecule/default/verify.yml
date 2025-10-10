@@ -2,9 +2,7 @@
 - name: Verify
   hosts: all
   roles:
-    - role: tunnel_info
-      tunnel_info_account_id: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_ID') }}"
-      tunnel_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+    - tunnel_info
 
   post_tasks:
     - name: Ensure cloudflare tunnel information is verified
