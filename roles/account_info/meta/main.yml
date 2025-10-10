@@ -1,5 +1,6 @@
 ---
 allow_duplicates: true
+dependencies: []
 galaxy_info:
   role_name: account_info
   author: Taylor Kimball
