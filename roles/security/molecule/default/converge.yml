@@ -1,0 +1,13 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+  roles:
+    - role: security
+      security_list: []
+      tags:
+        - molecule-idempotence-notest
+
+    - zone
+    - security
+...

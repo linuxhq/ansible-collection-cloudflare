@@ -17,7 +17,7 @@
           '/settings/ssl' }}"
   loop: "{{ ssl_list }}"
   loop_control:
-    label: "{{ _ssl.zone_id }}"
+    label: "{{ _ssl.zone_id | d(none) }}"
     loop_var: _ssl
   when:
     - ssl_api_token is not none
@@ -42,7 +42,7 @@
           '/settings/always_use_https' }}"
   loop: "{{ ssl_list }}"
   loop_control:
-    label: "{{ _auh.zone_id }}"
+    label: "{{ _auh.zone_id | d(none) }}"
     loop_var: _auh
   when:
     - ssl_api_token is not none
@@ -67,7 +67,7 @@
           '/settings/min_tls_version' }}"
   loop: "{{ ssl_list }}"
   loop_control:
-    label: "{{ _mtv.zone_id }}"
+    label: "{{ _mtv.zone_id | d(none) }}"
     loop_var: _mtv
   when:
     - ssl_api_token is not none
@@ -92,7 +92,7 @@
           '/settings/opportunistic_encryption' }}"
   loop: "{{ ssl_list }}"
   loop_control:
-    label: "{{ _oe.zone_id }}"
+    label: "{{ _oe.zone_id | d(none) }}"
     loop_var: _oe
   when:
     - ssl_api_token is not none
@@ -117,7 +117,7 @@
           '/settings/automatic_https_rewrites' }}"
   loop: "{{ ssl_list }}"
   loop_control:
-    label: "{{ _ahr.zone_id }}"
+    label: "{{ _ahr.zone_id | d(none) }}"
     loop_var: _ahr
   when:
     - ssl_api_token is not none
