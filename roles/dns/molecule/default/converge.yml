@@ -7,5 +7,6 @@
       tags:
         - molecule-idempotence-notest
 
+    - zone
     - dns
 ...
