@@ -10,27 +10,37 @@ Configure scrape shield settings
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_auth_token: null
-    cf_scrape_shield: []
+    scrape_shield_api_token: null
+    scrape_shield_list: []
 
 ## Dependencies
 
-* [linuxhq.cloudflare.zone_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
+* [linuxhq.cloudflare.zone\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
+      vars:
+        account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+        account_info_name: linuxhq
+        zone_info_api_token: "{{ account_info_api_token }}"
+
       roles:
+        - role: linuxhq.cloudflare.zone
+          zone_account_id: "{{ _account_info_id }}"
+          zone_api_token: "{{ account_info_api_token }}"
+          zone_list:
+            - name: lhqcfv2.net
+              type: full
+
         - role: linuxhq.cloudflare.scrape_shield
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_scrape_shield:
-            - zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
-              email_obfuscation: true
-              hotlink_protection: true
-              server_side_exclude: true
+        scrape_shield_api_token: "{{ account_info_api_token }}"
+        scrape_shield_list:
+          - zone_id: "{{ _zone_info_dict['lhqcfv2.net'].id }}"
+            email_obfuscation: true
+            hotlink_protection: true
+            server_side_exclude: true
 
 ## License
 
