@@ -1,76 +1,76 @@
 ---
-- name: Ensure cloudflare email obfuscation is patched
+- name: Ensure cloudflare email obfuscation setting is managed
   tags:
     - scrape_shield
   ansible.builtin.uri:
     body:
-      value: "{{ 'on' if _scrape_shield.email_obfuscation | bool else 'off' }}"
+      value: "{{ 'on' if _eo.email_obfuscation | bool else 'off' }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ scrape_shield_api_token }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _scrape_shield.zone_id +
-             '/settings/email_obfuscation' }}"
-  loop: "{{ cf_scrape_shield }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _eo.zone_id ~
+          '/settings/email_obfuscation' }}"
+  loop: "{{ scrape_shield_list }}"
   loop_control:
-    label: "{{ _scrape_shield.zone_id | default(none) }}"
-    loop_var: _scrape_shield
+    label: "{{ _eo.zone_id | d(none) }}"
+    loop_var: _eo
   when:
-    - cf_auth_token is not none
-    - _scrape_shield.email_obfuscation is defined
-    - _scrape_shield.zone_id is defined
+    - scrape_shield_api_token is not none
+    - _eo.email_obfuscation is defined
+    - _eo.zone_id is defined
 
-- name: Ensure cloudflare server side exclude is patched
+- name: Ensure cloudflare server side exclude setting is managed
   tags:
     - scrape_shield
   ansible.builtin.uri:
     body:
-      value: "{{ 'on' if _scrape_shield.server_side_exclude | bool else 'off' }}"
+      value: "{{ 'on' if _sse.server_side_exclude | bool else 'off' }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ scrape_shield_api_token }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _scrape_shield.zone_id +
-             '/settings/server_side_exclude' }}"
-  loop: "{{ cf_scrape_shield }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _sse.zone_id ~
+          '/settings/server_side_exclude' }}"
+  loop: "{{ scrape_shield_list }}"
   loop_control:
-    label: "{{ _scrape_shield.zone_id | default(none) }}"
-    loop_var: _scrape_shield
+    label: "{{ _sse.zone_id | d(none) }}"
+    loop_var: _sse
   when:
-    - cf_auth_token is not none
-    - _scrape_shield.server_side_exclude is defined
-    - _scrape_shield.zone_id is defined
+    - scrape_shield_api_token is not none
+    - _sse.server_side_exclude is defined
+    - _sse.zone_id is defined
 
-- name: Ensure cloudflare hotlink protection is patched
+- name: Ensure cloudflare hotlink protection setting is managed
   tags:
     - scrape_shield
   ansible.builtin.uri:
     body:
-      value: "{{ 'on' if _scrape_shield.hotlink_protection | bool else 'off' }}"
+      value: "{{ 'on' if _hp.hotlink_protection | bool else 'off' }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ scrape_shield_api_token }}"
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _scrape_shield.zone_id +
-             '/settings/hotlink_protection' }}"
-  loop: "{{ cf_scrape_shield }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _hp.zone_id ~
+          '/settings/hotlink_protection' }}"
+  loop: "{{ scrape_shield_list }}"
   loop_control:
-    label: "{{ _scrape_shield.zone_id | default(none) }}"
-    loop_var: _scrape_shield
+    label: "{{ _hp.zone_id | d(none) }}"
+    loop_var: _hp
   when:
-    - cf_auth_token is not none
-    - _scrape_shield.hotlink_protection is defined
-    - _scrape_shield.zone_id is defined
+    - scrape_shield_api_token is not none
+    - _hp.hotlink_protection is defined
+    - _hp.zone_id is defined
 ...
