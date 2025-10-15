@@ -10,32 +10,28 @@ Gather information about cloudflare access applications
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
+    access_app_info_account_id: null
+    access_app_info_api_token: null
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
 
 ## Return Values
 
-    _cf_access_app_aud
-    _cf_access_app_domain_type
-    _cf_access_app_id
-    _cf_access_app_policies
-    _cf_access_app_session_duration
-    _cf_access_app_type
+    _access_app_info_dict
+    _access_app_info_list
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.access_app_info
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+        - linuxhq.cloudflare.access_app_info
+          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          account_info_name: linuxhq
+          access_app_info_account_id: "{{ _account_info_id }}"
+          access_app_info_api_token: "{{ account_info_api_token }}"
 
 ## License
 
