@@ -1,0 +1,12 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: access_app
+      access_app_list: []
+      tags:
+        - molecule-idempotence-notest
+
+    - zone
+    - access_app
+...

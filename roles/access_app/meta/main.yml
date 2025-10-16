@@ -3,7 +3,7 @@ dependencies:
   - role: account_info
     tags: access_app
 galaxy_info:
-  role_name: application
+  role_name: access_app
   author: Taylor Kimball
   description: Create and update cloudflare access apps
   license: GPL-3.0-or-later

@@ -31,13 +31,13 @@ Configure network settings
           zone_account_id: "{{ _account_info_id }}"
           zone_api_token: "{{ account_info_api_token }}"
           zone_list:
-            - name: lhqcfv2.net
+            - name: taylorkimball.org
               type: full
 
         - role: linuxhq.cloudflare.network
           network_api_token: "{{ account_info_api_token }}"
           network_list:
-            - zone_id: "{{ _zone_info_dict['lhqcfv2.net'].id }}"
+            - zone_id: "{{ _zone_info_dict['taylorkimball.org'].id }}"
               ip_geolocation: true
               ipv6: false
               opportunistic_onion: false

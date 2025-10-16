@@ -27,7 +27,7 @@ provisioner:
 
         dns_api_token: "{{ account_info_api_token }}"
         dns_records:
-          - zone: lhqcfv2.net
+          - zone: taylorkimball.org
             records:
               - record: one
                 proxied: true
@@ -85,7 +85,7 @@ provisioner:
         zone_account_id: "{{ _account_info_id }}"
         zone_api_token: "{{ account_info_api_token }}"
         zone_list:
-          - name: lhqcfv2.net
+          - name: taylorkimball.org
             type: full
 
 verifier:

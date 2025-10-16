@@ -31,13 +31,13 @@ Configure scrape shield settings
           zone_account_id: "{{ _account_info_id }}"
           zone_api_token: "{{ account_info_api_token }}"
           zone_list:
-            - name: lhqcfv2.net
+            - name: taylorkimball.org
               type: full
 
         - role: linuxhq.cloudflare.scrape_shield
         scrape_shield_api_token: "{{ account_info_api_token }}"
         scrape_shield_list:
-          - zone_id: "{{ _zone_info_dict['lhqcfv2.net'].id }}"
+          - zone_id: "{{ _zone_info_dict['taylorkimball.org'].id }}"
             email_obfuscation: true
             hotlink_protection: true
             server_side_exclude: true

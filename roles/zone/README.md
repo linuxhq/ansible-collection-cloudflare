@@ -32,7 +32,7 @@ Manage cloudflare zones
           zone_account_id: "{{ _account_info_id }}"
           zone_api_token: "{{ account_info_api_token }}"
           zone_list:
-            - name: lhqcfv2.net
+            - name: taylorkimball.org
               type: full
 
 ## License
