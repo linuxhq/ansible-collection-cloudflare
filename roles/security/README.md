@@ -31,13 +31,13 @@ Configure security settings
           zone_account_id: "{{ _account_info_id }}"
           zone_api_token: "{{ account_info_api_token }}"
           zone_list:
-            - name: lhqcfv2.net
+            - name: taylorkimball.org
               type: full
 
         - role: linuxhq.cloudflare.security
           security_api_token: "{{ account_info_api_token }}"
           security_list:
-            - zone_id: "{{ _zone_info_dict['lhqcfv2.net'].id }}"
+            - zone_id: "{{ _zone_info_dict['taylorkimball.org'].id }}"
               browser_check: true
               challenge_ttl: 1800
               security_level: high

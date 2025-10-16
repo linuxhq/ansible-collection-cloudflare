@@ -10,15 +10,13 @@ Create and update cloudflare access apps
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
-    cf_access_apps: []
+    access_app_account_id: null
+    access_app_api_token: null
+    access_app_list: []
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
 
 ## Return Values
 
@@ -30,11 +28,13 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_app
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_access_apps:
-            - domain: tunnel.linuxhq.org
-              name: tunnel-linuxhq-org
+          account_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          account_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+          access_app_account_id: "{{ _account_info_id }}"
+          access_app_api_token: "{{ account_info_api_token }}"
+          access_app_list:
+            - domain: taylorkimball.org
+              name: taylorkimball.org
               type: self_hosted
 
 ## License

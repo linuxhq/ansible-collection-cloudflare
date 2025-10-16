@@ -5,19 +5,16 @@
   pre_tasks:
     - name: Ensure inventory lists are formatted
       tags:
-        - dns
+        - access_app
       ansible.builtin.set_fact:
-        dns_records:
-          - zone: taylorkimball.org
-            records:
-              "{{ dns_records[0].records |
-                  map('combine', {'state': 'absent'}) |
-                  list }}"
+        access_app_list:
+          "{{ access_app_list |
+              map('combine', {'state': 'absent'}) }}"
         zone_list:
           "{{ zone_list |
               map('combine', {'state': 'absent'}) }}"
 
   roles:
-    - dns
+    - access_app
     - zone
 ...

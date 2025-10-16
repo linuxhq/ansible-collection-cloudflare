@@ -1,5 +1,5 @@
 ---
-cf_account_id: null
-cf_auth_token: null
-cf_access_apps: []
+access_app_account_id: null
+access_app_api_token: null
+access_app_list: []
 ...

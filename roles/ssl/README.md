@@ -35,13 +35,13 @@ None
           zone_account_id: "{{ _account_info_id }}"
           zone_api_token: "{{ account_info_api_token }}"
           zone_list:
-            - name: lhqcfv2.net
+            - name: taylorkimball.org
               type: full
 
         - role: linuxhq.cloudflare.ssl
           ssl_api_token: "{{ account_info_api_token }}"
           ssl_list:
-            - zone_id: "{{ _zone_info_dict['lhqcfv2.net'].id }}"
+            - zone_id: "{{ _zone_info_dict['taylorkimball.org'].id }}"
               always_use_https: true
               automatic_https_rewrites: true
               min_tls_version: 1.3
