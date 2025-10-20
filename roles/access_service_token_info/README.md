@@ -10,19 +10,17 @@ Gather information about cloudflare access service tokens
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
+    access_service_token_info_account_id: null
+    access_service_token_info_api_token: null
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
 
 ## Return Values
 
-    _cf_access_service_token_duration
-    _cf_access_service_token_id
+    _access_service_token_info_dict
+    _access_service_token_info_list
 
 ## Example Playbook
 
@@ -30,8 +28,10 @@ Available variables are listed below, along with default values:
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_service_token_info
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          account_info_name: linuxhq
+          access_service_token_info_account_id: "{{ _account_info_id }}"
+          access_service_token_info_api_token: "{{ account_info_api_token }}"
 
 ## License
 
