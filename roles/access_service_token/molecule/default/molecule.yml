@@ -1,0 +1,34 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../requirements.yml
+
+driver:
+  name: vagrant
+
+platforms:
+  - name: almalinux9
+    box: bento/almalinux-9
+
+provisioner:
+  name: ansible
+  log: true
+  options:
+    diff: true
+  inventory:
+    group_vars:
+      all:
+        account_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+        account_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+        access_service_token_account_id: "{{ _account_info_id }}"
+        access_service_token_api_token: "{{ account_info_api_token }}"
+        access_service_token_list:
+          - name: taylorkimball.org
+            duration: forever
+
+verifier:
+  name: ansible
+  options:
+    diff: true
+...

@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create and update cloudflare access service tokens
+Manage cloudflare access service tokens
 
 ## Requirements
 
@@ -10,16 +10,14 @@ Create and update cloudflare access service tokens
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
-    cf_debug: true
-    cf_access_service_tokens: []
+    access_service_token_account_id: null
+    access_service_token_api_token: null
+    access_service_token_display: true
+    access_service_token_list: []
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
 
 ## Return Values
 
@@ -31,11 +29,12 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_service_token
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_debug: true
-          cf_access_service_tokens:
-            - name: linuxhq
+          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          account_info_name: linuxhq
+          access_service_token_account_id: "{{ _account_info_id }}"
+          access_service_token_api_token: "{{ account_info_api_token }}"
+          access_service_token_list:
+            - name: taylorkimball.org
               duration: forever
 
 ## License

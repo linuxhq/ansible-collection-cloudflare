@@ -5,7 +5,7 @@ dependencies:
 galaxy_info:
   role_name: ssl
   author: Taylor Kimball
-  description: Configure ssl settings
+  description: Manage cloudflare ssl settings
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq

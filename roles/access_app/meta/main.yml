@@ -5,7 +5,7 @@ dependencies:
 galaxy_info:
   role_name: access_app
   author: Taylor Kimball
-  description: Create and update cloudflare access apps
+  description: Manage cloudflare access applications
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
