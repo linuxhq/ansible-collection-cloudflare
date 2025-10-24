@@ -1,55 +1,37 @@
 ---
-- name: Ensure cloudflare access group details are gathered
+- name: Ensure cloudflare access group information is gathered
   tags:
     - access_group_info
   ansible.builtin.uri:
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ access_group_info_api_token }}"
     method: GET
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             cf_account_id +
-             '/access/groups' }}"
-  register: _access_group_get
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_group_info_account_id ~
+          '/access/groups' }}"
+  register: __access_group_info_query
   when:
-    - cf_account_id is not none
-    - cf_auth_token is not none
+    - access_group_info_account_id is not none
+    - access_group_info_api_token is not none
 
-- name: Ensure dictionary of access group ids is generated
+- name: Ensure list of cloudflare access group information is generated
   tags:
     - access_group_info
   ansible.builtin.set_fact:
-    _cf_access_group_default: "{{ _cf_access_group_default |
-                                  default({}) |
-                                  combine({_name: _default}) }}"
-    _cf_access_group_exclude: "{{ _cf_access_group_exclude |
-                                  default({}) |
-                                  combine({_name: _exclude}) }}"
-    _cf_access_group_id: "{{ _cf_access_group_id |
-                             default({}) |
-                             combine({_name: _id}) }}"
-    _cf_access_group_include: "{{ _cf_access_group_include |
-                                  default({}) |
-                                  combine({_name: _include}) }}"
-    _cf_access_group_require: "{{ _cf_access_group_require |
-                                  default({}) |
-                                  combine({_name: _require}) }}"
-  loop: "{{ _access_group_get.json.result }}"
-  loop_control:
-    label: "{{ _name | default(none) }}"
-    loop_var: _group
-  vars:
-    _id: "{{ _group.id }}"
-    _name: "{{ _group.name }}"
-    _default: "{{ _group.is_default | default(false) }}"
-    _exclude: "{{ _group.exclude | default([]) }}"
-    _include: "{{ _group.include | default([]) }}"
-    _require: "{{ _group.require | default([]) }}"
-  when:
-    - _access_group_get.json.result is defined
-    - _access_group_get.json.result | length > 0
-    - _group.id is defined
-    - _group.name is defined
+    _access_group_info_list:
+      "{{ __access_group_info_query.json.result |
+          d([]) }}"
+
+- name: Ensure dict of cloudflare access group information is generated
+  tags:
+    - access_group_info
+  ansible.builtin.set_fact:
+    _access_group_info_dict:
+      "{{ (dict(_access_group_info_list |
+               json_query('[].name') |
+               zip(_access_group_info_list))) |
+          d({}) }}"
 ...
