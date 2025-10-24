@@ -5,7 +5,7 @@ dependencies:
 galaxy_info:
   role_name: security
   author: Taylor Kimball
-  description: Configure security settings
+  description: Manage cloudflare security settings
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq

@@ -1,105 +1,140 @@
 ---
-- name: Ensure cloudflare access service token details are gathered
+- name: Ensure cloudflare access service token information is gathered
   tags:
     - access_service_token
   ansible.builtin.uri:
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ access_service_token_api_token }}"
     method: GET
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             cf_account_id +
-             '/access/service_tokens' }}"
-  register: _service_tokens_get
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_service_token_account_id ~
+          '/access/service_tokens' }}"
+  register: __access_service_token_query
   when:
-    - cf_account_id is not none
-    - cf_auth_token is not none
+    - access_service_token_account_id is not none
+    - access_service_token_api_token is not none
 
-- name: Ensure dictionary of access service tokens is generated
+- name: Ensure list of cloudflare access service token information is generated
   tags:
     - access_service_token
   ansible.builtin.set_fact:
-    _cf_tokens: "{{ _cf_tokens |
-                    default({}) |
-                    combine({_name: _id}) }}"
-  loop: "{{ _service_tokens_get.json.result }}"
-  loop_control:
-    label: "{{ _name | default(none) }}"
-    loop_var: _token
-  vars:
-    _id: "{{ _token.id }}"
-    _name: "{{ _token.name }}"
+    _access_service_token_list:
+      "{{ __access_service_token_query.json.result |
+          d([]) }}"
+
+- name: Ensure dict of cloudflare access service token information is generated
+  tags:
+    - access_service_token
+  ansible.builtin.set_fact:
+    _access_service_token_dict:
+      "{{ (dict(_access_service_token_list |
+               json_query('[].name') |
+               zip(_access_service_token_list))) |
+          d({}) }}"
 
 - name: Ensure cloudflare access service tokens are present
   tags:
     - access_service_token
   ansible.builtin.uri:
     body:
-      duration: "{{ _token.duration | default(omit) }}"
-      name: "{{ _token.name }}"
+      duration: "{{ _post.duration | d(omit) }}"
+      name: "{{ _post.name }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ access_service_token_api_token }}"
     method: POST
     status_code:
       - 201
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             cf_account_id +
-             '/access/service_tokens' }}"
-  register: _service_tokens_post
-  loop: "{{ cf_access_service_tokens }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_service_token_account_id ~
+          '/access/service_tokens' }}"
+  register: __access_service_token_post
+  loop: "{{ access_service_token_list }}"
   loop_control:
-    label: "{{ _token.name }}"
-    loop_var: _token
+    label: "{{ _post.name | d(omit) }}"
+    loop_var: _post
   when:
-    - cf_account_id is not none
-    - cf_auth_token is not none
-    - _token.name is defined
-    - _cf_tokens is not defined or
-      _token.name not in _cf_tokens.keys()
+    - access_service_token_account_id is not none
+    - access_service_token_api_token is not none
+    - _post.name is defined
+    - _post.name not in _access_service_token_dict.keys()
+    - _post.state is not defined or
+      _post.state == 'present'
+
+- name: Ensure cloudflare access service tokens are displayed
+  tags:
+    - access_service_token
+  ansible.builtin.debug:
+    msg: |
+      {{ (__access_service_token_post.results |
+         json_query('[].json[].result') |
+         list) |
+         d([]) |
+         to_nice_yaml(indent=2) }}
+  when:
+    - access_service_token_display | bool
 
 - name: Ensure cloudflare access service tokens are updated
   tags:
     - access_service_token
   ansible.builtin.uri:
     body:
-      duration: "{{ _token.duration | default(omit) }}"
-      name: "{{ _token.name }}"
+      duration: "{{ _put.duration | d(omit) }}"
+      name: "{{ _put.name }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ access_service_token_api_token }}"
     method: PUT
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             cf_account_id +
-             '/access/service_tokens/' +
-             _cf_tokens[_token.name] }}"
-  loop: "{{ cf_access_service_tokens }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_service_token_account_id ~
+          '/access/service_tokens/' ~
+          _access_service_token_dict[_put.name].id }}"
+  loop: "{{ access_service_token_list }}"
   loop_control:
-    label: "{{ _token.name }}"
-    loop_var: _token
+    label: "{{ _put.name | d(omit) }}"
+    loop_var: _put
   when:
-    - cf_account_id is not none
-    - cf_auth_token is not none
-    - _token.name is defined
-    - _cf_tokens is defined and
-      _token.name in _cf_tokens.keys()
+    - access_service_token_account_id is not none
+    - access_service_token_api_token is not none
+    - _put.name is defined
+    - _put.name in _access_service_token_dict.keys()
+    - _put.state is not defined or
+      _put.state == 'present'
+    - _access_service_token_dict[_put.name] is defined
+    - _access_service_token_dict[_put.name].id is defined
 
-- name: Ensure cloudflare access service tokens are displayed  # noqa: jinja[invalid]
+- name: Ensure cloudflare access service tokens are absent
   tags:
     - access_service_token
-  ansible.builtin.debug:
-    msg: |
-      {{ _service_tokens_post.results |
-         json_query('[].json[].result') |
-         list |
-         default([]) |
-         to_nice_yaml(indent=2) }}
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ access_service_token_api_token }}"
+    method: DELETE
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_service_token_account_id ~
+          '/access/service_tokens/' ~
+          _access_service_token_dict[_delete.name].id }}"
+  loop: "{{ access_service_token_list }}"
+  loop_control:
+    label: "{{ _delete.name | d(omit) }}"
+    loop_var: _delete
   when:
-    - cf_debug | bool
+    - access_service_token_account_id is not none
+    - access_service_token_api_token is not none
+    - _delete.name is defined
+    - _delete.name in _access_service_token_dict.keys()
+    - _delete.state is defined and
+      _delete.state == 'absent'
+    - _access_service_token_dict[_delete.name] is defined
+    - _access_service_token_dict[_delete.name].id is defined
 ...

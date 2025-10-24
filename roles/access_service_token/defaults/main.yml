@@ -1,6 +1,6 @@
 ---
-cf_account_id: null
-cf_auth_token: null
-cf_debug: true
-cf_access_service_tokens: []
+access_service_token_account_id: null
+access_service_token_api_token: null
+access_service_token_display: true
+access_service_token_list: []
 ...

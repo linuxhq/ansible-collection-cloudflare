@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Configure scrape shield settings
+Manage cloudflare scrape shield settings
 
 ## Requirements
 
