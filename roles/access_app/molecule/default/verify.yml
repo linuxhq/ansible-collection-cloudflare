@@ -3,18 +3,39 @@
   hosts: all
 
   pre_tasks:
-    - name: Ensure inventory lists are formatted
+    - name: Ensure roles are included
       tags:
         - access_app
+      ansible.builtin.include_role:
+        name: "{{ _role }}"
+      loop:
+        - access_group_info
+        - access_policy_info
+        - access_service_token_info
+      loop_control:
+        label: "{{ _role }}"
+        loop_var: _role
+
+    - name: Ensure inventory lists are formatted
+      tags:
+        - access_policy
       ansible.builtin.set_fact:
         access_app_list:
           "{{ access_app_list |
               map('combine', {'state': 'absent'}) }}"
-        zone_list:
-          "{{ zone_list |
+        access_group_list:
+          "{{ access_group_list |
+              map('combine', {'state': 'absent'}) }}"
+        access_policy_list:
+          "{{ access_policy_list |
+              map('combine', {'state': 'absent'}) }}"
+        access_service_token_list:
+          "{{ access_service_token_list |
               map('combine', {'state': 'absent'}) }}"
 
   roles:
     - access_app
-    - zone
+    - access_policy
+    - access_group
+    - access_service_token
 ...
