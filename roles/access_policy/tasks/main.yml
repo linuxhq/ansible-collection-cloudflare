@@ -1,129 +1,147 @@
 ---
-- name: Ensure cloudflare access policy details are gathered
+- name: Ensure cloudflare access policy information is gathered
   tags:
     - access_policy
   ansible.builtin.uri:
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ access_policy_api_token }}"
     method: GET
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             cf_account_id +
-             '/access/apps/' +
-             _policy.application_id +
-             '/policies' }}"
-  loop: "{{ cf_access_policies }}"
-  loop_control:
-    label: "{{ _policy.application_id }}"
-    loop_var: _policy
-  register: _policies_get
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_policy_account_id ~
+          '/access/policies' }}"
+  register: __access_policy_query
   when:
-    - cf_account_id is not none
-    - cf_auth_token is not none
-    - _policy.application_id is defined
+    - access_policy_account_id is not none
+    - access_policy_api_token is not none
 
-- name: Ensure dictionary of access policies is generated
+- name: Ensure list of cloudflare access policy information is generated
   tags:
     - access_policy
   ansible.builtin.set_fact:
-    _cf_policies: "{{ _cf_policies |
-                      default({}) |
-                      combine({_name: _id}) }}"
-  loop: "{{ q('ansible.builtin.subelements', _policies_get.results, 'json.result', {'skip_missing': true}) }}"
-  loop_control:
-    label: "{{ _name | default(none) }}"
-    loop_var: _policy
-  vars:
-    _id: "{{ _policy.1.id }}"
-    _name: "{{ _policy.1.name }}"
-  when:
-    - _policies_get.results is defined
-    - _policies_get.results | length > 0
-    - _policy.1.id is defined
-    - _policy.1.name is defined
+    __access_policy_list:
+      "{{ __access_policy_query.json.result |
+          d([]) }}"
+
+- name: Ensure dict of cloudflare access policy information is generated
+  tags:
+    - access_policy
+  ansible.builtin.set_fact:
+    __access_policy_dict:
+      "{{ (dict(__access_policy_list |
+               json_query('[].name') |
+               zip(__access_policy_list))) |
+          d({}) }}"
 
 - name: Ensure cloudflare access policies are present
   tags:
     - access_policy
   ansible.builtin.uri:
     body:
-      approval_groups: "{{ _policy.approval_groups | default(omit) }}"
-      approval_required: "{{ _policy.approval_required | default(false) }}"
-      decision: "{{ _policy.decision }}"
-      exclude: "{{ _policy.exclude | default(omit) }}"
-      include: "{{ _policy.include }}"
-      isolation_required: "{{ _policy.isolation_required | default(false) }}"
-      name: "{{ _policy.name }}"
-      precedence: "{{ _policy.precedence | default(omit) }}"
-      purpose_justification_prompt: "{{ _policy.purpose_justification_prompt | default(omit) }}"
-      purpose_justification_required: "{{ _policy.purpose_justification_required | default(false) }}"
-      require: "{{ _policy.require | default(omit) }}"
+      approval_groups: "{{ _post.approval_groups | d(omit) }}"
+      approval_required: "{{ _post.approval_required | d(false) }}"
+      decision: "{{ _post.decision }}"
+      exclude: "{{ _post.exclude | d(omit) }}"
+      include: "{{ _post.include }}"
+      isolation_required: "{{ _post.isolation_required | d(false) }}"
+      name: "{{ _post.name }}"
+      precedence: "{{ _post.precedence | d(omit) }}"
+      purpose_justification_prompt: "{{ _post.purpose_justification_prompt | d(omit) }}"
+      purpose_justification_required: "{{ _post.purpose_justification_required | d(false) }}"
+      require: "{{ _post.require | d(omit) }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ access_policy_api_token }}"
     method: POST
     status_code:
       - 201
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             cf_account_id +
-             '/access/apps/' +
-             _policy.application_id +
-             '/policies' }}"
-  loop: "{{ cf_access_policies }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_policy_account_id ~
+          '/access/policies' }}"
+  loop: "{{ access_policy_list }}"
   loop_control:
-    label: "{{ _policy.name | default(none) }}"
-    loop_var: _policy
+    label: "{{ _post.name | d(none) }}"
+    loop_var: _post
   when:
-    - cf_account_id is not none
-    - cf_auth_token is not none
-    - _policy.decision is defined
-    - _policy.include is defined
-    - _policy.name is defined
-    - _cf_policies is not defined or
-      _policy.name not in _cf_policies.keys()
+    - access_policy_account_id is not none
+    - access_policy_api_token is not none
+    - _post.decision is defined
+    - _post.include is defined
+    - _post.name is defined
+    - _post.name not in __access_policy_dict.keys()
+    - _post.state is not defined or
+      _post.state == 'present'
 
 - name: Ensure cloudflare access policies are updated
   tags:
     - access_policy
   ansible.builtin.uri:
     body:
-      approval_groups: "{{ _policy.approval_groups | default(omit) }}"
-      approval_required: "{{ _policy.approval_required | default(false) }}"
-      decision: "{{ _policy.decision }}"
-      exclude: "{{ _policy.exclude | default(omit) }}"
-      include: "{{ _policy.include }}"
-      isolation_required: "{{ _policy.isolation_required | default(false) }}"
-      name: "{{ _policy.name }}"
-      precedence: "{{ _policy.precedence | default(omit) }}"
-      purpose_justification_prompt: "{{ _policy.purpose_justification_prompt | default(omit) }}"
-      purpose_justification_required: "{{ _policy.purpose_justification_required | default(false) }}"
-      require: "{{ _policy.require | default(omit) }}"
+      approval_groups: "{{ _put.approval_groups | d(omit) }}"
+      approval_required: "{{ _put.approval_required | d(false) }}"
+      decision: "{{ _put.decision }}"
+      exclude: "{{ _put.exclude | d(omit) }}"
+      include: "{{ _put.include }}"
+      isolation_required: "{{ _put.isolation_required | d(false) }}"
+      name: "{{ _put.name }}"
+      precedence: "{{ _put.precedence | d(omit) }}"
+      purpose_justification_prompt: "{{ _put.purpose_justification_prompt | d(omit) }}"
+      purpose_justification_required: "{{ _put.purpose_justification_required | d(false) }}"
+      require: "{{ _put.require | d(omit) }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ access_policy_api_token }}"
     method: PUT
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             cf_account_id +
-             '/access/apps/' +
-             _policy.application_id +
-             '/policies/' +
-             _cf_policies[_policy.name] }}"
-  loop: "{{ cf_access_policies }}"
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+             access_policy_account_id ~
+             '/access/policies/' ~
+             __access_policy_dict[_put.name].id }}"
+  loop: "{{ access_policy_list }}"
   loop_control:
-    label: "{{ _policy.name | default(none) }}"
-    loop_var: _policy
+    label: "{{ _put.name | d(none) }}"
+    loop_var: _put
   when:
-    - cf_account_id is not none
-    - cf_auth_token is not none
-    - _policy.decision is defined
-    - _policy.include is defined
-    - _policy.name is defined
-    - _cf_policies is defined and
-      _policy.name in _cf_policies.keys()
+    - access_policy_account_id is not none
+    - access_policy_api_token is not none
+    - _put.decision is defined
+    - _put.include is defined
+    - _put.name is defined
+    - _put.name in __access_policy_dict.keys()
+    - _put.state is not defined or
+      _put.state == 'present'
+    - __access_policy_dict[_put.name] is defined
+    - __access_policy_dict[_put.name].id is defined
+
+- name: Ensure cloudflare access policies are absent
+  tags:
+    - access_policy
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ access_policy_api_token }}"
+    method: DELETE
+    status_code:
+      - 200
+      - 202
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+             access_policy_account_id ~
+             '/access/policies/' ~
+             __access_policy_dict[_delete.name].id }}"
+  loop: "{{ access_policy_list }}"
+  loop_control:
+    label: "{{ _delete.name | d(none) }}"
+    loop_var: _delete
+  when:
+    - access_policy_account_id is not none
+    - access_policy_api_token is not none
+    - _delete.name is defined
+    - _delete.name in __access_policy_dict.keys()
+    - _delete.state is defined and
+      _delete.state == 'absent'
+    - __access_policy_dict[_delete.name] is defined
+    - __access_policy_dict[_delete.name].id is defined
 ...

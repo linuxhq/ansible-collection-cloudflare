@@ -1,5 +1,5 @@
 ---
-cf_account_id: null
-cf_auth_token: null
-cf_access_policies: []
+access_policy_account_id: null
+access_policy_api_token: null
+access_policy_list: []
 ...

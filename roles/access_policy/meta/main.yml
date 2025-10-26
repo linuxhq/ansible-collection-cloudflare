@@ -1,17 +1,11 @@
 ---
 dependencies:
-  - role: account_info
-    tags: access_policy
-  - role: access_app_info
-    tags: access_policy
   - role: access_group_info
-    tags: access_policy
-  - role: access_service_token_info
     tags: access_policy
 galaxy_info:
   role_name: access_policy
   author: Taylor Kimball
-  description: Create and update cloudflare access policies
+  description: Manage cloudflare access policies
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
