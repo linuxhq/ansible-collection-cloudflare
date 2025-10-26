@@ -1,5 +1,5 @@
 ---
-cf_account_id: null
-cf_auth_token: null
-cf_access_groups: []
+access_group_account_id: null
+access_group_api_token: null
+access_group_list: []
 ...

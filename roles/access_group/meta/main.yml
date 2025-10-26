@@ -1,13 +1,11 @@
 ---
 dependencies:
-  - role: account_info
-    tags: access_group
   - role: access_service_token_info
     tags: access_group
 galaxy_info:
   role_name: access_group
   author: Taylor Kimball
-  description: Create and update cloudflare access groups
+  description: Manage cloudflare access groups
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
