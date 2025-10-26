@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create and update cloudflare access groups
+Manage cloudflare access groups
 
 ## Requirements
 
@@ -10,16 +10,14 @@ Create and update cloudflare access groups
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
-    cf_access_groups: []
+    access_group_account_id: null
+    access_group_api_token: null
+    access_group_list: []
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
-* [linuxhq.cloudflare.access_service_token_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_service_token_info)
+* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.access\_service\_token\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_service_token_info)
 
 ## Return Values
 
@@ -31,14 +29,25 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_group
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_access_groups:
-            - name: linuxhq.net
+          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          account_info_name: linuxhq
+
+          access_group_account_id: "{{ _account_info_id }}"
+          access_group_api_token: "{{ account_info_api_token }}"
+          access_group_list:
+            - name: taylorkimball.org
               include:
                 - service_token:
-                    token_id: "{{ _cf_access_service_token_id['linuxhq.net'] }}"
+                    token_id: "{{ _access_service_token_info_dict['taylorkimball.org'].id }}"
               is_default: false
+
+          access_service_token_account_id: "{{ _account_info_id }}"
+          access_service_token_api_token: "{{ account_info_api_token }}"
+          access_service_token_info_account_id: "{{ _account_info_id }}"
+          access_service_token_info_api_token: "{{ account_info_api_token }}"
+          access_service_token_list:
+            - name: taylorkimball.org
+              duration: forever
 
 ## License
 

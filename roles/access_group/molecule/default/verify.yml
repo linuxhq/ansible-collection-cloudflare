@@ -1,0 +1,24 @@
+---
+- name: Verify
+  hosts: all
+
+  pre_tasks:
+    - name: Ensure roles are included
+      ansible.builtin.include_role:
+        name: access_service_token_info
+
+    - name: Ensure inventory lists are formatted
+      tags:
+        - access_group
+      ansible.builtin.set_fact:
+        access_group_list:
+          "{{ access_group_list |
+              map('combine', {'state': 'absent'}) }}"
+        access_service_token_list:
+          "{{ access_service_token_list |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - access_group
+    - access_service_token
+...
