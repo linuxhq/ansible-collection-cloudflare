@@ -16,7 +16,6 @@ Manage cloudflare access groups
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
 * [linuxhq.cloudflare.access\_service\_token\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_service_token_info)
 
 ## Return Values
