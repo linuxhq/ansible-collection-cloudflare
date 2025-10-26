@@ -1,6 +1,6 @@
 ---
 dependencies:
-  - role: account_info
+  - role: access_policy_info
     tags: access_app
 galaxy_info:
   role_name: access_app

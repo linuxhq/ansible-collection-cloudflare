@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare access app information is gathered
+- name: Ensure cloudflare access application information is gathered
   tags:
     - access_app
   ansible.builtin.uri:
@@ -17,7 +17,7 @@
     - access_app_account_id is not none
     - access_app_api_token is not none
 
-- name: Ensure list of cloudflare access app information is generated
+- name: Ensure list of cloudflare access application information is generated
   tags:
     - access_app
   ansible.builtin.set_fact:
@@ -25,7 +25,7 @@
       "{{ __access_app_query.json.result |
           d([]) }}"
 
-- name: Ensure dict of cloudflare access app information is generated
+- name: Ensure dict of cloudflare access application information is generated
   tags:
     - access_app
   ansible.builtin.set_fact:
@@ -35,7 +35,7 @@
                zip(__access_app_list))) |
           d({}) }}"
 
-- name: Ensure cloudflare access apps are present
+- name: Ensure cloudflare access applications are present
   tags:
     - access_app
   ansible.builtin.uri:
@@ -51,6 +51,7 @@
       http_only_cookie_attribute: "{{ _post.http_only_cookie_attribute | d(true) }}"
       logo_url: "{{ _post.logo_url | d(omit) }}"
       name: "{{ _post.name }}"
+      policies: "{{ _post.policies | d(omit)  }}"
       same_site_cookie_attribute: "{{ _post.same_site_cookie_attribute | d(omit) }}"
       service_auth_401_redirect: "{{ _post.service_auth_401_redirect | d(omit) }}"
       session_duration: "{{ _post.session_duration | d('24h') }}"
@@ -80,7 +81,7 @@
       _post.state == 'present'
     - _post.type is defined
 
-- name: Ensure cloudflare access apps are updated
+- name: Ensure cloudflare access applications are updated
   tags:
     - access_app
   ansible.builtin.uri:
@@ -96,6 +97,7 @@
       http_only_cookie_attribute: "{{ _put.http_only_cookie_attribute | d(true) }}"
       logo_url: "{{ _put.logo_url | d(omit) }}"
       name: "{{ _put.name }}"
+      policies: "{{ _put.policies | d(omit) }}"
       same_site_cookie_attribute: "{{ _put.same_site_cookie_attribute | d(omit) }}"
       service_auth_401_redirect: "{{ _put.service_auth_401_redirect | d(omit) }}"
       session_duration: "{{ _put.session_duration | d('24h') }}"
@@ -126,7 +128,7 @@
     - _put.type is defined
     - __access_app_dict[_put.name].id is defined
 
-- name: Ensure cloudflare access apps are absent
+- name: Ensure cloudflare access applications are absent
   tags:
     - access_app
   ansible.builtin.uri:

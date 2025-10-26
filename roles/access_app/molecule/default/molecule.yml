@@ -27,13 +27,39 @@ provisioner:
         access_app_list:
           - domain: taylorkimball.org
             name: taylorkimball.org
+            policies:
+              - id: "{{ _access_policy_info_dict['taylorkimball.org'].id }}"
             type: self_hosted
 
-        zone_account_id: "{{ _account_info_id }}"
-        zone_api_token: "{{ account_info_api_token }}"
-        zone_list:
+        access_group_account_id: "{{ _account_info_id }}"
+        access_group_api_token: "{{ account_info_api_token }}"
+        access_group_info_account_id: "{{ _account_info_id }}"
+        access_group_info_api_token: "{{ account_info_api_token }}"
+        access_group_list:
           - name: taylorkimball.org
-            type: full
+            include:
+              - service_token:
+                  token_id: "{{ _access_service_token_info_dict['taylorkimball.org'].id }}"
+            is_default: false
+
+        access_policy_account_id: "{{ _account_info_id }}"
+        access_policy_api_token: "{{ account_info_api_token }}"
+        access_policy_info_account_id: "{{ _account_info_id }}"
+        access_policy_info_api_token: "{{ account_info_api_token }}"
+        access_policy_list:
+          - name: taylorkimball.org
+            decision: non_identity
+            include:
+              - group:
+                  id: "{{ _access_group_info_dict['taylorkimball.org'].id }}"
+
+        access_service_token_account_id: "{{ _account_info_id }}"
+        access_service_token_api_token: "{{ account_info_api_token }}"
+        access_service_token_info_account_id: "{{ _account_info_id }}"
+        access_service_token_info_api_token: "{{ account_info_api_token }}"
+        access_service_token_list:
+          - name: taylorkimball.org
+            duration: forever
 
 verifier:
   name: ansible

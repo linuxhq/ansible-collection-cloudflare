@@ -7,6 +7,17 @@
       tags:
         - molecule-idempotence-notest
 
-    - zone
+    - role: access_service_token
+      tags:
+        - molecule-idempotence-notest
+
+    - role: access_group
+      tags:
+        - molecule-idempotence-notest
+
+    - role: access_policy
+      tags:
+        - molecule-idempotence-notest
+
     - access_app
 ...
