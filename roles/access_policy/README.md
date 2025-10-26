@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create and update cloudflare access policies
+Manage cloudflare access policies
 
 ## Requirements
 
@@ -10,18 +10,13 @@ Create and update cloudflare access policies
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
-    cf_access_policies: []
+    access_policy_account_id: null
+    access_policy_api_token: null
+    access_policy_list: []
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
-* [linuxhq.cloudflare.access_app_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_app_info)
-* [linuxhq.cloudflare.access_group_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_group_info)
-* [linuxhq.cloudflare.access_service_token_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_service_token_info)
+* [linuxhq.cloudflare.access\_group\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_group_info)
 
 ## Return Values
 
@@ -33,15 +28,36 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_policy
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_access_policies:
-            - application_id: "{{ _cf_access_app_id['linuxhq.net'] }}"
+          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          account_info_name: linuxhq
+
+          access_group_account_id: "{{ _account_info_id }}"
+          access_group_api_token: "{{ account_info_api_token }}"
+          access_group_info_account_id: "{{ _account_info_id }}"
+          access_group_info_api_token: "{{ account_info_api_token }}"
+          access_group_list:
+            - name: taylorkimball.org
+              include:
+                - service_token:
+                    token_id: "{{ _access_service_token_info_dict['taylorkimball.org'].id }}"
+              is_default: false
+
+          access_policy_account_id: "{{ _account_info_id }}"
+          access_policy_api_token: "{{ account_info_api_token }}"
+          access_policy_list:
+            - name: taylorkimball.org
               decision: non_identity
-              name: linuxhq.net
               include:
                 - group:
-                    id: "{{ _cf_access_group_id['linuxhq.net'] }}"
+                    id: "{{ _access_group_info_dict['taylorkimball.org'].id }}"
+
+          access_service_token_account_id: "{{ _account_info_id }}"
+          access_service_token_api_token: "{{ account_info_api_token }}"
+          access_service_token_info_account_id: "{{ _account_info_id }}"
+          access_service_token_info_api_token: "{{ account_info_api_token }}"
+          access_service_token_list:
+            - name: taylorkimball.org
+              duration: forever
 
 ## License
 
