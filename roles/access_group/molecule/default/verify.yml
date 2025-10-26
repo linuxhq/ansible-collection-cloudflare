@@ -4,6 +4,8 @@
 
   pre_tasks:
     - name: Ensure roles are included
+      tags:
+        - access_group
       ansible.builtin.include_role:
         name: access_service_token_info
 

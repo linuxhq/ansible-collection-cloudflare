@@ -5,7 +5,7 @@
     - access_app_info
 
   post_tasks:
-    - name: Ensure cloudflare access app information is verified
+    - name: Ensure cloudflare access application information is verified
       tags:
         - access_app_info
       ansible.builtin.assert:
