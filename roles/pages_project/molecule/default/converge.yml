@@ -1,0 +1,13 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: pages_project
+      pages_project_account_id: null
+      pages_project_api_token: null
+      pages_project_list: []
+      tags:
+        - molecule-idempotence-notest
+
+    - pages_project
+...
