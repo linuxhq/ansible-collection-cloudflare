@@ -1,0 +1,24 @@
+---
+dependencies:
+  - role: account_info
+    tags: pages_domain_info
+galaxy_info:
+  role_name: pages_domain_info
+  author: Taylor Kimball
+  description: Gather information about cloudflare pages domains
+  license: GPL-3.0-or-later
+  min_ansible_version: 2.15.0
+  namespace: linuxhq
+  platforms:
+    - name: GenericLinux
+      versions:
+        - all
+    - name: macOS
+      versions:
+        - all
+  galaxy_tags:
+    - cloudflare
+    - domain
+    - info
+    - pages
+...
