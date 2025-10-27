@@ -14,7 +14,7 @@
       - 401
       - 403
     url: 'https://api.cloudflare.com/client/v4/accounts'
-  register: __account_info
+  register: __account_info_query
   when:
     - account_info_api_token is not none
     - account_info_name is not none
@@ -23,14 +23,14 @@
   tags:
     - account_info
   ansible.builtin.set_fact:
-    _account_info_id: "{{ __account_info.json.result[0].id }}"
-    _account_info_name: "{{ __account_info.json.result[0].name }}"
-    _account_info_settings: "{{ __account_info.json.result[0].settings }}"
-    _account_info_type: "{{ __account_info.json.result[0].type }}"
+    _account_info_id: "{{ __account_info_query.json.result[0].id }}"
+    _account_info_name: "{{ __account_info_query.json.result[0].name }}"
+    _account_info_settings: "{{ __account_info_query.json.result[0].settings }}"
+    _account_info_type: "{{ __account_info_query.json.result[0].type }}"
   when:
-    - __account_info.json.result is defined
-    - __account_info.json.result[0].name is defined
-    - __account_info.json.result[0].id is defined
-    - __account_info.json.result[0].settings is defined
-    - __account_info.json.result[0].type is defined
+    - __account_info_query.json.result is defined
+    - __account_info_query.json.result[0].name is defined
+    - __account_info_query.json.result[0].id is defined
+    - __account_info_query.json.result[0].settings is defined
+    - __account_info_query.json.result[0].type is defined
 ...
