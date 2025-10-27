@@ -1,4 +1,3 @@
 ---
-cf_auth_token: null
-cf_zone_id: null
+page_rule_info_api_token: null
 ...

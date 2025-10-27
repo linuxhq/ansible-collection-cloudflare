@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - page_rule_info
+
+  post_tasks:
+    - name: Ensure cloudflare page rule information is verified
+      tags:
+        - page_rule_info
+      ansible.builtin.assert:
+        that:
+          - _page_rule_info_dict | length > 0
+          - _page_rule_info_list | length > 0
+...

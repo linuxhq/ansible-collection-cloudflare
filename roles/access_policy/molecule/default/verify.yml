@@ -12,7 +12,7 @@
         - access_group_info
         - access_service_token_info
       loop_control:
-        label: "{{ _role }}"
+        label: "{{ _role | d(none) }}"
         loop_var: _role
 
     - name: Ensure inventory lists are formatted

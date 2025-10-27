@@ -1,7 +1,4 @@
 ---
-dependencies:
-  - role: zone_info
-    tags: page_rule_info
 galaxy_info:
   role_name: page_rule_info
   author: Taylor Kimball

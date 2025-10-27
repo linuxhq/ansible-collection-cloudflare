@@ -1,49 +1,73 @@
 ---
-- name: Ensure cloudflare page rule details are gathered
+- name: Ensure cloudflare page rule zone information is gathered
   tags:
     - page_rule_info
   ansible.builtin.uri:
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ page_rule_info_api_token }}"
     method: GET
     status_code:
       - 200
-      - 401
-      - 403
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             cf_zone_id +
-             '/pagerules' }}"
-  register: _page_rules
+    url: 'https://api.cloudflare.com/client/v4/zones'
+  register: __page_rule_info_zone_query
   when:
-    - cf_auth_token is not none
-    - cf_zone_id is not none
+    - page_rule_info_api_token is not none
 
-- name: Ensure list of cloudflare page rules is generated
+- name: Ensure list of cloudflare page rule zone information is generated
   tags:
     - page_rule_info
   ansible.builtin.set_fact:
-    _cf_page_rules: "{{ _cf_page_rules |
-                        default([]) +
-                        [{'id': _id,
-                          'status': _status,
-                          'priority': _priority,
-                          'actions': _actions,
-                          'targets': _targets}] }}"
-  loop: "{{ _page_rules.json.result | d([], true) }}"
+    __page_rule_info_zone_list:
+      "{{ __page_rule_info_zone_query.json.result |
+          d([]) |
+          json_query('[].{
+            id: id,
+            name: name
+          }') }}"
+
+- name: Ensure cloudflare page rule information is gathered
+  tags:
+    - page_rule_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ page_rule_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _zone.id ~
+          '/pagerules' }}"
+  register: __page_rule_info_rule_query
+  loop: "{{ __page_rule_info_zone_list }}"
   loop_control:
-    label: "{{ _rule.id | default(none) }}"
-    loop_var: _rule
-  vars:
-    _actions: "{{ _rule.actions }}"
-    _id: "{{ _rule.id }}"
-    _priority: "{{ _rule.priority }}"
-    _status: "{{ _rule.status }}"
-    _targets: "{{ _rule.targets }}"
+    label: "{{ _zone.name | d(none) }}"
+    loop_var: _zone
   when:
-    - _rule.actions is defined
-    - _rule.id is defined
-    - _rule.priority is defined
-    - _rule.status is defined
-    - _rule.targets is defined
+    - page_rule_info_api_token is not none
+    - _zone.id is defined
+    - _zone.name is defined
+
+- name: Ensure list of cloudflare page rule information is generated
+  tags:
+    - page_rule_info
+  ansible.builtin.set_fact:
+    _page_rule_info_list:
+      "{{ __page_rule_info_rule_query.results |
+          d([]) |
+          json_query('[].{
+            name: _zone.name,
+            id: _zone.id,
+            page_rules: json.result
+          }') }}"
+
+- name: Ensure dict of cloudflare page rule information is generated
+  tags:
+    - page_rule_info
+  ansible.builtin.set_fact:
+    _page_rule_info_dict:
+      "{{ (dict(_page_rule_info_list |
+                json_query('[].name') |
+                zip(_page_rule_info_list))) |
+          d({}) }}"
 ...
