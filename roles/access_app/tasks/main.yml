@@ -51,7 +51,7 @@
       http_only_cookie_attribute: "{{ _post.http_only_cookie_attribute | d(true) }}"
       logo_url: "{{ _post.logo_url | d(omit) }}"
       name: "{{ _post.name }}"
-      policies: "{{ _post.policies | d(omit)  }}"
+      policies: "{{ _post.policies | d(omit) }}"
       same_site_cookie_attribute: "{{ _post.same_site_cookie_attribute | d(omit) }}"
       service_auth_401_redirect: "{{ _post.service_auth_401_redirect | d(omit) }}"
       session_duration: "{{ _post.session_duration | d('24h') }}"
