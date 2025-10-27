@@ -10,21 +10,17 @@ Gather information about cloudflare pages projects
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
+    pages_project_info_account_id: null
+    pages_project_info_api_token: null
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
 
 ## Return Values
 
-    _cf_pages_project_branch
-    _cf_pages_project_domains
-    _cf_pages_project_id
-    _cf_pages_project_subdomain
+    _pages_project_info_dict
+    _pages_project_info_list
 
 ## Example Playbook
 
@@ -32,8 +28,10 @@ Available variables are listed below, along with default values:
       connection: local
       roles:
         - role: linuxhq.cloudflare.pages_project_info
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          account_info_name: linuxhq
+          pages_project_info_account_id: "{{ _account_info_id }}"
+          pages_project_info_api_token: "{{ account_info_api_token }}"
 
 ## License
 
