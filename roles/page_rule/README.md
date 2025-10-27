@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create and update cloudflare page rules
+Manage cloudflare page rules
 
 ## Requirements
 
@@ -10,14 +10,12 @@ Create and update cloudflare page rules
 
 ## Role Variables
 
-Available variables are ruleed below, along with default values:
-
-    cf_auth_token: null
-    cf_page_rules: []
+    page_rule_api_token: null
+    page_rule_list: []
 
 ## Dependencies
 
-* [linuxhq.cloudflare.zone_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
+* [linuxhq.cloudflare.zone\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
 
 ## Return Values
 
@@ -29,20 +27,32 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.page_rule
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_page_rules:
-            - zone_id: "{{ _cf_zone_id['linuxhq.org'] }}"
-              rules:
+          zone_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          page_rule_api_token: "{{ zone_info_api_token }}"
+          page_rule_list:
+            - zone_id: "{{ _zone_info_dict['taylorkimball.org'].id }}"
+              page_rules:
                 - actions:
                     - id: forwarding_url
                       value:
                         status_code: 301
-                        url: https://github.com/linuxhq
-                  priority: 1
+                        url: https://github.com/tkimball83
+                  status: active
                   targets:
                     - constraint:
                         operator: matches
-                        value: '*linuxhq.org/*'
+                        value: "taylorkimball.org/*"
+                      target: url
+                - actions:
+                    - id: forwarding_url
+                      value:
+                        status_code: 301
+                        url: https://github.com/tkimball83
+                  status: active
+                  targets:
+                    - constraint:
+                        operator: matches
+                        value: "www.taylorkimball.org/*"
                       target: url
 
 ## License

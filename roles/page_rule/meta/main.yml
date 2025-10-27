@@ -5,7 +5,7 @@ dependencies:
 galaxy_info:
   role_name: page_rule
   author: Taylor Kimball
-  description: Create and update cloudflare page rules
+  description: Manage cloudflare page rules
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq

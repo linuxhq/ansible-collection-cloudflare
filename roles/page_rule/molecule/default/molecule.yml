@@ -1,0 +1,55 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../requirements.yml
+
+driver:
+  name: vagrant
+
+platforms:
+  - name: almalinux9
+    box: bento/almalinux-9
+
+provisioner:
+  name: ansible
+  log: true
+  options:
+    diff: true
+  inventory:
+    group_vars:
+      all:
+        zone_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+
+        page_rule_api_token: "{{ zone_info_api_token }}"
+        page_rule_list:
+          - zone_id: "{{ _zone_info_dict['taylorkimball.org'].id }}"
+            page_rules:
+              - actions:
+                  - id: forwarding_url
+                    value:
+                      status_code: 301
+                      url: https://github.com/tkimball83
+                status: active
+                targets:
+                  - constraint:
+                      operator: matches
+                      value: "taylorkimball.org/*"
+                    target: url
+              - actions:
+                  - id: forwarding_url
+                    value:
+                      status_code: 301
+                      url: https://github.com/tkimball83
+                status: active
+                targets:
+                  - constraint:
+                      operator: matches
+                      value: "www.taylorkimball.org/*"
+                    target: url
+
+verifier:
+  name: ansible
+  options:
+    diff: true
+...
