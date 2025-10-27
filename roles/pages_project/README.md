@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create and update cloudflare pages projects
+Manage cloudflare pages projects
 
 ## Requirements
 
@@ -10,15 +10,13 @@ Create and update cloudflare pages projects
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
-    cf_pages_projects: []
+    pages_project_account_id: null
+    pages_project_api_token: null
+    pages_project_list: []
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
 
 ## Return Values
 
@@ -30,10 +28,12 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.pages_project
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_pages_projects:
-            - name: linuxhq-net
+          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          account_info_name: linuxhq
+          pages_project_account_id: "{{ _account_info_id }}"
+          pages_project_api_token: "{{ account_info_api_token }}"
+          pages_project_list:
+            - name: taylorkimball-org
               production_branch: main
 
 ## License

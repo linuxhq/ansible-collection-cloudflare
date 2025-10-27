@@ -5,7 +5,7 @@ dependencies:
 galaxy_info:
   role_name: pages_project
   author: Taylor Kimball
-  description: Create and update cloudflare pages projects
+  description: Manage cloudflare pages projects
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq

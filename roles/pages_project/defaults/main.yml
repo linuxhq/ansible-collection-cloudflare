@@ -1,5 +1,5 @@
 ---
-cf_account_id: null
-cf_auth_token: null
-cf_pages_projects: []
+pages_project_account_id: null
+pages_project_api_token: null
+pages_project_list: []
 ...

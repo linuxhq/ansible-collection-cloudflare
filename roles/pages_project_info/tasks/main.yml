@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare pages project details are gathered
+- name: Ensure cloudflare pages project information is gathered
   tags:
     - pages_project_info
   ansible.builtin.uri:
