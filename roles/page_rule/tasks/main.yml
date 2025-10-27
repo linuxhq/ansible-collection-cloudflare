@@ -1,78 +1,90 @@
 ---
-- name: Ensure cloudflare page rule details are gathered
+- name: Ensure cloudflare page rule information is gathered
   tags:
     - page_rule
   ansible.builtin.uri:
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ page_rule_api_token }}"
     method: GET
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _rule.zone_id +
-             '/pagerules' }}"
-  loop: "{{ cf_page_rules }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _get.zone_id ~
+          '/pagerules' }}"
+  loop: "{{ page_rule_list }}"
   loop_control:
-    label: "{{ _rule.zone_id }}"
-    loop_var: _rule
-  register: _page_rules
+    label: "{{ _get.zone_id }}"
+    loop_var: _get
+  register: __page_rule_query
   when:
-    - cf_auth_token is not none
-    - _rule.zone_id is defined
+    - page_rule_api_token is not none
+    - _get.zone_id is defined
 
-- name: Ensure cloudflare page rules are absent
+- name: Ensure list of cloudflare page rule information is generated
+  tags:
+    - page_rule
+  ansible.builtin.set_fact:
+    __page_rule_list:
+      "{{ __page_rule_query.results |
+          d([]) |
+          json_query('[].{
+            zone_id: _get.zone_id,
+            page_rule_ids: json.result[].id
+          }') }}"
+
+- name: Ensure cloudpage page rules are absent
   tags:
     - page_rule
   ansible.builtin.uri:
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      authorization: "bearer {{ page_rule_api_token }}"
     method: DELETE
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _rule_id.0._rule.zone_id +
-             '/pagerules/' +
-             _rule_id.1.id }}"
-  loop: "{{ q('ansible.builtin.subelements', _page_rules.results, 'json.result', {'skip_missing': true}) }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _delete.0.zone_id ~
+          '/pagerules/' ~
+          _delete.1 }}"
+  loop:
+    "{{ q('ansible.builtin.subelements',
+          __page_rule_list,
+          'page_rule_ids',
+          {'skip_missing': true}) }}"
   loop_control:
-    label: "{{ _rule_id.1.id }}"
-    loop_var: _rule_id
+    label: "{{ _delete.1 | d(none) }}"
+    loop_var: _delete
   when:
-    - cf_auth_token is not none
-    - _rule_id.0._rule.zone_id is defined
-    - _rule_id.1.id is defined
+    - page_rule_api_token is not none
+    - _delete.0.zone_id is defined
+    - _delete.1 is defined
 
 - name: Ensure cloudflare page rules are present
   tags:
     - page_rule
   ansible.builtin.uri:
-    body:
-      actions: "{{ _rule.1.actions }}"
-      priority: "{{ _rule.1.priority | int }}"
-      status: "{{ _rule.1.status | default('active') }}"
-      targets: "{{ _rule.1.targets }}"
+    body: "{{ _post.1 }}"
     body_format: json
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      authorization: "Bearer {{ page_rule_api_token }}"
     method: POST
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/zones/' +
-             _rule.0.zone_id +
-             '/pagerules' }}"
-  loop: "{{ q('ansible.builtin.subelements', cf_page_rules, 'rules', {'skip_missing': true}) }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _post.0.zone_id ~
+          '/pagerules' }}"
+  loop:
+    "{{ q('ansible.builtin.subelements',
+           page_rule_list,
+           'page_rules',
+           {'skip_missing': true}) }}"
   loop_control:
-    label: "{{ _rule.0.zone_id }}"
-    loop_var: _rule
+    label: "{{ _post.0.zone_id | d(none) }}"
+    loop_var: _post
   when:
-    - cf_auth_token is not none
-    - _rule.0.zone_id is defined
-    - _rule.1.actions is defined
-    - _rule.1.actions | length > 0
-    - _rule.1.priority is defined
-    - _rule.1.targets is defined
-    - _rule.1.targets | length > 0
+    - page_rule_api_token is not none
+    - _post.0.zone_id is defined
+    - _post.1 is defined
 ...

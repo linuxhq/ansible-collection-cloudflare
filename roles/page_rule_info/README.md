@@ -26,7 +26,8 @@ None
     - hosts: cloudflare
       connection: local
       roles:
-        - linuxhq.cloudflare.page_rule_info
+        - role: linuxhq.cloudflare.page_rule_info
+          page_rule_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
 
 ## License
 

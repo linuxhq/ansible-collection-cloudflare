@@ -1,4 +1,4 @@
 ---
-cf_auth_token: null
-cf_page_rules: []
+page_rule_api_token: null
+page_rule_list: []
 ...
