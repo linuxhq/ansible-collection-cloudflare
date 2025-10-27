@@ -3,49 +3,35 @@
   tags:
     - pages_project_info
   ansible.builtin.uri:
-    follow_redirects: false
     headers:
-      Authorization: "Bearer {{ cf_auth_token }}"
+      Authorization: "Bearer {{ pages_project_info_api_token }}"
     method: GET
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             cf_account_id +
-             '/pages/projects' }}"
-  register: _pages_projects_get
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          pages_project_info_account_id ~
+          '/pages/projects' }}"
+  register: __pages_project_info_query
   when:
-    - cf_account_id is not none
-    - cf_auth_token is not none
+    - pages_project_info_account_id is not none
+    - pages_project_info_api_token is not none
 
-- name: Ensure list of pages project names is generated
+- name: Ensure list of cloudflare pages project information is generated
   tags:
     - pages_project_info
   ansible.builtin.set_fact:
-    _cf_pages_project_branch: "{{ _cf_pages_project_branch |
-                                  default({}) |
-                                  combine({_name: _branch}) }}"
-    _cf_pages_project_domains: "{{ _cf_pages_project_domains |
-                                   default({}) |
-                                   combine({_name: _domains}) }}"
-    _cf_pages_project_id: "{{ _cf_pages_project_id |
-                              default({}) |
-                              combine({_name: _id}) }}"
-    _cf_pages_project_subdomain: "{{ _cf_pages_project_subdomain |
-                                     default({}) |
-                                     combine({_name: _subdomain}) }}"
-  loop: "{{ _pages_projects_get.json.result }}"
-  loop_control:
-    label: "{{ _name | default(none) }}"
-    loop_var: _project
-  vars:
-    _id: "{{ _project.id }}"
-    _name: "{{ _project.name }}"
-    _branch: "{{ _project.production_branch | default(none) }}"
-    _domains: "{{ _project.domains | default([]) }}"
-    _subdomain: "{{ _project.subdomain | default(none) }}"
-  when:
-    - _pages_projects_get.json.result is defined
-    - _pages_projects_get.json.result | length > 0
-    - _project.id is defined
-    - _project.name is defined
+    _pages_project_info_list:
+      "{{ __pages_project_info_query.json.result |
+          d([]) }}"
+
+- name: Ensure dict of cloudflare pages project information is generated
+  tags:
+    - pages_project_info
+  ansible.builtin.set_fact:
+    _pages_project_info_dict:
+      "{{ (dict(_pages_project_info_list |
+               json_query('[].name') |
+               zip(_pages_project_info_list))) |
+          d({}) }}"
 ...
