@@ -55,7 +55,7 @@
   register: __access_service_token_post
   loop: "{{ access_service_token_list }}"
   loop_control:
-    label: "{{ _post.name | d(omit) }}"
+    label: "{{ _post.name | d(none) }}"
     loop_var: _post
   when:
     - access_service_token_account_id is not none
@@ -98,7 +98,7 @@
           _access_service_token_dict[_put.name].id }}"
   loop: "{{ access_service_token_list }}"
   loop_control:
-    label: "{{ _put.name | d(omit) }}"
+    label: "{{ _put.name | d(none) }}"
     loop_var: _put
   when:
     - access_service_token_account_id is not none
@@ -126,7 +126,7 @@
           _access_service_token_dict[_delete.name].id }}"
   loop: "{{ access_service_token_list }}"
   loop_control:
-    label: "{{ _delete.name | d(omit) }}"
+    label: "{{ _delete.name | d(none) }}"
     loop_var: _delete
   when:
     - access_service_token_account_id is not none

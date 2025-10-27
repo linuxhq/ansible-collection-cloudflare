@@ -10,27 +10,23 @@ Gather information about cloudflare page rules
 
 ## Role Variables
 
-Available variables are ruleed below, along with default values:
-
-    cf_auth_token: null
-    cf_zone_id: null
+    page_rule_info_api_token: null
 
 ## Dependencies
 
-* [linuxhq.cloudflare.zone_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
+None
 
 ## Return Values
 
-    _cf_page_rules
+    _page_rule_info_dict
+    _page_rule_info_list
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.page_rule_info
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
+        - linuxhq.cloudflare.page_rule_info
 
 ## License
 
