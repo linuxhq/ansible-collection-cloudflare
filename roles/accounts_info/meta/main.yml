@@ -2,9 +2,9 @@
 allow_duplicates: true
 dependencies: []
 galaxy_info:
-  role_name: account_info
+  role_name: accounts_info
   author: Taylor Kimball
-  description: Gather information about cloudflare account
+  description: Gather information about cloudflare accounts
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq

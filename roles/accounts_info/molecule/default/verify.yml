@@ -1,0 +1,17 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - accounts_info
+
+  post_tasks:
+    - name: Ensure cloudflare accounts information is verified
+      tags:
+        - accounts_info
+      ansible.builtin.assert:
+        that:
+          - _accounts_info_id is defined
+          - _accounts_info_name is defined
+          - _accounts_info_settings is defined
+          - _accounts_info_type is defined
+...
