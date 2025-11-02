@@ -1,8 +1,10 @@
-# zone
+# zones
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
 Manage cloudflare zones
+
+Application programming interface -> [zones](https://developers.cloudflare.com/api/resources/zones/)
 
 ## Requirements
 
@@ -10,12 +12,12 @@ Manage cloudflare zones
 
 ## Role Variables
 
-    zone_account_id: null
-    zone_api_token: null
-    zone_list: []
-    zone_match: all
-    zone_page: 1
-    zone_per_page: 20
+    zones_account_id: null
+    zones_api_token: null
+    zones_list: []
+    zones_match: all
+    zones_page: 1
+    zones_per_page: 20
 
 ## Dependencies
 
@@ -26,14 +28,30 @@ Manage cloudflare zones
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.zone
-          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          account_info_name: linuxhq
-          zone_account_id: "{{ _account_info_id }}"
-          zone_api_token: "{{ account_info_api_token }}"
-          zone_list:
-            - name: taylorkimball.org
+        - role: linuxhq.cloudflare.zones
+          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+
+          zones_account_id: "{{ _accounts_info_id }}"
+          zones_api_token: "{{ accounts_info_api_token }}"
+          zones_list:
+            - name: l5zdemvfovxuq.org
               type: full
+              settings:
+                - id: always_use_https
+                  value: 'on'
+                - id: ipv6
+                  value: 'off'
+
+            - name: lwszpiefomimc.org
+              type: full
+              settings:
+                - id: development_mode
+                  value: 'on'
+                - id: min_tls_version
+                  value: 1.3
+                - id: ssl
+                  value: strict
 
 ## License
 

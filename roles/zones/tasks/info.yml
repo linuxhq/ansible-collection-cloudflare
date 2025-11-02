@@ -1,0 +1,41 @@
+---
+- name: Ensure cloudflare zones information is gathered
+  tags:
+    - zones
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ zones_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones' ~
+          '?match=' ~
+          zones_match ~
+          '&page=' ~
+          zones_page ~
+          '&per_page=' ~
+          zones_per_page }}"
+  register: __zones_query
+  check_mode: false
+  when:
+    - zones_api_token is not none
+
+- name: Ensure list of cloudflare zones information is generated
+  tags:
+    - zones
+  ansible.builtin.set_fact:
+    __zones_list:
+      "{{ __zones_query.json.result |
+          d([]) }}"
+
+- name: Ensure dict of cloudflare zones information is generated
+  tags:
+    - zones
+  ansible.builtin.set_fact:
+    __zones_dict:
+      "{{ (dict(__zones_list |
+               json_query('[].name') |
+               zip(__zones_list))) |
+          d({}) }}"
+...

@@ -1,8 +1,8 @@
 ---
-zone_account_id: null
-zone_api_token: null
-zone_list: []
-zone_match: all
-zone_page: 1
-zone_per_page: 20
+zones_account_id: null
+zones_api_token: null
+zones_list: []
+zones_match: all
+zones_page: 1
+zones_per_page: 20
 ...
