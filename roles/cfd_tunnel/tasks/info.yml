@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare cfd tunnels information is gathered
+- name: Ensure cloudflare cfd tunnel information is gathered
   tags:
     - cfd_tunnel
   ansible.builtin.uri:
@@ -18,7 +18,7 @@
     - cfd_tunnel_account_id is not none
     - cfd_tunnel_api_token is not none
 
-- name: Ensure list of cloudflare cfd tunnels information is generated
+- name: Ensure list of cloudflare cfd tunnel information is generated
   tags:
     - cfd_tunnel
   ansible.builtin.set_fact:
@@ -26,7 +26,7 @@
       "{{ __cfd_tunnel_query.json.result |
           d([]) }}"
 
-- name: Ensure dict of cloudflare cfd tunnels information is generated
+- name: Ensure dict of cloudflare cfd tunnel information is generated
   tags:
     - cfd_tunnel
   ansible.builtin.set_fact:

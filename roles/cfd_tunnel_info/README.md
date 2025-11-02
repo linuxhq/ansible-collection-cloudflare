@@ -1,8 +1,10 @@
-# tunnel\_info
+# cfd\_tunnel\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Gather information about cloudflare tunnels
+Gather information about cloudflare cfd tunnels
+
+Application programming interface -> [tunnels](https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/)
 
 ## Requirements
 
@@ -10,8 +12,8 @@ Gather information about cloudflare tunnels
 
 ## Role Variables
 
-    tunnel_info_account_id: null
-    tunnel_info_api_token: null
+    cfd_tunnel_info_account_id: null
+    cfd_tunnel_info_api_token: null
 
 ## Dependencies
 
@@ -19,19 +21,19 @@ Gather information about cloudflare tunnels
 
 ## Return Values
 
-    _tunnel_info_dict
-    _tunnel_info_list
+    _cfd_tunnel_info_dict
+    _cfd_tunnel_info_list
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.tunnel_info
+        - role: linuxhq.cloudflare.cfd_tunnel_info
           accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           accounts_info_name: linuxhq
-          tunnel_info_account_id: "{{ _accounts_info_id }}"
-          tunnel_info_api_token: "{{ accounts_info_api_token }}"
+          cfd_tunnel_info_account_id: "{{ _accounts_info_id }}"
+          cfd_tunnel_info_api_token: "{{ accounts_info_api_token }}"
 
 ## License
 
