@@ -1,8 +1,10 @@
-# account\_info
+# accounts\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Gather information about cloudflare account
+Gather information about cloudflare accounts
+
+Application programming interface reference -> [accounts](https://developers.cloudflare.com/api/resources/accounts/)
 
 ## Requirements
 
@@ -10,30 +12,24 @@ Gather information about cloudflare account
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    account_info_api_token: null
-    account_info_name: null
-
-## Dependencies
-
-None
+    accounts_info_api_token: null
+    accounts_info_name: null
 
 ## Return Values
 
-    _account_info_id
-    _account_info_name
-    _account_info_settings
-    _account_info_type
+    _accounts_info_id
+    _accounts_info_name
+    _accounts_info_settings
+    _accounts_info_type
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.account_info
-          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          account_info_name: linuxhq
+        - role: linuxhq.cloudflare.accounts_info
+          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          accounts_info_name: linuxhq
 
 ## License
 
