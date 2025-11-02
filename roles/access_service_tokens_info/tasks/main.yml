@@ -1,0 +1,38 @@
+---
+- name: Ensure cloudflare access service tokens information is gathered
+  tags:
+    - access_service_tokens_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ access_service_tokens_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_service_tokens_info_account_id ~
+          '/access/service_tokens' }}"
+  register: __access_service_tokens_info_query
+  check_mode: false
+  when:
+    - access_service_tokens_info_account_id is not none
+    - access_service_tokens_info_api_token is not none
+
+- name: Ensure list of cloudflare access service tokens information is generated
+  tags:
+    - access_service_tokens_info
+  ansible.builtin.set_fact:
+    _access_service_tokens_info_list:
+      "{{ __access_service_tokens_info_query.json.result |
+          d([]) }}"
+
+- name: Ensure dict of cloudflare access service tokens information is generated
+  tags:
+    - access_service_tokens_info
+  ansible.builtin.set_fact:
+    _access_service_tokens_info_dict:
+      "{{ (dict(_access_service_tokens_info_list |
+               json_query('[].name') |
+               zip(_access_service_tokens_info_list))) |
+          d({}) }}"
+...

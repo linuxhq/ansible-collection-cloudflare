@@ -1,0 +1,12 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: access_service_tokens_info
+      access_service_tokens_info_account_id: null
+      access_service_tokens_info_api_token: null
+      tags:
+        - molecule-idempotence-notest
+
+    - access_service_tokens_info
+...

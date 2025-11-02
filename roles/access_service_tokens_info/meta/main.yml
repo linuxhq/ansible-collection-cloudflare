@@ -2,9 +2,9 @@
 allow_duplicates: true
 dependencies:
   - role: accounts_info
-    tags: access_service_token_info
+    tags: access_service_tokens_info
 galaxy_info:
-  role_name: access_service_token_info
+  role_name: access_service_tokens_info
   author: Taylor Kimball
   description: Gather information about cloudflare access service tokens
   license: GPL-3.0-or-later
