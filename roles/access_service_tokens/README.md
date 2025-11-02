@@ -1,8 +1,10 @@
-# access\_service\_token
+# access\_service\_tokens
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
 Manage cloudflare access service tokens
+
+Application programming interface -> [access](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/)
 
 ## Requirements
 
@@ -10,10 +12,10 @@ Manage cloudflare access service tokens
 
 ## Role Variables
 
-    access_service_token_account_id: null
-    access_service_token_api_token: null
-    access_service_token_display: true
-    access_service_token_list: []
+    access_service_tokens_account_id: null
+    access_service_tokens_api_tokens: null
+    access_service_tokens_display: true
+    access_service_tokens_list: []
 
 ## Dependencies
 
@@ -24,12 +26,12 @@ Manage cloudflare access service tokens
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.access_service_token
+        - role: linuxhq.cloudflare.access_service_tokens
           accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           accounts_info_name: linuxhq
-          access_service_token_account_id: "{{ _accounts_info_id }}"
-          access_service_token_api_token: "{{ accounts_info_api_token }}"
-          access_service_token_list:
+          access_service_tokens_account_id: "{{ _accounts_info_id }}"
+          access_service_tokens_api_token: "{{ accounts_info_api_token }}"
+          access_service_tokens_list:
             - name: taylorkimball.org
               duration: forever
 
