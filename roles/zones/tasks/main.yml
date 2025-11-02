@@ -1,120 +1,138 @@
 ---
-- name: Ensure cloudflare zone information is gathered
+- name: Ensure cloudflare zones information tasks are included
   tags:
-    - zone
-  ansible.builtin.uri:
-    headers:
-      Authorization: "Bearer {{ zone_api_token }}"
-    method: GET
-    status_code:
-      - 200
-    url:
-      "{{ 'https://api.cloudflare.com/client/v4/zones' ~
-          '?match=' ~
-          zone_match ~
-          '&page=' ~
-          zone_page ~
-          '&per_page=' ~
-          zone_per_page }}"
-  register: __zone_query
-  when:
-    - zone_api_token is not none
-
-- name: Ensure list of cloudflare zone information is generated
-  tags:
-    - zone
-  ansible.builtin.set_fact:
-    __zone_list:
-      "{{ __zone_query.json.result |
-          d([]) }}"
-
-- name: Ensure dict of cloudflare zone information is generated
-  tags:
-    - zone
-  ansible.builtin.set_fact:
-    __zone_dict:
-      "{{ (dict(__zone_list |
-               json_query('[].name') |
-               zip(__zone_list))) |
-          d({}) }}"
+    - zones
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - zones
+    file: info.yml
 
 - name: Ensure cloudflare zones are present
   tags:
-    - zone
+    - zones
   ansible.builtin.uri:
     body:
       account:
-        id: "{{ zone_account_id }}"
+        id: "{{ zones_account_id }}"
       name: "{{ _post.name }}"
       type: "{{ _post.type | d('full') }}"
     body_format: json
     headers:
-      Authorization: "Bearer {{ zone_api_token }}"
+      Authorization: "Bearer {{ zones_api_token }}"
     method: POST
     status_code:
       - 200
     url: 'https://api.cloudflare.com/client/v4/zones'
-  loop: "{{ zone_list }}"
+  loop: "{{ zones_list }}"
   loop_control:
     label: "{{ _post.name | d(none) }}"
     loop_var: _post
+  changed_when: true
   when:
-    - zone_account_id is not none
-    - zone_api_token is not none
+    - zones_account_id is not none
+    - zones_api_token is not none
     - _post.name is defined
-    - _post.name not in __zone_dict.keys()
+    - _post.name not in __zones_dict.keys()
     - _post.state is not defined or
       _post.state == 'present'
 
+- name: Ensure cloudflare zones information tasks are included
+  tags:
+    - zones
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - zones
+    file: info.yml
+
 - name: Ensure cloudflare zones are updated
   tags:
-    - zone
+    - zones
   ansible.builtin.uri:
     body:
       type: "{{ _patch.type | d('full') }}"
       vanity_name_servers: "{{ _patch.vanity_name_servers | d(omit) }}"
     body_format: json
     headers:
-      Authorization: "Bearer {{ zone_api_token }}"
+      Authorization: "Bearer {{ zones_api_token }}"
     method: PATCH
     status_code:
       - 200
     url:
       "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
-          __zone_dict[_patch.name].id }}"
-  loop: "{{ zone_list }}"
+          __zones_dict[_patch.name].id }}"
+  loop: "{{ zones_list }}"
   loop_control:
     label: "{{ _patch.name | d(none) }}"
     loop_var: _patch
+  changed_when: true
   when:
-    - zone_api_token is not none
+    - zones_api_token is not none
     - _patch.name is defined
-    - _patch.name in __zone_dict.keys()
+    - _patch.name in __zones_dict.keys()
     - _patch.state is not defined or
       _patch.state == 'present'
-    - __zone_dict[_patch.name].id is defined
+    - __zones_dict[_patch.name].id is defined
+
+- name: Ensure cloudflare zones settings are managed
+  tags:
+    - zones
+  ansible.builtin.uri:
+    body:
+      value: "{{ _setting.1.value }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ zones_api_token }}"
+    method: PATCH
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          __zones_dict[_setting.0.name].id ~
+          '/settings/' ~
+          _setting.1.id }}"
+  loop:
+    "{{ q('ansible.builtin.subelements',
+          zones_list,
+          'settings',
+          {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ _setting.1.id | d(none) }}"
+    loop_var: _setting
+  changed_when: true
+  when:
+    - zones_api_token is not none
+    - _setting.0.name is defined
+    - _setting.0.name in __zones_dict.keys()
+    - _setting.0.state is not defined or
+      _setting.0.state == 'present'
+    - _setting.1.id is defined
+    - _setting.1.value is defined
+    - __zones_dict[_setting.0.name].id is defined
 
 - name: Ensure cloudflare zones are absent
   tags:
-    - zone
+    - zones
   ansible.builtin.uri:
     headers:
-      Authorization: "Bearer {{ zone_api_token }}"
+      Authorization: "Bearer {{ zones_api_token }}"
     method: DELETE
     status_code:
       - 200
     url:
       "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
-          __zone_dict[_delete.name].id }}"
-  loop: "{{ zone_list }}"
+          __zones_dict[_delete.name].id }}"
+  loop: "{{ zones_list }}"
   loop_control:
     label: "{{ _delete.name | d(none) }}"
     loop_var: _delete
+  changed_when: true
   when:
-    - zone_api_token is not none
+    - zones_api_token is not none
     - _delete.name is defined
-    - _delete.name in __zone_dict.keys()
+    - _delete.name in __zones_dict.keys()
     - _delete.state is defined and
       _delete.state == 'absent'
-    - __zone_dict[_delete.name].id is defined
+    - __zones_dict[_delete.name].id is defined
 ...

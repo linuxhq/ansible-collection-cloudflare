@@ -5,12 +5,12 @@
   pre_tasks:
     - name: Ensure inventory lists are formatted
       tags:
-        - zone
+        - zones
       ansible.builtin.set_fact:
-        zone_list:
-          "{{ zone_list |
+        zones_list:
+          "{{ zones_list |
               map('combine', {'state': 'absent'}) }}"
 
   roles:
-    - zone
+    - zones
 ...

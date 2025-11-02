@@ -1,8 +1,10 @@
-# zone\_info
+# zones\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
 Gather information about cloudflare zones
+
+Application programming interface -> [zones](https://developers.cloudflare.com/api/resources/zones/)
 
 ## Requirements
 
@@ -10,27 +12,23 @@ Gather information about cloudflare zones
 
 ## Role Variables
 
-    zone_info_api_token: null
-    zone_info_match: all
-    zone_info_page: 1
-    zone_info_per_page: 20
-
-## Dependencies
-
-None
+    zones_info_api_token: null
+    zones_info_match: all
+    zones_info_page: 1
+    zones_info_per_page: 20
 
 ## Return Values
 
-    _zone_info_dict
-    _zone_info_list
+    _zones_info_dict
+    _zones_info_list
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.zone_info
-          zone_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+        - role: linuxhq.cloudflare.zones_info
+          zones_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
 
 ## License
 

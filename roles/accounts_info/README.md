@@ -4,7 +4,7 @@
 
 Gather information about cloudflare accounts
 
-Application programming interface reference -> [accounts](https://developers.cloudflare.com/api/resources/accounts/)
+Application programming interface -> [accounts](https://developers.cloudflare.com/api/resources/accounts/)
 
 ## Requirements
 

@@ -11,8 +11,6 @@
     method: GET
     status_code:
       - 200
-      - 401
-      - 403
     url: 'https://api.cloudflare.com/client/v4/accounts'
   register: __accounts_info_query
   check_mode: false
