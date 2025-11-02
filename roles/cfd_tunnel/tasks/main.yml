@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare cfd tunnels information tasks are included
+- name: Ensure cloudflare cfd tunnel information tasks are included
   tags:
     - cfd_tunnel
   ansible.builtin.include_tasks:
@@ -8,7 +8,7 @@
         - cfd_tunnel
     file: info.yml
 
-- name: Ensure cloudflare cfd tunnels are present
+- name: Ensure cloudflare cfd tunnel are present
   tags:
     - cfd_tunnel
   ansible.builtin.uri:
@@ -40,7 +40,7 @@
       _post.state == 'present'
     - _post.tunnel_secret is defined
 
-- name: Ensure cloudflare cfd tunnels information tasks are included
+- name: Ensure cloudflare cfd tunnel information tasks are included
   tags:
     - cfd_tunnel
   ansible.builtin.include_tasks:
@@ -49,7 +49,7 @@
         - cfd_tunnel
     file: info.yml
 
-- name: Ensure cloudflare cfd tunnels are updated
+- name: Ensure cloudflare cfd tunnel are updated
   tags:
     - cfd_tunnel
   ansible.builtin.uri:
@@ -82,7 +82,7 @@
     - _patch.tunnel_secret is defined
     - __cfd_tunnel_dict[_patch.name].id is defined
 
-- name: Ensure cloudflare cfd tunnels are absent
+- name: Ensure cloudflare cfd tunnel are absent
   tags:
     - cfd_tunnel
   ansible.builtin.uri:

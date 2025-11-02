@@ -14,7 +14,7 @@
           '/pagerules' }}"
   loop: "{{ page_rule_list }}"
   loop_control:
-    label: "{{ _get.zone_id }}"
+    label: "{{ _get.zone_id | d(none) }}"
     loop_var: _get
   register: __page_rule_query
   when:
