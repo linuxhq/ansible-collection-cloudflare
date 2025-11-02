@@ -18,11 +18,7 @@ Available variables are listed below, along with default values:
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
-
-## Return Values
-
-None
+* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
 
 ## Example Playbook
 

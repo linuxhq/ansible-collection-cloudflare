@@ -16,11 +16,7 @@ Manage cloudflare pages projects
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
-
-## Return Values
-
-None
+* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
 
 ## Example Playbook
 
@@ -28,10 +24,10 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.pages_project
-          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          account_info_name: linuxhq
-          pages_project_account_id: "{{ _account_info_id }}"
-          pages_project_api_token: "{{ account_info_api_token }}"
+          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          accounts_info_name: linuxhq
+          pages_project_account_id: "{{ _accounts_info_id }}"
+          pages_project_api_token: "{{ accounts_info_api_token }}"
           pages_project_list:
             - name: taylorkimball-org
               production_branch: main

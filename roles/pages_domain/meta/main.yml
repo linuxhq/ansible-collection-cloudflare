@@ -1,6 +1,6 @@
 ---
 dependencies:
-  - role: account_info
+  - role: accounts_info
     tags: pages_domain
 galaxy_info:
   role_name: pages_domain

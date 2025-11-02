@@ -18,21 +18,17 @@ Manage cloudflare access groups
 
 * [linuxhq.cloudflare.access\_service\_token\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_service_token_info)
 
-## Return Values
-
-None
-
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_group
-          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          account_info_name: linuxhq
+          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          accounts_info_name: linuxhq
 
-          access_group_account_id: "{{ _account_info_id }}"
-          access_group_api_token: "{{ account_info_api_token }}"
+          access_group_account_id: "{{ _accounts_info_id }}"
+          access_group_api_token: "{{ accounts_info_api_token }}"
           access_group_list:
             - name: taylorkimball.org
               include:
@@ -40,10 +36,10 @@ None
                     token_id: "{{ _access_service_token_info_dict['taylorkimball.org'].id }}"
               is_default: false
 
-          access_service_token_account_id: "{{ _account_info_id }}"
-          access_service_token_api_token: "{{ account_info_api_token }}"
-          access_service_token_info_account_id: "{{ _account_info_id }}"
-          access_service_token_info_api_token: "{{ account_info_api_token }}"
+          access_service_token_account_id: "{{ _accounts_info_id }}"
+          access_service_token_api_token: "{{ accounts_info_api_token }}"
+          access_service_token_info_account_id: "{{ _accounts_info_id }}"
+          access_service_token_info_api_token: "{{ accounts_info_api_token }}"
           access_service_token_list:
             - name: taylorkimball.org
               duration: forever

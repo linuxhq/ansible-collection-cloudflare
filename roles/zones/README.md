@@ -21,7 +21,7 @@ Application programming interface -> [zones](https://developers.cloudflare.com/a
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
 
 ## Example Playbook
 

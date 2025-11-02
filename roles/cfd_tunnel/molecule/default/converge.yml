@@ -2,10 +2,10 @@
 - name: Converge
   hosts: all
   roles:
-    - role: tunnel
-      tunnel_list: []
+    - role: cfd_tunnel
+      cfd_tunnel_list: []
       tags:
         - molecule-idempotence-notest
 
-    - tunnel
+    - cfd_tunnel
 ...

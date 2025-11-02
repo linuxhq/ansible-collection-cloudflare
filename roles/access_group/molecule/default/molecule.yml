@@ -19,11 +19,11 @@ provisioner:
   inventory:
     group_vars:
       all:
-        account_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        account_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+        accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
 
-        access_group_account_id: "{{ _account_info_id }}"
-        access_group_api_token: "{{ account_info_api_token }}"
+        access_group_account_id: "{{ _accounts_info_id }}"
+        access_group_api_token: "{{ accounts_info_api_token }}"
         access_group_list:
           - name: taylorkimball.org
             include:
@@ -31,10 +31,10 @@ provisioner:
                   token_id: "{{ _access_service_token_info_dict['taylorkimball.org'].id }}"
             is_default: false
 
-        access_service_token_account_id: "{{ _account_info_id }}"
-        access_service_token_api_token: "{{ account_info_api_token }}"
-        access_service_token_info_account_id: "{{ _account_info_id }}"
-        access_service_token_info_api_token: "{{ account_info_api_token }}"
+        access_service_token_account_id: "{{ _accounts_info_id }}"
+        access_service_token_api_token: "{{ accounts_info_api_token }}"
+        access_service_token_info_account_id: "{{ _accounts_info_id }}"
+        access_service_token_info_api_token: "{{ accounts_info_api_token }}"
         access_service_token_list:
           - name: taylorkimball.org
             duration: forever

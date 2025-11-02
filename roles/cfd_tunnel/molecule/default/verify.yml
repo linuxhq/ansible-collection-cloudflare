@@ -5,12 +5,12 @@
   pre_tasks:
     - name: Ensure inventory lists are formatted
       tags:
-        - tunnel
+        - cfd_tunnel
       ansible.builtin.set_fact:
-        tunnel_list:
-          "{{ tunnel_list |
+        cfd_tunnel_list:
+          "{{ cfd_tunnel_list |
               map('combine', {'state': 'absent'}) }}"
 
   roles:
-    - tunnel
+    - cfd_tunnel
 ...
