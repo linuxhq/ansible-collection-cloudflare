@@ -1,9 +1,9 @@
 ---
 dependencies:
   - role: accounts_info
-    tags: access_service_token
+    tags: access_service_tokens
 galaxy_info:
-  role_name: access_service_token
+  role_name: access_service_tokens
   author: Taylor Kimball
   description: Manage cloudflare access service tokens
   license: GPL-3.0-or-later
