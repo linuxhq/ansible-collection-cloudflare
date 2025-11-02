@@ -17,11 +17,7 @@ Manage cloudflare access service tokens
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
-
-## Return Values
-
-None
+* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
 
 ## Example Playbook
 
@@ -29,10 +25,10 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_service_token
-          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          account_info_name: linuxhq
-          access_service_token_account_id: "{{ _account_info_id }}"
-          access_service_token_api_token: "{{ account_info_api_token }}"
+          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          accounts_info_name: linuxhq
+          access_service_token_account_id: "{{ _accounts_info_id }}"
+          access_service_token_api_token: "{{ accounts_info_api_token }}"
           access_service_token_list:
             - name: taylorkimball.org
               duration: forever

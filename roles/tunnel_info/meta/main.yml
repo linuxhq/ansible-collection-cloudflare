@@ -1,7 +1,7 @@
 ---
 allow_duplicates: true
 dependencies:
-  - role: account_info
+  - role: accounts_info
     tags: tunnel_info
 galaxy_info:
   role_name: tunnel_info

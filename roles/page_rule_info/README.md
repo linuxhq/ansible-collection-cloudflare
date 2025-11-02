@@ -12,10 +12,6 @@ Gather information about cloudflare page rules
 
     page_rule_info_api_token: null
 
-## Dependencies
-
-None
-
 ## Return Values
 
     _page_rule_info_dict

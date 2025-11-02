@@ -1,0 +1,38 @@
+---
+- name: Ensure cloudflare cfd tunnels information is gathered
+  tags:
+    - cfd_tunnel
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ cfd_tunnel_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          cfd_tunnel_account_id ~
+          '/cfd_tunnel?is_deleted=false' }}"
+  register: __cfd_tunnel_query
+  check_mode: false
+  when:
+    - cfd_tunnel_account_id is not none
+    - cfd_tunnel_api_token is not none
+
+- name: Ensure list of cloudflare cfd tunnels information is generated
+  tags:
+    - cfd_tunnel
+  ansible.builtin.set_fact:
+    __cfd_tunnel_list:
+      "{{ __cfd_tunnel_query.json.result |
+          d([]) }}"
+
+- name: Ensure dict of cloudflare cfd tunnels information is generated
+  tags:
+    - cfd_tunnel
+  ansible.builtin.set_fact:
+    __cfd_tunnel_dict:
+      "{{ (dict(__cfd_tunnel_list |
+               json_query('[].name') |
+               zip(__cfd_tunnel_list))) |
+          d({}) }}"
+...

@@ -15,7 +15,7 @@ Gather information about cloudflare tunnels
 
 ## Dependencies
 
-* [linuxhq.cloudflare.account\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/account_info)
+* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
 
 ## Return Values
 
@@ -28,10 +28,10 @@ Gather information about cloudflare tunnels
       connection: local
       roles:
         - role: linuxhq.cloudflare.tunnel_info
-          account_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          account_info_name: linuxhq
-          tunnel_info_account_id: "{{ _account_info_id }}"
-          tunnel_info_api_token: "{{ account_info_api_token }}"
+          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          accounts_info_name: linuxhq
+          tunnel_info_account_id: "{{ _accounts_info_id }}"
+          tunnel_info_api_token: "{{ accounts_info_api_token }}"
 
 ## License
 

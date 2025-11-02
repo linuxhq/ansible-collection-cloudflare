@@ -17,10 +17,6 @@ Manage cloudflare page rules
 
 * [linuxhq.cloudflare.zone\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
 
-## Return Values
-
-None
-
 ## Example Playbook
 
     - hosts: cloudflare

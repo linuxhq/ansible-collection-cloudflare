@@ -24,10 +24,6 @@ Available variables are listed below, along with default values:
 
 * [linuxhq.cloudflare.zone_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
 
-## Return Values
-
-None
-
 ## Example Playbook
 
     - hosts: cloudflare
