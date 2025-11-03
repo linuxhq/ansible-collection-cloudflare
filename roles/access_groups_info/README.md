@@ -1,8 +1,10 @@
-# access\_group\_info
+# access\_groups\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
 Gather information about cloudflare access groups
+
+Application programming interface -> [access](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/)
 
 ## Requirements
 
@@ -10,8 +12,8 @@ Gather information about cloudflare access groups
 
 ## Role Variables
 
-    access_group_info_account_id: null
-    access_group_info_api_token: null
+    access_groups_info_account_id: null
+    access_groups_info_api_token: null
 
 ## Dependencies
 
@@ -19,19 +21,19 @@ Gather information about cloudflare access groups
 
 ## Return Values
 
-    _access_group_info_dict
-    _access_group_info_list
+    _access_groups_info_dict
+    _access_groups_info_list
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.access_group_info
+        - role: linuxhq.cloudflare.access_groups_info
           accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           accounts_info_name: linuxhq
-          access_group_info_account_id: "{{ _accounts_info_id }}"
-          access_group_info_api_token: "{{ accounts_info_api_token }}"
+          access_groups_info_account_id: "{{ _accounts_info_id }}"
+          access_groups_info_api_token: "{{ accounts_info_api_token }}"
 
 ## License
 

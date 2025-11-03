@@ -2,13 +2,13 @@
 - name: Converge
   hosts: all
   roles:
-    - role: access_policy
-      access_policy_account_id: null
-      access_policy_api_token: null
+    - role: access_policies
+      access_policies_account_id: null
+      access_policies_api_token: null
       tags:
         - molecule-idempotence-notest
 
-    - role: access_service_token
+    - role: access_service_tokens
       tags:
         - molecule-idempotence-notest
 
@@ -16,5 +16,5 @@
       tags:
         - molecule-idempotence-notest
 
-    - access_policy
+    - access_policies
 ...

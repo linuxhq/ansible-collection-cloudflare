@@ -1,8 +1,10 @@
-# access\_policy
+# access\_policies
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
 Manage cloudflare access policies
+
+Application programming interface -> [access](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/)
 
 ## Requirements
 
@@ -10,9 +12,9 @@ Manage cloudflare access policies
 
 ## Role Variables
 
-    access_policy_account_id: null
-    access_policy_api_token: null
-    access_policy_list: []
+    access_policies_account_id: null
+    access_policies_api_token: null
+    access_policies_list: []
 
 ## Dependencies
 
@@ -23,7 +25,7 @@ Manage cloudflare access policies
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.access_policy
+        - role: linuxhq.cloudflare.access_policies
           accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           accounts_info_name: linuxhq
 
@@ -35,23 +37,23 @@ Manage cloudflare access policies
             - name: taylorkimball.org
               include:
                 - service_token:
-                    token_id: "{{ _access_service_token_info_dict['taylorkimball.org'].id }}"
+                    token_id: "{{ _access_service_tokens_info_dict['taylorkimball.org'].id }}"
               is_default: false
 
-          access_policy_account_id: "{{ _accounts_info_id }}"
-          access_policy_api_token: "{{ accounts_info_api_token }}"
-          access_policy_list:
+          access_policies_account_id: "{{ _accounts_info_id }}"
+          access_policies_api_token: "{{ accounts_info_api_token }}"
+          access_policies_list:
             - name: taylorkimball.org
               decision: non_identity
               include:
                 - group:
                     id: "{{ _access_group_info_dict['taylorkimball.org'].id }}"
 
-          access_service_token_account_id: "{{ _accounts_info_id }}"
-          access_service_token_api_token: "{{ accounts_info_api_token }}"
-          access_service_token_info_account_id: "{{ _accounts_info_id }}"
-          access_service_token_info_api_token: "{{ accounts_info_api_token }}"
-          access_service_token_list:
+          access_service_tokens_account_id: "{{ _accounts_info_id }}"
+          access_service_tokens_api_token: "{{ accounts_info_api_token }}"
+          access_service_tokens_info_account_id: "{{ _accounts_info_id }}"
+          access_service_tokens_info_api_token: "{{ accounts_info_api_token }}"
+          access_service_tokens_list:
             - name: taylorkimball.org
               duration: forever
 
