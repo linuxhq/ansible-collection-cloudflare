@@ -19,7 +19,22 @@ provisioner:
   inventory:
     group_vars:
       all:
-        page_rule_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+        pagerules_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - converge
+    - check
+    - verify
+    - cleanup
+    - destroy
 
 verifier:
   name: ansible

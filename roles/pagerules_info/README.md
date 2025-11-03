@@ -1,8 +1,10 @@
-# page\_rule\_info
+# pagerules\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Gather information about cloudflare page rules
+Gather information about cloudflare pagerules
+
+Application programming interface -> [pagerules](https://developers.cloudflare.com/api/resources/page_rules/)
 
 ## Requirements
 
@@ -10,20 +12,20 @@ Gather information about cloudflare page rules
 
 ## Role Variables
 
-    page_rule_info_api_token: null
+    pagerules_info_api_token: null
 
 ## Return Values
 
-    _page_rule_info_dict
-    _page_rule_info_list
+    _pagerules_info_dict
+    _pagerules_info_list
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.page_rule_info
-          page_rule_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+        - role: linuxhq.cloudflare.pagerules_info
+          pagerules_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
 
 ## License
 
