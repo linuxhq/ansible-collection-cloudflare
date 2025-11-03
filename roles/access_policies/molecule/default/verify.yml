@@ -9,7 +9,7 @@
       ansible.builtin.include_role:
         name: "{{ _role }}"
       loop:
-        - access_group_info
+        - access_groups_info
         - access_service_tokens_info
       loop_control:
         label: "{{ _role | d(none) }}"
@@ -19,8 +19,8 @@
       tags:
         - access_policies
       ansible.builtin.set_fact:
-        access_group_list:
-          "{{ access_group_list |
+        access_groups_list:
+          "{{ access_groups_list |
               map('combine', {'state': 'absent'}) }}"
         access_policies_list:
           "{{ access_policies_list |
@@ -31,6 +31,6 @@
 
   roles:
     - access_policies
-    - access_group
+    - access_groups
     - access_service_tokens
 ...

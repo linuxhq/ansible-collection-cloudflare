@@ -18,7 +18,7 @@ Application programming interface -> [access](https://developers.cloudflare.com/
 
 ## Dependencies
 
-* [linuxhq.cloudflare.access\_group\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_group_info)
+* [linuxhq.cloudflare.access\_groups\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_groups_info)
 
 ## Example Playbook
 
@@ -29,11 +29,11 @@ Application programming interface -> [access](https://developers.cloudflare.com/
           accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           accounts_info_name: linuxhq
 
-          access_group_account_id: "{{ _accounts_info_id }}"
-          access_group_api_token: "{{ accounts_info_api_token }}"
-          access_group_info_account_id: "{{ _accounts_info_id }}"
-          access_group_info_api_token: "{{ accounts_info_api_token }}"
-          access_group_list:
+          access_groups_account_id: "{{ _accounts_info_id }}"
+          access_groups_api_token: "{{ accounts_info_api_token }}"
+          access_groups_info_account_id: "{{ _accounts_info_id }}"
+          access_groups_info_api_token: "{{ accounts_info_api_token }}"
+          access_groups_list:
             - name: taylorkimball.org
               include:
                 - service_token:
@@ -47,7 +47,7 @@ Application programming interface -> [access](https://developers.cloudflare.com/
               decision: non_identity
               include:
                 - group:
-                    id: "{{ _access_group_info_dict['taylorkimball.org'].id }}"
+                    id: "{{ _access_groups_info_dict['taylorkimball.org'].id }}"
 
           access_service_tokens_account_id: "{{ _accounts_info_id }}"
           access_service_tokens_api_token: "{{ accounts_info_api_token }}"

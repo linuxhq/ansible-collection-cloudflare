@@ -5,6 +5,7 @@
     - role: access_service_tokens
       access_service_tokens_account_id: null
       access_service_tokens_api_token: null
+      access_service_tokens_list: []
       tags:
         - molecule-idempotence-notest
 
