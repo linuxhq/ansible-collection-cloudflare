@@ -19,12 +19,12 @@ provisioner:
   inventory:
     group_vars:
       all:
-        zone_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+        zones_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
 
-        page_rule_api_token: "{{ zone_info_api_token }}"
-        page_rule_list:
-          - zone_id: "{{ _zone_info_dict['taylorkimball.org'].id }}"
-            page_rules:
+        pagerules_api_token: "{{ zones_info_api_token }}"
+        pagerules_list:
+          - zone_id: "{{ _zones_info_dict['taylorkimball.org'].id }}"
+            pagerules:
               - actions:
                   - id: forwarding_url
                     value:
@@ -47,6 +47,21 @@ provisioner:
                       operator: matches
                       value: "www.taylorkimball.org/*"
                     target: url
+
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - converge
+    - check
+    - verify
+    - cleanup
+    - destroy
 
 verifier:
   name: ansible

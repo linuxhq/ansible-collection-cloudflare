@@ -1,8 +1,10 @@
-# page\_rule
+# pagerules
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
 Manage cloudflare page rules
+
+Application programming interface -> [pagerules](https://developers.cloudflare.com/api/resources/page_rules/)
 
 ## Requirements
 
@@ -10,8 +12,8 @@ Manage cloudflare page rules
 
 ## Role Variables
 
-    page_rule_api_token: null
-    page_rule_list: []
+    pagerules_api_token: null
+    pagerules_list: []
 
 ## Dependencies
 
@@ -22,12 +24,12 @@ Manage cloudflare page rules
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.page_rule
-          zone_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          page_rule_api_token: "{{ zone_info_api_token }}"
-          page_rule_list:
+        - role: linuxhq.cloudflare.pagerules
+          zones_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          pagerules_api_token: "{{ zones_info_api_token }}"
+          pagerules_list:
             - zone_id: "{{ _zone_info_dict['taylorkimball.org'].id }}"
-              page_rules:
+              pagerules:
                 - actions:
                     - id: forwarding_url
                       value:

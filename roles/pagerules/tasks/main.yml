@@ -1,10 +1,10 @@
 ---
-- name: Ensure cloudflare page rule information is gathered
+- name: Ensure cloudflare pagerules information is gathered
   tags:
-    - page_rule
+    - pagerules
   ansible.builtin.uri:
     headers:
-      Authorization: "Bearer {{ page_rule_api_token }}"
+      Authorization: "Bearer {{ pagerules_api_token }}"
     method: GET
     status_code:
       - 200
@@ -12,33 +12,34 @@
       "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
           _get.zone_id ~
           '/pagerules' }}"
-  loop: "{{ page_rule_list }}"
+  loop: "{{ pagerules_list }}"
   loop_control:
     label: "{{ _get.zone_id | d(none) }}"
     loop_var: _get
-  register: __page_rule_query
+  register: __pagerules_query
+  check_mode: false
   when:
-    - page_rule_api_token is not none
+    - pagerules_api_token is not none
     - _get.zone_id is defined
 
-- name: Ensure list of cloudflare page rule information is generated
+- name: Ensure list of cloudflare pagerules information is generated
   tags:
-    - page_rule
+    - pagerules
   ansible.builtin.set_fact:
-    __page_rule_list:
-      "{{ __page_rule_query.results |
+    __pagerules_list:
+      "{{ __pagerules_query.results |
           d([]) |
           json_query('[].{
             zone_id: _get.zone_id,
-            page_rule_ids: json.result[].id
+            pagerules_ids: json.result[].id
           }') }}"
 
-- name: Ensure cloudpage page rules are absent
+- name: Ensure cloudpage pagerules are absent
   tags:
-    - page_rule
+    - pagerules
   ansible.builtin.uri:
     headers:
-      authorization: "bearer {{ page_rule_api_token }}"
+      authorization: "Bearer {{ pagerules_api_token }}"
     method: DELETE
     status_code:
       - 200
@@ -49,25 +50,26 @@
           _delete.1 }}"
   loop:
     "{{ q('ansible.builtin.subelements',
-          __page_rule_list,
-          'page_rule_ids',
+          __pagerules_list,
+          'pagerules_ids',
           {'skip_missing': true}) }}"
   loop_control:
     label: "{{ _delete.1 | d(none) }}"
     loop_var: _delete
+  changed_when: true
   when:
-    - page_rule_api_token is not none
+    - pagerules_api_token is not none
     - _delete.0.zone_id is defined
     - _delete.1 is defined
 
-- name: Ensure cloudflare page rules are present
+- name: Ensure cloudflare pagerules are present
   tags:
-    - page_rule
+    - pagerules
   ansible.builtin.uri:
     body: "{{ _post.1 }}"
     body_format: json
     headers:
-      authorization: "Bearer {{ page_rule_api_token }}"
+      authorization: "Bearer {{ pagerules_api_token }}"
     method: POST
     status_code:
       - 200
@@ -77,14 +79,15 @@
           '/pagerules' }}"
   loop:
     "{{ q('ansible.builtin.subelements',
-           page_rule_list,
-           'page_rules',
+           pagerules_list,
+           'pagerules',
            {'skip_missing': true}) }}"
   loop_control:
     label: "{{ _post.0.zone_id | d(none) }}"
     loop_var: _post
+  changed_when: true
   when:
-    - page_rule_api_token is not none
+    - pagesrule_api_token is not none
     - _post.0.zone_id is defined
     - _post.1 is defined
 ...
