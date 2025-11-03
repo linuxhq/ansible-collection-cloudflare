@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - access_policies_info
+
+  post_tasks:
+    - name: Ensure cloudflare access policies information is verified
+      tags:
+        - access_policies_info
+      ansible.builtin.assert:
+        that:
+          - _access_policies_info_dict | length > 0
+          - _access_policies_info_list | length > 0
+...
