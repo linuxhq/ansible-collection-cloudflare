@@ -1,6 +1,6 @@
 ---
 dependencies:
-  - role: access_group_info
+  - role: access_groups_info
     tags: access_policies
 galaxy_info:
   role_name: access_policies
