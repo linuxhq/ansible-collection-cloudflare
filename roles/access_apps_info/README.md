@@ -1,8 +1,10 @@
-# access\_app\_info
+# access\_apps\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Gather information about cloudflare access applications
+Gather information about cloudflare access apps
+
+Application programming interface -> [access](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/)
 
 ## Requirements
 
@@ -10,8 +12,8 @@ Gather information about cloudflare access applications
 
 ## Role Variables
 
-    access_app_info_account_id: null
-    access_app_info_api_token: null
+    access_apps_info_account_id: null
+    access_apps_info_api_token: null
 
 ## Dependencies
 
@@ -19,19 +21,19 @@ Gather information about cloudflare access applications
 
 ## Return Values
 
-    _access_app_info_dict
-    _access_app_info_list
+    _access_apps_info_dict
+    _access_apps_info_list
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.access_app_info
+        - role: linuxhq.cloudflare.access_apps_info
           accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           accounts_info_name: linuxhq
-          access_app_info_account_id: "{{ _accounts_info_id }}"
-          access_app_info_api_token: "{{ accounts_info_api_token }}"
+          access_apps_info_account_id: "{{ _accounts_info_id }}"
+          access_apps_info_api_token: "{{ accounts_info_api_token }}"
 
 ## License
 
