@@ -5,13 +5,13 @@
   pre_tasks:
     - name: Ensure roles are included
       tags:
-        - access_app
+        - access_apps
       ansible.builtin.include_role:
         name: "{{ _role }}"
       loop:
-        - access_group_info
-        - access_policy_info
-        - access_service_token_info
+        - access_groups_info
+        - access_policies_info
+        - access_service_tokens_info
       loop_control:
         label: "{{ _role | d(none) }}"
         loop_var: _role
@@ -20,22 +20,22 @@
       tags:
         - access_policy
       ansible.builtin.set_fact:
-        access_app_list:
-          "{{ access_app_list |
+        access_apps_list:
+          "{{ access_apps_list |
               map('combine', {'state': 'absent'}) }}"
-        access_group_list:
-          "{{ access_group_list |
+        access_groups_list:
+          "{{ access_groups_list |
               map('combine', {'state': 'absent'}) }}"
-        access_policy_list:
-          "{{ access_policy_list |
+        access_policies_list:
+          "{{ access_policies_list |
               map('combine', {'state': 'absent'}) }}"
-        access_service_token_list:
-          "{{ access_service_token_list |
+        access_service_tokens_list:
+          "{{ access_service_tokens_list |
               map('combine', {'state': 'absent'}) }}"
 
   roles:
-    - access_app
-    - access_policy
-    - access_group
-    - access_service_token
+    - access_apps
+    - access_policies
+    - access_groups
+    - access_service_tokens
 ...
