@@ -5,32 +5,32 @@
   pre_tasks:
     - name: Ensure roles are included
       tags:
-        - access_policy
+        - access_policies
       ansible.builtin.include_role:
         name: "{{ _role }}"
       loop:
         - access_group_info
-        - access_service_token_info
+        - access_service_tokens_info
       loop_control:
         label: "{{ _role | d(none) }}"
         loop_var: _role
 
     - name: Ensure inventory lists are formatted
       tags:
-        - access_policy
+        - access_policies
       ansible.builtin.set_fact:
         access_group_list:
           "{{ access_group_list |
               map('combine', {'state': 'absent'}) }}"
-        access_policy_list:
-          "{{ access_policy_list |
+        access_policies_list:
+          "{{ access_policies_list |
               map('combine', {'state': 'absent'}) }}"
-        access_service_token_list:
-          "{{ access_service_token_list |
+        access_service_tokens_list:
+          "{{ access_service_tokens_list |
               map('combine', {'state': 'absent'}) }}"
 
   roles:
-    - access_policy
+    - access_policies
     - access_group
-    - access_service_token
+    - access_service_tokens
 ...

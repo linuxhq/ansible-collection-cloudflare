@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - access_groups_info
+
+  post_tasks:
+    - name: Ensure cloudflare access groups information is verified
+      tags:
+        - access_groups_info
+      ansible.builtin.assert:
+        that:
+          - _access_groups_info_dict | length > 0
+          - _access_groups_info_list | length > 0
+...
