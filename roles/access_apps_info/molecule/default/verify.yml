@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - access_apps_info
+
+  post_tasks:
+    - name: Ensure cloudflare access apps information is verified
+      tags:
+        - access_apps_info
+      ansible.builtin.assert:
+        that:
+          - _access_apps_info_dict | length > 0
+          - _access_apps_info_list | length > 0
+...
