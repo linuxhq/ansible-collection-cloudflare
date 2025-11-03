@@ -1,11 +1,11 @@
 ---
 dependencies:
-  - role: zone_info
-    tags: page_rule
+  - role: zones_info
+    tags: pagerules
 galaxy_info:
-  role_name: page_rule
+  role_name: pagerules
   author: Taylor Kimball
-  description: Manage cloudflare page rules
+  description: Manage cloudflare pagerules
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
@@ -18,6 +18,5 @@ galaxy_info:
         - all
   galaxy_tags:
     - cloudflare
-    - page
-    - rule
+    - pagerules
 ...
