@@ -1,43 +1,16 @@
 ---
-- name: Ensure cloudflare access application information is gathered
+- name: Ensure cloudflare access apps information tasks are included
   tags:
-    - access_app
-  ansible.builtin.uri:
-    headers:
-      Authorization: "Bearer {{ access_app_api_token }}"
-    method: GET
-    status_code:
-      - 200
-    url:
-      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
-          access_app_account_id ~
-          '/access/apps' }}"
-  register: __access_app_query
-  when:
-    - access_app_account_id is not none
-    - access_app_api_token is not none
+    - access_apps
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - access_apps
+    file: info.yml
 
-- name: Ensure list of cloudflare access application information is generated
+- name: Ensure cloudflare access apps are present
   tags:
-    - access_app
-  ansible.builtin.set_fact:
-    __access_app_list:
-      "{{ __access_app_query.json.result |
-          d([]) }}"
-
-- name: Ensure dict of cloudflare access application information is generated
-  tags:
-    - access_app
-  ansible.builtin.set_fact:
-    __access_app_dict:
-      "{{ (dict(__access_app_list |
-               json_query('[].name') |
-               zip(__access_app_list))) |
-          d({}) }}"
-
-- name: Ensure cloudflare access applications are present
-  tags:
-    - access_app
+    - access_apps
   ansible.builtin.uri:
     body:
       allowed_idps: "{{ _post.allowed_idps | d(omit) }}"
@@ -59,31 +32,41 @@
       type: "{{ _post.type }}"
     body_format: json
     headers:
-      Authorization: "Bearer {{ access_app_api_token }}"
+      Authorization: "Bearer {{ access_apps_api_token }}"
     method: POST
     status_code:
       - 201
     url:
       "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
-          access_app_account_id ~
+          access_apps_account_id ~
           '/access/apps' }}"
-  loop: "{{ access_app_list }}"
+  loop: "{{ access_apps_list }}"
   loop_control:
     label: "{{ _post.name | d(none) }}"
     loop_var: _post
+  changed_when: true
   when:
-    - access_app_account_id is not none
-    - access_app_api_token is not none
+    - access_apps_account_id is not none
+    - access_apps_api_token is not none
     - _post.domain is defined
     - _post.name is defined
-    - _post.name not in __access_app_dict.keys()
+    - _post.name not in __access_apps_dict.keys()
     - _post.state is not defined or
       _post.state == 'present'
     - _post.type is defined
 
-- name: Ensure cloudflare access applications are updated
+- name: Ensure cloudflare access apps information tasks are included
   tags:
-    - access_app
+    - access_apps
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - access_apps
+    file: info.yml
+
+- name: Ensure cloudflare access apps are updated
+  tags:
+    - access_apps
   ansible.builtin.uri:
     body:
       allowed_idps: "{{ _put.allowed_idps | d(omit) }}"
@@ -105,55 +88,57 @@
       type: "{{ _put.type }}"
     body_format: json
     headers:
-      Authorization: "Bearer {{ access_app_api_token }}"
+      Authorization: "Bearer {{ access_apps_api_token }}"
     method: PUT
     status_code:
       - 200
     url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             access_app_account_id +
+             access_apps_account_id +
              '/access/apps/' +
-             __access_app_dict[_put.name].id }}"
-  loop: "{{ access_app_list }}"
+             __access_apps_dict[_put.name].id }}"
+  loop: "{{ access_apps_list }}"
   loop_control:
     label: "{{ _put.name | d(none) }}"
     loop_var: _put
+  changed_when: true
   when:
-    - access_app_account_id is not none
-    - access_app_api_token is not none
+    - access_apps_account_id is not none
+    - access_apps_api_token is not none
     - _put.domain is defined
     - _put.name is defined
-    - _put.name in __access_app_dict.keys()
+    - _put.name in __access_apps_dict.keys()
     - _put.state is not defined or
       _put.state == 'present'
     - _put.type is defined
-    - __access_app_dict[_put.name].id is defined
+    - __access_apps_dict[_put.name].id is defined
 
-- name: Ensure cloudflare access applications are absent
+- name: Ensure cloudflare access apps are absent
   tags:
-    - access_app
+    - access_apps
   ansible.builtin.uri:
     headers:
-      Authorization: "Bearer {{ access_app_api_token }}"
+      Authorization: "Bearer {{ access_apps_api_token }}"
     method: DELETE
     status_code:
       - 200
       - 202
     url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             access_app_account_id +
+             access_apps_account_id +
              '/access/apps/' +
-             __access_app_dict[_delete.name].id }}"
-  loop: "{{ access_app_list }}"
+             __access_apps_dict[_delete.name].id }}"
+  loop: "{{ access_apps_list }}"
   loop_control:
     label: "{{ _delete.name | d(none) }}"
     loop_var: _delete
+  changed_when: true
   when:
-    - access_app_account_id is not none
-    - access_app_api_token is not none
+    - access_apps_account_id is not none
+    - access_apps_api_token is not none
     - _delete.domain is defined
     - _delete.name is defined
-    - _delete.name in __access_app_dict.keys()
+    - _delete.name in __access_apps_dict.keys()
     - _delete.state is defined and
       _delete.state == 'absent'
     - _delete.type is defined
-    - __access_app_dict[_delete.name].id is defined
+    - __access_apps_dict[_delete.name].id is defined
 ...

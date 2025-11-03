@@ -3,8 +3,6 @@
   hosts: all
   roles:
     - role: access_groups
-      access_groups_account_id: null
-      access_groups_api_token: null
       access_groups_list: []
       tags:
         - molecule-idempotence-notest
