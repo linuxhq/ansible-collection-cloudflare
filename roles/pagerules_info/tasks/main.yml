@@ -1,0 +1,75 @@
+---
+- name: Ensure cloudflare pagerules zone information is gathered
+  tags:
+    - pagerules_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ pagerules_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url: 'https://api.cloudflare.com/client/v4/zones'
+  register: __pagerules_info_zone_query
+  check_mode: false
+  when:
+    - pagerules_info_api_token is not none
+
+- name: Ensure list of cloudflare pagerules zone information is generated
+  tags:
+    - pagerules_info
+  ansible.builtin.set_fact:
+    __pagerules_info_zone_list:
+      "{{ __pagerules_info_zone_query.json.result |
+          d([]) |
+          json_query('[].{
+            id: id,
+            name: name
+          }') }}"
+
+- name: Ensure cloudflare pagerules information is gathered
+  tags:
+    - pagerules_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ pagerules_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _zone.id ~
+          '/pagerules' }}"
+  register: __pagerules_info_rule_query
+  loop: "{{ __pagerules_info_zone_list }}"
+  loop_control:
+    label: "{{ _zone.name | d(none) }}"
+    loop_var: _zone
+  check_mode: false
+  when:
+    - pagerules_info_api_token is not none
+    - _zone.id is defined
+    - _zone.name is defined
+
+- name: Ensure list of cloudflare pagerules information is generated
+  tags:
+    - pagerules_info
+  ansible.builtin.set_fact:
+    _pagerules_info_list:
+      "{{ __pagerules_info_rule_query.results |
+          d([]) |
+          json_query('[].{
+            name: _zone.name,
+            id: _zone.id,
+            pagerules: json.result
+          }') }}"
+
+- name: Ensure dict of cloudflare pagerules information is generated
+  tags:
+    - pagerules_info
+  ansible.builtin.set_fact:
+    _pagerules_info_dict:
+      "{{ (dict(_pagerules_info_list |
+                json_query('[].name') |
+                zip(_pagerules_info_list))) |
+          d({}) }}"
+...
