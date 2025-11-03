@@ -20,7 +20,7 @@ Manage cloudflare dns records
 
 ## Dependencies
 
-* [linuxhq.cloudflare.tunnel\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/tunnel_info)
+* [linuxhq.cloudflare.cfd\_tunnel\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/cfd_tunnel_info)
 
 ## Example Playbook
 

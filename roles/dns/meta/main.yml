@@ -1,6 +1,6 @@
 ---
 dependencies:
-  - role: tunnel_info
+  - role: cfd_tunnel_info
     tags: dns
 galaxy_info:
   role_name: dns
