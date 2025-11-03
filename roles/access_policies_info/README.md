@@ -1,8 +1,10 @@
-# access\_policy\_info
+# access\_policies\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
 Gather information about cloudflare access policies
+
+Application programming interface -> [access](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/)
 
 ## Requirements
 
@@ -10,8 +12,8 @@ Gather information about cloudflare access policies
 
 ## Role Variables
 
-    access_policy_info_account_id: null
-    access_policy_info_api_token: null
+    access_policies_info_account_id: null
+    access_policies_info_api_token: null
 
 ## Dependencies
 
@@ -19,19 +21,19 @@ Gather information about cloudflare access policies
 
 ## Return Values
 
-    _access_policy_info_dict
-    _access_policy_info_list
+    _access_policies_info_dict
+    _access_policies_info_list
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.access_policy_info
+        - role: linuxhq.cloudflare.access_policies_info
           accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           accounts_info_name: linuxhq
-          access_policy_info_account_id: "{{ _accounts_info_id }}"
-          access_policy_info_api_token: "{{ accounts_info_api_token }}"
+          access_policies_info_account_id: "{{ _accounts_info_id }}"
+          access_policies_info_api_token: "{{ accounts_info_api_token }}"
 
 ## License
 

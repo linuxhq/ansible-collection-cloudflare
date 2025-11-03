@@ -2,9 +2,9 @@
 allow_duplicates: true
 dependencies:
   - role: accounts_info
-    tags: access_policy_info
+    tags: access_policies_info
 galaxy_info:
-  role_name: access_policy_info
+  role_name: access_policies_info
   author: Taylor Kimball
   description: Gather information about cloudflare access policies
   license: GPL-3.0-or-later
@@ -20,6 +20,6 @@ galaxy_info:
   galaxy_tags:
     - access
     - cloudflare
-    - policy
     - info
+    - policies
 ...
