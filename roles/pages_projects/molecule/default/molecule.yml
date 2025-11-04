@@ -22,11 +22,29 @@ provisioner:
         accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
         accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
 
-        pages_project_account_id: "{{ _accounts_info_id }}"
-        pages_project_api_token: "{{ accounts_info_api_token }}"
-        pages_project_list:
-          - name: taylorkimball-org
+        pages_projects_account_id: "{{ _accounts_info_id }}"
+        pages_projects_api_token: "{{ accounts_info_api_token }}"
+        pages_projects_list:
+          - name: linuxhq-dev
             production_branch: main
+            domains:
+              - name: linuxhq.dev
+                zone: linuxhq.dev
+
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - converge
+    - check
+    - verify
+    - cleanup
+    - destroy
 
 verifier:
   name: ansible

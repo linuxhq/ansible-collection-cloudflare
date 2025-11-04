@@ -5,12 +5,12 @@
   pre_tasks:
     - name: Ensure inventory lists are formatted
       tags:
-        - pages_project
+        - pages_projects
       ansible.builtin.set_fact:
-        pages_project_list:
-          "{{ pages_project_list |
+        pages_projects_list:
+          "{{ pages_projects_list |
               map('combine', {'state': 'absent'}) }}"
 
   roles:
-    - pages_project
+    - pages_projects
 ...

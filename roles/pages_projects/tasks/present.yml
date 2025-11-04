@@ -1,0 +1,131 @@
+---
+- name: Ensure cloudflare pages projects are present
+  tags:
+    - pages_projects
+  ansible.builtin.uri:
+    body:
+      build_config: "{{ _present.build_config | d(omit) }}"
+      deployment_configs: "{{ _present.deployment_configs | d(omit) }}"
+      name: "{{ _present.name }}"
+      production_branch: "{{ _present.production_branch }}"
+      source: "{{ _present.source | d(omit) }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ pages_projects_api_token }}"
+    method: POST
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          pages_projects_account_id ~
+          '/pages/projects' }}"
+  changed_when: true
+  when:
+    - _present.name not in __pages_projects_dict.keys()
+
+- name: Ensure cloudflare pages projects information tasks are included
+  tags:
+    - pages_projects
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - pages_projects
+    file: info.yml
+
+- name: Ensure cloudflare pages projects are updated
+  tags:
+    - pages_projects
+  ansible.builtin.uri:
+    body:
+      build_config: "{{ _present.build_config | d(omit) }}"
+      deployment_configs: "{{ _present.deployment_configs | d(omit) }}"
+      name: "{{ _present.name }}"
+      production_branch: "{{ _present.production_branch }}"
+      source: "{{ _present.source | d(omit) }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ pages_projects_api_token }}"
+    method: PATCH
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             pages_projects_account_id +
+             '/pages/projects/' +
+             _present.name }}"
+  changed_when: true
+  when:
+    - _present.name in __pages_projects_dict.keys()
+
+- name: Ensure cloudflare pages projects dns records are present
+  tags:
+    - pages_projects
+  community.general.cloudflare_dns:
+    api_token: "{{ pages_projects_api_token }}"
+    proxied: true
+    record: "{{ '@' if _dns.name == _dns.zone else __pages_projects_record }}"
+    state: present
+    type: CNAME
+    value: "{{ __pages_projects_dict[_present.name].domains.0 }}"
+    zone: "{{ _dns.zone }}"
+  loop: "{{ _present.domains | d([]) }}"
+  loop_control:
+    label: "{{ _dns.name | d(none) }}"
+    loop_var: _dns
+  vars:
+    __pages_projects_record:
+      "{{ _dns.1.name.split('.')[:-2] | join('.') }}"
+  when:
+    - _present.name in __pages_projects_dict.keys()
+    - _dns.name is defined
+    - _dns.zone is defined
+
+- name: Ensure cloudflare pages projects domains are present
+  tags:
+    - pages_projects
+  ansible.builtin.uri:
+    body:
+      name: "{{ _post.name }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ pages_projects_api_token }}"
+    method: POST
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             pages_projects_account_id +
+             '/pages/projects/' +
+             _present.name +
+             '/domains' }}"
+  loop: "{{ _present.domains | d([]) }}"
+  loop_control:
+    label: "{{ _post.name | d(none) }}"
+    loop_var: _post
+  changed_when: true
+  when:
+    - _present.name in __pages_projects_dict.keys()
+    - _post.name not in __pages_projects_dict[_present.name].domains
+
+- name: Ensure cloudflare pages projects domains are updated
+  tags:
+    - pages_projects
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ pages_projects_api_token }}"
+    method: PATCH
+    status_code:
+      - 200
+    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
+             pages_projects_account_id +
+             '/pages/projects/' +
+             _present.name +
+             '/domains/' ~
+             _patch.name }}"
+  loop: "{{ _present.domains | d([]) }}"
+  loop_control:
+    label: "{{ _patch.name | d(none) }}"
+    loop_var: _patch
+  changed_when: true
+  when:
+    - _present.name in __pages_projects_dict.keys()
+    - _patch.name not in __pages_projects_dict[_present.name].domains
+...

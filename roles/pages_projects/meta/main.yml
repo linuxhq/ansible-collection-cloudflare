@@ -1,11 +1,11 @@
 ---
 dependencies:
   - role: accounts_info
-    tags: pages_domain_info
+    tags: pages_projects
 galaxy_info:
-  role_name: pages_domain_info
+  role_name: pages_projects
   author: Taylor Kimball
-  description: Gather information about cloudflare pages domains
+  description: Manage cloudflare pages projects
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
@@ -18,7 +18,6 @@ galaxy_info:
         - all
   galaxy_tags:
     - cloudflare
-    - domain
-    - info
     - pages
+    - projects
 ...

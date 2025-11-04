@@ -1,0 +1,52 @@
+---
+- name: Ensure cloudflare pages projects information tasks are included
+  tags:
+    - pages_projects
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - pages_projects
+    file: info.yml
+  when:
+    - pages_projects_account_id is not none
+    - pages_projects_api_token is not none
+
+- name: Ensure cloudflare pages projects present tasks are included
+  tags:
+    - pages_projects
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - pages_projects
+    file: present.yml
+  loop: "{{ pages_projects_list }}"
+  loop_control:
+    label: "{{ _present.name | d(none) }}"
+    loop_var: _present
+  when:
+    - pages_projects_account_id is not none
+    - pages_projects_api_token is not none
+    - _present.name is defined
+    - _present.production_branch is defined
+    - _present.state is not defined or
+      _present.state == 'present'
+
+- name: Ensure cloudflare pages projects absent tasks are included
+  tags:
+    - pages_projects
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - pages_projects
+    file: absent.yml
+  loop: "{{ pages_projects_list }}"
+  loop_control:
+    label: "{{ _absent.name | d(none) }}"
+    loop_var: _absent
+  when:
+    - pages_projects_account_id is not none
+    - pages_projects_api_token is not none
+    - _absent.name is defined
+    - _absent.state is defined and
+      _absent.state == 'absent'
+...
