@@ -1,4 +1,4 @@
-# pages\_project\_info
+# pages\_projects\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
@@ -8,10 +8,12 @@ Gather information about cloudflare pages projects
 
 * Cloudflare api `Token` with `Read` permissions to `Cloudflare Pages`
 
+Application programming interface -> [projects](https://developers.cloudflare.com/api/resources/pages/subresources/projects/)
+
 ## Role Variables
 
-    pages_project_info_account_id: null
-    pages_project_info_api_token: null
+    pages_projects_info_account_id: null
+    pages_projects_info_api_token: null
 
 ## Dependencies
 
@@ -19,19 +21,19 @@ Gather information about cloudflare pages projects
 
 ## Return Values
 
-    _pages_project_info_dict
-    _pages_project_info_list
+    _pages_projects_info_dict
+    _pages_projects_info_list
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.pages_project_info
+        - role: linuxhq.cloudflare.pages_projects_info
           accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           accounts_info_name: linuxhq
-          pages_project_info_account_id: "{{ _accounts_info_id }}"
-          pages_project_info_api_token: "{{ accounts_info_api_token }}"
+          pages_projects_info_account_id: "{{ _accounts_info_id }}"
+          pages_projects_info_api_token: "{{ accounts_info_api_token }}"
 
 ## License
 

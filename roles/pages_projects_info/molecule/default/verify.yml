@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - pages_projects_info
+
+  post_tasks:
+    - name: Ensure cloudflare pages projects information is verified
+      tags:
+        - pages_projects_info
+      ansible.builtin.assert:
+        that:
+          - _pages_projects_info_dict | length > 0
+          - _pages_projects_info_list | length > 0
+...
