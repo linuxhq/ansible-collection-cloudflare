@@ -30,9 +30,9 @@ Manage cloudflare dns records
         - role: linuxhq.cloudflare.dns
           dns_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           dns_records:
-            - zone: linuxhq.net
+            - zone: linuxhq.dev
               records:
-                - record: tkimball
+                - record: ansible
                   proxied: false
                   type: CNAME
                   value: ansible.com

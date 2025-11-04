@@ -28,29 +28,29 @@ Application programming interface -> [pagerules](https://developers.cloudflare.c
           zones_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           pagerules_api_token: "{{ zones_info_api_token }}"
           pagerules_list:
-            - zone_id: "{{ _zone_info_dict['taylorkimball.org'].id }}"
+            - zone_id: "{{ _zone_info_dict['linuxhq.dev'].id }}"
               pagerules:
                 - actions:
                     - id: forwarding_url
                       value:
                         status_code: 301
-                        url: https://github.com/tkimball83
+                        url: https://github.com/linuxhq
                   status: active
                   targets:
                     - constraint:
                         operator: matches
-                        value: "taylorkimball.org/*"
+                        value: "linuxhq.dev/*"
                       target: url
                 - actions:
                     - id: forwarding_url
                       value:
                         status_code: 301
-                        url: https://github.com/tkimball83
+                        url: https://github.com/linuxhq
                   status: active
                   targets:
                     - constraint:
                         operator: matches
-                        value: "www.taylorkimball.org/*"
+                        value: "www.linuxhq.dev/*"
                       target: url
 
 ## License

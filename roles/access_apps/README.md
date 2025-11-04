@@ -32,10 +32,10 @@ Application programming interface -> [access](https://developers.cloudflare.com/
           access_apps_account_id: "{{ _accounts_info_id }}"
           access_apps_api_token: "{{ accounts_info_api_token }}"
           access_apps_list:
-            - domain: taylorkimball.org
-              name: taylorkimball.org
+            - domain: linuxhq.dev
+              name: linuxhq.dev
               policies:
-                - id: "{{ _access_policies_info_dict['taylorkimball.org'].id }}"
+                - id: "{{ _access_policies_info_dict['linuxhq.dev'].id }}"
               type: self_hosted
 
           access_groups_account_id: "{{ _accounts_info_id }}"
@@ -43,10 +43,10 @@ Application programming interface -> [access](https://developers.cloudflare.com/
           access_groups_info_account_id: "{{ _accounts_info_id }}"
           access_groups_info_api_token: "{{ accounts_info_api_token }}"
           access_groups_list:
-            - name: taylorkimball.org
+            - name: linuxhq.dev
               include:
                 - service_token:
-                    token_id: "{{ _access_service_tokens_info_dict['taylorkimball.org'].id }}"
+                    token_id: "{{ _access_service_tokens_info_dict['linuxhq.dev'].id }}"
               is_default: false
 
           access_policies_account_id: "{{ _accounts_info_id }}"
@@ -54,18 +54,18 @@ Application programming interface -> [access](https://developers.cloudflare.com/
           access_policies_info_account_id: "{{ _accounts_info_id }}"
           access_policies_info_api_token: "{{ accounts_info_api_token }}"
           access_policies_list:
-            - name: taylorkimball.org
+            - name: linuxhq.dev
               decision: non_identity
               include:
                 - group:
-                    id: "{{ _access_groups_info_dict['taylorkimball.org'].id }}"
+                    id: "{{ _access_groups_info_dict['linuxhq.dev'].id }}"
 
           access_service_tokens_account_id: "{{ _accounts_info_id }}"
           access_service_tokens_api_token: "{{ accounts_info_api_token }}"
           access_service_tokens_info_account_id: "{{ _accounts_info_id }}"
           access_service_tokens_info_api_token: "{{ accounts_info_api_token }}"
           access_service_tokens_list:
-            - name: taylorkimball.org
+            - name: linuxhq.dev
               duration: forever
 
 ## License

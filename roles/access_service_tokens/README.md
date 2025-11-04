@@ -32,7 +32,7 @@ Application programming interface -> [access](https://developers.cloudflare.com/
           access_service_tokens_account_id: "{{ _accounts_info_id }}"
           access_service_tokens_api_token: "{{ accounts_info_api_token }}"
           access_service_tokens_list:
-            - name: taylorkimball.org
+            - name: linuxhq.dev
               duration: forever
 
 ## License

@@ -27,7 +27,7 @@ provisioner:
 
         dns_api_token: "{{ accounts_info_api_token }}"
         dns_records:
-          - zone: taylorkimball.org
+          - zone: linuxhq.dev
             records:
               - record: one
                 proxied: true

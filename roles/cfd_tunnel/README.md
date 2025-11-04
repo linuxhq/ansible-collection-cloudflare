@@ -31,7 +31,7 @@ Application programming interface -> [tunnels](https://developers.cloudflare.com
           cfd_tunnel_account_id: "{{ _accounts_info_id }}"
           cfd_tunnel_api_token: "{{ accounts_info_api_token }}"
           cfd_tunnel_list:
-            - name: taylorkimball.org
+            - name: linuxhq.dev
               tunnel_secret: YjNhS3ZzQ0puNzNxdFljY0VmbkpGdWlOb3M3dWNxUlJ5YmhVUkx6S2NUNFBZN3k3bUZUb21McnUzd1BhTkh2aQo=
 
 ## License
