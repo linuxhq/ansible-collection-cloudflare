@@ -1,8 +1,10 @@
-# rule\_list
+# rules\_lists
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create and update cloudflare rule lists
+Manage cloudflare rules lists
+
+Application programming interface -> [rules](https://developers.cloudflare.com/api/resources/rules/)
 
 ## Requirements
 
@@ -10,11 +12,9 @@ Create and update cloudflare rule lists
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
-    cf_rule_lists: []
+    rules_lists_account_id: null
+    rules_lists_api_token: null
+    rules_lists_list: []
 
 ## Dependencies
 
@@ -25,15 +25,20 @@ Available variables are listed below, along with default values:
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.rule_list
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_rule_lists:
+        - role: linuxhq.cloudflare.rules_lists
+          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+          rules_lists_account_id: "{{ _accounts_info_id }}"
+          rules_lists_api_token: "{{ accounts_info_api_token }}"
+          rules_lists_list:
             - kind: ip
-              name: cloudflare
+              name: uptime_robot
               elements:
-                - ip: 1.1.1.1/32
-                - ip: 1.1.1.2/32
+                "{{ lookup('ansible.builtin.url',
+                           'https://uptimerobot.com/inc/files/ips/IPv4.txt',
+                           wantlist=true) |
+                    map('community.general.dict_kv', 'ip') |
+                    sort(attribute='ip') }}"
 
 ## License
 
