@@ -1,8 +1,10 @@
-# rule\_list\_info
+# rules\_lists\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Gather information about cloudflare rule lists
+Gather information about cloudflare rules lists
+
+Application programming interface -> [rules](https://developers.cloudflare.com/api/resources/rules/)
 
 ## Requirements
 
@@ -10,10 +12,8 @@ Gather information about cloudflare rule lists
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
+    rules_lists_info_account_id: null
+    rules_lists_info_api_token: null
 
 ## Dependencies
 
@@ -21,19 +21,19 @@ Available variables are listed below, along with default values:
 
 ## Return Values
 
-    _cf_rule_list_id
-    _cf_rule_list_items
-    _cf_rule_list_kind
-    _cf_rule_list_referencing_filters
+    _rules_lists_info_dict
+    _rules_lists_info_list
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.rule_list_info
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
+        - role: linuxhq.cloudflare.rules_lists_info
+          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          accounts_info_name: linuxhq
+          rules_lists_info_account_id: "{{ _accounts_info_id }}"
+          rules_lists_info_api_token: "{{ accounts_info_api_token }}"
 
 ## License
 
