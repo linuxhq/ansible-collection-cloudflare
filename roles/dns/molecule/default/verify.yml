@@ -8,7 +8,7 @@
         - dns
       ansible.builtin.set_fact:
         dns_records:
-          - zone: taylorkimball.org
+          - zone: linuxhq.dev
             records:
               "{{ dns_records[0].records |
                   map('combine', {'state': 'absent'}) |
