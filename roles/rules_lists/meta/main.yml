@@ -1,11 +1,11 @@
 ---
 dependencies:
   - role: accounts_info
-    tags: rule_list
+    tags: rules_lists
 galaxy_info:
-  role_name: rule_list
+  role_name: rules_lists
   author: Taylor Kimball
-  description: Create and update cloudflare rule lists
+  description: Mange cloudflare rules lists
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
@@ -18,6 +18,6 @@ galaxy_info:
         - all
   galaxy_tags:
     - cloudflare
-    - list
-    - rule
+    - lists
+    - rules
 ...
