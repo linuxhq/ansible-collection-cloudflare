@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - rules_lists_info
+
+  post_tasks:
+    - name: Ensure cloudflare rules lists information is verified
+      tags:
+        - rules_lists_info
+      ansible.builtin.assert:
+        that:
+          - _rules_lists_info_dict | length > 0
+          - _rules_lists_info_list | length > 0
+...
