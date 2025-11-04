@@ -1,20 +1,21 @@
-# pages\_domain
+# pages\_projects
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Create and update cloudflare pages domains
+Manage cloudflare pages projects
+
+Application programming interface -> [projects](https://developers.cloudflare.com/api/resources/pages/subresources/projects/)
 
 ## Requirements
 
 * Cloudflare api `Token` with `Edit` permissions to `Cloudflare Pages`
+* Cloudflare api `Token` with `Edit` permissions to `DNS`
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_account_id: null
-    cf_auth_token: null
-    cf_pages_domains: []
+    pages_projects_account_id: null
+    pages_projects_api_token: null
+    pages_projects_list: []
 
 ## Dependencies
 
@@ -25,12 +26,17 @@ Available variables are listed below, along with default values:
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.pages_domain
-          cf_account_id: "{{ _cf_account_id }}"
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_pages_domains:
-            - name: linuxhq.net
-              project_name: linuxhq-net
+        - role: linuxhq.cloudflare.pages_projects
+          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          accounts_info_name: linuxhq
+          pages_projects_account_id: "{{ _accounts_info_id }}"
+          pages_projects_api_token: "{{ accounts_info_api_token }}"
+          pages_projects_list:
+            - name: linuxhq-dev
+              production_branch: main
+              domains:
+                - name: linuxhq.dev
+                  zone: linuxhq.dev
 
 ## License
 
