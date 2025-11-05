@@ -1,0 +1,112 @@
+---
+- name: Ensure cloudflare rulesets information tasks are included
+  tags:
+    - rulesets
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - rulesets
+    file: info.yml
+
+- name: Ensure cloudflare rulesets are present
+  tags:
+    - rulesets
+  ansible.builtin.uri:
+    body:
+      kind: zone
+      name: "{{ _post.name }}"
+      phase: "{{ rulesets_phase }}"
+      rules: "{{ _post.rules }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ rulesets_api_token }}"
+    method: POST
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _post.zone_id ~
+          '/rulesets' }}"
+  loop: "{{ rulesets_list }}"
+  loop_control:
+    label: "{{ _post.name | d(none) }}"
+    loop_var: _post
+  changed_when: true
+  when:
+    - rulesets_api_token is not none
+    - _post.name is defined
+    - _post.state is not defined or
+      _post.state == 'preesnt'
+    - _post.zone_id is defined
+    - __rulesets_dict[_post.zone_id].name is none
+
+- name: Ensure cloudflare rulesets information tasks are included
+  tags:
+    - rulesets
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - rulesets
+    file: info.yml
+
+- name: Ensure cloudflare rulesets are updated
+  tags:
+    - rulesets
+  ansible.builtin.uri:
+    body:
+      name: "{{ _put.name }}"
+      rules: "{{ _put.rules }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ rulesets_api_token }}"
+    method: PUT
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _put.zone_id ~
+          '/rulesets/phases/' ~
+          rulesets_phase ~
+          '/entrypoint' }}"
+  loop: "{{ rulesets_list }}"
+  loop_control:
+    label: "{{ _put.name | d(none) }}"
+    loop_var: _put
+  changed_when: true
+  when:
+    - rulesets_api_token is not none
+    - _put.name is defined
+    - _put.state is not defined or
+      _put.state == 'present'
+    - _put.zone_id is defined
+    - __rulesets_dict[_put.zone_id].name is not none
+
+- name: Ensure cloudflare rulesets are absent
+  tags:
+    - rulesets
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ rulesets_api_token }}"
+    method: DELETE
+    status_code:
+      - 200
+      - 204
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _delete.zone_id ~
+          '/rulesets/' ~
+          __rulesets_dict[_delete.zone_id].id }}"
+  loop: "{{ rulesets_list }}"
+  loop_control:
+    label: "{{ _delete.name | d(none) }}"
+    loop_var: _delete
+  changed_when: true
+  when:
+    - rulesets_api_token is not none
+    - _delete.name is defined
+    - _delete.state is defined and
+      _delete.state == 'absent'
+    - _delete.zone_id is defined
+    - __rulesets_dict[_delete.zone_id].id is defined
+    - __rulesets_dict[_delete.zone_id].name is not none
+...

@@ -1,0 +1,51 @@
+---
+- name: Ensure cloudflare rulesets information is gathered
+  tags:
+    - rulesets
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ rulesets_api_token }}"
+    method: GET
+    status_code:
+      - 200
+      - 404
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _get.zone_id ~
+          '/rulesets/phases/' ~
+          rulesets_phase ~
+          '/entrypoint' }}"
+  register: __rulesets_query
+  loop: "{{ rulesets_list }}"
+  loop_control:
+    label: "{{ _get.zone_id | d(none) }}"
+    loop_var: _get
+  check_mode: false
+  when:
+    - rulesets_api_token is not none
+    - _get.zone_id is defined
+
+- name: Ensure list of cloudflare rulesets information is generated
+  tags:
+    - rulesets
+  ansible.builtin.set_fact:
+    __rulesets_list:
+      "{{ __rulesets_query.results |
+          d([]) |
+          json_query('[].{
+            id: json.result.id,
+            name: json.result.name,
+            rules: json.result.rules || `[]`,
+            zone_id: _get.zone_id
+          }') }}"
+
+- name: Ensure dict of cloudflare rulesets information is generated
+  tags:
+    - rulesets
+  ansible.builtin.set_fact:
+    __rulesets_dict:
+      "{{ (dict(__rulesets_list |
+               json_query('[].zone_id') |
+               zip(__rulesets_list))) |
+          d({}) }}"
+...
