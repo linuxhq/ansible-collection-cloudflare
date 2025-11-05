@@ -1,11 +1,11 @@
 ---
 dependencies:
-  - role: zone_info
-    tags: ruleset_entrypoint
+  - role: zones_info
+    tags: rulesets
 galaxy_info:
-  role_name: ruleset_entrypoint
+  role_name: rulesets
   author: Taylor Kimball
-  description: Create and update cloudflare entrypoint rule sets
+  description: Manage cloudflare rulesets
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
@@ -18,8 +18,5 @@ galaxy_info:
         - all
   galaxy_tags:
     - cloudflare
-    - entry
-    - point
-    - rule
-    - set
+    - rulesets
 ...
