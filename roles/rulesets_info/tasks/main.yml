@@ -1,0 +1,98 @@
+---
+- name: Ensure cloudflare rulesets zone information is gathered
+  tags:
+    - rulesets_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ rulesets_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url: 'https://api.cloudflare.com/client/v4/zones'
+  register: __rulesets_info_zone_query
+  check_mode: false
+  when:
+    - rulesets_info_api_token is not none
+
+- name: Ensure list of cloudflare rulesets zone information is generated
+  tags:
+    - rulesets_info
+  ansible.builtin.set_fact:
+    __rulesets_info_zone_list:
+      "{{ __rulesets_info_zone_query.json.result |
+          d([]) |
+          json_query('[].{
+            id: id,
+            name: name
+          }') }}"
+
+- name: Ensure cloudflare rulesets information is gathered
+  tags:
+    - rulesets_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ rulesets_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+      - 404
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _rulesets.id ~
+          '/rulesets/phases/' ~
+          rulesets_info_phase ~
+          '/entrypoint' }}"
+  register: __rulesets_info_query
+  loop: "{{ __rulesets_info_zone_list }}"
+  loop_control:
+    label: "{{ _rulesets.name | d(none) }}"
+    loop_var: _rulesets
+  changed_when: false
+  when:
+    - rulesets_info_api_token is not none
+    - _rulesets.id is defined
+    - _rulesets.name is defined
+  async: "{{ ansible_check_mode | ternary(0, rulesets_info_async) }}"
+  poll: "{{ rulesets_info_poll }}"
+
+- name: Ensure cloudflare rulesets information jobs are complete
+  tags:
+    - rulesets_info
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __rulesets_info_status
+  loop: "{{ __rulesets_info_query.results }}"
+  loop_control:
+    label: "{{ _jid._rulesets.name | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __rulesets_info_status.finished
+  retries: "{{ rulesets_info_retries }}"
+  delay: "{{ rulesets_info_delay }}"
+
+- name: Ensure list of cloudflare rulesets information is generated
+  tags:
+    - rulesets_info
+  ansible.builtin.set_fact:
+    _rulesets_info_list:
+      "{{ __rulesets_info_status.results |
+          d([]) |
+          json_query('[].{
+            name: _jid._rulesets.name,
+            id: json.result.id,
+            phase: json.result.phase,
+            rules: json.result.rules || `[]`
+          }') }}"
+
+- name: Ensure dict of cloudflare rulesets information is generated
+  tags:
+    - rulesets_info
+  ansible.builtin.set_fact:
+    _rulesets_info_dict:
+      "{{ (dict(_rulesets_info_list |
+               json_query('[].name') |
+               zip(_rulesets_info_list))) |
+          d({}) }}"
+...

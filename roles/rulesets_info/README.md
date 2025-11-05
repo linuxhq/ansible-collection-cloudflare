@@ -1,8 +1,10 @@
-# ruleset\_entrypoint\_info
+# rulesets\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Gather information about cloudflare entrypoint rulesets
+Gather information about cloudflare rulesets
+
+Application programming interface -> [rulesets](https://developers.cloudflare.com/api/resources/rulesets/)
 
 ## Requirements
 
@@ -10,29 +12,25 @@ Gather information about cloudflare entrypoint rulesets
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_auth_token: null
-    cf_ruleset_phase: http_request_firewall_custom
-    cf_zone_id: null
-
-## Dependencies
-
-* [linuxhq.cloudflare.zone_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
+    rulesets_info_async: 300
+    rulesets_info_api_token: null
+    rulesets_info_delay: 3
+    rulesets_info_phase: http_request_firewall_custom
+    rulesets_info_poll: 0
+    rulesets_info_retries: 100
 
 ## Return Values
 
-    _cf_ruleset_id
-    _cf_ruleset_rules
+    _rulesets_info_dict
+    _rulesets_info_list
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.rule_list_info
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_zone_id: "{{ _cf_zone_id['linuxhq.net'] }}"
+        - role: linuxhq.cloudflare.rulesets_info
+          rulesets_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
 
 ## License
 
