@@ -17,7 +17,7 @@ Application programming interface -> [pagerules](https://developers.cloudflare.c
 
 ## Dependencies
 
-* [linuxhq.cloudflare.zone\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zone_info)
+* [linuxhq.cloudflare.zones\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zones_info)
 
 ## Example Playbook
 
@@ -28,7 +28,7 @@ Application programming interface -> [pagerules](https://developers.cloudflare.c
           zones_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           pagerules_api_token: "{{ zones_info_api_token }}"
           pagerules_list:
-            - zone_id: "{{ _zone_info_dict['linuxhq.dev'].id }}"
+            - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"
               pagerules:
                 - actions:
                     - id: forwarding_url
