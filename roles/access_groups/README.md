@@ -18,7 +18,7 @@ Application programming interface -> [access](https://developers.cloudflare.com/
 
 ## Dependencies
 
-* [linuxhq.cloudflare.access\_service\_token\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_service_token_info)
+* [linuxhq.cloudflare.access\_service\_tokens\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_service_tokens_info)
 
 ## Example Playbook
 
