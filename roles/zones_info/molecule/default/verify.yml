@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - zones_info
+
+  post_tasks:
+    - name: Ensure cloudflare zones information is verified
+      tags:
+        - zones_info
+      ansible.builtin.assert:
+        that:
+          - _zones_info_dict | length > 0
+          - _zones_info_list | length > 0
+...

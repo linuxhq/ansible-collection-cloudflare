@@ -1,6 +1,0 @@
----
-cf_auth_token: null
-cf_zones_match: all
-cf_zones_page: 1
-cf_zones_per_page: 20
-...

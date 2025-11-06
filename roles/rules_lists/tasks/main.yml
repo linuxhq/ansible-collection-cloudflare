@@ -1,0 +1,171 @@
+---
+- name: Ensure cloudflare rules lists information tasks are included
+  tags:
+    - rules_lists
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - rules_lists
+    file: info.yml
+
+- name: Ensure cloudflare rules lists are present
+  tags:
+    - rules_lists
+  ansible.builtin.uri:
+    body:
+      description: "{{ _post.description | d(_post.name) }}"
+      kind: "{{ _post.kind }}"
+      name: "{{ _post.name }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ rules_lists_api_token }}"
+    method: POST
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          rules_lists_account_id ~
+          '/rules/lists' }}"
+  loop: "{{ rules_lists_list }}"
+  loop_control:
+    label: "{{ _post.name | d(none) }}"
+    loop_var: _post
+  changed_when: true
+  when:
+    - rules_lists_account_id is not none
+    - rules_lists_api_token is not none
+    - _post.kind is defined
+    - _post.name is defined
+    - _post.name not in __rules_lists_dict.keys()
+    - _post.state is not defined or
+      _post.state == 'present'
+
+- name: Ensure cloudflare rules lists information tasks are included
+  tags:
+    - rules_lists
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - rules_lists
+    file: info.yml
+
+- name: Ensure cloudflare rules lists are updated
+  tags:
+    - rules_lists
+  ansible.builtin.uri:
+    body:
+      description: "{{ _put.description | d(_put.name) }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ rules_lists_api_token }}"
+    method: PUT
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          rules_lists_account_id ~
+          '/rules/lists/' ~
+          __rules_lists_dict[_put.name].id }}"
+  loop: "{{ rules_lists_list }}"
+  loop_control:
+    label: "{{ _put.name | d(none) }}"
+    loop_var: _put
+  changed_when: true
+  when:
+    - rules_lists_account_id is not none
+    - rules_lists_api_token is not none
+    - _put.description is defined or
+      _put.name is defined
+    - _put.name in __rules_lists_dict.keys()
+    - _put.state is not defined or
+      _put.state == 'present'
+    - __rules_lists_dict[_put.name].id is defined
+
+- name: Ensure cloudflare rules lists are populated
+  tags:
+    - rules_lists
+  ansible.builtin.uri:
+    body: "{{ _post.elements }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ rules_lists_api_token }}"
+    method: POST
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          rules_lists_account_id ~
+          '/rules/lists/' ~
+          __rules_lists_dict[_post.name].id ~
+          '/items' }}"
+  register: __rules_lists_post
+  loop: "{{ rules_lists_list }}"
+  loop_control:
+    label: "{{ _post.name | d(none) }}"
+    loop_var: _post
+  changed_when: true
+  when:
+    - rules_lists_account_id is not none
+    - rules_lists_api_token is not none
+    - _post.name is defined
+    - _post.name in __rules_lists_dict.keys()
+    - _post.elements is defined
+    - _post.elements | length > 0
+    - _post.state is not defined or
+      _post.state == 'present'
+    - __rules_lists_dict[_post.name].id is defined
+
+- name: Ensure cloudflare rules lists bulk operations are completed
+  tags:
+    - rules_lists
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ rules_lists_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          rules_lists_account_id ~
+          '/rules/lists/bulk_operations/' ~
+          _get.json.result.operation_id }}"
+  register: __rules_lists_bulk_operations
+  loop: "{{ __rules_lists_post.results }}"
+  loop_control:
+    label: "{{ _get.json.result.operation_id | d(none) }}"
+    loop_var: _get
+  when:
+    - rules_lists_account_id is not none
+    - rules_lists_api_token is not none
+    - _get.json.result.operation_id is defined
+  until:
+    - __rules_lists_bulk_operations.json.result.status == 'completed'
+
+- name: Ensure cloudflare rules lists are absent
+  tags:
+    - rules_lists
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ rules_lists_api_token }}"
+    method: DELETE
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          rules_lists_account_id ~
+          '/rules/lists/' ~
+          __rules_lists_dict[_delete.name].id }}"
+  loop: "{{ rules_lists_list }}"
+  loop_control:
+    label: "{{ _delete.name | d(none) }}"
+    loop_var: _delete
+  changed_when: true
+  when:
+    - rules_lists_account_id is not none
+    - rules_lists_api_token is not none
+    - _delete.name is defined
+    - _delete.name in __rules_lists_dict.keys()
+    - _delete.state is defined and
+      _delete.state == 'absent'
+    - __rules_lists_dict[_delete.name].id is defined
+...

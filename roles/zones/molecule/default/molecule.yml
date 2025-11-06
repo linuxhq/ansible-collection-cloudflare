@@ -1,0 +1,61 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../requirements.yml
+
+driver:
+  name: vagrant
+
+platforms:
+  - name: almalinux9
+    box: bento/almalinux-9
+
+provisioner:
+  name: ansible
+  log: true
+  options:
+    diff: true
+  inventory:
+    group_vars:
+      all:
+        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+        accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+
+        zones_account_id: "{{ _accounts_info_id }}"
+        zones_api_token: "{{ accounts_info_api_token }}"
+        zones_list:
+          - name: linuxhq.dev
+            type: full
+            settings:
+              - id: always_use_https
+                value: 'on'
+              - id: development_mode
+                value: 'on'
+              - id: ipv6
+                value: 'off'
+              - id: min_tls_version
+                value: 1.3
+              - id: ssl
+                value: strict
+
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - converge
+    - check
+    - verify
+    - cleanup
+    - destroy
+
+verifier:
+  name: ansible
+  options:
+    diff: true
+...

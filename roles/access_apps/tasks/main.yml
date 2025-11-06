@@ -1,0 +1,146 @@
+---
+- name: Ensure cloudflare access apps information tasks are included
+  tags:
+    - access_apps
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - access_apps
+    file: info.yml
+
+- name: Ensure cloudflare access apps are present
+  tags:
+    - access_apps
+  ansible.builtin.uri:
+    body:
+      allowed_idps: "{{ _post.allowed_idps | d(omit) }}"
+      app_launcher_visible: "{{ _post.app_launcher_visible | d(true) }}"
+      auto_redirect_to_identity: "{{ _post.auto_redirect_to_identity | d(false) }}"
+      cors_headers: "{{ _post.cors_headers | d(omit) }}"
+      custom_deny_message: "{{ _post.custom_deny_message | d(omit) }}"
+      custom_deny_url: "{{ _post.custom_deny_url | d(omit) }}"
+      domain: "{{ _post.domain }}"
+      enable_binding_cookie: "{{ _post.enable_binding_cookie | d(false) }}"
+      http_only_cookie_attribute: "{{ _post.http_only_cookie_attribute | d(true) }}"
+      logo_url: "{{ _post.logo_url | d(omit) }}"
+      name: "{{ _post.name }}"
+      policies: "{{ _post.policies | d(omit) }}"
+      same_site_cookie_attribute: "{{ _post.same_site_cookie_attribute | d(omit) }}"
+      service_auth_401_redirect: "{{ _post.service_auth_401_redirect | d(omit) }}"
+      session_duration: "{{ _post.session_duration | d('24h') }}"
+      skip_interstitial: "{{ _post.skip_interstitial | d(omit) }}"
+      type: "{{ _post.type }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ access_apps_api_token }}"
+    method: POST
+    status_code:
+      - 201
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_apps_account_id ~
+          '/access/apps' }}"
+  loop: "{{ access_apps_list }}"
+  loop_control:
+    label: "{{ _post.name | d(none) }}"
+    loop_var: _post
+  changed_when: true
+  when:
+    - access_apps_account_id is not none
+    - access_apps_api_token is not none
+    - _post.domain is defined
+    - _post.name is defined
+    - _post.name not in __access_apps_dict.keys()
+    - _post.state is not defined or
+      _post.state == 'present'
+    - _post.type is defined
+
+- name: Ensure cloudflare access apps information tasks are included
+  tags:
+    - access_apps
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - access_apps
+    file: info.yml
+
+- name: Ensure cloudflare access apps are updated
+  tags:
+    - access_apps
+  ansible.builtin.uri:
+    body:
+      allowed_idps: "{{ _put.allowed_idps | d(omit) }}"
+      app_launcher_visible: "{{ _put.app_launcher_visible | d(true) }}"
+      auto_redirect_to_identity: "{{ _put.auto_redirect_to_identity | d(false) }}"
+      cors_headers: "{{ _put.cors_headers | d(omit) }}"
+      custom_deny_message: "{{ _put.custom_deny_message | d(omit) }}"
+      custom_deny_url: "{{ _put.custom_deny_url | d(omit) }}"
+      domain: "{{ _put.domain }}"
+      enable_binding_cookie: "{{ _put.enable_binding_cookie | d(false) }}"
+      http_only_cookie_attribute: "{{ _put.http_only_cookie_attribute | d(true) }}"
+      logo_url: "{{ _put.logo_url | d(omit) }}"
+      name: "{{ _put.name }}"
+      policies: "{{ _put.policies | d(omit) }}"
+      same_site_cookie_attribute: "{{ _put.same_site_cookie_attribute | d(omit) }}"
+      service_auth_401_redirect: "{{ _put.service_auth_401_redirect | d(omit) }}"
+      session_duration: "{{ _put.session_duration | d('24h') }}"
+      skip_interstitial: "{{ _put.skip_interstitial | d(omit) }}"
+      type: "{{ _put.type }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ access_apps_api_token }}"
+    method: PUT
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_apps_account_id ~
+          '/access/apps/' ~
+          __access_apps_dict[_put.name].id }}"
+  loop: "{{ access_apps_list }}"
+  loop_control:
+    label: "{{ _put.name | d(none) }}"
+    loop_var: _put
+  changed_when: true
+  when:
+    - access_apps_account_id is not none
+    - access_apps_api_token is not none
+    - _put.domain is defined
+    - _put.name is defined
+    - _put.name in __access_apps_dict.keys()
+    - _put.state is not defined or
+      _put.state == 'present'
+    - _put.type is defined
+    - __access_apps_dict[_put.name].id is defined
+
+- name: Ensure cloudflare access apps are absent
+  tags:
+    - access_apps
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ access_apps_api_token }}"
+    method: DELETE
+    status_code:
+      - 200
+      - 202
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_apps_account_id ~
+          '/access/apps/' ~
+          __access_apps_dict[_delete.name].id }}"
+  loop: "{{ access_apps_list }}"
+  loop_control:
+    label: "{{ _delete.name | d(none) }}"
+    loop_var: _delete
+  changed_when: true
+  when:
+    - access_apps_account_id is not none
+    - access_apps_api_token is not none
+    - _delete.domain is defined
+    - _delete.name is defined
+    - _delete.name in __access_apps_dict.keys()
+    - _delete.state is defined and
+      _delete.state == 'absent'
+    - _delete.type is defined
+    - __access_apps_dict[_delete.name].id is defined
+...

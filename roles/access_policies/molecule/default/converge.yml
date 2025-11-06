@@ -1,0 +1,19 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: access_policies
+      access_policies_list: []
+      tags:
+        - molecule-idempotence-notest
+
+    - role: access_service_tokens
+      tags:
+        - molecule-idempotence-notest
+
+    - role: access_groups
+      tags:
+        - molecule-idempotence-notest
+
+    - access_policies
+...

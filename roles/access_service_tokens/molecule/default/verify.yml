@@ -1,0 +1,16 @@
+---
+- name: Verify
+  hosts: all
+
+  pre_tasks:
+    - name: Ensure inventory lists are formatted
+      tags:
+        - access_service_tokens
+      ansible.builtin.set_fact:
+        access_service_tokens_list:
+          "{{ access_service_tokens_list |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - access_service_tokens
+...

@@ -1,0 +1,63 @@
+---
+- name: Ensure cloudflare pages projects dns records are absent
+  tags:
+    - pages_projects
+  community.general.cloudflare_dns:
+    api_token: "{{ pages_projects_api_token }}"
+    record: "{{ '@' if _dns.name == _dns.zone else _dns.name }}"
+    state: absent
+    type: CNAME
+    value: "{{ __pages_projects_dict[_absent.name].domains.0 }}"
+    zone: "{{ _dns.zone }}"
+  loop: "{{ _absent.domains | d([]) }}"
+  loop_control:
+    label: "{{ _dns.name | d(none) }}"
+    loop_var: _dns
+  when:
+    - _absent.name in __pages_projects_dict.keys()
+    - _dns.name is defined
+    - _dns.zone is defined
+
+- name: Ensure cloudflare pages projects domains are absent
+  tags:
+    - pages_projects
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ pages_projects_api_token }}"
+    method: DELETE
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          pages_projects_account_id ~
+          '/pages/projects/' ~
+          _absent.name ~
+          '/domains/' ~
+          _delete.name }}"
+  loop: "{{ _absent.domains | d([]) }}"
+  loop_control:
+    label: "{{ _delete.name | d(none) }}"
+    loop_var: _delete
+  changed_when: true
+  when:
+    - _absent.name in __pages_projects_dict.keys()
+    - _delete.name in __pages_projects_dict[_absent.name].domains
+
+- name: Ensure cloudflare pages projects are absent
+  tags:
+    - pages_projects
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ pages_projects_api_token }}"
+    method: DELETE
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          pages_projects_account_id ~
+          '/pages/projects/' ~
+          _absent.name }}"
+  changed_when: true
+  when:
+    - _absent.name in __pages_projects_dict.keys()
+...

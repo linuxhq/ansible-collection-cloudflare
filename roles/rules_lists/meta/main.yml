@@ -1,0 +1,23 @@
+---
+dependencies:
+  - role: accounts_info
+    tags: rules_lists
+galaxy_info:
+  role_name: rules_lists
+  author: Taylor Kimball
+  description: Mange cloudflare rules lists
+  license: GPL-3.0-or-later
+  min_ansible_version: 2.15.0
+  namespace: linuxhq
+  platforms:
+    - name: GenericLinux
+      versions:
+        - all
+    - name: macOS
+      versions:
+        - all
+  galaxy_tags:
+    - cloudflare
+    - lists
+    - rules
+...
