@@ -12,7 +12,6 @@ This document outlines the steps to execute the example playbooks
 
 Setup the following environment variables
 
-    export ANSIBLE_INVENTORY=hosts
     export CLOUDFLARE_ACCOUNT_NAME=your.account.name
     export CLOUDFLARE_API_TOKEN=your.account.token
     export CLOUDFLARE_DOMAIN=your.domain.com
