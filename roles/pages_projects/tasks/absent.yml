@@ -26,12 +26,13 @@
     method: DELETE
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             pages_projects_account_id +
-             '/pages/projects/' +
-             _absent.name +
-             '/domains/' ~
-             _delete.name }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          pages_projects_account_id ~
+          '/pages/projects/' ~
+          _absent.name ~
+          '/domains/' ~
+          _delete.name }}"
   loop: "{{ _absent.domains | d([]) }}"
   loop_control:
     label: "{{ _delete.name | d(none) }}"
@@ -50,10 +51,11 @@
     method: DELETE
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             pages_projects_account_id +
-             '/pages/projects/' +
-             _absent.name }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          pages_projects_account_id ~
+          '/pages/projects/' ~
+          _absent.name }}"
   changed_when: true
   when:
     - _absent.name in __pages_projects_dict.keys()

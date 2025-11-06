@@ -80,10 +80,11 @@
     method: PUT
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
-             access_policies_account_id ~
-             '/access/policies/' ~
-             __access_policies_dict[_put.name].id }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_policies_account_id ~
+          '/access/policies/' ~
+          __access_policies_dict[_put.name].id }}"
   loop: "{{ access_policies_list }}"
   loop_control:
     label: "{{ _put.name | d(none) }}"
@@ -111,10 +112,11 @@
     status_code:
       - 200
       - 202
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
-             access_policies_account_id ~
-             '/access/policies/' ~
-             __access_policies_dict[_delete.name].id }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_policies_account_id ~
+          '/access/policies/' ~
+          __access_policies_dict[_delete.name].id }}"
   loop: "{{ access_policies_list }}"
   loop_control:
     label: "{{ _delete.name | d(none) }}"

@@ -8,9 +8,10 @@
     method: GET
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             rules_lists_account_id +
-             '/rules/lists' }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          rules_lists_account_id ~
+          '/rules/lists' }}"
   register: __rules_lists_query
   check_mode: false
   when:

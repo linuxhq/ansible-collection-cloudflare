@@ -48,10 +48,11 @@
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             pages_projects_account_id +
-             '/pages/projects/' +
-             _present.name }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          pages_projects_account_id ~
+          '/pages/projects/' ~
+          _present.name }}"
   changed_when: true
   when:
     - _present.name in __pages_projects_dict.keys()
@@ -91,11 +92,12 @@
     method: POST
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             pages_projects_account_id +
-             '/pages/projects/' +
-             _present.name +
-             '/domains' }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          pages_projects_account_id ~
+          '/pages/projects/' ~
+          _present.name ~
+          '/domains' }}"
   loop: "{{ _present.domains | d([]) }}"
   loop_control:
     label: "{{ _post.name | d(none) }}"
@@ -114,12 +116,13 @@
     method: PATCH
     status_code:
       - 200
-    url: "{{ 'https://api.cloudflare.com/client/v4/accounts/' +
-             pages_projects_account_id +
-             '/pages/projects/' +
-             _present.name +
-             '/domains/' ~
-             _patch.name }}"
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          pages_projects_account_id ~
+          '/pages/projects/' ~
+          _present.name ~
+          '/domains/' ~
+          _patch.name }}"
   loop: "{{ _present.domains | d([]) }}"
   loop_control:
     label: "{{ _patch.name | d(none) }}"
