@@ -1,0 +1,14 @@
+---
+pages_projects_account_id: "{{ _accounts_info_id }}"
+pages_projects_api_token: "{{ cloudflare_api_token }}"
+
+pages_projects_info_account_id: "{{ _accounts_info_id }}"
+pages_projects_info_api_token: "{{ cloudflare_api_token }}"
+
+pages_projects_list:
+  - name: "{{ cloudflare_domain | replace('.', '-') }}"
+    production_branch: main
+    domains:
+      - name: "pages.{{ cloudflare_domain }}"
+        zone: "{{ cloudflare_domain }}"
+...

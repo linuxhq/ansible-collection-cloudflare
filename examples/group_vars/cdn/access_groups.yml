@@ -1,0 +1,14 @@
+---
+access_groups_account_id: "{{ _accounts_info_id }}"
+access_groups_api_token: "{{ cloudflare_api_token }}"
+
+access_groups_info_account_id: "{{ _accounts_info_id }}"
+access_groups_info_api_token: "{{ cloudflare_api_token }}"
+
+access_groups_list:
+  - name: "{{ cloudflare_domain }}"
+    include:
+      - service_token:
+          token_id: "{{ _access_service_tokens_info_dict[cloudflare_domain].id }}"
+    is_default: false
+...

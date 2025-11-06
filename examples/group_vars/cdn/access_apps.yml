@@ -1,0 +1,14 @@
+---
+access_apps_account_id: "{{ _accounts_info_id }}"
+access_apps_api_token: "{{ cloudflare_api_token }}"
+
+access_apps_info_account_id: "{{ _accounts_info_id }}"
+access_apps_info_api_token: "{{ cloudflare_api_token }}"
+
+access_apps_list:
+  - domain: "tunnel.{{ cloudflare_domain }}"
+    name: "{{ cloudflare_domain }}"
+    policies:
+      - id: "{{ _access_policies_info_dict[cloudflare_domain].id }}"
+    type: self_hosted
+...

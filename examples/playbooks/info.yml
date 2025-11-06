@@ -1,0 +1,17 @@
+---
+- name: Ensure cloudflare info roles are executed
+  hosts: cdn
+
+  roles:
+    - access_apps_info
+    - access_groups_info
+    - access_policies_info
+    - access_service_tokens_info
+    - accounts_info
+    - cfd_tunnel_info
+    - pagerules_info
+    - pages_projects_info
+    - rules_lists_info
+    - rulesets_info
+    - zones_info
+...

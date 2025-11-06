@@ -1,0 +1,38 @@
+---
+rulesets_api_token: "{{ cloudflare_api_token }}"
+rulesets_info_api_token: "{{ cloudflare_api_token }}"
+
+rulesets_list:
+  - zone_id: "{{ _zones_info_dict[cloudflare_domain].id }}"
+    name: default
+    rules:
+      - action: skip
+        action_parameters:
+          ruleset: current
+        description: UptimeRobot
+        enabled: true
+        expression: >-
+          (ip.src in $uptime_robot)
+        logging:
+          enabled: true
+
+      - action: block
+        description: US
+        enabled: true
+        expression: >-
+          (ip.geoip.country ne "US")
+
+      - action: block
+        description: Amazon ASN
+        enabled: true
+        expression: >-
+          (ip.geoip.asnum eq 7224) or
+          (ip.geoip.asnum eq 14618) or
+          (ip.geoip.asnum eq 16509)
+
+      - action: block
+        description: Known Bots
+        enabled: true
+        expression: >-
+          (cf.client.bot)
+...
