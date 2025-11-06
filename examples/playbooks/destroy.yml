@@ -64,6 +64,7 @@
     - access_policies
     - access_groups
     - access_service_tokens
+    - pages_projects
     - pagerules
     - rulesets
     - zones

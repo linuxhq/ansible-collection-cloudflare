@@ -4,6 +4,7 @@
     - pages_projects
   community.general.cloudflare_dns:
     api_token: "{{ pages_projects_api_token }}"
+    record: "{{ '@' if _dns.name == _dns.zone else _dns.name }}"
     state: absent
     type: CNAME
     value: "{{ __pages_projects_dict[_absent.name].domains.0 }}"
