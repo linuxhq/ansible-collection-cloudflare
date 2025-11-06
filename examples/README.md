@@ -10,15 +10,21 @@ This document outlines the steps to execute the example playbooks
 
 # Environment
 
-Setup the following environment variables
+Define and export the following environment variables
 
-    export CLOUDFLARE_ACCOUNT_NAME=your.account.name
-    export CLOUDFLARE_API_TOKEN=your.account.token
-    export CLOUDFLARE_DOMAIN=your.domain.com
+* CLOUDFLARE\_ACCOUNT\_NAME
+* CLOUDFLARE\_API\_TOKEN
+* CLOUDFLARE\_DOMAIN
+
+Command-line examples
+
+    export CLOUDFLARE_ACCOUNT_NAME=linuxhq
+    export CLOUDFLARE_API_TOKEN=7f15527b20d04645e27dd16eb8e350c0
+    export CLOUDFLARE_DOMAIN=linuxhq.dev
 
 # Inventory
 
-Inventory variables can be found [here](group_vars/cdn)
+Ansible inventory variables can be found [here](group_vars/cdn)
 
 # Execute
 
@@ -38,9 +44,13 @@ To destroy all service configurations supported by this collection
 
     ansible-playbook playbooks/destroy.yml
 
+To destroy all service configurations while keeping the zone
+
+    ansible-playbook playbooks/destroy.yml --skip-tags zones
+
 ## Info
 
-To gather inforamtion for all services supported by this collection
+To gather information for all services supported by this collection
 
     ansible-playbook playbooks/info.yml
 

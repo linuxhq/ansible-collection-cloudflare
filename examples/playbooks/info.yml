@@ -1,7 +1,6 @@
 ---
-- name: Ensure cloudflare info roles are executed
+- name: Ensure cloudflare roles are executed
   hosts: cdn
-
   roles:
     - access_apps_info
     - access_groups_info
