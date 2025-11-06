@@ -1,0 +1,18 @@
+---
+- name: Ensure cloudflare roles are executed
+  hosts: cdn
+
+  roles:
+    - rules_lists
+    - zones
+    - rulesets
+    - pagerules
+    - pages_projects
+    - access_service_tokens
+    - access_groups
+    - access_policies
+    - access_apps
+    - cfd_tunnel
+    - dns
+    - purge_cache
+...

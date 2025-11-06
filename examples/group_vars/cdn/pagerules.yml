@@ -1,0 +1,30 @@
+---
+pagerules_api_token: "{{ cloudflare_api_token }}"
+pagerules_info_api_token: "{{ cloudflare_api_token }}"
+
+pagerules_list:
+  - zone_id: "{{ _zones_info_dict[cloudflare_domain].id }}"
+    pagerules:
+      - actions:
+          - id: forwarding_url
+            value:
+              status_code: 301
+              url: https://www.linuxhq.org
+        status: active
+        targets:
+          - constraint:
+              operator: matches
+              value: "{{ cloudflare_domain }}/*"
+            target: url
+      - actions:
+          - id: forwarding_url
+            value:
+              status_code: 301
+              url: https://www.linuxhq.org
+        status: active
+        targets:
+          - constraint:
+              operator: matches
+              value: "www.{{ cloudflare_domain }}/*"
+            target: url
+...

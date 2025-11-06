@@ -63,7 +63,7 @@
   community.general.cloudflare_dns:
     api_token: "{{ pages_projects_api_token }}"
     proxied: true
-    record: "{{ '@' if _dns.name == _dns.zone else __pages_projects_record }}"
+    record: "{{ '@' if _dns.name == _dns.zone else _dns.name }}"
     state: present
     type: CNAME
     value: "{{ __pages_projects_dict[_present.name].domains.0 }}"
@@ -72,9 +72,6 @@
   loop_control:
     label: "{{ _dns.name | d(none) }}"
     loop_var: _dns
-  vars:
-    __pages_projects_record:
-      "{{ _dns.1.name.split('.')[:-2] | join('.') }}"
   when:
     - _present.name in __pages_projects_dict.keys()
     - _dns.name is defined
