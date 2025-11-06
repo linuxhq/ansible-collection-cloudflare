@@ -12,9 +12,9 @@ This document outlines the steps to execute the example playbooks
 
 Define and export the following environment variables
 
-* CLOUDFLARE\_ACCOUNT\_NAME
-* CLOUDFLARE\_API\_TOKEN
-* CLOUDFLARE\_DOMAIN
+* `CLOUDFLARE_ACCOUNT_NAME`
+* `CLOUDFLARE_API_TOKEN`
+* `CLOUDFLARE_DOMAIN`
 
 Command-line examples
 
