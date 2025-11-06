@@ -17,6 +17,10 @@ Setup the following environment variables
    export CLOUDFLARE_API_TOKEN=your.account.token
    export CLOUDFLARE_DOMAIN=your.domain.com
 
+# Inventory
+
+Inventory can be found (here)[group_vars/cdn]
+
 ## Build
 
 To configure all services supported by this collection
