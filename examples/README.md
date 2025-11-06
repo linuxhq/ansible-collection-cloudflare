@@ -20,6 +20,8 @@ Setup the following environment variables
 
 Inventory variables can be found [here](group_vars/cdn)
 
+# Execute
+
 ## Build
 
 To configure all services supported by this collection
