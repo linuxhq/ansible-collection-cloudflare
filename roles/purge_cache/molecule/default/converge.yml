@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: purge_cache
+      purge_cache_list: []
+      tags:
+        - molecule-idempotence-notest
+
+    - purge_cache
+...

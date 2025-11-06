@@ -1,0 +1,27 @@
+---
+- name: Verify
+  hosts: all
+
+  pre_tasks:
+    - name: Ensure roles are included
+      tags:
+        - pagerules
+      ansible.builtin.include_role:
+        name: "{{ _role }}"
+      loop:
+        - zones_info
+      loop_control:
+        label: "{{ _role | d(none) }}"
+        loop_var: _role
+
+    - name: Ensure inventory lists are formatted
+      tags:
+        - pagerules
+      ansible.builtin.set_fact:
+        pagerules_list:
+          "{{ pagerules_list |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - pagerules
+...

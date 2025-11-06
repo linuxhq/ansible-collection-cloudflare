@@ -1,0 +1,12 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: rules_lists_info
+      rules_lists_info_account_id: null
+      rules_lists_info_api_token: null
+      tags:
+        - molecule-idempotence-notest
+
+    - rules_lists_info
+...

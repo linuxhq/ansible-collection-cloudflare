@@ -1,0 +1,95 @@
+---
+- name: Ensure cloudflare pagerules information is gathered
+  tags:
+    - pagerules
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ pagerules_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _get.zone_id ~
+          '/pagerules' }}"
+  loop: "{{ pagerules_list }}"
+  loop_control:
+    label: "{{ _get.zone_id | d(none) }}"
+    loop_var: _get
+  register: __pagerules_query
+  check_mode: false
+  when:
+    - pagerules_api_token is not none
+    - _get.zone_id is defined
+
+- name: Ensure list of cloudflare pagerules information is generated
+  tags:
+    - pagerules
+  ansible.builtin.set_fact:
+    __pagerules_list:
+      "{{ __pagerules_query.results |
+          d([]) |
+          json_query('[].{
+            zone_id: _get.zone_id,
+            pagerules_ids: json.result[].id || `[]`
+          }') }}"
+
+- name: Ensure cloudpage pagerules are absent
+  tags:
+    - pagerules
+  ansible.builtin.uri:
+    headers:
+      authorization: "Bearer {{ pagerules_api_token }}"
+    method: DELETE
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _delete.0.zone_id ~
+          '/pagerules/' ~
+          _delete.1 }}"
+  loop:
+    "{{ q('ansible.builtin.subelements',
+          __pagerules_list,
+          'pagerules_ids',
+          {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ _delete.1 | d(none) }}"
+    loop_var: _delete
+  changed_when: true
+  when:
+    - pagerules_api_token is not none
+    - _delete.0.zone_id is defined
+    - _delete.1 is defined
+
+- name: Ensure cloudflare pagerules are present
+  tags:
+    - pagerules
+  ansible.builtin.uri:
+    body: "{{ _post.1 }}"
+    body_format: json
+    headers:
+      authorization: "Bearer {{ pagerules_api_token }}"
+    method: POST
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _post.0.zone_id ~
+          '/pagerules' }}"
+  loop:
+    "{{ q('ansible.builtin.subelements',
+           pagerules_list,
+           'pagerules',
+           {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ _post.0.zone_id | d(none) }}"
+    loop_var: _post
+  changed_when: true
+  when:
+    - pagesrule_api_token is not none
+    - _post.0.zone_id is defined
+    - _post.0.state is not defined or
+      _post.0.state == 'present'
+    - _post.1 is defined
+...

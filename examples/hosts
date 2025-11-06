@@ -1,0 +1,13 @@
+---
+all:
+  vars:
+    ansible_connection: local
+  children:
+    cdn:
+      hosts:
+        cloudflare: {}
+      vars:
+        cloudflare_account_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+        cloudflare_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+        cloudflare_domain: "{{ lookup('env', 'CLOUDFLARE_DOMAIN') }}"
+...

@@ -1,42 +1,19 @@
 ---
-- name: Ensure cloudflare dns records are present
+- name: Ensure cloudflare dns records are batched
   tags:
     - dns
-  community.general.cloudflare_dns:
-    algorithm: "{{ _dns.1.algorithm | default(omit) }}"
-    api_token: "{{ cf_auth_token }}"
-    cert_usage: "{{ _dns.1.cert_usage | default(omit) }}"
-    flag: "{{ _dns.1.flag | default(omit) }}"
-    hash_type: "{{ _dns.1.hash_type | default(omit) }}"
-    key_tag: "{{ _dns.1.key_tag | default(omit) }}"
-    port: "{{ _dns.1.port | default(omit) }}"
-    priority: "{{ _dns.1.priority | default(omit) }}"
-    proto: "{{ _dns.1.proto | default(omit) }}"
-    proxied: "{{ _dns.1.proxied | default(false) }}"
-    record: "{{ _dns.1.record }}"
-    selector: "{{ _dns.1.selector | default(omit) }}"
-    service: "{{ _dns.1.service | default(omit) }}"
-    solo: "{{ _dns.1.solo | default(omit) }}"
-    state: "{{ _dns.1.state | default('present') }}"
-    tag: "{{ _dns.1.tag | default(omit) }}"
-    timeout: "{{ _dns.0.timeout | default(30) }}"
-    ttl: "{{ _dns.1.ttl | default(1) }}"
-    type: "{{ _dns.1.type | upper }}"
-    value: "{{ _dns.1.value }}"
-    weight: "{{ _dns.1.weight | default(omit) }}"
-    zone: "{{ _dns.0.zone }}"
-  loop: "{{ q('ansible.builtin.subelements', cf_dns, 'records', {'skip_missing': true}) }}"
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - dns
+    file: include.yml
+  loop:
+    "{{ q('ansible.builtin.subelements',
+          dns_records,
+          'records',
+          {'skip_missing': true}) |
+        batch(dns_batch) }}"
   loop_control:
-    label: "{{ _label | default(none) }}"
-    loop_var: _dns
-  vars:
-    _label: "{{ _dns.1.type + ':' +
-                _dns.1.record + '.' +
-                _dns.0.zone }}"
-  when:
-    - cf_auth_token is not none
-    - _dns.0.zone is defined
-    - _dns.1.record is defined
-    - _dns.1.type is defined
-    - _dns.1.value is defined
+    label: "{{ __dns_records | length }}"
+    loop_var: __dns_records
 ...

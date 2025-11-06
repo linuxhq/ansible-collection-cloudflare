@@ -1,0 +1,11 @@
+---
+dns_api_token: "{{ cloudflare_api_token }}"
+
+dns_records:
+  - zone: "{{ cloudflare_domain }}"
+    records:
+      - record: tunnel
+        proxied: true
+        type: CNAME
+        value: "{{ _cfd_tunnel_info_dict[cloudflare_domain].id ~ '.cfargotunnel.com' }}"
+...

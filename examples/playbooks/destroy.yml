@@ -1,0 +1,72 @@
+---
+- name: Ensure cloudflare roles are executed
+  hosts: cdn
+  pre_tasks:
+    - name: Ensure roles are included
+      ansible.builtin.include_role:
+        name: "{{ _role }}"
+      loop:
+        - access_apps_info
+        - access_groups_info
+        - access_policies_info
+        - access_service_tokens_info
+        - accounts_info
+        - cfd_tunnel_info
+        - pagerules_info
+        - pages_projects_info
+        - rules_lists_info
+        - rulesets_info
+        - zones_info
+      loop_control:
+        label: "{{ _role | d(none) }}"
+        loop_var: _role
+
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        access_apps_list:
+          "{{ access_apps_list |
+              map('combine', {'state': 'absent'}) }}"
+        access_groups_list:
+          "{{ access_groups_list |
+              map('combine', {'state': 'absent'}) }}"
+        access_policies_list:
+          "{{ access_policies_list |
+              map('combine', {'state': 'absent'}) }}"
+        access_service_tokens_list:
+          "{{ access_service_tokens_list |
+              map('combine', {'state': 'absent'}) }}"
+        dns_records:
+          - zone: "{{ cloudflare_domain }}"
+            records:
+              "{{ dns_records[0].records |
+                  map('combine', {'state': 'absent'}) |
+                  list }}"
+        cfd_tunnel_list:
+          "{{ cfd_tunnel_list |
+              map('combine', {'state': 'absent'}) }}"
+        pages_projects_list:
+          "{{ pages_projects_list |
+              map('combine', {'state': 'absent'}) }}"
+        pagerules_list:
+          "{{ pagerules_list |
+              map('combine', {'state': 'absent'}) }}"
+        rules_lists_list:
+          "{{ rules_lists_list |
+              map('combine', {'state': 'absent'}) }}"
+        rulesets_list:
+          "{{ rulesets_list |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - dns
+    - cfd_tunnel
+    - access_apps
+    - access_policies
+    - access_groups
+    - access_service_tokens
+    - pages_projects
+    - pagerules
+    - rulesets
+    - zones
+    - rules_lists
+...

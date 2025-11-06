@@ -4,20 +4,25 @@
 
 Manage cloudflare dns records
 
+Application programming interface -> [dns](https://developers.cloudflare.com/api/resources/dns/)
+
 ## Requirements
 
 * Cloudflare api `Token` with `Edit` permissions to `DNS`
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    cf_auth_token: null
-    cf_dns: []
+    dns_api_token: null
+    dns_async: 300
+    dns_batch: 10
+    dns_delay: 3
+    dns_poll: 0
+    dns_records: []
+    dns_retries: 100
 
 ## Dependencies
 
-* [linuxhq.cloudflare.tunnel_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/tunnel_info)
+* [linuxhq.cloudflare.cfd\_tunnel\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/cfd_tunnel_info)
 
 ## Example Playbook
 
@@ -25,11 +30,11 @@ Available variables are listed below, along with default values:
       connection: local
       roles:
         - role: linuxhq.cloudflare.dns
-          cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-          cf_dns:
-            - zone: linuxhq.net
+          dns_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          dns_records:
+            - zone: linuxhq.dev
               records:
-                - record: tkimball
+                - record: ansible
                   proxied: false
                   type: CNAME
                   value: ansible.com

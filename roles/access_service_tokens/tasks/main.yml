@@ -1,0 +1,123 @@
+---
+- name: Ensure cloudflare access service tokens information tasks are included
+  tags:
+    - access_service_tokens
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - access_service_tokens
+    file: info.yml
+
+- name: Ensure cloudflare access service tokens are present
+  tags:
+    - access_service_tokens
+  ansible.builtin.uri:
+    body:
+      duration: "{{ _post.duration | d(omit) }}"
+      name: "{{ _post.name }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ access_service_tokens_api_token }}"
+    method: POST
+    status_code:
+      - 201
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_service_tokens_account_id ~
+          '/access/service_tokens' }}"
+  register: __access_service_tokens_post
+  loop: "{{ access_service_tokens_list }}"
+  loop_control:
+    label: "{{ _post.name | d(none) }}"
+    loop_var: _post
+  changed_when: true
+  when:
+    - access_service_tokens_account_id is not none
+    - access_service_tokens_api_token is not none
+    - _post.name is defined
+    - _post.name not in __access_service_tokens_dict.keys()
+    - _post.state is not defined or
+      _post.state == 'present'
+
+- name: Ensure cloudflare access service tokens are displayed
+  tags:
+    - access_service_tokens
+  ansible.builtin.debug:
+    msg: |
+      {{ (__access_service_tokens_post.results |
+         json_query('[].json[].result') |
+         list) |
+         d([]) |
+         to_nice_yaml(indent=2) }}
+  when:
+    - access_service_tokens_display | bool
+
+- name: Ensure cloudflare access service tokens information tasks are included
+  tags:
+    - access_service_tokens
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - access_service_tokens
+    file: info.yml
+
+- name: Ensure cloudflare access service tokens are updated
+  tags:
+    - access_service_tokens
+  ansible.builtin.uri:
+    body:
+      duration: "{{ _put.duration | d(omit) }}"
+      name: "{{ _put.name }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ access_service_tokens_api_token }}"
+    method: PUT
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_service_tokens_account_id ~
+          '/access/service_tokens/' ~
+          __access_service_tokens_dict[_put.name].id }}"
+  loop: "{{ access_service_tokens_list }}"
+  loop_control:
+    label: "{{ _put.name | d(none) }}"
+    loop_var: _put
+  changed_when: true
+  when:
+    - access_service_tokens_account_id is not none
+    - access_service_tokens_api_token is not none
+    - _put.name is defined
+    - _put.name in __access_service_tokens_dict.keys()
+    - _put.state is not defined or
+      _put.state == 'present'
+    - __access_service_tokens_dict[_put.name].id is defined
+
+- name: Ensure cloudflare access service tokens are absent
+  tags:
+    - access_service_tokens
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ access_service_tokens_api_token }}"
+    method: DELETE
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_service_tokens_account_id ~
+          '/access/service_tokens/' ~
+          __access_service_tokens_dict[_delete.name].id }}"
+  loop: "{{ access_service_tokens_list }}"
+  loop_control:
+    label: "{{ _delete.name | d(none) }}"
+    loop_var: _delete
+  changed_when: true
+  when:
+    - access_service_tokens_account_id is not none
+    - access_service_tokens_api_token is not none
+    - _delete.name is defined
+    - _delete.name in __access_service_tokens_dict.keys()
+    - _delete.state is defined and
+      _delete.state == 'absent'
+    - __access_service_tokens_dict[_delete.name].id is defined
+...

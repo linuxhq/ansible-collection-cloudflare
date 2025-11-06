@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - pagerules_info
+
+  post_tasks:
+    - name: Ensure cloudflare pagerules information is verified
+      tags:
+        - pagerules_info
+      ansible.builtin.assert:
+        that:
+          - _pagerules_info_dict | length > 0
+          - _pagerules_info_list | length > 0
+...

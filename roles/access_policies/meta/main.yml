@@ -1,0 +1,23 @@
+---
+dependencies:
+  - role: access_groups_info
+    tags: access_policies
+galaxy_info:
+  role_name: access_policies
+  author: Taylor Kimball
+  description: Manage cloudflare access policies
+  license: GPL-3.0-or-later
+  min_ansible_version: 2.15.0
+  namespace: linuxhq
+  platforms:
+    - name: GenericLinux
+      versions:
+        - all
+    - name: macOS
+      versions:
+        - all
+  galaxy_tags:
+    - access
+    - cloudflare
+    - policies
+...

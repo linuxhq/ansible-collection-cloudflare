@@ -1,0 +1,134 @@
+---
+- name: Ensure cloudflare access policies information tasks are included
+  tags:
+    - access_policies
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - access_policies
+    file: info.yml
+
+- name: Ensure cloudflare access policies are present
+  tags:
+    - access_policies
+  ansible.builtin.uri:
+    body:
+      approval_groups: "{{ _post.approval_groups | d(omit) }}"
+      approval_required: "{{ _post.approval_required | d(false) }}"
+      decision: "{{ _post.decision }}"
+      exclude: "{{ _post.exclude | d(omit) }}"
+      include: "{{ _post.include }}"
+      isolation_required: "{{ _post.isolation_required | d(false) }}"
+      name: "{{ _post.name }}"
+      precedence: "{{ _post.precedence | d(omit) }}"
+      purpose_justification_prompt: "{{ _post.purpose_justification_prompt | d(omit) }}"
+      purpose_justification_required: "{{ _post.purpose_justification_required | d(false) }}"
+      require: "{{ _post.require | d(omit) }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ access_policies_api_token }}"
+    method: POST
+    status_code:
+      - 201
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_policies_account_id ~
+          '/access/policies' }}"
+  loop: "{{ access_policies_list }}"
+  loop_control:
+    label: "{{ _post.name | d(none) }}"
+    loop_var: _post
+  changed_when: true
+  when:
+    - access_policies_account_id is not none
+    - access_policies_api_token is not none
+    - _post.decision is defined
+    - _post.include is defined
+    - _post.name is defined
+    - _post.name not in __access_policies_dict.keys()
+    - _post.state is not defined or
+      _post.state == 'present'
+
+- name: Ensure cloudflare access policies information tasks are included
+  tags:
+    - access_policies
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - access_policies
+    file: info.yml
+
+- name: Ensure cloudflare access policies are updated
+  tags:
+    - access_policies
+  ansible.builtin.uri:
+    body:
+      approval_groups: "{{ _put.approval_groups | d(omit) }}"
+      approval_required: "{{ _put.approval_required | d(false) }}"
+      decision: "{{ _put.decision }}"
+      exclude: "{{ _put.exclude | d(omit) }}"
+      include: "{{ _put.include }}"
+      isolation_required: "{{ _put.isolation_required | d(false) }}"
+      name: "{{ _put.name }}"
+      precedence: "{{ _put.precedence | d(omit) }}"
+      purpose_justification_prompt: "{{ _put.purpose_justification_prompt | d(omit) }}"
+      purpose_justification_required: "{{ _put.purpose_justification_required | d(false) }}"
+      require: "{{ _put.require | d(omit) }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ access_policies_api_token }}"
+    method: PUT
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_policies_account_id ~
+          '/access/policies/' ~
+          __access_policies_dict[_put.name].id }}"
+  loop: "{{ access_policies_list }}"
+  loop_control:
+    label: "{{ _put.name | d(none) }}"
+    loop_var: _put
+  changed_when: true
+  when:
+    - access_policies_account_id is not none
+    - access_policies_api_token is not none
+    - _put.decision is defined
+    - _put.include is defined
+    - _put.name is defined
+    - _put.name in __access_policies_dict.keys()
+    - _put.state is not defined or
+      _put.state == 'present'
+    - __access_policies_dict[_put.name] is defined
+    - __access_policies_dict[_put.name].id is defined
+
+- name: Ensure cloudflare access policies are absent
+  tags:
+    - access_policies
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ access_policies_api_token }}"
+    method: DELETE
+    status_code:
+      - 200
+      - 202
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          access_policies_account_id ~
+          '/access/policies/' ~
+          __access_policies_dict[_delete.name].id }}"
+  loop: "{{ access_policies_list }}"
+  loop_control:
+    label: "{{ _delete.name | d(none) }}"
+    loop_var: _delete
+  changed_when: true
+  when:
+    - access_policies_account_id is not none
+    - access_policies_api_token is not none
+    - _delete.name is defined
+    - _delete.name in __access_policies_dict.keys()
+    - _delete.state is defined and
+      _delete.state == 'absent'
+    - __access_policies_dict[_delete.name] is defined
+    - __access_policies_dict[_delete.name].id is defined
+...

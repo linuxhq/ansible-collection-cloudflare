@@ -17,57 +17,9 @@ A collection of cloudflare roles
 
     ansible-galaxy collection install linuxhq.cloudflare
 
-# Playbook
+# Examples
 
-An example playbook utilizing roles available to create a cloudflare tunnel
-
-    - hosts: localhost
-      connection: local
-
-      vars:
-        cf_account_id: "{{ _cf_account_id }}"
-        cf_account_name: linuxhq
-        cf_auth_token: LYwUWCwe33KWgtRbXUgi9M3EysNixqscjLpbuUfx
-
-      roles:
-        - role: linuxhq.cloudflare.zone
-          cf_zones:
-            - name: linuxhq.net
-
-        - role: linuxhq.cloudflare.tunnel
-          cf_tunnels:
-            - name: linuxhq-net-tunnel
-              config_src: local
-              tunnel_secret: ZGtjVXdzRWJramFYVVduYm0zd2VSalhVaE5IZWppNGQ=
-
-        - role: linuxhq.cloudflare.access_service_token
-          cf_access_service_tokens:
-            - name: linuxhq-net-token
-              duration: forever
-
-        - role: linuxhq.cloudflare.access_app
-          cf_access_apps:
-            - domain: tunnel.linuxhq.net
-              name: linuxhq-net-app
-              type: self_hosted
-
-        - role: linuxhq.cloudflare.access_policy
-          cf_access_policies:
-            - application_id: "{{ _cf_access_app_id['linuxhq-net-app'] }}"
-              decision: non_identity
-              name: linuxhq-net-policy
-              include:
-                - service_token:
-                    token_id: "{{ _cf_access_service_token_id['linuxhq-net-token'] }}"
-
-        - role: linuxhq.cloudflare.dns
-          cf_dns:
-            - zone: linuxhq.net
-              records:
-                - record: tunnel
-                  proxied: true
-                  type: CNAME
-                  value: "{{ _cf_tunnel_id['linuxhq-net-tunnel'] ~ '.cfargotunnel.com' }}"
+Example playbooks and inventory can be found [here](examples/)
 
 # Tokens
 
@@ -87,6 +39,7 @@ If you plan to utilize all the roles in this collection you'll need the followin
 | Account | Account Filter Lists                                  | Edit  |
 | Account | Account Settings                                      | Read  |
 | Account | Cloudflare Tunnel                                     | Edit  |
+| Zone    | Cache Purge                                           | Purge |
 | Zone    | DNS                                                   | Edit  |
 | Zone    | Page Rules                                            | Edit  |
 | Zone    | Zone                                                  | Edit  |

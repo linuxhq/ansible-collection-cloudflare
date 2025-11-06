@@ -1,0 +1,35 @@
+---
+- name: Ensure cloudflare accounts information is gathered
+  tags:
+    - accounts_info
+  ansible.builtin.uri:
+    body:
+      name: "{{ accounts_info_name }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ accounts_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url: 'https://api.cloudflare.com/client/v4/accounts'
+  register: __accounts_info_query
+  check_mode: false
+  when:
+    - accounts_info_api_token is not none
+    - accounts_info_name is not none
+
+- name: Ensure cloudflare accounts information is generated
+  tags:
+    - accounts_info
+  ansible.builtin.set_fact:
+    _accounts_info_id: "{{ __accounts_info_query.json.result[0].id }}"
+    _accounts_info_name: "{{ __accounts_info_query.json.result[0].name }}"
+    _accounts_info_settings: "{{ __accounts_info_query.json.result[0].settings }}"
+    _accounts_info_type: "{{ __accounts_info_query.json.result[0].type }}"
+  when:
+    - __accounts_info_query.json.result is defined
+    - __accounts_info_query.json.result[0].name is defined
+    - __accounts_info_query.json.result[0].id is defined
+    - __accounts_info_query.json.result[0].settings is defined
+    - __accounts_info_query.json.result[0].type is defined
+...
