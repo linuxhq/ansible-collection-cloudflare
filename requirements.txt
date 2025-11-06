@@ -1,5 +1,6 @@
 ansible>11,<12
 ansible-lint==25.9.1
+antsibull-changelog==0.34.0
 awscli==1.37.10
 boto3==1.36.10
 botocore==1.36.10
