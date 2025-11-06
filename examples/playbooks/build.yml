@@ -1,7 +1,6 @@
 ---
 - name: Ensure cloudflare roles are executed
   hosts: cdn
-
   roles:
     - rules_lists
     - zones
