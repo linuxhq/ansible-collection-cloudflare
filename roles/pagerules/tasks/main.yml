@@ -34,7 +34,7 @@
             pagerules_ids: json.result[].id || `[]`
           }') }}"
 
-- name: Ensure cloudpage pagerules are absent
+- name: Ensure cloudflare pagerules are absent
   tags:
     - pagerules
   ansible.builtin.uri:
