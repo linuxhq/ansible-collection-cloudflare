@@ -32,8 +32,13 @@ Application programming interface -> [access](https://developers.cloudflare.com/
           access_apps_account_id: "{{ _accounts_info_id }}"
           access_apps_api_token: "{{ accounts_info_api_token }}"
           access_apps_list:
-            - domain: linuxhq.dev
-              name: linuxhq.dev
+            - name: linuxhq.dev
+              domain: linuxhq.dev
+              destinations:
+                - type: public
+                  uri: linuxhq.dev
+                - type: public
+                  uri: secondary.linuxhq.dev
               policies:
                 - id: "{{ _access_policies_info_dict['linuxhq.dev'].id }}"
               type: self_hosted
