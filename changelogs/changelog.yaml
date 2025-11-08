@@ -1,6 +1,14 @@
 ---
 ancestor: null
 releases:
+  2.0.1:
+    changes:
+      minor_changes:
+        - Added support for destinations in access_apps role
+      release_summary: >-
+        This release adds support for the destinations option in the access_apps role.
+        This allows for multiple domains to be associated with a single application.
+    release_date: '2025-11-06'
   2.0.0:
     changes:
       breaking_changes:

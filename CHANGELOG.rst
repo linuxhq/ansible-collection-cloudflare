@@ -4,6 +4,19 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.0.1
+======
+
+Release Summary
+---------------
+
+This release adds support for the destinations option in the access_apps role. This allows for multiple domains to be associated with a single application.
+
+Minor Changes
+-------------
+
+- Added support for destinations in access_apps role
+
 v2.0.0
 ======
 
