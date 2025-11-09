@@ -1,24 +1,27 @@
-# devices\_settings
+# devices\_settings\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Manage cloudflare devices settings
+Gather information about cloudflare devices settings
 
 Application programming interface -> [zero\_trust](https://developers.cloudflare.com/api/resources/zero_trust/)
 
 ## Requirements
 
-* Cloudflare api `Token` with `Edit` permissions to `Zero Trust`
+* Cloudflare api `Token` with `Read` permissions to `Zero Trust`
 
 ## Role Variables
 
-    devices_settings_account_id: null
-    devices_settings_api_token: null
-    devices_settings_disable_for_time: 0
-    devices_settings_gateway_proxy_enabled: false
-    devices_settings_gateway_udp_proxy_enabled: false
-    devices_settings_root_certificate_installation_enabled: false
-    devices_settings_use_zt_virtual_ip: false
+    devices_settings_info_account_id: null
+    devices_settings_info_api_token: null
+
+## Return Values
+
+    _devices_settings_info_disable_for_time
+    _devices_settings_info_gateway_proxy_enabled
+    _devices_settings_info_gateway_udp_proxy_enabled
+    _devices_settings_info_root_certificate_installation_enabled
+    _devices_settings_info_use_zt_virtual_ip
 
 ## Dependencies
 
@@ -29,14 +32,11 @@ Application programming interface -> [zero\_trust](https://developers.cloudflare
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.devices_settings
+        - role: linuxhq.cloudflare.devices_settings_info
           accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           accounts_info_name: linuxhq
-          devices_settings_account_id: "{{ _accounts_info_id }}"
-          devices_settings_api_token: "{{ accounts_info_api_token }}"
-          devices_settings_gateway_proxy_enabled: true
-          devices_settings_gateway_udp_proxy_enabled: true
-          devices_settings_use_zt_virtual_ip: true
+          devices_settings_info_account_id: "{{ _accounts_info_id }}"
+          devices_settings_info_api_token: "{{ accounts_info_api_token }}"
 
 ## License
 

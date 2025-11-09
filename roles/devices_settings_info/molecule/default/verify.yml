@@ -1,0 +1,18 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - devices_settings_info
+
+  post_tasks:
+    - name: Ensure cloudflare devices settings information is verified
+      tags:
+        - devices_settings_info
+      ansible.builtin.assert:
+        that:
+          - _devices_settings_info_disable_for_time is defined
+          - _devices_settings_info_gateway_proxy_enabled is defined
+          - _devices_settings_info_gateway_udp_proxy_enabled is defined
+          - _devices_settings_info_root_certificate_installation_enabled is defined
+          - _devices_settings_info_use_zt_virtual_ip is defined
+...
