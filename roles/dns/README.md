@@ -23,6 +23,7 @@ Application programming interface -> [dns](https://developers.cloudflare.com/api
 ## Dependencies
 
 * [linuxhq.cloudflare.cfd\_tunnel\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/cfd_tunnel_info)
+* [linuxhq.cloudflare.warp\_connector\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/warp_connector_info)
 
 ## Example Playbook
 

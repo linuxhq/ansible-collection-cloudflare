@@ -2,6 +2,8 @@
 dependencies:
   - role: cfd_tunnel_info
     tags: dns
+  - role: warp_connector_info
+    tags: dns
 galaxy_info:
   role_name: dns
   author: Taylor Kimball
