@@ -26,8 +26,8 @@ Application programming interface -> [rules](https://developers.cloudflare.com/a
       connection: local
       roles:
         - role: linuxhq.cloudflare.rules_lists
-          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          accounts_info_name: linuxhq
           rules_lists_account_id: "{{ _accounts_info_id }}"
           rules_lists_api_token: "{{ accounts_info_api_token }}"
           rules_lists_list:

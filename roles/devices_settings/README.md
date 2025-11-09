@@ -1,23 +1,24 @@
-# zones
+# devices\_settings
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Manage cloudflare zones
+Manage cloudflare devices settings
 
-Application programming interface -> [zones](https://developers.cloudflare.com/api/resources/zones/)
+Application programming interface -> [zero\_trust](https://developers.cloudflare.com/api/resources/zero_trust/)
 
 ## Requirements
 
-* Cloudflare api `Token` with `Edit` permissions to `Zone`
+* Cloudflare api `Token` with `Edit` permissions to `Zero Trust`
 
 ## Role Variables
 
-    zones_account_id: null
-    zones_api_token: null
-    zones_list: []
-    zones_match: all
-    zones_page: 1
-    zones_per_page: 20
+    devices_settings_account_id: null
+    devices_settings_api_token: null
+    devices_settings_disable_for_time: 0
+    devices_settings_gateway_proxy_enabled: false
+    devices_settings_gateway_udp_proxy_enabled: false
+    devices_settings_root_certificate_installation_enabled: false
+    devices_settings_use_zt_virtual_ip: false
 
 ## Dependencies
 
@@ -28,25 +29,13 @@ Application programming interface -> [zones](https://developers.cloudflare.com/a
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.zones
+        - role: linuxhq.cloudflare.devices_settings_settings
           accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           accounts_info_name: linuxhq
-          zones_account_id: "{{ _accounts_info_id }}"
-          zones_api_token: "{{ accounts_info_api_token }}"
-          zones_list:
-            - name: linuxhq.dev
-              type: full
-              settings:
-                - id: always_use_https
-                  value: 'on'
-                - id: development_mode
-                  value: 'on'
-                - id: ipv6
-                  value: 'off'
-                - id: min_tls_version
-                  value: 1.3
-                - id: ssl
-                  value: strict
+          devices_settings_settings_account_id: "{{ _accounts_info_id }}"
+          devices_settings_settings_api_token: "{{ accounts_info_api_token }}"
+          devices_settings_gateway_proxy_enabled: true
+          devices_settings_gateway_udp_proxy_enabled: true
 
 ## License
 

@@ -26,7 +26,7 @@ Application programming interface -> [rulesets](https://developers.cloudflare.co
       connection: local
       roles:
         - role: linuxhq.cloudflare.rulesets
-          zones_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          zones_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           rulesets_api_token: "{{ zones_info_api_token }}"
           rulesets_list:
             - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"
