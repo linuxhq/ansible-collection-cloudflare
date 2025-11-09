@@ -36,6 +36,7 @@ Application programming interface -> [zero\_trust](https://developers.cloudflare
           devices_settings_settings_api_token: "{{ accounts_info_api_token }}"
           devices_settings_gateway_proxy_enabled: true
           devices_settings_gateway_udp_proxy_enabled: true
+          devices_settings_use_zt_virtual_ip: true
 
 ## License
 
