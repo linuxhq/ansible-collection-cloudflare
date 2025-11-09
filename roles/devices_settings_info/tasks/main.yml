@@ -1,0 +1,41 @@
+---
+- name: Ensure cloudflare devices settings information is gathered
+  tags:
+    - devices_settings_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ devices_settings_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          devices_settings_info_account_id ~
+          '/devices/settings' }}"
+  register: __devices_settings_info_query
+  check_mode: false
+  when:
+    - devices_settings_info_api_token is not none
+
+- name: Ensure cloudflare devices settings information is generated
+  tags:
+    - devices_settings_info
+  ansible.builtin.set_fact:
+    _devices_settings_info_disable_for_time:
+      "{{ __devices_settings_info_query.json.result.disable_for_time }}"
+    _devices_settings_info_gateway_proxy_enabled:
+      "{{ __devices_settings_info_query.json.result.gateway_proxy_enabled }}"
+    _devices_settings_info_gateway_udp_proxy_enabled:
+      "{{ __devices_settings_info_query.json.result.gateway_udp_proxy_enabled }}"
+    _devices_settings_info_root_certificate_installation_enabled:
+      "{{ __devices_settings_info_query.json.result.root_certificate_installation_enabled }}"
+    _devices_settings_info_use_zt_virtual_ip:
+      "{{ __devices_settings_info_query.json.result.use_zt_virtual_ip }}"
+  when:
+    - __devices_settings_info_query.json.result is defined
+    - __devices_settings_info_query.json.result.disable_for_time is defined
+    - __devices_settings_info_query.json.result.gateway_proxy_enabled is defined
+    - __devices_settings_info_query.json.result.gateway_udp_proxy_enabled is defined
+    - __devices_settings_info_query.json.result.root_certificate_installation_enabled is defined
+    - __devices_settings_info_query.json.result.use_zt_virtual_ip is defined
+...
