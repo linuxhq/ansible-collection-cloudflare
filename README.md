@@ -40,6 +40,7 @@ If you plan to utilize all the roles in this collection you'll need the followin
 | Account | Account Settings                                      | Read  |
 | Account | Cloudflare Tunnel                                     | Edit  |
 | Account | Cloudflare One Connector: WARP                        | Edit  |
+| Account | Zero Trust                                            | Edit  |
 | Zone    | Cache Purge                                           | Purge |
 | Zone    | DNS                                                   | Edit  |
 | Zone    | Page Rules                                            | Edit  |
