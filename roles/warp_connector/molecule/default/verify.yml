@@ -1,0 +1,16 @@
+---
+- name: Verify
+  hosts: all
+
+  pre_tasks:
+    - name: Ensure inventory lists are formatted
+      tags:
+        - warp_connector
+      ansible.builtin.set_fact:
+        warp_connector_list:
+          "{{ warp_connector_list |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - warp_connector
+...
