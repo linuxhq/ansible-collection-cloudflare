@@ -1,0 +1,27 @@
+---
+- name: Ensure cloudflare devices policy information is gathered
+  tags:
+    - devices_policy_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ devices_policy_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          devices_policy_info_account_id ~
+          '/devices/policy' }}"
+  register: __devices_policy_info_query
+  check_mode: false
+  when:
+    - devices_policy_info_api_token is not none
+
+- name: Ensure cloudflare devices policy information is generated
+  tags:
+    - devices_policy_info
+  ansible.builtin.set_fact:
+    _devices_policy_info_dict:
+      "{{ __devices_policy_info_query.json.result |
+          d({}) }}"
+...

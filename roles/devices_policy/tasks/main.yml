@@ -1,0 +1,22 @@
+---
+- name: Ensure cloudflare devices policy are managed
+  tags:
+    - devices_policy
+  ansible.builtin.uri:
+    body: "{{ devices_policy_dict }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ devices_policy_api_token }}"
+    method: PATCH
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          devices_policy_account_id ~
+          '/devices/policy' }}"
+  changed_when: true
+  when:
+    - devices_policy_account_id is not none
+    - devices_policy_api_token is not none
+    - devices_policy_dict | length > 0
+...
