@@ -1,0 +1,25 @@
+---
+- name: Ensure cloudflare zerotrust connectivity settings are managed
+  tags:
+    - zerotrust_connectivity_settings
+  ansible.builtin.uri:
+    body:
+      icmp_proxy_enabled:
+        "{{ zerotrust_connectivity_settings_icmp_proxy_enabled }}"
+      offramp_warp_enabled:
+        "{{ zerotrust_connectivity_settings_offramp_warp_enabled }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ zerotrust_connectivity_settings_api_token }}"
+    method: PATCH
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          zerotrust_connectivity_settings_account_id ~
+          '/zerotrust/connectivity_settings' }}"
+  changed_when: true
+  when:
+    - zerotrust_connectivity_settings_account_id is not none
+    - zerotrust_connectivity_settings_api_token is not none
+...
