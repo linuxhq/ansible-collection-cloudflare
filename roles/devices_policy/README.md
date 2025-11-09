@@ -31,6 +31,7 @@ Application programming interface -> [zero\_trust](https://developers.cloudflare
           devices_policy_account_id: "{{ _accounts_info_id }}"
           devices_policy_api_token: "{{ accounts_info_api_token }}"
           devices_policy_dict:
+            auto_connect: 60
             include:
               - address: 100.64.0.0/10
             service_mode_v2:
