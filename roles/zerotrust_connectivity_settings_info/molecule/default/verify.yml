@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - zerotrust_connectivity_settings_info
+
+  post_tasks:
+    - name: Ensure cloudflare zerotrust connectivity settings information is verified
+      tags:
+        - zerotrust_connectivity_settings_info
+      ansible.builtin.assert:
+        that:
+          - _zerotrust_connectivity_settings_info_dict.icmp_proxy_enabled is defined
+          - _zerotrust_connectivity_settings_info_dict.offramp_warp_enabled is defined
+...

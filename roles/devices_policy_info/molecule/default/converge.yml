@@ -1,0 +1,12 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: devices_policy_info
+      devices_policy_info_account_id: null
+      devices_policy_info_api_token: null
+      tags:
+        - molecule-idempotence-notest
+
+    - devices_policy_info
+...

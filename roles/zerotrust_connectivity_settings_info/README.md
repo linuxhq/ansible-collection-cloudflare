@@ -1,8 +1,8 @@
-# devices\_settings\_info
+# zerotrust\_connectivity\_settings\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
 
-Gather information about cloudflare devices settings
+Gather information about cloudflare zerotrust connectivity settings
 
 Application programming interface -> [zero\_trust](https://developers.cloudflare.com/api/resources/zero_trust/)
 
@@ -12,12 +12,12 @@ Application programming interface -> [zero\_trust](https://developers.cloudflare
 
 ## Role Variables
 
-    devices_settings_info_account_id: null
-    devices_settings_info_api_token: null
+    zerotrust_connectivity_settings_info_account_id: null
+    zerotrust_connectivity_settings_info_api_token: null
 
 ## Return Values
 
-    _devices_settings_info_dict
+    _zerotrust_connectivity_settings_info_dict
 
 ## Dependencies
 
@@ -28,11 +28,11 @@ Application programming interface -> [zero\_trust](https://developers.cloudflare
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.devices_settings_info
+        - role: linuxhq.cloudflare.zerotrust_connectivity_settings_info
           accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           accounts_info_name: linuxhq
-          devices_settings_info_account_id: "{{ _accounts_info_id }}"
-          devices_settings_info_api_token: "{{ accounts_info_api_token }}"
+          zerotrust_connectivity_settings_info_account_id: "{{ _accounts_info_id }}"
+          zerotrust_connectivity_settings_info_api_token: "{{ accounts_info_api_token }}"
 
 ## License
 

@@ -10,9 +10,9 @@
         - devices_settings_info
       ansible.builtin.assert:
         that:
-          - _devices_settings_info_disable_for_time is defined
-          - _devices_settings_info_gateway_proxy_enabled is defined
-          - _devices_settings_info_gateway_udp_proxy_enabled is defined
-          - _devices_settings_info_root_certificate_installation_enabled is defined
-          - _devices_settings_info_use_zt_virtual_ip is defined
+          - _devices_settings_info_dict.disable_for_time is defined
+          - _devices_settings_info_dict.gateway_proxy_enabled is defined
+          - _devices_settings_info_dict.gateway_udp_proxy_enabled is defined
+          - _devices_settings_info_dict.root_certificate_installation_enabled is defined
+          - _devices_settings_info_dict.use_zt_virtual_ip is defined
 ...
