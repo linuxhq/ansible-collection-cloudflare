@@ -4,6 +4,26 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.0.2
+======
+
+Release Summary
+---------------
+
+This release introduces eight new cloudflare warp related roles
+
+Minor Changes
+-------------
+
+- Initial commit of devices_policy role
+- Initial commit of devices_policy_info role
+- Initial commit of devices_settings role
+- Initial commit of devices_settings_info role
+- Initial commit of warp_connector role
+- Initial commit of warp_connector_info role
+- Initial commit of zerotrust_connectivity_settings role
+- Initial commit of zerotrust_connectivity_settings_info role
+
 v2.0.1
 ======
 
