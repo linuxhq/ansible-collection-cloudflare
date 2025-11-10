@@ -1,6 +1,20 @@
 ---
 ancestor: null
 releases:
+  2.0.2:
+    changes:
+      minor_changes:
+        - Initial commit of devices_policy role
+        - Initial commit of devices_policy_info role
+        - Initial commit of devices_settings role
+        - Initial commit of devices_settings_info role
+        - Initial commit of warp_connector role
+        - Initial commit of warp_connector_info role
+        - Initial commit of zerotrust_connectivity_settings role
+        - Initial commit of zerotrust_connectivity_settings_info role
+      release_summary: >-
+        This release introduces eight new cloudflare warp related roles
+    release_date: '2025-11-10'
   2.0.1:
     changes:
       minor_changes:

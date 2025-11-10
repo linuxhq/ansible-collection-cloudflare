@@ -12,10 +12,14 @@
         - access_service_tokens_info
         - accounts_info
         - cfd_tunnel_info
+        - devices_policy_info
+        - devices_settings_info
         - pagerules_info
         - pages_projects_info
         - rules_lists_info
         - rulesets_info
+        - warp_connector_info
+        - zerotrust_connectivity_settings_info
         - zones_info
       loop_control:
         label: "{{ _role | d(none) }}"
@@ -38,9 +42,10 @@
         dns_records:
           - zone: "{{ cloudflare_domain }}"
             records:
-              "{{ dns_records[0].records |
-                  map('combine', {'state': 'absent'}) |
-                  list }}"
+              - "{{ dns_records.0.records.0 |
+                    combine({'state': 'absent'}) }}"
+              - "{{ dns_records.0.records.1 |
+                    combine({'state': 'absent'}) }}"
         cfd_tunnel_list:
           "{{ cfd_tunnel_list |
               map('combine', {'state': 'absent'}) }}"
@@ -56,9 +61,13 @@
         rulesets_list:
           "{{ rulesets_list |
               map('combine', {'state': 'absent'}) }}"
+        warp_connector_list:
+          "{{ warp_connector_list |
+              map('combine', {'state': 'absent'}) }}"
 
   roles:
     - dns
+    - warp_connector
     - cfd_tunnel
     - access_apps
     - access_policies

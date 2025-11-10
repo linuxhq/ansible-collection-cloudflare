@@ -1,0 +1,23 @@
+---
+dependencies:
+  - role: accounts_info
+    tags: warp_connector
+galaxy_info:
+  role_name: warp_connector
+  author: Taylor Kimball
+  description: Manage cloudflare warp connectors
+  license: GPL-3.0-or-later
+  min_ansible_version: 2.15.0
+  namespace: linuxhq
+  platforms:
+    - name: GenericLinux
+      versions:
+        - all
+    - name: macOS
+      versions:
+        - all
+  galaxy_tags:
+    - cloudflare
+    - connector
+    - warp
+...

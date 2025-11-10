@@ -1,0 +1,12 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: warp_connector_info
+      warp_connector_info_account_id: null
+      warp_connector_info_api_token: null
+      tags:
+        - molecule-idempotence-notest
+
+    - warp_connector_info
+...

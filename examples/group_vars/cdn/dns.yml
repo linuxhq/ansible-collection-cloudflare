@@ -4,8 +4,13 @@ dns_api_token: "{{ cloudflare_api_token }}"
 dns_records:
   - zone: "{{ cloudflare_domain }}"
     records:
-      - record: tunnel
+      - record: cfd
         proxied: true
         type: CNAME
-        value: "{{ _cfd_tunnel_info_dict[cloudflare_domain].id ~ '.cfargotunnel.com' }}"
+        value: "{{ _cfd_tunnel_info_dict[cloudflare_domain ~ '-cfd'].id ~ '.cfargotunnel.com' }}"
+
+      - record: warp
+        proxied: true
+        type: CNAME
+        value: "{{ _warp_connector_info_dict[cloudflare_domain ~ '-warp'].id ~ '.cfargotunnel.com' }}"
 ...
