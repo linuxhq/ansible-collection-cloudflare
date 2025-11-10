@@ -1,0 +1,31 @@
+---
+- name: Ensure cloudflare devices settings are managed
+  tags:
+    - devices_settings
+  ansible.builtin.uri:
+    body:
+      disable_for_time:
+        "{{ devices_settings_disable_for_time }}"
+      gateway_proxy_enabled:
+        "{{ devices_settings_gateway_proxy_enabled }}"
+      gateway_udp_proxy_enabled:
+        "{{ devices_settings_gateway_udp_proxy_enabled }}"
+      root_certificate_installation_enabled:
+        "{{ devices_settings_root_certificate_installation_enabled }}"
+      use_zt_virtual_ip:
+        "{{ devices_settings_use_zt_virtual_ip }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ devices_settings_api_token }}"
+    method: PUT
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          devices_settings_account_id ~
+          '/devices/settings' }}"
+  changed_when: true
+  when:
+    - devices_settings_account_id is not none
+    - devices_settings_api_token is not none
+...

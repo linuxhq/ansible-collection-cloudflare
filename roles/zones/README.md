@@ -29,9 +29,8 @@ Application programming interface -> [zones](https://developers.cloudflare.com/a
       connection: local
       roles:
         - role: linuxhq.cloudflare.zones
-          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
-
+          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+          accounts_info_name: linuxhq
           zones_account_id: "{{ _accounts_info_id }}"
           zones_api_token: "{{ accounts_info_api_token }}"
           zones_list:

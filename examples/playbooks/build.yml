@@ -12,6 +12,10 @@
     - access_policies
     - access_apps
     - cfd_tunnel
+    - devices_policy
+    - devices_settings
+    - zerotrust_connectivity_settings
+    - warp_connector
     - dns
     - purge_cache
 ...

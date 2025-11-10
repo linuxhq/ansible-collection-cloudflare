@@ -1,0 +1,110 @@
+---
+- name: Ensure cloudflare warp connector information tasks are included
+  tags:
+    - warp_connector
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - warp_connector
+    file: info.yml
+
+- name: Ensure cloudflare warp connector are present
+  tags:
+    - warp_connector
+  ansible.builtin.uri:
+    body:
+      name: "{{ _post.name }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ warp_connector_api_token }}"
+    method: POST
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          warp_connector_account_id ~
+          '/warp_connector' }}"
+  register: __warp_connector_post
+  loop: "{{ warp_connector_list }}"
+  loop_control:
+    label: "{{ _post.name | d(none) }}"
+    loop_var: _post
+  changed_when: true
+  when:
+    - warp_connector_account_id is not none
+    - warp_connector_api_token is not none
+    - _post.name is defined
+    - _post.name not in __warp_connector_dict.keys()
+    - _post.state is not defined or
+      _post.state == 'present'
+
+- name: Ensure cloudflare warp connector information tasks are included
+  tags:
+    - warp_connector
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - warp_connector
+    file: info.yml
+
+- name: Ensure cloudflare warp connector are updated
+  tags:
+    - warp_connector
+  ansible.builtin.uri:
+    body:
+      name: "{{ _patch.name }}"
+      tunnel_secret:
+        "{{ _patch.tunnel_secret | trim if _patch.tunnel_secret is defined else omit }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ warp_connector_api_token }}"
+    method: PATCH
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          warp_connector_account_id ~
+          '/warp_connector/' ~
+          __warp_connector_dict[_patch.name].id }}"
+  loop: "{{ warp_connector_list }}"
+  loop_control:
+    label: "{{ _patch.name | d(none) }}"
+    loop_var: _patch
+  changed_when: true
+  when:
+    - warp_connector_account_id is not none
+    - warp_connector_api_token is not none
+    - _patch.name is defined
+    - _patch.name in __warp_connector_dict.keys()
+    - _patch.state is not defined or
+      _patch.state == 'present'
+    - __warp_connector_dict[_patch.name].id is defined
+
+- name: Ensure cloudflare warp connector are absent
+  tags:
+    - warp_connector
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ warp_connector_api_token }}"
+    method: DELETE
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          warp_connector_account_id ~
+          '/warp_connector/' ~
+          __warp_connector_dict[_delete.name].id }}"
+  loop: "{{ warp_connector_list }}"
+  loop_control:
+    label: "{{ _delete.name | d(none) }}"
+    loop_var: _delete
+  changed_when: true
+  when:
+    - warp_connector_account_id is not none
+    - warp_connector_api_token is not none
+    - _delete.name is defined
+    - _delete.name in __warp_connector_dict.keys()
+    - _delete.state is defined and
+      _delete.state == 'absent'
+    - __warp_connector_dict[_delete.name].id is defined
+...

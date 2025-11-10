@@ -1,0 +1,38 @@
+---
+- name: Ensure cloudflare warp connector information is gathered
+  tags:
+    - warp_connector
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ warp_connector_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          warp_connector_account_id ~
+          '/warp_connector?is_deleted=false' }}"
+  register: __warp_connector_query
+  check_mode: false
+  when:
+    - warp_connector_account_id is not none
+    - warp_connector_api_token is not none
+
+- name: Ensure list of cloudflare warp connector information is generated
+  tags:
+    - warp_connector
+  ansible.builtin.set_fact:
+    __warp_connector_list:
+      "{{ __warp_connector_query.json.result |
+          d([]) }}"
+
+- name: Ensure dict of cloudflare warp connector information is generated
+  tags:
+    - warp_connector
+  ansible.builtin.set_fact:
+    __warp_connector_dict:
+      "{{ (dict(__warp_connector_list |
+               json_query('[].name') |
+               zip(__warp_connector_list))) |
+          d({}) }}"
+...

@@ -1,0 +1,27 @@
+---
+- name: Ensure cloudflare devices settings information is gathered
+  tags:
+    - devices_settings_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ devices_settings_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          devices_settings_info_account_id ~
+          '/devices/settings' }}"
+  register: __devices_settings_info_query
+  check_mode: false
+  when:
+    - devices_settings_info_api_token is not none
+
+- name: Ensure cloudflare devices settings information is generated
+  tags:
+    - devices_settings_info
+  ansible.builtin.set_fact:
+    _devices_settings_info_dict:
+      "{{ __devices_settings_info_query.json.result |
+          d({}) }}"
+...

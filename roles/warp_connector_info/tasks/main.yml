@@ -1,0 +1,87 @@
+---
+- name: Ensure cloudflare warp connector information is gathered
+  tags:
+    - warp_connector_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ warp_connector_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          warp_connector_info_account_id ~
+          '/warp_connector?is_deleted=false' }}"
+  register: __warp_connector_info_query
+  check_mode: false
+  when:
+    - warp_connector_info_account_id is not none
+    - warp_connector_info_api_token is not none
+
+- name: Ensure list of cloudflare warp connector information is generated
+  tags:
+    - warp_connector_info
+  ansible.builtin.set_fact:
+    __warp_connector_info_list:
+      "{{ __warp_connector_info_query.json.result |
+          d([]) }}"
+
+- name: Ensure cloudflare warp connector token information is gathered
+  tags:
+    - warp_connector_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ warp_connector_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          warp_connector_info_account_id ~
+          '/warp_connector/' ~
+          _token.id ~
+          '/token' }}"
+  register: __warp_connector_info_token_query
+  loop: "{{ __warp_connector_info_list }}"
+  loop_control:
+    label: "{{ _token.name | d(none) }}"
+    loop_var: _token
+  check_mode: false
+  when:
+    - warp_connector_info_account_id is not none
+    - warp_connector_info_api_token is not none
+    - _token.id is defined
+
+- name: Ensure list of cloudflare warp connector token information is generated
+  tags:
+    - warp_connector_info
+  ansible.builtin.set_fact:
+    __warp_connector_info_token_list:
+      "{{ (__warp_connector_info_token_query.results |
+          json_query('[].{
+            name: _token.name,
+            token: json.result
+          }')) |
+          d([]) }}"
+
+- name: Ensure lists of cloudflare warp connector information are merged
+  tags:
+    - warp_connector_info
+  ansible.builtin.set_fact:
+    _warp_connector_info_list:
+      "{{ (__warp_connector_info_list |
+          community.general.lists_mergeby(
+            __warp_connector_info_token_list,
+            'name')) |
+          d([]) }}"
+
+- name: Ensure dict of cloudflare warp connector information is generated
+  tags:
+    - warp_connector_info
+  ansible.builtin.set_fact:
+    _warp_connector_info_dict:
+      "{{ (dict(_warp_connector_info_list |
+               json_query('[].name') |
+               zip(_warp_connector_info_list))) |
+          d({}) }}"
+...
