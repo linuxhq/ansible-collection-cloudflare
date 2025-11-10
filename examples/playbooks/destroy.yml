@@ -42,12 +42,10 @@
         dns_records:
           - zone: "{{ cloudflare_domain }}"
             records:
-              - "{{ dns_records.0.records |
-                    map('combine', {'state': 'absent'}) |
-                    list }}"
-              - "{{ dns_records.1.records |
-                    map('combine', {'state': 'absent'}) |
-                    list }}"
+              - "{{ dns_records.0.records.0 |
+                    combine({'state': 'absent'}) }}"
+              - "{{ dns_records.0.records.1 |
+                    combine({'state': 'absent'}) }}"
         cfd_tunnel_list:
           "{{ cfd_tunnel_list |
               map('combine', {'state': 'absent'}) }}"
