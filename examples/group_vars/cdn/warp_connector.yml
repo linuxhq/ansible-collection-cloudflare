@@ -1,0 +1,10 @@
+---
+warp_connector_account_id: "{{ _accounts_info_id }}"
+warp_connector_api_token: "{{ cloudflare_api_token }}"
+
+warp_connector_info_account_id: "{{ _accounts_info_id }}"
+warp_connector_info_api_token: "{{ cloudflare_api_token }}"
+
+warp_connector_list:
+  - name: "{{ cloudflare_domain }}-warp"
+...

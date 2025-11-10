@@ -8,9 +8,13 @@
     - access_service_tokens_info
     - accounts_info
     - cfd_tunnel_info
+    - devices_policy_info
+    - devices_settings_info
     - pagerules_info
     - pages_projects_info
     - rules_lists_info
     - rulesets_info
+    - warp_connector_info
+    - zerotrust_connectivity_settings_info
     - zones_info
 ...
