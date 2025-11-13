@@ -10,20 +10,11 @@ jobs:
     name: release
     runs-on: ubuntu-latest
     steps:
-      - name: Ensure codebase is present
-        uses: actions/checkout@v3
-
-      - name: Ensure python3 is present
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-
-      - name: Ensure ansible-core is present
-        run: pip install ansible-core==2.15.0
-
-      - name: Ensure ansible-galaxy collection is built
-        run: ansible-galaxy collection build
-
-      - name: Ensure ansible-galaxy collection is published
-        run: ansible-galaxy collection publish --api-key ${{ secrets.GALAXY_API_KEY }} linuxhq-cloudflare-*.tar.gz
+      - run: pip install ansible-core==2.15.0
+      - run: ansible-galaxy collection build
+      - run: ansible-galaxy collection publish --api-key ${{ secrets.GALAXY_API_KEY }} linuxhq-cloudflare-*.tar.gz
 ...
