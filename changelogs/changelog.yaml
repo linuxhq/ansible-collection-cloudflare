@@ -35,7 +35,6 @@ releases:
         - scrape_shield - role deprecated
         - security - role deprecated
         - ssl - role deprecated
-        - pages_projects - merged pages_domain and pages_projects roles
         - access_apps - renamed from access_app
         - access_apps_info - renamed from access_app_info
         - access_groups - renamed from access_group

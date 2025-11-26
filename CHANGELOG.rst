@@ -87,7 +87,6 @@ Breaking Changes / Porting Guide
 - pagerules - renamed from page_rule
 - pagerules_info - renamed from page_rule_info
 - pages_projects - merged pages_domain and pages_projects roles
-- pages_projects - merged pages_domain and pages_projects roles
 - pages_projects_info - renamed from pages_project_info
 - rules_lists - renamed from rule_list
 - rules_lists_info - renamed from rule_list_info
