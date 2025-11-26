@@ -29,6 +29,7 @@ Application programming interface -> [dnssec](https://developers.cloudflare.com/
           dnssec_api_token: "{{ zones_info_api_token }}"
           dnssec_list:
             - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"
+              status: active
 
 ## License
 
