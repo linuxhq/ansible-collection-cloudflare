@@ -1,0 +1,27 @@
+---
+- name: Verify
+  hosts: all
+
+  pre_tasks:
+    - name: Ensure roles are included
+      tags:
+        - dnssec
+      ansible.builtin.include_role:
+        name: "{{ _role }}"
+      loop:
+        - zones_info
+      loop_control:
+        label: "{{ _role | d(none) }}"
+        loop_var: _role
+
+    - name: Ensure inventory lists are formatted
+      tags:
+        - dnssec
+      ansible.builtin.set_fact:
+        dnssec_list:
+          "{{ dnssec_list |
+              map('combine', {'status': 'disabled'}) }}"
+
+  roles:
+    - dnssec
+...

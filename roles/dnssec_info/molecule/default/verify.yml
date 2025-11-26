@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - dnssec_info
+
+  post_tasks:
+    - name: Ensure cloudflare dnssec information is verified
+      tags:
+        - dnssec_info
+      ansible.builtin.assert:
+        that:
+          - _dnssec_info_dict | length > 0
+          - _dnssec_info_list | length > 0
+...
