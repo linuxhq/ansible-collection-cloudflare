@@ -1,0 +1,8 @@
+---
+dnssec_api_token: "{{ cloudflare_api_token }}"
+dnssec_info_api_token: "{{ cloudflare_api_token }}"
+
+dnssec_list:
+  - zone_id: "{{ _zones_info_dict[cloudflare_domain].id }}"
+    status: active
+...

@@ -4,6 +4,20 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.0.3
+======
+
+Release Summary
+---------------
+
+This release introduces two new cloudflare dnssec related roles
+
+Minor Changes
+-------------
+
+- dnssec - initial commit
+- dnssec_info - initial commit
+
 v2.0.2
 ======
 
@@ -15,14 +29,14 @@ This release introduces eight new cloudflare warp related roles
 Minor Changes
 -------------
 
-- Initial commit of devices_policy role
-- Initial commit of devices_policy_info role
-- Initial commit of devices_settings role
-- Initial commit of devices_settings_info role
-- Initial commit of warp_connector role
-- Initial commit of warp_connector_info role
-- Initial commit of zerotrust_connectivity_settings role
-- Initial commit of zerotrust_connectivity_settings_info role
+- devices_policy - initial commit
+- devices_policy_info - initial commit
+- devices_settings - initial commit
+- devices_settings_info - initial commit
+- warp_connector - initial commit
+- warp_connector_info - initial commit
+- zerotrust_connectivity_settings - initial commit
+- zerotrust_connectivity_settings_info - initial commit
 
 v2.0.1
 ======
@@ -35,7 +49,7 @@ This release adds support for the destinations option in the access_apps role. T
 Minor Changes
 -------------
 
-- Added support for destinations in access_apps role
+- access_apps - add support for destinations
 
 v2.0.0
 ======
@@ -48,42 +62,42 @@ This release restructures the entire collection.  All inventory and playbooks wi
 Minor Changes
 -------------
 
-- Added check_mode support to avoid failures
-- Added example inventory and playbooks
-- Added molecule tests to all roles
-- Added state support to all applicable roles
-- Addition of purge_cache role
-- Updated ansible-lint configuration to have no exclusions
+- added check_mode support to avoid failures
+- added example inventory and playbooks
+- added molecule tests to all roles
+- added state support to all applicable roles
+- addition of purge_cache role
+- updated ansible-lint configuration to have no exclusions
 
 Breaking Changes / Porting Guide
 --------------------------------
 
-- Deprecated network role in favor of zones role
-- Deprecated scrape_shield role role in favor of zones role
-- Deprecated security role in favor of zones role
-- Deprecated ssl role in favor of zones role
-- Merged pages_domain and pages_project roles into pages_projects role
-- Renamed role access_app -> access_apps and associated role variables
-- Renamed role access_app_info -> access_apps_info and associated role variables
-- Renamed role access_group -> access_groups and associated role variables
-- Renamed role access_group_info -> access_groups_info and associated role variables
-- Renamed role access_policy -> access_policies and associated role variables
-- Renamed role access_policy_info -> access_policies_info and associated role variables
-- Renamed role access_service_token -> access_service_tokens and associated role variables
-- Renamed role access_service_token_info -> access_service_tokens_info and associated role variables
-- Renamed role account_info -> accounts_info and associated role variables
-- Renamed role page_rule -> pagerules and associated role variables
-- Renamed role page_rule_info -> pagerules_info and associated role variables
-- Renamed role pages_project -> pages_projects and associated role variables
-- Renamed role pages_project_info -> pages_projects_info and associated role variables
-- Renamed role rule_list -> rules_lists and associated role variables
-- Renamed role rule_list_info -> rules_lists_info and associated role variables
-- Renamed role ruleset_entrypoint -> rulesets and associated role variables
-- Renamed role ruleset_entrypoint_info -> rulesets_info and associated role variables
-- Renamed role tunnel -> cfd_tunnel and associated role variables
-- Renamed role tunnel_info -> cfd_tunnel_info and associated role variables
-- Renamed role zone -> zones and associated role variables
-- Renamed role zone_info -> zones_info and associated role variables
+- access_apps - renamed from access_app
+- access_apps_info - renamed from access_app_info
+- access_groups - renamed from access_group
+- access_groups_info - renamed from access_group_info
+- access_policies - renamed from access_policy
+- access_policies_info - renamed from access_policy_info
+- access_service_tokens - renamed from access_service_token
+- access_service_tokens_info - renamed from access_service_token_info
+- accounts_info - renamed from account_info
+- cfd_tunnel - renamed from tunnel
+- cfd_tunnel_info - renamed from tunnel_info
+- network - role deprecated
+- pagerules - renamed from page_rule
+- pagerules_info - renamed from page_rule_info
+- pages_projects - merged pages_domain and pages_projects roles
+- pages_projects - renamed from pages_project
+- pages_projects_info - renamed from pages_project_info
+- rules_lists - renamed from rule_list
+- rules_lists_info - renamed from rule_list_info
+- rulesets - renamed from ruleset_entrypoint
+- rulesets_info - renamed from ruleset_entrypoint_info
+- scrape_shield - role deprecated
+- security - role deprecated
+- ssl - role deprecated
+- zones - renamed from zone
+- zones_info - renamed from zone_info
 
 v1.2.0
 ======
