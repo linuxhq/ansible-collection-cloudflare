@@ -87,7 +87,7 @@
     loop_var: _post
   changed_when: true
   when:
-    - pagesrule_api_token is not none
+    - pagerules_api_token is not none
     - _post.0.zone_id is defined
     - _post.0.state is not defined or
       _post.0.state == 'present'

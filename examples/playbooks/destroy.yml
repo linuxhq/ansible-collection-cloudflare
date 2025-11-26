@@ -46,6 +46,9 @@
                     combine({'state': 'absent'}) }}"
               - "{{ dns_records.0.records.1 |
                     combine({'state': 'absent'}) }}"
+        dnssec_list:
+          "{{ dnssec_list |
+              map('combine', {'status': 'disabled'}) }}"
         cfd_tunnel_list:
           "{{ cfd_tunnel_list |
               map('combine', {'state': 'absent'}) }}"
@@ -76,6 +79,7 @@
     - pages_projects
     - pagerules
     - rulesets
+    - dnssec
     - zones
     - rules_lists
 ...

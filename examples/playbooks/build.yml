@@ -4,6 +4,7 @@
   roles:
     - rules_lists
     - zones
+    - dnssec
     - rulesets
     - pagerules
     - pages_projects

@@ -1,0 +1,75 @@
+---
+- name: Ensure cloudflare dnssec zone information is gathered
+  tags:
+    - dnssec_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ dnssec_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url: 'https://api.cloudflare.com/client/v4/zones'
+  register: __dnssec_info_zone_query
+  check_mode: false
+  when:
+    - dnssec_info_api_token is not none
+
+- name: Ensure list of cloudflare dnssec zone information is generated
+  tags:
+    - dnssec_info
+  ansible.builtin.set_fact:
+    __dnssec_info_zone_list:
+      "{{ __dnssec_info_zone_query.json.result |
+          d([]) |
+          json_query('[].{
+            id: id,
+            name: name
+          }') }}"
+
+- name: Ensure cloudflare dnssec information is gathered
+  tags:
+    - dnssec_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ dnssec_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _zone.id ~
+          '/dnssec' }}"
+  register: __dnssec_info_rule_query
+  loop: "{{ __dnssec_info_zone_list }}"
+  loop_control:
+    label: "{{ _zone.name | d(none) }}"
+    loop_var: _zone
+  check_mode: false
+  when:
+    - dnssec_info_api_token is not none
+    - _zone.id is defined
+    - _zone.name is defined
+
+- name: Ensure list of cloudflare dnssec information is generated
+  tags:
+    - dnssec_info
+  ansible.builtin.set_fact:
+    _dnssec_info_list:
+      "{{ __dnssec_info_rule_query.results |
+          d([]) |
+          json_query('[].{
+            name: _zone.name,
+            id: _zone.id,
+            dnssec: json.result
+          }') }}"
+
+- name: Ensure dict of cloudflare dnssec information is generated
+  tags:
+    - dnssec_info
+  ansible.builtin.set_fact:
+    _dnssec_info_dict:
+      "{{ (dict(_dnssec_info_list |
+                json_query('[].name') |
+                zip(_dnssec_info_list))) |
+          d({}) }}"
+...
