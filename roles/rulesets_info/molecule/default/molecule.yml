@@ -9,7 +9,10 @@ driver:
 
 platforms:
   - name: almalinux9
-    box: bento/almalinux-9
+    box: bento/almalinux-9.6
+    box_architecture: arm64
+    cpus: 4
+    memory: 4096
 
 provisioner:
   name: ansible

@@ -10,6 +10,7 @@
     - cfd_tunnel_info
     - devices_policy_info
     - devices_settings_info
+    - dnssec_info
     - pagerules_info
     - pages_projects_info
     - rules_lists_info

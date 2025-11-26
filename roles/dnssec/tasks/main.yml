@@ -1,0 +1,29 @@
+---
+- name: Ensure cloudflare dnssec settings are managed
+  tags:
+    - dnssec
+  ansible.builtin.uri:
+    body:
+      dnssec_multi_signer: "{{ _patch.dnssec_multi_signer | d(omit )}}"
+      dnssec_presigned: "{{ _patch.dnssec_presigned | d(omit) }}"
+      dnssec_use_nsec3: "{{ _patch.dnssec_use_nsec3 | d(omit) }}"
+      status: "{{ _patch.status | d('active') }}"
+    body_format: json
+    headers:
+      authorization: "Bearer {{ dnssec_api_token }}"
+    method: PATCH
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
+          _patch.zone_id ~
+          '/dnssec' }}"
+  loop: "{{ dnssec_list }}"
+  loop_control:
+    label: "{{ _patch.zone_id | d(none) }}"
+    loop_var: _patch
+  changed_when: true
+  when:
+    - dnssec_api_token is not none
+    - _patch.zone_id is defined
+...
