@@ -31,10 +31,10 @@ releases:
   2.0.0:
     changes:
       breaking_changes:
-        - network - role deprecated
-        - scrape_shield - role deprecated
-        - security - role deprecated
-        - ssl - role deprecated
+        - network - deprecated
+        - scrape_shield - deprecated
+        - security - deprecated
+        - ssl - deprecated
         - access_apps - renamed from access_app
         - access_apps_info - renamed from access_app_info
         - access_groups - renamed from access_group

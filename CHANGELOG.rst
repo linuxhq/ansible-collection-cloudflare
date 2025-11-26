@@ -83,7 +83,7 @@ Breaking Changes / Porting Guide
 - accounts_info - renamed from account_info
 - cfd_tunnel - renamed from tunnel
 - cfd_tunnel_info - renamed from tunnel_info
-- network - role deprecated
+- network - deprecated
 - pagerules - renamed from page_rule
 - pagerules_info - renamed from page_rule_info
 - pages_projects - merged pages_domain and pages_projects roles
@@ -92,9 +92,9 @@ Breaking Changes / Porting Guide
 - rules_lists_info - renamed from rule_list_info
 - rulesets - renamed from ruleset_entrypoint
 - rulesets_info - renamed from ruleset_entrypoint_info
-- scrape_shield - role deprecated
-- security - role deprecated
-- ssl - role deprecated
+- scrape_shield - deprecated
+- security - deprecated
+- ssl - deprecated
 - zones - renamed from zone
 - zones_info - renamed from zone_info
 
