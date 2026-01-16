@@ -4,6 +4,20 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.0.4
+======
+
+Release Summary
+---------------
+
+This release introduces new role access_identity_providers_info
+
+Minor Changes
+-------------
+
+- access_identity_providers_info - initial commit
+- access_policies - add meta dependency access_identity_providers_info
+
 v2.0.3
 ======
 

@@ -1,0 +1,4 @@
+---
+access_identity_providers_info_account_id: "{{ _accounts_info_id }}"
+access_identity_providers_info_api_token: "{{ cloudflare_api_token }}"
+...

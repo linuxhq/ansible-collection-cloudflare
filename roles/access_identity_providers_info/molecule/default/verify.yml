@@ -1,0 +1,16 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - access_identity_providers_info
+
+  post_tasks:
+    - name: Ensure cloudflare access identity providers information is verified
+      tags:
+        - access_identity_providers_info
+      ansible.builtin.assert:
+        that:
+          - _access_identity_providers_info_dict | length > 0
+          - _access_identity_providers_info_list | length > 0
+          - _access_identity_providers_info_dict['onetimepin'].id is defined
+...
