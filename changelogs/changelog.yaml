@@ -1,6 +1,13 @@
 ---
 ancestor: null
 releases:
+  2.0.4:
+    changes:
+      minor_changes:
+        - access_identity_providers_info - initial commit
+        - access_policies - add meta dependency access_identity_providers_info
+      release_summary: >-
+        This release introduces new role access_identity_providers_info
   2.0.3:
     changes:
       minor_changes:

@@ -36,10 +36,22 @@ provisioner:
                   token_id: "{{ _access_service_tokens_info_dict['linuxhq.dev'].id }}"
             is_default: false
 
+        access_identity_providers_info_account_id: "{{ _accounts_info_id }}"
+        access_identity_providers_info_api_token: "{{ accounts_info_api_token }}"
+
         access_policies_account_id: "{{ _accounts_info_id }}"
         access_policies_api_token: "{{ accounts_info_api_token }}"
         access_policies_list:
-          - name: linuxhq.dev
+          - name: linuxhq-dev-email
+            decision: allow
+            include:
+              - email:
+                  email: molecule@linuxhq.dev
+            require:
+              - login_method:
+                  id: "{{ _access_identity_providers_info_dict['onetimepin'].id }}"
+
+          - name: linuxhq-dev-group
             decision: non_identity
             include:
               - group:

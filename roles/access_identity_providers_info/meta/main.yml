@@ -1,13 +1,12 @@
 ---
+allow_duplicates: true
 dependencies:
-  - role: access_groups_info
-    tags: access_policies
-  - role: access_identity_providers_info
-    tags: access_policies
+  - role: accounts_info
+    tags: access_identity_providers_info
 galaxy_info:
-  role_name: access_policies
+  role_name: access_identity_providers_info
   author: Taylor Kimball
-  description: Manage cloudflare access policies
+  description: Gather information about cloudflare access identity providers
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
@@ -21,5 +20,7 @@ galaxy_info:
   galaxy_tags:
     - access
     - cloudflare
-    - policies
+    - identity
+    - info
+    - providers
 ...
