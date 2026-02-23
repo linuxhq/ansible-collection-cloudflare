@@ -1,0 +1,76 @@
+---
+- name: Ensure cloudflare cfd tunnel information is gathered
+  tags:
+    - cfd_tunnel_configurations_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ cfd_tunnel_configurations_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          cfd_tunnel_configurations_info_account_id ~
+          '/cfd_tunnel?is_deleted=false' }}"
+  register: __cfd_tunnel_configurations_info_query
+  check_mode: false
+  when:
+    - cfd_tunnel_configurations_info_account_id is not none
+    - cfd_tunnel_configurations_info_api_token is not none
+
+- name: Ensure list of cloudflare cfd tunnel information is generated
+  tags:
+    - cfd_tunnel_configurations_info
+  ansible.builtin.set_fact:
+    __cfd_tunnel_configurations_info_list:
+      "{{ __cfd_tunnel_configurations_info_query.json.result |
+          d([]) }}"
+
+- name: Ensure cloudflare cfd tunnel configurations information is gathered
+  tags:
+    - cfd_tunnel_configurations_info
+  ansible.builtin.uri:
+    headers:
+      Authorization: "Bearer {{ cfd_tunnel_configurations_info_api_token }}"
+    method: GET
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          cfd_tunnel_configurations_info_account_id ~
+          '/cfd_tunnel/' ~
+          _configuration.id ~
+          '/configurations' }}"
+  register: __cfd_tunnel_configurations_info_query_config
+  loop: "{{ __cfd_tunnel_configurations_info_list }}"
+  loop_control:
+    label: "{{ _configuration.name | d(none) }}"
+    loop_var: _configuration
+  check_mode: false
+  when:
+    - cfd_tunnel_configurations_info_account_id is not none
+    - cfd_tunnel_configurations_info_api_token is not none
+    - _configuration.id is defined
+
+- name: Ensure list of cloudflare cfd tunnel configurations information is generated
+  tags:
+    - cfd_tunnel_configurations_info
+  ansible.builtin.set_fact:
+    _cfd_tunnel_configurations_info_list:
+      "{{ (__cfd_tunnel_configurations_info_query_config.results |
+          json_query('[].{
+            name: _configuration.name,
+            config: json.result.config
+          }')) |
+          d([]) }}"
+
+- name: Ensure dict of cloudflare cfd tunnel configurations information is generated
+  tags:
+    - cfd_tunnel_configurations_info
+  ansible.builtin.set_fact:
+    _cfd_tunnel_configurations_info_dict:
+      "{{ (dict(_cfd_tunnel_configurations_info_list |
+               json_query('[].name') |
+               zip(_cfd_tunnel_configurations_info_list))) |
+          d({}) }}"
+...

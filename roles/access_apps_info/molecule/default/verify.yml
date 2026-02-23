@@ -6,8 +6,6 @@
 
   post_tasks:
     - name: Ensure cloudflare access apps information is verified
-      tags:
-        - access_apps_info
       ansible.builtin.assert:
         that:
           - _access_apps_info_dict | length > 0

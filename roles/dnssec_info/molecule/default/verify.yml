@@ -6,8 +6,6 @@
 
   post_tasks:
     - name: Ensure cloudflare dnssec information is verified
-      tags:
-        - dnssec_info
       ansible.builtin.assert:
         that:
           - _dnssec_info_dict | length > 0

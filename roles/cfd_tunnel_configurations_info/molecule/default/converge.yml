@@ -1,0 +1,14 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: cfd_tunnel
+      tags:
+        - molecule-idempotence-notest
+
+    - role: cfd_tunnel_configurations
+      tags:
+        - molecule-idempotence-notest
+
+    - cfd_tunnel_configurations_info
+...

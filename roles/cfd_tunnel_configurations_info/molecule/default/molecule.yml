@@ -1,0 +1,76 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../requirements.yml
+
+driver:
+  name: vagrant
+
+platforms:
+  - name: almalinux9
+    box: bento/almalinux-9.6
+    cpus: 4
+    memory: 4096
+
+provisioner:
+  name: ansible
+  log: true
+  options:
+    diff: true
+  inventory:
+    group_vars:
+      all:
+        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+        accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+
+        cfd_tunnel_account_id: "{{ _accounts_info_id }}"
+        cfd_tunnel_api_token: "{{ accounts_info_api_token }}"
+        cfd_tunnel_list:
+          - name: linuxhq.dev-remote
+            config_src: cloudflare
+
+        cfd_tunnel_info_account_id: "{{ _accounts_info_id }}"
+        cfd_tunnel_info_api_token: "{{ accounts_info_api_token }}"
+
+        cfd_tunnel_configurations_account_id: "{{ _accounts_info_id }}"
+        cfd_tunnel_configurations_api_token: "{{ accounts_info_api_token }}"
+        cfd_tunnel_configurations_list:
+          - tunnel_id: "{{ _cfd_tunnel_info_dict['linuxhq.dev-remote'].id }}"
+            config:
+              ingress:
+                - hostname: molecule-a.linuxhq.dev
+                  originRequest:
+                    http2Origin: true
+                    originServerName: molecule-a.linuxhq.dev
+                  service: https://nginx:8443
+                - hostname: molecule-b.linuxhq.dev
+                  originRequest:
+                    http2Origin: true
+                    originServerName: molecule-b.linuxhq.dev
+                  service: https://nginx:8443
+                - service: http_status:404
+
+        cfd_tunnel_configurations_info_account_id: "{{ _accounts_info_id }}"
+        cfd_tunnel_configurations_info_api_token: "{{ accounts_info_api_token }}"
+
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - converge
+    - check
+    - verify
+    - cleanup
+    - destroy
+
+verifier:
+  name: ansible
+  options:
+    diff: true
+...

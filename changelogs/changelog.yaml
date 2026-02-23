@@ -1,19 +1,31 @@
 ---
 ancestor: null
 releases:
+  2.0.5:
+    changes:
+      breaking_changes:
+        - cfd_tunnel - must define config_src for each tunnel in inventory
+      minor_changes:
+        - all - remove box_architecture from molecule config
+        - all - remove tags from molecule verify plays
+        - cfd_tunnel - add support for cloudflare managed tunnels
+        - cfd_tunnel_configurations - initial commit
+        - cfd_tunnel_configurations_info - initial commit
+      release_summary:
+        This release adds support for cloudflare managed tunnels
   2.0.4:
     changes:
       minor_changes:
         - access_identity_providers_info - initial commit
         - access_policies - add meta dependency access_identity_providers_info
-      release_summary: >-
+      release_summary:
         This release introduces new role access_identity_providers_info
   2.0.3:
     changes:
       minor_changes:
         - dnssec - initial commit
         - dnssec_info - initial commit
-      release_summary: >-
+      release_summary:
         This release introduces two new cloudflare dnssec related roles
   2.0.2:
     changes:
@@ -26,7 +38,7 @@ releases:
         - warp_connector_info - initial commit
         - zerotrust_connectivity_settings - initial commit
         - zerotrust_connectivity_settings_info - initial commit
-      release_summary: >-
+      release_summary:
         This release introduces eight new cloudflare warp related roles
   2.0.1:
     changes:
@@ -70,12 +82,12 @@ releases:
         - added state support to all applicable roles
         - addition of purge_cache role
         - updated ansible-lint configuration to have no exclusions
-      release_summary: >-
+      release_summary:
         This release restructures the entire collection.  All inventory and playbooks
         will need to be updated if you plan to use this and future releases.  Please
         see the examples provided.
   1.2.0:
     changes:
-      release_summary: >-
+      release_summary:
         All 1.x.x releases are now considered deprecated and will no longer receive updates.  Please see release 2.0.0
 ...

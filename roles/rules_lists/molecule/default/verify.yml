@@ -4,8 +4,6 @@
 
   pre_tasks:
     - name: Ensure inventory lists are formatted
-      tags:
-        - rules_lists
       ansible.builtin.set_fact:
         rules_lists_list:
           "{{ rules_lists_list |

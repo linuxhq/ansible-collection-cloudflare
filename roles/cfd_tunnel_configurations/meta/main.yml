@@ -1,0 +1,25 @@
+---
+dependencies:
+  - role: accounts_info
+    tags: cfd_tunnel_configurations
+  - role: cfd_tunnel_info
+    tags: cfd_tunnel_configurations
+galaxy_info:
+  role_name: cfd_tunnel_configurations
+  author: Taylor Kimball
+  description: Manage cloudflare cfd tunnel configurations
+  license: GPL-3.0-or-later
+  min_ansible_version: 2.15.0
+  namespace: linuxhq
+  platforms:
+    - name: GenericLinux
+      versions:
+        - all
+    - name: macOS
+      versions:
+        - all
+  galaxy_tags:
+    - cloudflare
+    - configurations
+    - tunnel
+...
