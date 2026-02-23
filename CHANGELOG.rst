@@ -4,6 +4,28 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.0.5
+======
+
+Release Summary
+---------------
+
+This release adds support for cloudflare managed tunnels
+
+Minor Changes
+-------------
+
+- all - remove box_architecture from molecule config
+- all - remove tags from molecule verify plays
+- cfd_tunnel - add support for cloudflare managed tunnels
+- cfd_tunnel_configurations - initial commit
+- cfd_tunnel_configurations_info - initial commit
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- cfd_tunnel - must define config_src for each tunnel in inventory
+
 v2.0.4
 ======
 
