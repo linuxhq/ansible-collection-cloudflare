@@ -6,8 +6,6 @@
 
   post_tasks:
     - name: Ensure cloudflare rules lists information is verified
-      tags:
-        - rules_lists_info
       ansible.builtin.assert:
         that:
           - _rules_lists_info_dict | length > 0

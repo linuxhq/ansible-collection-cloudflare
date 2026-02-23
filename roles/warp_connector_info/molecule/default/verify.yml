@@ -6,8 +6,6 @@
 
   post_tasks:
     - name: Ensure cloudflare warp connector information is verified
-      tags:
-        - warp_connector_info
       ansible.builtin.assert:
         that:
           - _warp_connector_info_dict | length > 0

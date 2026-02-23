@@ -1,0 +1,30 @@
+---
+- name: Ensure cloudflare cfd tunnel configurations are managed
+  tags:
+    - cfd_tunnel_configurations
+  ansible.builtin.uri:
+    body:
+      config: "{{ _put.config }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ cfd_tunnel_configurations_api_token }}"
+    method: PUT
+    status_code:
+      - 200
+    url:
+      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
+          cfd_tunnel_configurations_account_id ~
+          '/cfd_tunnel/' ~
+          _put.tunnel_id ~
+          '/configurations' }}"
+  loop: "{{ cfd_tunnel_configurations_list }}"
+  loop_control:
+    label: "{{ _put.tunnel_id | d(none) }}"
+    loop_var: _put
+  changed_when: true
+  when:
+    - cfd_tunnel_configurations_account_id is not none
+    - cfd_tunnel_configurations_api_token is not none
+    - _put.config is defined
+    - _put.tunnel_id is defined
+...

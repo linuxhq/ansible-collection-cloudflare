@@ -6,8 +6,6 @@
 
   post_tasks:
     - name: Ensure cloudflare devices policy information is verified
-      tags:
-        - devices_policy_info
       ansible.builtin.assert:
         that:
           - _devices_policy_info_dict is defined

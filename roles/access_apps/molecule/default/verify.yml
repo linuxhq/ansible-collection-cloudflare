@@ -4,8 +4,6 @@
 
   pre_tasks:
     - name: Ensure roles are included
-      tags:
-        - access_apps
       ansible.builtin.include_role:
         name: "{{ _role }}"
       loop:
@@ -17,8 +15,6 @@
         loop_var: _role
 
     - name: Ensure inventory lists are formatted
-      tags:
-        - access_policy
       ansible.builtin.set_fact:
         access_apps_list:
           "{{ access_apps_list |

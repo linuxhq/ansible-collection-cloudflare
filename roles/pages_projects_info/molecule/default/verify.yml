@@ -6,8 +6,6 @@
 
   post_tasks:
     - name: Ensure cloudflare pages projects information is verified
-      tags:
-        - pages_projects_info
       ansible.builtin.assert:
         that:
           - _pages_projects_info_dict | length > 0

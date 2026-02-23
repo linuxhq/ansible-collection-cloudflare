@@ -4,8 +4,6 @@
 
   pre_tasks:
     - name: Ensure roles are included
-      tags:
-        - pagerules
       ansible.builtin.include_role:
         name: "{{ _role }}"
       loop:
@@ -15,8 +13,6 @@
         loop_var: _role
 
     - name: Ensure inventory lists are formatted
-      tags:
-        - pagerules
       ansible.builtin.set_fact:
         pagerules_list:
           "{{ pagerules_list |
