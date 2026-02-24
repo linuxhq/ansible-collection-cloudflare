@@ -11,5 +11,5 @@ cfd_tunnel_list:
     tunnel_secret: YjNhS3ZzQ0puNzNxdFljY0VmbkpGdWlOb3M3dWNxUlJ5YmhVUkx6S2NUNFBZN3k3bUZUb21McnUzd1BhTkh2aQo=
 
   - name: "{{ cloudflare_domain }}-remote"
-    config_src: cloudflare"
+    config_src: cloudflare
 ...
