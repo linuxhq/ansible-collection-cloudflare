@@ -37,9 +37,10 @@ scenario:
     - syntax
     - create
     - prepare
-    - converge
+    - check
     - converge
     - check
+    - idempotence
     - verify
     - cleanup
     - destroy

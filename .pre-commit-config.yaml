@@ -4,15 +4,23 @@ default_stages:
 
 repos:
   - repo: https://github.com/ansible/ansible-lint.git
-    rev: v25.11.0
+    rev: v26.2.0
     hooks:
       - id: ansible-lint
         files: \.(yaml|yml)$
         language_version: python3
         verbose: true
 
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 26.3.1
+    hooks:
+      - id: black
+        exclude: ^venv/
+        files: \.(py)$
+        verbose: true
+
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.37.1
+    rev: v1.38.0
     hooks:
       - id: yamllint
         files: \.(yaml|yml)$

@@ -1,6 +1,6 @@
 # rulesets
 
-[![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
+[![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](https://www.gnu.org/licenses/gpl-3.0.txt)
 
 Manage cloudflare rulesets
 
@@ -8,7 +8,7 @@ Application programming interface -> [rulesets](https://developers.cloudflare.co
 
 ## Requirements
 
-* Cloudflare api `Token` with `Edit` permissions to `Zone: Zone WAF`
+* Cloudflare api `Token` with `Write` permissions to `Account WAF`
 
 ## Role Variables
 
@@ -43,20 +43,3 @@ Application programming interface -> [rulesets](https://developers.cloudflare.co
                   enabled: true
                   expression: >-
                     (cf.client.bot)
-
-## License
-
-Copyright (c) Linux HeadQuarters
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <http://www.gnu.org/licenses/>.

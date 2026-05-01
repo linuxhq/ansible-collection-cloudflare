@@ -26,8 +26,24 @@ provisioner:
         access_service_tokens_account_id: "{{ _accounts_info_id }}"
         access_service_tokens_api_token: "{{ accounts_info_api_token }}"
         access_service_tokens_list:
-          - name: linuxhq.dev
+          - name: molecule-00
             duration: forever
+          - name: molecule-01
+          - name: molecule-02
+            duration: forever
+          - name: molecule-03
+          - name: molecule-04
+            duration: forever
+          - name: molecule-05
+          - name: molecule-06
+            duration: forever
+          - name: molecule-07
+          - name: molecule-08
+            duration: forever
+          - name: molecule-09
+          - name: molecule-10
+            duration: forever
+          - name: molecule-11
 
 scenario:
   test_sequence:
@@ -37,9 +53,10 @@ scenario:
     - syntax
     - create
     - prepare
-    - converge
+    - check
     - converge
     - check
+    - idempotence
     - verify
     - cleanup
     - destroy
