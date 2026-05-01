@@ -1,6 +1,6 @@
 # pagerules\_info
 
-[![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](COPYING)
+[![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](https://www.gnu.org/licenses/gpl-3.0.txt)
 
 Gather information about cloudflare pagerules
 
@@ -8,7 +8,7 @@ Application programming interface -> [pagerules](https://developers.cloudflare.c
 
 ## Requirements
 
-* Cloudflare api `Token` with `View` permissions to `Zone Settings`
+* Cloudflare api `Token` with `Read` permissions to `Page Rules`
 
 ## Role Variables
 
@@ -26,20 +26,3 @@ Application programming interface -> [pagerules](https://developers.cloudflare.c
       roles:
         - role: linuxhq.cloudflare.pagerules_info
           pagerules_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-
-## License
-
-Copyright (c) Linux HeadQuarters
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <http://www.gnu.org/licenses/>.

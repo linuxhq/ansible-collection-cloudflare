@@ -1,0 +1,54 @@
+---
+- name: Ensure cloudflare access service tokens are managed
+  tags:
+    - access_service_tokens
+  linuxhq.cloudflare.access_service_tokens:
+    account_id: "{{ access_service_tokens_account_id }}"
+    api_token: "{{ access_service_tokens_api_token }}"
+    duration: "{{ _service_token.duration | d(omit) }}"
+    name: "{{ _service_token.name }}"
+    state: "{{ _service_token.state | d('present') }}"
+  register: __access_service_tokens_result
+  loop: "{{ __access_service_tokens_list }}"
+  loop_control:
+    label: "{{ _service_token.name | d(none) }}"
+    loop_var: _service_token
+  async: "{{ ansible_check_mode | ternary(0, access_service_tokens_async) }}"
+  poll: "{{ access_service_tokens_poll }}"
+  when:
+    - access_service_tokens_account_id is not none
+    - access_service_tokens_api_token is not none
+    - _service_token.name is defined
+  changed_when:
+    - ansible_check_mode | bool
+    - __access_service_tokens_result.changed | bool
+
+- name: Ensure managed cloudflare access service token jobs are complete
+  tags:
+    - access_service_tokens
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __access_service_tokens_status
+  loop: "{{ __access_service_tokens_result.results }}"
+  loop_control:
+    label: "{{ _jid._service_token.name | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __access_service_tokens_status.finished | bool
+  retries: "{{ access_service_tokens_retries }}"
+  delay: "{{ access_service_tokens_delay }}"
+
+- name: Ensure cloudflare access service tokens are displayed
+  tags:
+    - access_service_tokens
+  ansible.builtin.debug:
+    msg: |
+      {{ __access_service_tokens_status.results |
+         d([]) |
+         json_query("[?changed && _jid._service_token.state != 'absent'].service_token") |
+         to_nice_yaml(indent=2) }}
+  when:
+    - access_service_tokens_display | bool
+...

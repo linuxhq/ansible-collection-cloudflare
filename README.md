@@ -17,6 +17,11 @@ A collection of cloudflare roles
 
     ansible-galaxy collection install linuxhq.cloudflare
 
+## Requirements
+
+* Python `>= 3.9`
+* `cloudflare >= 4.3.1, < 5`
+
 # Examples
 
 Example playbooks and inventory can be found [here](examples/)
@@ -33,17 +38,17 @@ If you plan to utilize all the roles in this collection you'll need the followin
 
 | Type    | Permission                                            | Value |
 | ------- | ----------------------------------------------------- | ----- |
-| Account | Access: Apps and Policies                             | Edit  |
-| Account | Access: Organizations, Identity Providers, and Groups | Edit  |
-| Account | Access: Service Tokens                                | Edit  |
+| Account | Access: Apps and Policies                             | Write |
+| Account | Access: Organizations, Identity Providers, and Groups | Write |
+| Account | Access: Service Tokens                                | Write |
 | Account | Account Filter Lists                                  | Edit  |
 | Account | Account Settings                                      | Read  |
-| Account | Cloudflare Tunnel                                     | Edit  |
-| Account | Cloudflare One Connector: WARP                        | Edit  |
-| Account | Zero Trust                                            | Edit  |
+| Account | Account WAF                                           | Write |
+| Account | Cloudflare Pages                                      | Write |
+| Account | Cloudflare Tunnel                                     | Write |
+| Account | Cloudflare One Connector: WARP                        | Write |
+| Account | Zero Trust                                            | Write |
 | Zone    | Cache Purge                                           | Purge |
-| Zone    | DNS                                                   | Edit  |
-| Zone    | Page Rules                                            | Edit  |
-| Zone    | Zone                                                  | Edit  |
-| Zone    | Zone Settings                                         | Edit  |
-| Zone    | Zone WAF                                              | Edit  |
+| Zone    | DNS                                                   | Write |
+| Zone    | Page Rules                                            | Write |
+| Zone    | Zone                                                  | Write |

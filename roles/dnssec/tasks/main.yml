@@ -4,7 +4,7 @@
     - dnssec
   ansible.builtin.uri:
     body:
-      dnssec_multi_signer: "{{ _patch.dnssec_multi_signer | d(omit )}}"
+      dnssec_multi_signer: "{{ _patch.dnssec_multi_signer | d(omit) }}"
       dnssec_presigned: "{{ _patch.dnssec_presigned | d(omit) }}"
       dnssec_use_nsec3: "{{ _patch.dnssec_use_nsec3 | d(omit) }}"
       status: "{{ _patch.status | d('active') }}"
