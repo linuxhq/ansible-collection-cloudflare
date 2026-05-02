@@ -4,8 +4,6 @@
 
 Manage cloudflare dns records
 
-Application programming interface -> [dns](https://developers.cloudflare.com/api/resources/dns/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `DNS`

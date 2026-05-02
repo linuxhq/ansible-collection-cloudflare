@@ -4,8 +4,6 @@
 
 Manage cloudflare rulesets
 
-Application programming interface -> [rulesets](https://developers.cloudflare.com/api/resources/rulesets/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Account WAF`

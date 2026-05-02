@@ -4,8 +4,6 @@
 
 Gather information about cloudflare rulesets
 
-Application programming interface -> [rulesets](https://developers.cloudflare.com/api/resources/rulesets/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Account WAF`

@@ -4,8 +4,6 @@
 
 Gather information about cloudflare rules lists
 
-Application programming interface -> [rules](https://developers.cloudflare.com/api/resources/rules/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Account Filter Lists`

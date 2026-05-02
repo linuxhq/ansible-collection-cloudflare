@@ -4,8 +4,6 @@
 
 Gather information about cloudflare pages projects
 
-Application programming interface -> [projects](https://developers.cloudflare.com/api/resources/pages/subresources/projects/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Cloudflare Pages`

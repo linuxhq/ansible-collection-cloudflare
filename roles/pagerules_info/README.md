@@ -4,8 +4,6 @@
 
 Gather information about cloudflare pagerules
 
-Application programming interface -> [pagerules](https://developers.cloudflare.com/api/resources/page_rules/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Page Rules`

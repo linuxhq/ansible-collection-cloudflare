@@ -4,10 +4,9 @@
 
 Gather information about cloudflare dnssec settings
 
-Application programming interface -> [dnssec](https://developers.cloudflare.com/api/resources/dns/subresources/dnssec/)
-
 ## Requirements
 
+* Cloudflare api `Token` with `Read` permissions to `Zone`
 * Cloudflare api `Token` with `Read` permissions to `DNS`
 
 ## Role Variables

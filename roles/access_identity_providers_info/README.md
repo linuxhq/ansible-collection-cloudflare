@@ -4,8 +4,6 @@
 
 Gather information about cloudflare access identity providers
 
-Application programming interface -> [identity\_providers](https://developers.cloudflare.com/api/resources/zero_trust/subresources/identity_providers/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Access: Organizations, Identity Providers, and Groups`

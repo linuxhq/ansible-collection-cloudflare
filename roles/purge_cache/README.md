@@ -4,8 +4,6 @@
 
 Manage cloudflare purging of cache
 
-Application programming interface -> [cache](https://developers.cloudflare.com/api/resources/cache/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Purge` permissions to `Cache Purge`

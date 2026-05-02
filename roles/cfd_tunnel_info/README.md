@@ -4,8 +4,6 @@
 
 Gather information about cloudflare cfd tunnels
 
-Application programming interface -> [tunnels](https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Cloudflare Tunnel`

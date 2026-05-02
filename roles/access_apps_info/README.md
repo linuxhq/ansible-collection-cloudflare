@@ -4,8 +4,6 @@
 
 Gather information about cloudflare access apps
 
-Application programming interface -> [access](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Access: Apps and Policies`

@@ -4,8 +4,6 @@
 
 Manage cloudflare devices settings
 
-Application programming interface -> [zero\_trust](https://developers.cloudflare.com/api/resources/zero_trust/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Zero Trust`
