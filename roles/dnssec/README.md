@@ -4,8 +4,6 @@
 
 Manage cloudflare dnssec settings
 
-Application programming interface -> [dnssec](https://developers.cloudflare.com/api/resources/dns/subresources/dnssec/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `DNS`
@@ -13,7 +11,12 @@ Application programming interface -> [dnssec](https://developers.cloudflare.com/
 ## Role Variables
 
     dnssec_api_token: null
+    dnssec_async: 300
+    dnssec_batch: 10
+    dnssec_delay: 3
     dnssec_list: []
+    dnssec_poll: 0
+    dnssec_retries: 100
 
 ## Dependencies
 

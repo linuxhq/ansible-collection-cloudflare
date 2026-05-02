@@ -1,0 +1,42 @@
+---
+- name: Ensure cloudflare dnssec settings are managed
+  tags:
+    - dnssec
+  linuxhq.cloudflare.dnssec:
+    api_token: "{{ dnssec_api_token }}"
+    dnssec_multi_signer: "{{ _dnssec.dnssec_multi_signer | d(omit) }}"
+    dnssec_presigned: "{{ _dnssec.dnssec_presigned | d(omit) }}"
+    dnssec_use_nsec3: "{{ _dnssec.dnssec_use_nsec3 | d(omit) }}"
+    status: "{{ _dnssec.status | d('active') }}"
+    zone_id: "{{ _dnssec.zone_id }}"
+  register: __dnssec_result
+  loop: "{{ __dnssec_list }}"
+  loop_control:
+    label: "{{ _dnssec.zone_id | d(none) }}"
+    loop_var: _dnssec
+  async: "{{ ansible_check_mode | ternary(0, dnssec_async) }}"
+  poll: "{{ dnssec_poll }}"
+  when:
+    - dnssec_api_token is not none
+    - _dnssec.zone_id is defined
+  changed_when:
+    - ansible_check_mode | bool
+    - __dnssec_result.changed | bool
+
+- name: Ensure managed cloudflare dnssec jobs are complete
+  tags:
+    - dnssec
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __dnssec_status
+  loop: "{{ __dnssec_result.results }}"
+  loop_control:
+    label: "{{ _jid._dnssec.zone_id | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __dnssec_status.finished | bool
+  retries: "{{ dnssec_retries }}"
+  delay: "{{ dnssec_delay }}"
+...

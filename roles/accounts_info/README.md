@@ -4,8 +4,6 @@
 
 Gather information about cloudflare accounts
 
-Application programming interface -> [accounts](https://developers.cloudflare.com/api/resources/accounts/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Account Settings`

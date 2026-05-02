@@ -4,8 +4,6 @@
 
 Manage cloudflare cfd tunnels
 
-Application programming interface -> [tunnels](https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Cloudflare Tunnel`

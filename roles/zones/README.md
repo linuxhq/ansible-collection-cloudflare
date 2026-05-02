@@ -4,8 +4,6 @@
 
 Manage cloudflare zones
 
-Application programming interface -> [zones](https://developers.cloudflare.com/api/resources/zones/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Zone`

@@ -4,8 +4,6 @@
 
 Manage cloudflare page rules
 
-Application programming interface -> [pagerules](https://developers.cloudflare.com/api/resources/page_rules/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Page Rules`

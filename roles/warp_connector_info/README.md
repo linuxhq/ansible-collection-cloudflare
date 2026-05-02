@@ -4,8 +4,6 @@
 
 Gather information about cloudflare warp connectors
 
-Application programming interface -> [tunnels](https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Cloudflare One Connector: WARP`

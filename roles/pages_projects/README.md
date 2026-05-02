@@ -4,8 +4,6 @@
 
 Manage cloudflare pages projects
 
-Application programming interface -> [projects](https://developers.cloudflare.com/api/resources/pages/subresources/projects/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Cloudflare Pages`

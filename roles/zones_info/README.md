@@ -4,8 +4,6 @@
 
 Gather information about cloudflare zones
 
-Application programming interface -> [zones](https://developers.cloudflare.com/api/resources/zones/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Zone`

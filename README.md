@@ -52,3 +52,4 @@ If you plan to utilize all the roles in this collection you'll need the followin
 | Zone    | DNS                                                   | Write |
 | Zone    | Page Rules                                            | Write |
 | Zone    | Zone                                                  | Write |
+| Zone    | Zone                                                  | Read  |

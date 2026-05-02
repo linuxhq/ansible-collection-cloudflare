@@ -4,8 +4,6 @@
 
 Manage cloudflare access groups
 
-Application programming interface -> [access](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/)
-
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Access: Organizations, Identity Providers, and Groups`

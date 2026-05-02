@@ -1,4 +1,9 @@
 ---
 dnssec_api_token: null
+dnssec_async: 300
+dnssec_batch: 10
+dnssec_delay: 3
 dnssec_list: []
+dnssec_poll: 0
+dnssec_retries: 100
 ...
