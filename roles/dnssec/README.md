@@ -20,7 +20,7 @@ Manage cloudflare dnssec settings
 
 ## Dependencies
 
-* [linuxhq.cloudflare.zones\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zones_info)
+* [zones\_info](../zones_info)
 
 ## Example Playbook
 
@@ -28,7 +28,6 @@ Manage cloudflare dnssec settings
       connection: local
       roles:
         - role: linuxhq.cloudflare.dnssec
-          zones_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           dnssec_api_token: "{{ zones_info_api_token }}"
           dnssec_list:
             - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"

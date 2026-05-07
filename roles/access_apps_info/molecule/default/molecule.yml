@@ -23,8 +23,64 @@ provisioner:
       all:
         accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
         accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+
         access_apps_info_account_id: "{{ _accounts_info_id }}"
         access_apps_info_api_token: "{{ accounts_info_api_token }}"
+
+        access_groups_info_account_id: "{{ _accounts_info_id }}"
+        access_groups_info_api_token: "{{ accounts_info_api_token }}"
+
+        access_identity_providers_info_account_id: "{{ _accounts_info_id }}"
+        access_identity_providers_info_api_token: "{{ accounts_info_api_token }}"
+
+        access_policies_info_account_id: "{{ _accounts_info_id }}"
+        access_policies_info_api_token: "{{ accounts_info_api_token }}"
+
+        access_service_tokens_info_account_id: "{{ _accounts_info_id }}"
+        access_service_tokens_info_api_token: "{{ accounts_info_api_token }}"
+
+        access_apps_account_id: "{{ _accounts_info_id }}"
+        access_apps_api_token: "{{ accounts_info_api_token }}"
+        access_apps_list:
+          - name: linuxhq.dev
+            domain: linuxhq.dev
+            destinations:
+              - type: public
+                uri: linuxhq.dev
+              - type: public
+                uri: molecule-00.linuxhq.dev
+              - type: public
+                uri: molecule-01.linuxhq.dev
+            policies:
+              - id: "{{ _access_policies_info_dict['molecule-00-email'].id }}"
+            type: self_hosted
+
+        access_groups_account_id: "{{ _accounts_info_id }}"
+        access_groups_api_token: "{{ accounts_info_api_token }}"
+        access_groups_list:
+          - name: molecule-00
+            include:
+              - service_token:
+                  token_id: "{{ _access_service_tokens_info_dict['molecule-00'].id }}"
+            is_default: false
+
+        access_policies_account_id: "{{ _accounts_info_id }}"
+        access_policies_api_token: "{{ accounts_info_api_token }}"
+        access_policies_list:
+          - name: molecule-00-email
+            decision: allow
+            include:
+              - email:
+                  email: email@molecule.org
+            require:
+              - login_method:
+                  id: "{{ _access_identity_providers_info_dict['onetimepin'].id }}"
+
+        access_service_tokens_account_id: "{{ _accounts_info_id }}"
+        access_service_tokens_api_token: "{{ accounts_info_api_token }}"
+        access_service_tokens_list:
+          - name: molecule-00
+            duration: forever
 
 scenario:
   test_sequence:

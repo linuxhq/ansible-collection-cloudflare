@@ -15,7 +15,7 @@ Gather information about cloudflare access identity providers
 
 ## Dependencies
 
-* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
+* [accounts\_info](../accounts_info)
 
 ## Return Values
 
@@ -28,7 +28,5 @@ Gather information about cloudflare access identity providers
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_identity_providers_info
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
           access_identity_providers_info_account_id: "{{ _accounts_info_id }}"
           access_identity_providers_info_api_token: "{{ accounts_info_api_token }}"

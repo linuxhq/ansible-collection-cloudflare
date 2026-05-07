@@ -1,13 +1,51 @@
 ---
 - name: Verify
   hosts: all
+
   roles:
+    - access_groups_info
+    - access_identity_providers_info
     - access_policies_info
+    - access_service_tokens_info
 
   post_tasks:
-    - name: Ensure cloudflare access policies information is verified
+    - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _access_policies_info_dict | length > 0
-          - _access_policies_info_list | length > 0
+          - _access_policies_info_dict[_item].app_count == 0
+          - _access_policies_info_dict[_item].decision is defined
+          - _access_policies_info_dict[_item].exclude | length == 0
+          - _access_policies_info_dict[_item].include is defined
+          - _access_policies_info_dict[_item].name is defined
+          - _access_policies_info_dict[_item].require is defined
+          - _access_policies_info_dict[_item].uid is defined
+      loop:
+        "{{ access_policies_list |
+            map(attribute='name', default=[]) }}"
+      loop_control:
+        label: "{{ _item | d(none) }}"
+        loop_var: _item
+
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        access_groups_list:
+          "{{ access_groups_list |
+              map('combine', {'state': 'absent'}) }}"
+        access_policies_list:
+          "{{ access_policies_list |
+              map('combine', {'state': 'absent'}) }}"
+        access_service_tokens_list:
+          "{{ access_service_tokens_list |
+              map('combine', {'state': 'absent'}) }}"
+
+    - name: Ensure roles are included
+      ansible.builtin.include_role:
+        name: "{{ _role }}"
+      loop:
+        - access_policies
+        - access_groups
+        - access_service_tokens
+      loop_control:
+        label: "{{ _role | d(none) }}"
+        loop_var: _role
 ...

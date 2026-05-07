@@ -13,44 +13,44 @@ DOCUMENTATION = r"""
 module: dnssec
 short_description: Manage Cloudflare DNSSEC settings
 description:
-  - Manage Cloudflare DNSSEC settings for a zone.
+- Manage Cloudflare DNSSEC settings for a zone.
 author:
-  - Taylor Kimball (@tkimball83)
+- Taylor Kimball (@tkimball83)
 options:
   api_token:
     description:
-      - Cloudflare API token with permissions to manage DNS settings.
+    - Cloudflare API token with permissions to manage DNS settings.
     required: true
     type: str
-    no_log: true
   zone_id:
     description:
-      - Cloudflare zone identifier.
+    - Cloudflare zone identifier.
     required: true
     type: str
   dnssec_multi_signer:
     description:
-      - Whether multi-signer DNSSEC is enabled.
+    - Whether multi-signer DNSSEC is enabled.
     type: bool
   dnssec_presigned:
     description:
-      - Whether presigned DNSSEC is enabled.
+    - Whether presigned DNSSEC is enabled.
     type: bool
   dnssec_use_nsec3:
     description:
-      - Whether NSEC3 is enabled.
+    - Whether NSEC3 is enabled.
     type: bool
   status:
     description:
-      - Desired DNSSEC status.
+    - Desired DNSSEC status.
     type: str
     choices:
-      - active
-      - disabled
+    - active
+    - disabled
     default: active
 requirements:
-  - python >= 3.9
-  - cloudflare >= 4.3.1, < 5
+- python >= 3.9
+- cloudflare >= 4.3.1, < 5
+
 """
 
 EXAMPLES = r"""
@@ -68,6 +68,7 @@ EXAMPLES = r"""
 """
 
 RETURN = r"""
+---
 dnssec:
   description: Cloudflare DNSSEC settings after the requested operation.
   returned: always
@@ -76,62 +77,36 @@ message:
   description: Summary of the action taken.
   returned: always
   type: str
+
 """
 
 from ansible.module_utils.basic import AnsibleModule
 
-try:
-    import cloudflare
-    from cloudflare import Cloudflare
-except ImportError:
-    cloudflare = None
-    Cloudflare = None
+from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    cloudflare_client,
+    serialize_resource,
+)
 
 
-def serialize_resource(resource):
-    if resource is None:
-        return None
+def edit_dnssec(client, params):
+    payload = {
+        "zone_id": params["zone_id"],
+        "status": params["status"],
+    }
 
-    if hasattr(resource, "to_dict"):
-        return resource.to_dict()
+    for field in ("dnssec_multi_signer", "dnssec_presigned", "dnssec_use_nsec3"):
+        if params.get(field) is not None:
+            payload[field] = params[field]
 
-    return resource
-
-
-def fail_from_cloudflare_error(module, message, exc):
-    response = getattr(exc, "response", None)
-    status_code = getattr(exc, "status_code", None)
-    response_body = None
-
-    if response is not None:
-        if hasattr(response, "json"):
-            try:
-                response_body = response.json()
-            except Exception:
-                response_body = None
-        if response_body is None and hasattr(response, "text"):
-            response_body = response.text
-
-    module.fail_json(
-        msg=message,
-        error=str(exc),
-        status_code=status_code,
-        response=response_body,
-    )
+    return client.dns.dnssec.edit(**payload)
 
 
 def get_dnssec(client, zone_id):
     return client.dns.dnssec.get(zone_id=zone_id)
 
 
-def normalize_status(status):
-    if status == "pending":
-        return "active"
-
-    if status == "pending-disabled":
-        return "disabled"
-
-    return status
+def main():
+    run_module()
 
 
 def needs_update(current, params):
@@ -167,17 +142,14 @@ def needs_update(current, params):
     return False
 
 
-def edit_dnssec(client, params):
-    payload = {
-        "zone_id": params["zone_id"],
-        "status": params["status"],
-    }
+def normalize_status(status):
+    if status == "pending":
+        return "active"
 
-    for field in ("dnssec_multi_signer", "dnssec_presigned", "dnssec_use_nsec3"):
-        if params.get(field) is not None:
-            payload[field] = params[field]
+    if status == "pending-disabled":
+        return "disabled"
 
-    return client.dns.dnssec.edit(**payload)
+    return status
 
 
 def run_module():
@@ -197,46 +169,31 @@ def run_module():
         supports_check_mode=True,
     )
 
-    if Cloudflare is None:
-        module.fail_json(
-            msg="The official Cloudflare Python SDK is required for this module",
-            missing_python_package="cloudflare",
-        )
+    with cloudflare_client(module) as client:
+        current = get_dnssec(client, module.params["zone_id"])
+        current_dict = serialize_resource(current)
 
-    try:
-        with Cloudflare(api_token=module.params["api_token"]) as client:
-            current = get_dnssec(client, module.params["zone_id"])
-            current_dict = serialize_resource(current)
+        if not needs_update(current, module.params):
+            module.exit_json(
+                changed=False,
+                message="DNSSEC settings already present",
+                dnssec=current_dict,
+            )
 
-            if not needs_update(current, module.params):
-                module.exit_json(
-                    changed=False,
-                    message="DNSSEC settings already present",
-                    dnssec=current_dict,
-                )
+        if module.check_mode:
+            module.exit_json(
+                changed=True,
+                message="DNSSEC settings would be updated",
+                dnssec=current_dict,
+            )
 
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="DNSSEC settings would be updated",
-                    dnssec=current_dict,
-                )
-
-            dnssec = edit_dnssec(client, module.params)
-    except cloudflare.APIConnectionError as exc:
-        fail_from_cloudflare_error(module, "Cloudflare API connection failed", exc)
-    except cloudflare.APIStatusError as exc:
-        fail_from_cloudflare_error(module, "Cloudflare API request failed", exc)
+        dnssec = edit_dnssec(client, module.params)
 
     module.exit_json(
         changed=True,
         message="DNSSEC settings updated",
         dnssec=serialize_resource(dnssec),
     )
-
-
-def main():
-    run_module()
 
 
 if __name__ == "__main__":

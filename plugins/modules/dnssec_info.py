@@ -13,19 +13,19 @@ DOCUMENTATION = r"""
 module: dnssec_info
 short_description: Gather Cloudflare DNSSEC information
 description:
-  - Gather Cloudflare DNSSEC information for all accessible zones.
+- Gather Cloudflare DNSSEC information for all accessible zones.
 author:
-  - Taylor Kimball (@tkimball83)
+- Taylor Kimball (@tkimball83)
 options:
   api_token:
     description:
-      - Cloudflare API token with permissions to read DNS settings.
+    - Cloudflare API token with permissions to read DNS settings.
     required: true
     type: str
-    no_log: true
 requirements:
-  - python >= 3.9
-  - cloudflare >= 4.3.1, < 5
+- python >= 3.9
+- cloudflare >= 4.3.1, < 5
+
 """
 
 EXAMPLES = r"""
@@ -35,6 +35,7 @@ EXAMPLES = r"""
 """
 
 RETURN = r"""
+---
 dnssec:
   description: List of DNSSEC information by zone.
   returned: always
@@ -45,49 +46,16 @@ skipped_zones:
   returned: always
   type: list
   elements: dict
+
 """
 
 from ansible.module_utils.basic import AnsibleModule
 
-try:
-    import cloudflare
-    from cloudflare import Cloudflare
-except ImportError:
-    cloudflare = None
-    Cloudflare = None
-
-
-def serialize_resource(resource):
-    if resource is None:
-        return None
-
-    if hasattr(resource, "to_dict"):
-        return resource.to_dict()
-
-    return resource
-
-
-def fail_from_cloudflare_error(module, message, exc, **context):
-    response = getattr(exc, "response", None)
-    status_code = getattr(exc, "status_code", None)
-    response_body = None
-
-    if response is not None:
-        if hasattr(response, "json"):
-            try:
-                response_body = response.json()
-            except Exception:
-                response_body = None
-        if response_body is None and hasattr(response, "text"):
-            response_body = response.text
-
-    module.fail_json(
-        msg=message,
-        error=str(exc),
-        status_code=status_code,
-        response=response_body,
-        **context,
-    )
+from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    cloudflare,
+    cloudflare_client,
+    serialize_resource,
+)
 
 
 def build_error_details(exc):
@@ -128,18 +96,6 @@ def iter_zones(page):
     return page or []
 
 
-def list_zones(client):
-    page = client.zones.list(per_page=1000)
-    zones = []
-
-    for zone in iter_zones(page):
-        zone_dict = serialize_resource(zone)
-        if zone_dict.get("id") is not None and zone_dict.get("name") is not None:
-            zones.append({"id": zone_dict["id"], "name": zone_dict["name"]})
-
-    return zones
-
-
 def list_dnssec(client):
     dnssec = []
     skipped_zones = []
@@ -172,9 +128,25 @@ def list_dnssec(client):
     return dnssec, skipped_zones
 
 
+def list_zones(client):
+    page = client.zones.list(per_page=1000)
+    zones = []
+
+    for zone in iter_zones(page):
+        zone_dict = serialize_resource(zone)
+        if zone_dict.get("id") is not None and zone_dict.get("name") is not None:
+            zones.append({"id": zone_dict["id"], "name": zone_dict["name"]})
+
+    return zones
+
+
+def main():
+    run_module()
+
+
 def raise_zone_error(exc, zone, message):
-    setattr(exc, "_dnssec_info_message", message)
-    setattr(exc, "_dnssec_info_context", {"zone": zone})
+    setattr(exc, "_cloudflare_message", message)
+    setattr(exc, "_cloudflare_context", {"zone": zone})
     raise exc
 
 
@@ -186,39 +158,14 @@ def run_module():
         supports_check_mode=True,
     )
 
-    if Cloudflare is None:
-        module.fail_json(
-            msg="The official Cloudflare Python SDK is required for this module",
-            missing_python_package="cloudflare",
-        )
-
-    try:
-        with Cloudflare(api_token=module.params["api_token"]) as client:
-            dnssec, skipped_zones = list_dnssec(client)
-    except cloudflare.APIConnectionError as exc:
-        fail_from_cloudflare_error(
-            module,
-            getattr(exc, "_dnssec_info_message", "Cloudflare API connection failed"),
-            exc,
-            **getattr(exc, "_dnssec_info_context", {}),
-        )
-    except cloudflare.APIStatusError as exc:
-        fail_from_cloudflare_error(
-            module,
-            getattr(exc, "_dnssec_info_message", "Cloudflare API request failed"),
-            exc,
-            **getattr(exc, "_dnssec_info_context", {}),
-        )
+    with cloudflare_client(module) as client:
+        dnssec, skipped_zones = list_dnssec(client)
 
     module.exit_json(
         changed=False,
         dnssec=dnssec,
         skipped_zones=skipped_zones,
     )
-
-
-def main():
-    run_module()
 
 
 if __name__ == "__main__":

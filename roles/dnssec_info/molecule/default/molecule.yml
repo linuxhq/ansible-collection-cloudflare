@@ -21,7 +21,13 @@ provisioner:
   inventory:
     group_vars:
       all:
+        dnssec_api_token: "{{ zones_info_api_token }}"
         dnssec_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+        dnssec_list:
+          - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"
+            status: active
+
+        zones_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
 
 scenario:
   test_sequence:

@@ -12,11 +12,16 @@ Manage cloudflare access groups
 
     access_groups_account_id: null
     access_groups_api_token: null
+    access_groups_async: 300
+    access_groups_batch: 10
+    access_groups_delay: 3
     access_groups_list: []
+    access_groups_poll: 0
+    access_groups_retries: 100
 
 ## Dependencies
 
-* [linuxhq.cloudflare.access\_service\_tokens\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_service_tokens_info)
+* [access\_service\_tokens\_info](../access_service_tokens_info)
 
 ## Example Playbook
 
@@ -24,9 +29,6 @@ Manage cloudflare access groups
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_groups
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
-
           access_groups_account_id: "{{ _accounts_info_id }}"
           access_groups_api_token: "{{ accounts_info_api_token }}"
           access_groups_list:
@@ -35,11 +37,3 @@ Manage cloudflare access groups
                 - service_token:
                     token_id: "{{ _access_service_token_info_dict['linuxhq.dev'].id }}"
               is_default: false
-
-          access_service_tokens_account_id: "{{ _accounts_info_id }}"
-          access_service_tokens_api_token: "{{ accounts_info_api_token }}"
-          access_service_tokens_info_account_id: "{{ _accounts_info_id }}"
-          access_service_tokens_info_api_token: "{{ accounts_info_api_token }}"
-          access_service_tokens_list:
-            - name: linuxhq.dev
-              duration: forever

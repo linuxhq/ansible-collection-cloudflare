@@ -2,6 +2,26 @@
 - name: Converge
   hosts: all
   roles:
+    - role: access_service_tokens
+      tags:
+        - molecule-idempotence-notest
+      check_mode: false
+
+    - role: access_groups
+      tags:
+        - molecule-idempotence-notest
+      check_mode: false
+
+    - role: access_policies
+      tags:
+        - molecule-idempotence-notest
+      check_mode: false
+
+    - role: access_apps
+      tags:
+        - molecule-idempotence-notest
+      check_mode: false
+
     - role: access_apps_info
       access_apps_info_account_id: null
       access_apps_info_api_token: null
