@@ -1,5 +1,10 @@
 ---
 access_apps_account_id: null
 access_apps_api_token: null
+access_apps_async: 300
+access_apps_batch: 10
+access_apps_delay: 3
 access_apps_list: []
+access_apps_poll: 0
+access_apps_retries: 100
 ...

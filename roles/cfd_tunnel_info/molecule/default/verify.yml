@@ -1,13 +1,41 @@
 ---
 - name: Verify
   hosts: all
+
   roles:
     - cfd_tunnel_info
 
   post_tasks:
-    - name: Ensure cloudflare cfd tunnel information is verified
+    - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _cfd_tunnel_info_dict | length > 0
-          - _cfd_tunnel_info_list | length > 0
+          - _cfd_tunnel_info_dict['molecule-local'].account_tag is defined
+          - _cfd_tunnel_info_dict['molecule-local'].config_src == 'local'
+          - _cfd_tunnel_info_dict['molecule-local'].id is defined
+          - _cfd_tunnel_info_dict['molecule-local'].name is defined
+          - _cfd_tunnel_info_dict['molecule-local'].status is defined
+          - _cfd_tunnel_info_dict['molecule-local'].token is defined
+          - _cfd_tunnel_info_dict['molecule-local'].tun_type == 'cfd_tunnel'
+          - _cfd_tunnel_info_dict['molecule-remote'].account_tag is defined
+          - _cfd_tunnel_info_dict['molecule-remote'].config_src == 'cloudflare'
+          - _cfd_tunnel_info_dict['molecule-remote'].id is defined
+          - _cfd_tunnel_info_dict['molecule-remote'].name is defined
+          - _cfd_tunnel_info_dict['molecule-remote'].status is defined
+          - _cfd_tunnel_info_dict['molecule-remote'].token is defined
+          - _cfd_tunnel_info_dict['molecule-remote'].tun_type == 'cfd_tunnel'
+
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        cfd_tunnel_list:
+          "{{ cfd_tunnel_list |
+              map('combine', {'state': 'absent'}) }}"
+
+    - name: Ensure roles are included
+      ansible.builtin.include_role:
+        name: "{{ _role }}"
+      loop:
+        - cfd_tunnel
+      loop_control:
+        label: "{{ _role | d(none) }}"
+        loop_var: _role
 ...

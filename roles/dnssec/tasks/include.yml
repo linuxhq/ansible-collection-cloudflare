@@ -23,7 +23,7 @@
     - ansible_check_mode | bool
     - __dnssec_result.changed | bool
 
-- name: Ensure managed cloudflare dnssec jobs are complete
+- name: Ensure managed cloudflare dnssec setting jobs are complete
   tags:
     - dnssec
   ansible.builtin.async_status:

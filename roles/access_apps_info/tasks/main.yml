@@ -2,18 +2,10 @@
 - name: Ensure cloudflare access apps information is gathered
   tags:
     - access_apps_info
-  ansible.builtin.uri:
-    headers:
-      Authorization: "Bearer {{ access_apps_info_api_token }}"
-    method: GET
-    status_code:
-      - 200
-    url:
-      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
-          access_apps_info_account_id ~
-          '/access/apps' }}"
+  linuxhq.cloudflare.access_apps_info:
+    account_id: "{{ access_apps_info_account_id }}"
+    api_token: "{{ access_apps_info_api_token }}"
   register: __access_apps_info_query
-  check_mode: false
   when:
     - access_apps_info_account_id is not none
     - access_apps_info_api_token is not none
@@ -23,7 +15,7 @@
     - access_apps_info
   ansible.builtin.set_fact:
     _access_apps_info_list:
-      "{{ __access_apps_info_query.json.result |
+      "{{ __access_apps_info_query.access_apps |
           d([]) }}"
 
 - name: Ensure dict of cloudflare access apps information is generated

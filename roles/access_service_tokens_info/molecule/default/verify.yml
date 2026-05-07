@@ -1,13 +1,38 @@
 ---
 - name: Verify
   hosts: all
+
   roles:
     - access_service_tokens_info
 
   post_tasks:
-    - name: Ensure cloudflare access service tokens information is verified
+    - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _access_service_tokens_info_dict | length > 0
-          - _access_service_tokens_info_list | length > 0
+          - _access_service_tokens_info_dict[_item].client_id is defined
+          - _access_service_tokens_info_dict[_item].client_secret_version == 1
+          - _access_service_tokens_info_dict[_item].duration == 'forever'
+          - _access_service_tokens_info_dict[_item].id is defined
+          - _access_service_tokens_info_dict[_item].name == _item
+      loop:
+        "{{ access_service_tokens_list |
+            map(attribute='name', default=[]) }}"
+      loop_control:
+        label: "{{ _item | d(none) }}"
+        loop_var: _item
+
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        access_service_tokens_list:
+          "{{ access_service_tokens_list |
+              map('combine', {'state': 'absent'}) }}"
+
+    - name: Ensure roles are included
+      ansible.builtin.include_role:
+        name: "{{ _verify }}"
+      loop:
+        - access_service_tokens
+      loop_control:
+        label: "{{ _verify }}"
+        loop_var: _verify
 ...

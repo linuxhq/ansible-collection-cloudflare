@@ -2,18 +2,10 @@
 - name: Ensure cloudflare access policies information is gathered
   tags:
     - access_policies_info
-  ansible.builtin.uri:
-    headers:
-      Authorization: "Bearer {{ access_policies_info_api_token }}"
-    method: GET
-    status_code:
-      - 200
-    url:
-      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
-          access_policies_info_account_id ~
-          '/access/policies' }}"
+  linuxhq.cloudflare.access_policies_info:
+    account_id: "{{ access_policies_info_account_id }}"
+    api_token: "{{ access_policies_info_api_token }}"
   register: __access_policies_info_query
-  check_mode: false
   when:
     - access_policies_info_account_id is not none
     - access_policies_info_api_token is not none
@@ -23,7 +15,7 @@
     - access_policies_info
   ansible.builtin.set_fact:
     _access_policies_info_list:
-      "{{ __access_policies_info_query.json.result |
+      "{{ __access_policies_info_query.access_policies |
           d([]) }}"
 
 - name: Ensure dict of cloudflare access policies information is generated

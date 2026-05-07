@@ -25,6 +25,4 @@ Gather information about cloudflare accounts
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.accounts_info
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
+        - linuxhq.cloudflare.accounts_info

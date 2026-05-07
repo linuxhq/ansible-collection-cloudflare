@@ -12,11 +12,16 @@ Manage cloudflare cfd tunnels
 
     cfd_tunnel_account_id: null
     cfd_tunnel_api_token: null
+    cfd_tunnel_async: 300
+    cfd_tunnel_batch: 10
+    cfd_tunnel_delay: 3
     cfd_tunnel_list: []
+    cfd_tunnel_poll: 0
+    cfd_tunnel_retries: 100
 
 ## Dependencies
 
-* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
+* [accounts\_info](../accounts_info)
 
 ## Example Playbook
 
@@ -24,14 +29,13 @@ Manage cloudflare cfd tunnels
       connection: local
       roles:
         - role: linuxhq.cloudflare.cfd_tunnel
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
           cfd_tunnel_account_id: "{{ _accounts_info_id }}"
           cfd_tunnel_api_token: "{{ accounts_info_api_token }}"
           cfd_tunnel_list:
-            - name: linuxhq.dev-local
+            - name: molecule-local
               config_src: local
-              tunnel_secret: YjNhS3ZzQ0puNzNxdFljY0VmbkpGdWlOb3M3dWNxUlJ5YmhVUkx6S2NUNFBZN3k3bUZUb21McnUzd1BhTkh2aQo=
+              tunnel_secret: >-
+                YjNhS3ZzQ0puNzNxdFljY0VmbkpGdWlOb3M3dWNxUlJ5YmhVUkx6S2NUNFBZN3k3bUZUb21McnUzd1BhTkh2aQo=
 
-            - name: linuxhq.dev-remote
+            - name: molecule-remote
               config_src: cloudflare

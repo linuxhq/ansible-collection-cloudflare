@@ -1,5 +1,10 @@
 ---
 cfd_tunnel_account_id: null
 cfd_tunnel_api_token: null
+cfd_tunnel_async: 300
+cfd_tunnel_batch: 10
+cfd_tunnel_delay: 3
 cfd_tunnel_list: []
+cfd_tunnel_poll: 0
+cfd_tunnel_retries: 100
 ...

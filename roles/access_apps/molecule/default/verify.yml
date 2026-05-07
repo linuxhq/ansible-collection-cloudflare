@@ -8,6 +8,7 @@
         name: "{{ _role }}"
       loop:
         - access_groups_info
+        - access_identity_providers_info
         - access_policies_info
         - access_service_tokens_info
       loop_control:

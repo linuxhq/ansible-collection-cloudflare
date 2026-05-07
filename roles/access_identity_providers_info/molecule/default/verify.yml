@@ -1,6 +1,7 @@
 ---
 - name: Verify
   hosts: all
+
   roles:
     - access_identity_providers_info
 
@@ -8,7 +9,12 @@
     - name: Ensure cloudflare access identity providers information is verified
       ansible.builtin.assert:
         that:
-          - _access_identity_providers_info_dict | length > 0
-          - _access_identity_providers_info_list | length > 0
+          - _access_identity_providers_info_dict['onetimepin'].config.redirect_url is defined
           - _access_identity_providers_info_dict['onetimepin'].id is defined
+          - _access_identity_providers_info_dict['onetimepin'].name is defined
+          - _access_identity_providers_info_dict['onetimepin'].scim_config is defined
+          - _access_identity_providers_info_dict['onetimepin'].scim_config | length > 0
+          - _access_identity_providers_info_dict['onetimepin'].type == 'onetimepin'
+          - _access_identity_providers_info_dict['onetimepin'].uid is defined
+          - _access_identity_providers_info_dict['onetimepin'].version is defined
 ...

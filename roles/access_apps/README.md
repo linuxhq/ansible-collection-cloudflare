@@ -12,11 +12,16 @@ Manage cloudflare access apps
 
     access_apps_account_id: null
     access_apps_api_token: null
+    access_apps_async: 300
+    access_apps_batch: 10
+    access_apps_delay: 3
     access_apps_list: []
+    access_apps_poll: 0
+    access_apps_retries: 100
 
 ## Dependencies
 
-* [linuxhq.cloudflare.access\_policies\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/access_policies_info)
+* [access\_policies\_info](../access_policies_info)
 
 ## Example Playbook
 
@@ -24,9 +29,6 @@ Manage cloudflare access apps
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_apps
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
-
           access_apps_account_id: "{{ _accounts_info_id }}"
           access_apps_api_token: "{{ accounts_info_api_token }}"
           access_apps_list:
@@ -36,37 +38,9 @@ Manage cloudflare access apps
                 - type: public
                   uri: linuxhq.dev
                 - type: public
-                  uri: secondary.linuxhq.dev
+                  uri: molecule-00.linuxhq.dev
+                - type: public
+                  uri: molecule-01.linuxhq.dev
               policies:
-                - id: "{{ _access_policies_info_dict['linuxhq.dev'].id }}"
+                - id: "{{ _access_policies_info_dict['molecule-00-email'].id }}"
               type: self_hosted
-
-          access_groups_account_id: "{{ _accounts_info_id }}"
-          access_groups_api_token: "{{ accounts_info_api_token }}"
-          access_groups_info_account_id: "{{ _accounts_info_id }}"
-          access_groups_info_api_token: "{{ accounts_info_api_token }}"
-          access_groups_list:
-            - name: linuxhq.dev
-              include:
-                - service_token:
-                    token_id: "{{ _access_service_tokens_info_dict['linuxhq.dev'].id }}"
-              is_default: false
-
-          access_policies_account_id: "{{ _accounts_info_id }}"
-          access_policies_api_token: "{{ accounts_info_api_token }}"
-          access_policies_info_account_id: "{{ _accounts_info_id }}"
-          access_policies_info_api_token: "{{ accounts_info_api_token }}"
-          access_policies_list:
-            - name: linuxhq.dev
-              decision: non_identity
-              include:
-                - group:
-                    id: "{{ _access_groups_info_dict['linuxhq.dev'].id }}"
-
-          access_service_tokens_account_id: "{{ _accounts_info_id }}"
-          access_service_tokens_api_token: "{{ accounts_info_api_token }}"
-          access_service_tokens_info_account_id: "{{ _accounts_info_id }}"
-          access_service_tokens_info_api_token: "{{ accounts_info_api_token }}"
-          access_service_tokens_list:
-            - name: linuxhq.dev
-              duration: forever

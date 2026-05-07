@@ -29,21 +29,27 @@ provisioner:
           - name: molecule-00
             duration: forever
           - name: molecule-01
+            duration: forever
           - name: molecule-02
             duration: forever
           - name: molecule-03
+            duration: forever
           - name: molecule-04
             duration: forever
           - name: molecule-05
+            duration: forever
           - name: molecule-06
             duration: forever
           - name: molecule-07
+            duration: forever
           - name: molecule-08
             duration: forever
           - name: molecule-09
+            duration: forever
           - name: molecule-10
             duration: forever
           - name: molecule-11
+            duration: forever
 
 scenario:
   test_sequence:

@@ -23,14 +23,16 @@ provisioner:
       all:
         accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
         accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+
         cfd_tunnel_account_id: "{{ _accounts_info_id }}"
         cfd_tunnel_api_token: "{{ accounts_info_api_token }}"
         cfd_tunnel_list:
-          - name: linuxhq.dev-local
+          - name: molecule-local
             config_src: local
-            tunnel_secret: YjNhS3ZzQ0puNzNxdFljY0VmbkpGdWlOb3M3dWNxUlJ5YmhVUkx6S2NUNFBZN3k3bUZUb21McnUzd1BhTkh2aQo=
+            tunnel_secret: >-
+              YjNhS3ZzQ0puNzNxdFljY0VmbkpGdWlOb3M3dWNxUlJ5YmhVUkx6S2NUNFBZN3k3bUZUb21McnUzd1BhTkh2aQo=
 
-          - name: linuxhq.dev-remote
+          - name: molecule-remote
             config_src: cloudflare
 
 scenario:

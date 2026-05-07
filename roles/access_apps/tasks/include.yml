@@ -1,0 +1,58 @@
+---
+- name: Ensure cloudflare access apps are managed
+  tags:
+    - access_apps
+  linuxhq.cloudflare.access_apps:
+    account_id: "{{ access_apps_account_id }}"
+    allowed_idps: "{{ _access_app.allowed_idps | d(omit) }}"
+    api_token: "{{ access_apps_api_token }}"
+    app_launcher_visible: "{{ _access_app.app_launcher_visible | d(true) }}"
+    auto_redirect_to_identity: "{{ _access_app.auto_redirect_to_identity | d(false) }}"
+    cors_headers: "{{ _access_app.cors_headers | d(omit) }}"
+    custom_deny_message: "{{ _access_app.custom_deny_message | d(omit) }}"
+    custom_deny_url: "{{ _access_app.custom_deny_url | d(omit) }}"
+    destinations: "{{ _access_app.destinations | d(omit) }}"
+    domain: "{{ _access_app.domain | d(omit) }}"
+    enable_binding_cookie: "{{ _access_app.enable_binding_cookie | d(false) }}"
+    http_only_cookie_attribute: "{{ _access_app.http_only_cookie_attribute | d(true) }}"
+    logo_url: "{{ _access_app.logo_url | d(omit) }}"
+    name: "{{ _access_app.name }}"
+    policies: "{{ _access_app.policies | d(omit) }}"
+    same_site_cookie_attribute: "{{ _access_app.same_site_cookie_attribute | d(omit) }}"
+    service_auth_401_redirect: "{{ _access_app.service_auth_401_redirect | d(omit) }}"
+    session_duration: "{{ _access_app.session_duration | d('24h') }}"
+    skip_interstitial: "{{ _access_app.skip_interstitial | d(omit) }}"
+    state: "{{ _access_app.state | d('present') }}"
+    type: "{{ _access_app.type | d(omit) }}"
+  register: __access_apps_result
+  loop: "{{ __access_apps_list }}"
+  loop_control:
+    label: "{{ _access_app.name | d(none) }}"
+    loop_var: _access_app
+  async: "{{ ansible_check_mode | ternary(0, access_apps_async) }}"
+  poll: "{{ access_apps_poll }}"
+  when:
+    - access_apps_account_id is not none
+    - access_apps_api_token is not none
+    - _access_app.name is defined
+  changed_when:
+    - ansible_check_mode | bool
+    - __access_apps_result.changed | bool
+
+- name: Ensure managed cloudflare access app jobs are complete
+  tags:
+    - access_apps
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __access_apps_status
+  loop: "{{ __access_apps_result.results }}"
+  loop_control:
+    label: "{{ _jid._access_app.name | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __access_apps_status.finished | bool
+  retries: "{{ access_apps_retries }}"
+  delay: "{{ access_apps_delay }}"
+...

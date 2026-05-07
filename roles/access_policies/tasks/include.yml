@@ -1,0 +1,51 @@
+---
+- name: Ensure cloudflare access policies are managed
+  tags:
+    - access_policies
+  linuxhq.cloudflare.access_policies:
+    account_id: "{{ access_policies_account_id }}"
+    api_token: "{{ access_policies_api_token }}"
+    approval_groups: "{{ _access_policy.approval_groups | d(omit) }}"
+    approval_required: "{{ _access_policy.approval_required | d(false) }}"
+    decision: "{{ _access_policy.decision | d(omit) }}"
+    exclude: "{{ _access_policy.exclude | d(omit) }}"
+    include: "{{ _access_policy.include | d(omit) }}"
+    isolation_required: "{{ _access_policy.isolation_required | d(false) }}"
+    name: "{{ _access_policy.name }}"
+    precedence: "{{ _access_policy.precedence | d(omit) }}"
+    purpose_justification_prompt: "{{ _access_policy.purpose_justification_prompt | d(omit) }}"
+    purpose_justification_required: "{{ _access_policy.purpose_justification_required | d(false) }}"
+    require: "{{ _access_policy.require | d(omit) }}"
+    state: "{{ _access_policy.state | d('present') }}"
+  register: __access_policies_result
+  loop: "{{ __access_policies_list }}"
+  loop_control:
+    label: "{{ _access_policy.name | d(none) }}"
+    loop_var: _access_policy
+  async: "{{ ansible_check_mode | ternary(0, access_policies_async) }}"
+  poll: "{{ access_policies_poll }}"
+  when:
+    - access_policies_account_id is not none
+    - access_policies_api_token is not none
+    - _access_policy.name is defined
+  changed_when:
+    - ansible_check_mode | bool
+    - __access_policies_result.changed | bool
+
+- name: Ensure managed cloudflare access policy jobs are complete
+  tags:
+    - access_policies
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __access_policies_status
+  loop: "{{ __access_policies_result.results }}"
+  loop_control:
+    label: "{{ _jid._access_policy.name | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __access_policies_status.finished | bool
+  retries: "{{ access_policies_retries }}"
+  delay: "{{ access_policies_delay }}"
+...

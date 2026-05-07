@@ -1,5 +1,10 @@
 ---
 access_policies_account_id: null
 access_policies_api_token: null
+access_policies_async: 300
+access_policies_batch: 10
+access_policies_delay: 3
 access_policies_list: []
+access_policies_poll: 0
+access_policies_retries: 100
 ...

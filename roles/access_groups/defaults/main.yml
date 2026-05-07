@@ -1,5 +1,10 @@
 ---
 access_groups_account_id: null
 access_groups_api_token: null
+access_groups_async: 300
+access_groups_batch: 10
+access_groups_delay: 3
 access_groups_list: []
+access_groups_poll: 0
+access_groups_retries: 100
 ...

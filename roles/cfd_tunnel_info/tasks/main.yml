@@ -2,18 +2,10 @@
 - name: Ensure cloudflare cfd tunnel information is gathered
   tags:
     - cfd_tunnel_info
-  ansible.builtin.uri:
-    headers:
-      Authorization: "Bearer {{ cfd_tunnel_info_api_token }}"
-    method: GET
-    status_code:
-      - 200
-    url:
-      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
-          cfd_tunnel_info_account_id ~
-          '/cfd_tunnel?is_deleted=false' }}"
+  linuxhq.cloudflare.cfd_tunnel_info:
+    account_id: "{{ cfd_tunnel_info_account_id }}"
+    api_token: "{{ cfd_tunnel_info_api_token }}"
   register: __cfd_tunnel_info_query
-  check_mode: false
   when:
     - cfd_tunnel_info_account_id is not none
     - cfd_tunnel_info_api_token is not none
@@ -22,57 +14,8 @@
   tags:
     - cfd_tunnel_info
   ansible.builtin.set_fact:
-    __cfd_tunnel_info_list:
-      "{{ __cfd_tunnel_info_query.json.result |
-          d([]) }}"
-
-- name: Ensure cloudflare cfd tunnel token information is gathered
-  tags:
-    - cfd_tunnel_info
-  ansible.builtin.uri:
-    headers:
-      Authorization: "Bearer {{ cfd_tunnel_info_api_token }}"
-    method: GET
-    status_code:
-      - 200
-    url:
-      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
-          cfd_tunnel_info_account_id ~
-          '/cfd_tunnel/' ~
-          _token.id ~
-          '/token' }}"
-  register: __cfd_tunnel_info_token_query
-  loop: "{{ __cfd_tunnel_info_list }}"
-  loop_control:
-    label: "{{ _token.name | d(none) }}"
-    loop_var: _token
-  check_mode: false
-  when:
-    - cfd_tunnel_info_account_id is not none
-    - cfd_tunnel_info_api_token is not none
-    - _token.id is defined
-
-- name: Ensure list of cloudflare cfd tunnel token information is generated
-  tags:
-    - cfd_tunnel_info
-  ansible.builtin.set_fact:
-    __cfd_tunnel_info_token_list:
-      "{{ (__cfd_tunnel_info_token_query.results |
-          json_query('[].{
-            name: _token.name,
-            token: json.result
-          }')) |
-          d([]) }}"
-
-- name: Ensure lists of cloudflare cfd tunnel information are merged
-  tags:
-    - cfd_tunnel_info
-  ansible.builtin.set_fact:
     _cfd_tunnel_info_list:
-      "{{ (__cfd_tunnel_info_list |
-          community.general.lists_mergeby(
-            __cfd_tunnel_info_token_list,
-            'name')) |
+      "{{ __cfd_tunnel_info_query.cfd_tunnels |
           d([]) }}"
 
 - name: Ensure dict of cloudflare cfd tunnel information is generated

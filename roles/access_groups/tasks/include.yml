@@ -1,0 +1,45 @@
+---
+- name: Ensure cloudflare access groups are managed
+  tags:
+    - access_groups
+  linuxhq.cloudflare.access_groups:
+    account_id: "{{ access_groups_account_id }}"
+    api_token: "{{ access_groups_api_token }}"
+    exclude: "{{ _access_group.exclude | d(omit) }}"
+    include: "{{ _access_group.include | d(omit) }}"
+    is_default: "{{ _access_group.is_default | d(false) }}"
+    name: "{{ _access_group.name }}"
+    require: "{{ _access_group.require | d(omit) }}"
+    state: "{{ _access_group.state | d('present') }}"
+  register: __access_groups_result
+  loop: "{{ __access_groups_list }}"
+  loop_control:
+    label: "{{ _access_group.name | d(none) }}"
+    loop_var: _access_group
+  async: "{{ ansible_check_mode | ternary(0, access_groups_async) }}"
+  poll: "{{ access_groups_poll }}"
+  when:
+    - access_groups_account_id is not none
+    - access_groups_api_token is not none
+    - _access_group.name is defined
+  changed_when:
+    - ansible_check_mode | bool
+    - __access_groups_result.changed | bool
+
+- name: Ensure managed cloudflare access group jobs are complete
+  tags:
+    - access_groups
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __access_groups_status
+  loop: "{{ __access_groups_result.results }}"
+  loop_control:
+    label: "{{ _jid._access_group.name | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __access_groups_status.finished | bool
+  retries: "{{ access_groups_retries }}"
+  delay: "{{ access_groups_delay }}"
+...
