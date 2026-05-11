@@ -1,6 +1,15 @@
 ---
 ancestor: null
 releases:
+  2.0.6:
+    changes:
+      breaking_changes:
+        - device_policy - defaults have been broken out into individual variables
+      minor_changes:
+        - all - migrated from uri wrappers to custom ansible modules
+        - all - added async support to applicable roles
+      release_summary:
+        This release adds async support where applicable and custom modules
   2.0.5:
     changes:
       breaking_changes:

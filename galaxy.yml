@@ -1,6 +1,30 @@
 ---
 authors:
   - Taylor Kimball (https://github.com/tkimball83)
+build_ignore:
+  - .ansible
+  - .ansible/**
+  - .ansible-lint
+  - .github
+  - .github/**
+  - .gitignore
+  - .pre-commit-config.yaml
+  - .python-version
+  - .yamllint
+  - ansible.cfg
+  - Makefile
+  - requirements.txt
+  - requirements.yml
+  - roles/*/molecule
+  - roles/*/molecule/**
+  - venv
+  - venv/**
+  - '**/__pycache__'
+  - '**/__pycache__/**'
+  - '**/*.pyc'
+  - '**/*.pyo'
+  - '*.tar.gz'
+  - '*.tgz'
 description: A collection of cloudflare roles
 dependencies:
   community.general: '>=8.0.0'

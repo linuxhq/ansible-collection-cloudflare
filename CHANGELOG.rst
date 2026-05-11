@@ -4,6 +4,25 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.0.6
+======
+
+Release Summary
+---------------
+
+This release adds async support where applicable and custom modules
+
+Minor Changes
+-------------
+
+- all - added async support to applicable roles
+- all - migrated from uri wrappers to custom ansible modules
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- device_policy - defaults have been broken out into individual variables
+
 v2.0.5
 ======
 
