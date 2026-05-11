@@ -2,6 +2,11 @@
 - name: Converge
   hosts: all
   roles:
+    - role: warp_connector
+      tags:
+        - molecule-idempotence-notest
+      check_mode: false
+
     - role: warp_connector_info
       warp_connector_info_account_id: null
       warp_connector_info_api_token: null

@@ -33,7 +33,35 @@ Manage cloudflare zones
       roles:
         - role: linuxhq.cloudflare.zones
           zones_list:
-            - name: linuxhq.dev
+            - name: molecule.com
+              type: full
+              settings:
+                - id: always_use_https
+                  value: 'on'
+                - id: development_mode
+                  value: 'on'
+                - id: ipv6
+                  value: 'off'
+                - id: min_tls_version
+                  value: 1.3
+                - id: ssl
+                  value: strict
+
+            - name: molecule.net
+              type: full
+              settings:
+                - id: always_use_https
+                  value: 'on'
+                - id: development_mode
+                  value: 'on'
+                - id: ipv6
+                  value: 'off'
+                - id: min_tls_version
+                  value: 1.3
+                - id: ssl
+                  value: strict
+
+            - name: molecule.org
               type: full
               settings:
                 - id: always_use_https
