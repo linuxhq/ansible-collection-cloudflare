@@ -1,0 +1,46 @@
+---
+- name: Ensure cloudflare pages projects are managed
+  tags:
+    - pages_projects
+  linuxhq.cloudflare.pages_projects:
+    account_id: "{{ pages_projects_account_id }}"
+    api_token: "{{ pages_projects_api_token }}"
+    build_config: "{{ _pages_project.build_config | d(omit) }}"
+    deployment_configs: "{{ _pages_project.deployment_configs | d(omit) }}"
+    domains: "{{ _pages_project.domains | d(omit) }}"
+    name: "{{ _pages_project.name }}"
+    production_branch: "{{ _pages_project.production_branch | d(omit) }}"
+    source: "{{ _pages_project.source | d(omit) }}"
+    state: "{{ _pages_project.state | d('present') }}"
+  register: __pages_projects_result
+  loop: "{{ __pages_projects_list }}"
+  loop_control:
+    label: "{{ _pages_project.name | d(none) }}"
+    loop_var: _pages_project
+  async: "{{ ansible_check_mode | ternary(0, pages_projects_async) }}"
+  poll: "{{ pages_projects_poll }}"
+  when:
+    - pages_projects_account_id is not none
+    - pages_projects_api_token is not none
+    - _pages_project.name is defined
+  changed_when:
+    - ansible_check_mode | bool
+    - __pages_projects_result.changed | bool
+
+- name: Ensure managed cloudflare pages project jobs are complete
+  tags:
+    - pages_projects
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __pages_projects_status
+  loop: "{{ __pages_projects_result.results }}"
+  loop_control:
+    label: "{{ _jid._pages_project.name | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __pages_projects_status.finished | bool
+  retries: "{{ pages_projects_retries }}"
+  delay: "{{ pages_projects_delay }}"
+...

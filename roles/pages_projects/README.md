@@ -7,17 +7,21 @@ Manage cloudflare pages projects
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Cloudflare Pages`
-* Cloudflare api `Token` with `Write` permissions to `DNS`
 
 ## Role Variables
 
     pages_projects_account_id: null
     pages_projects_api_token: null
+    pages_projects_async: 300
+    pages_projects_batch: 10
+    pages_projects_delay: 3
     pages_projects_list: []
+    pages_projects_poll: 0
+    pages_projects_retries: 100
 
 ## Dependencies
 
-* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
+* [accounts\_info](../accounts_info)
 
 ## Example Playbook
 
@@ -25,13 +29,8 @@ Manage cloudflare pages projects
       connection: local
       roles:
         - role: linuxhq.cloudflare.pages_projects
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
-          pages_projects_account_id: "{{ _accounts_info_id }}"
-          pages_projects_api_token: "{{ accounts_info_api_token }}"
           pages_projects_list:
             - name: linuxhq-dev
               production_branch: main
               domains:
                 - name: linuxhq.dev
-                  zone: linuxhq.dev
