@@ -29,9 +29,21 @@ Manage cloudflare access groups
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_groups
+          access_groups_account_id: '{{ _accounts_info_id }}'
+          access_groups_api_token: '{{ accounts_info_api_token }}'
           access_groups_list:
-            - name: linuxhq.dev
+            - name: molecule-00
               include:
                 - service_token:
-                    token_id: "{{ _access_service_token_info_dict['linuxhq.dev'].id }}"
+                    token_id: "{{ _access_service_tokens_info_dict['molecule-00'].id }}"
+              is_default: false
+            - name: molecule-01
+              include:
+                - service_token:
+                    token_id: "{{ _access_service_tokens_info_dict['molecule-01'].id }}"
+              is_default: false
+            - name: molecule-02
+              include:
+                - service_token:
+                    token_id: "{{ _access_service_tokens_info_dict['molecule-02'].id }}"
               is_default: false

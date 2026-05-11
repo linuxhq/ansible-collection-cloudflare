@@ -26,4 +26,6 @@ Gather information about cloudflare devices settings
     - hosts: cloudflare
       connection: local
       roles:
-        - linuxhq.cloudflare.devices_settings_info
+        - role: linuxhq.cloudflare.devices_settings_info
+          devices_settings_info_account_id: '{{ _accounts_info_id }}'
+          devices_settings_info_api_token: '{{ accounts_info_api_token }}'

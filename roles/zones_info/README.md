@@ -25,4 +25,5 @@ Gather information about cloudflare zones
     - hosts: cloudflare
       connection: local
       roles:
-        - linuxhq.cloudflare.zones_info
+        - role: linuxhq.cloudflare.zones_info
+          zones_info_api_token: '{{ accounts_info_api_token }}'

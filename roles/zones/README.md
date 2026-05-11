@@ -29,44 +29,44 @@ Manage cloudflare zones
       connection: local
       roles:
         - role: linuxhq.cloudflare.zones
+          zones_account_id: '{{ _accounts_info_id }}'
+          zones_api_token: '{{ accounts_info_api_token }}'
           zones_list:
             - name: molecule.com
               type: full
               settings:
                 - id: always_use_https
-                  value: 'on'
+                  value: "on"
                 - id: development_mode
-                  value: 'on'
+                  value: "on"
                 - id: ipv6
-                  value: 'off'
+                  value: "off"
                 - id: min_tls_version
                   value: 1.3
                 - id: ssl
                   value: strict
-
             - name: molecule.net
               type: full
               settings:
                 - id: always_use_https
-                  value: 'on'
+                  value: "on"
                 - id: development_mode
-                  value: 'on'
+                  value: "on"
                 - id: ipv6
-                  value: 'off'
+                  value: "off"
                 - id: min_tls_version
                   value: 1.3
                 - id: ssl
                   value: strict
-
             - name: molecule.org
               type: full
               settings:
                 - id: always_use_https
-                  value: 'on'
+                  value: "on"
                 - id: development_mode
-                  value: 'on'
+                  value: "on"
                 - id: ipv6
-                  value: 'off'
+                  value: "off"
                 - id: min_tls_version
                   value: 1.3
                 - id: ssl

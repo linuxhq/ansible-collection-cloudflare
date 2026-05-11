@@ -23,4 +23,5 @@ Gather information about cloudflare rulesets
     - hosts: cloudflare
       connection: local
       roles:
-        - linuxhq.cloudflare.rulesets_info
+        - role: linuxhq.cloudflare.rulesets_info
+          rulesets_info_api_token: '{{ accounts_info_api_token }}'

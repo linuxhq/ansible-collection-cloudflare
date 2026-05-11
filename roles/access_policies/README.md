@@ -30,6 +30,8 @@ Manage cloudflare access policies
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_policies
+          access_policies_account_id: '{{ _accounts_info_id }}'
+          access_policies_api_token: '{{ accounts_info_api_token }}'
           access_policies_list:
             - name: molecule-00-email
               decision: allow
@@ -39,7 +41,6 @@ Manage cloudflare access policies
               require:
                 - login_method:
                     id: "{{ _access_identity_providers_info_dict['onetimepin'].id }}"
-
             - name: molecule-00-group
               decision: non_identity
               include:

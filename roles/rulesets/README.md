@@ -29,18 +29,16 @@ Manage cloudflare rulesets
       connection: local
       roles:
         - role: linuxhq.cloudflare.rulesets
+          rulesets_api_token: '{{ accounts_info_api_token }}'
           rulesets_list:
-            - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"
+            - zone_id: '{{ _zones_info_dict[zones_list.0.name].id }}'
               name: default
               rules:
                 - action: block
                   description: US
                   enabled: true
-                  expression: >-
-                    (ip.geoip.country ne "US")
-
+                  expression: (ip.geoip.country ne "US")
                 - action: block
                   description: Known Bots
                   enabled: true
-                  expression: >-
-                    (cf.client.bot)
+                  expression: (cf.client.bot)

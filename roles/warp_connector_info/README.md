@@ -27,4 +27,6 @@ Gather information about cloudflare warp connectors
     - hosts: cloudflare
       connection: local
       roles:
-        - linuxhq.cloudflare.warp_connector_info
+        - role: linuxhq.cloudflare.warp_connector_info
+          warp_connector_info_account_id: '{{ _accounts_info_id }}'
+          warp_connector_info_api_token: '{{ accounts_info_api_token }}'

@@ -30,18 +30,20 @@ Manage cloudflare cfd tunnel configurations
       connection: local
       roles:
         - role: linuxhq.cloudflare.cfd_tunnel_configurations
+          cfd_tunnel_configurations_account_id: '{{ _accounts_info_id }}'
+          cfd_tunnel_configurations_api_token: '{{ accounts_info_api_token }}'
           cfd_tunnel_configurations_list:
-            - tunnel_id: "{{ _cfd_tunnel_info_dict['linuxhq.dev-remote'].id }}"
+            - tunnel_id: "{{ _cfd_tunnel_info_dict['molecule'].id }}"
               config:
                 ingress:
-                  - hostname: molecule-a.linuxhq.dev
+                  - hostname: organic.molecule.org
                     originRequest:
                       http2Origin: true
-                      originServerName: molecule-a.linuxhq.dev
+                      originServerName: organic.molecule.org
                     service: https://nginx:8443
-                  - hostname: molecule-b.linuxhq.dev
+                  - hostname: inorganic.molecule.org
                     originRequest:
                       http2Origin: true
-                      originServerName: molecule-b.linuxhq.dev
+                      originServerName: inorganic.molecule.org
                     service: https://nginx:8443
                   - service: http_status:404
