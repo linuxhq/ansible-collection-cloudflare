@@ -214,4 +214,7 @@ def serialize_resource(resource):
 def values_differ(current, desired):
     current = serialize_resource(current)
     desired = serialize_resource(desired)
+    if not isinstance(current, dict) or not isinstance(desired, dict):
+        return current != desired
+
     return recursive_diff(current, desired) is not None
