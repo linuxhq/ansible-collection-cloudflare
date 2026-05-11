@@ -2,6 +2,11 @@
 - name: Converge
   hosts: all
   roles:
+    - role: zones
+      tags:
+        - molecule-idempotence-notest
+      check_mode: false
+
     - role: purge_cache
       purge_cache_list: []
       tags:

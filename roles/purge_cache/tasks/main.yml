@@ -1,27 +1,16 @@
 ---
-- name: Ensure cloudflare cache purge is executed
+- name: Ensure cloudflare purge cache resources are batched
   tags:
     - purge_cache
-  ansible.builtin.uri:
-    body: "{{ _cache.cache }}"
-    body_format: json
-    headers:
-      Authorization: "Bearer {{ purge_cache_api_token }}"
-    method: POST
-    status_code:
-      - 200
-    url:
-      "{{ 'https://api.cloudflare.com/client/v4/zones/' ~
-          _cache.zone_id ~
-          '/purge_cache' }}"
-  loop: "{{ purge_cache_list }}"
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - purge_cache
+    file: include.yml
+  loop:
+    "{{ purge_cache_list |
+        batch(purge_cache_batch) }}"
   loop_control:
-    label: "{{ _cache.zone_id | d(none) }}"
-    loop_var: _cache
-  changed_when: true
-  when:
-    - purge_cache_api_token is not none
-    - _cache.cache is defined
-    - _cache.cache | length > 0
-    - _cache.zone_id is defined
+    label: "{{ __purge_cache_list | length }}"
+    loop_var: __purge_cache_list
 ...

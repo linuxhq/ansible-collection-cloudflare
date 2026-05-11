@@ -1,5 +1,14 @@
 ---
 - name: Verify
   hosts: all
-  tasks: []
+
+  roles:
+    - zerotrust_connectivity_settings_info
+
+  post_tasks:
+    - name: Ensure info is verified
+      ansible.builtin.assert:
+        that:
+          - _zerotrust_connectivity_settings_info_dict.icmp_proxy_enabled | bool
+          - _zerotrust_connectivity_settings_info_dict.offramp_warp_enabled | bool
 ...

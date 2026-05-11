@@ -1,4 +1,9 @@
 ---
 purge_cache_api_token: null
+purge_cache_async: 300
+purge_cache_batch: 10
+purge_cache_delay: 3
 purge_cache_list: []
+purge_cache_poll: 0
+purge_cache_retries: 100
 ...

@@ -17,7 +17,7 @@ Manage cloudflare zerotrust connectivity settings
 
 ## Dependencies
 
-* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
+* [accounts\_info](../accounts_info)
 
 ## Example Playbook
 
@@ -25,9 +25,5 @@ Manage cloudflare zerotrust connectivity settings
       connection: local
       roles:
         - role: linuxhq.cloudflare.zerotrust_connectivity_settings
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
-          zerotrust_connectivity_settings_account_id: "{{ _accounts_info_id }}"
-          zerotrust_connectivity_settings_api_token: "{{ accounts_info_api_token }}"
           zerotrust_connectivity_settings_icmp_proxy_enabled: true
           zerotrust_connectivity_settings_offramp_warp_enabled: true

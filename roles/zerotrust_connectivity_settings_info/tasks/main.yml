@@ -2,19 +2,12 @@
 - name: Ensure cloudflare zerotrust connectivity settings information is gathered
   tags:
     - zerotrust_connectivity_settings_info
-  ansible.builtin.uri:
-    headers:
-      Authorization: "Bearer {{ zerotrust_connectivity_settings_info_api_token }}"
-    method: GET
-    status_code:
-      - 200
-    url:
-      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
-          zerotrust_connectivity_settings_info_account_id ~
-          '/zerotrust/connectivity_settings' }}"
+  linuxhq.cloudflare.zerotrust_connectivity_settings_info:
+    account_id: "{{ zerotrust_connectivity_settings_info_account_id }}"
+    api_token: "{{ zerotrust_connectivity_settings_info_api_token }}"
   register: __zerotrust_connectivity_settings_info_query
-  check_mode: false
   when:
+    - zerotrust_connectivity_settings_info_account_id is not none
     - zerotrust_connectivity_settings_info_api_token is not none
 
 - name: Ensure cloudflare zerotrust connectivity settings information is generated
@@ -22,6 +15,6 @@
     - zerotrust_connectivity_settings_info
   ansible.builtin.set_fact:
     _zerotrust_connectivity_settings_info_dict:
-      "{{ __zerotrust_connectivity_settings_info_query.json.result |
+      "{{ __zerotrust_connectivity_settings_info_query.connectivity_settings |
           d({}) }}"
 ...

@@ -23,10 +23,14 @@ provisioner:
       all:
         accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
         accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+
         zerotrust_connectivity_settings_account_id: "{{ _accounts_info_id }}"
         zerotrust_connectivity_settings_api_token: "{{ accounts_info_api_token }}"
         zerotrust_connectivity_settings_icmp_proxy_enabled: true
         zerotrust_connectivity_settings_offramp_warp_enabled: true
+
+        zerotrust_connectivity_settings_info_account_id: "{{ _accounts_info_id }}"
+        zerotrust_connectivity_settings_info_api_token: "{{ accounts_info_api_token }}"
 
 scenario:
   test_sequence:
