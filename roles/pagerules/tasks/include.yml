@@ -1,0 +1,48 @@
+---
+- name: Ensure cloudflare pagerules are managed
+  tags:
+    - pagerules
+  linuxhq.cloudflare.pagerules:
+    actions: "{{ _pagerule.1.actions | d(omit) }}"
+    api_token: "{{ pagerules_api_token }}"
+    priority: "{{ _pagerule.1.priority | d(omit) }}"
+    state: "{{ _pagerule.0.state | d('present') }}"
+    status: "{{ _pagerule.1.status | d('active') }}"
+    targets: "{{ _pagerule.1.targets }}"
+    zone_id: "{{ _pagerule.0.zone_id }}"
+  register: __pagerules_result
+  loop:
+    "{{ q('ansible.builtin.subelements',
+          __pagerules_list,
+          'pagerules',
+          {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ _pagerule.0.zone_id | d(none) }}"
+    loop_var: _pagerule
+  async: "{{ ansible_check_mode | ternary(0, pagerules_async) }}"
+  poll: "{{ pagerules_poll }}"
+  when:
+    - pagerules_api_token is not none
+    - _pagerule.0.zone_id is defined
+    - _pagerule.1.targets is defined
+  changed_when:
+    - ansible_check_mode | bool
+    - __pagerules_result.changed | bool
+
+- name: Ensure managed cloudflare pagerule jobs are complete
+  tags:
+    - pagerules
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __pagerules_status
+  loop: "{{ __pagerules_result.results }}"
+  loop_control:
+    label: "{{ _jid._pagerule.0.zone_id | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __pagerules_status.finished | bool
+  retries: "{{ pagerules_retries }}"
+  delay: "{{ pagerules_delay }}"
+...

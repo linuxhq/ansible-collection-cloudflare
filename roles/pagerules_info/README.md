@@ -22,5 +22,4 @@ Gather information about cloudflare pagerules
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.pagerules_info
-          pagerules_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+        - linuxhq.cloudflare.pagerules_info

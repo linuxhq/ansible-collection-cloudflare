@@ -1,13 +1,35 @@
 ---
 - name: Verify
   hosts: all
+
   roles:
     - pagerules_info
+    - zones_info
 
   post_tasks:
-    - name: Ensure cloudflare pagerules information is verified
+    - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _pagerules_info_dict | length > 0
-          - _pagerules_info_list | length > 0
+          - _pagerules_info_dict[zones_list.0.name].id is defined
+          - _pagerules_info_dict[zones_list.0.name].name is defined
+          - _pagerules_info_dict[zones_list.0.name].pagerules | length == 2
+
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        pagerules_list:
+          "{{ pagerules_list |
+              map('combine', {'state': 'absent'}) }}"
+        zones_list:
+          "{{ zones_list |
+              map('combine', {'state': 'absent'}) }}"
+
+    - name: Ensure roles are included
+      ansible.builtin.include_role:
+        name: "{{ _role }}"
+      loop:
+        - pagerules
+        - zones
+      loop_control:
+        label: "{{ _role | d(none) }}"
+        loop_var: _role
 ...

@@ -11,11 +11,16 @@ Manage cloudflare page rules
 ## Role Variables
 
     pagerules_api_token: null
+    pagerules_async: 300
+    pagerules_batch: 10
+    pagerules_delay: 3
     pagerules_list: []
+    pagerules_poll: 0
+    pagerules_retries: 100
 
 ## Dependencies
 
-* [linuxhq.cloudflare.zones\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zones_info)
+* [zones\_info](../zones_info)
 
 ## Example Playbook
 
@@ -23,8 +28,6 @@ Manage cloudflare page rules
       connection: local
       roles:
         - role: linuxhq.cloudflare.pagerules
-          zones_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          pagerules_api_token: "{{ zones_info_api_token }}"
           pagerules_list:
             - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"
               pagerules:

@@ -2,10 +2,31 @@
 - name: Converge
   hosts: all
   roles:
+    - role: zones
+      tags:
+        - molecule-idempotence-notest
+      check_mode: false
+
     - role: pagerules
       pagerules_list: []
       tags:
         - molecule-idempotence-notest
+
+    - role: pagerules
+      pagerules_list:
+        - zone_id: "{{ _zones_info_dict[zones_list.0.name].id }}"
+          pagerules:
+            - actions:
+                - id: forwarding_url
+                  value:
+                    status_code: 301
+                    url: https://docs.ansible.com/projects/molecule
+              status: active
+              targets:
+                - constraint:
+                    operator: matches
+                    value: "molecule.org/*"
+                  target: url
 
     - pagerules
 ...
