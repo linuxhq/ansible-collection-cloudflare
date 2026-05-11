@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare zones resources are batched
+- name: Ensure cloudflare zones are batched
   tags:
     - zones
   ansible.builtin.include_tasks:

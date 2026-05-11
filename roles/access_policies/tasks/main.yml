@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare access policies resources are batched
+- name: Ensure cloudflare access policies are batched
   tags:
     - access_policies
   ansible.builtin.include_tasks:

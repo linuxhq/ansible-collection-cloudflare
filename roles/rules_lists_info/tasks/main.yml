@@ -18,7 +18,7 @@
       "{{ __rules_lists_info_query.rules_lists |
           d([]) }}"
 
-- name: Ensure dict of cloudflare rule lists information is generated
+- name: Ensure dict of cloudflare rules lists information is generated
   tags:
     - rules_lists_info
   ansible.builtin.set_fact:

@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare purge cache resources are batched
+- name: Ensure cloudflare cache purges are batched
   tags:
     - purge_cache
   ansible.builtin.include_tasks:

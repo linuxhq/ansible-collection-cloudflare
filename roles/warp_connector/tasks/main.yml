@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare warp connector resources are batched
+- name: Ensure cloudflare warp connectors are batched
   tags:
     - warp_connector
   ansible.builtin.include_tasks:
