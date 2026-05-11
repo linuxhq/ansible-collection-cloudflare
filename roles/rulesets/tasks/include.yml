@@ -1,0 +1,43 @@
+---
+- name: Ensure cloudflare rulesets are managed
+  tags:
+    - rulesets
+  linuxhq.cloudflare.rulesets:
+    api_token: "{{ rulesets_api_token }}"
+    name: "{{ _ruleset.name }}"
+    phase: "{{ rulesets_phase }}"
+    rules: "{{ _ruleset.rules | d(omit) }}"
+    state: "{{ _ruleset.state | d('present') }}"
+    zone_id: "{{ _ruleset.zone_id }}"
+  register: __rulesets_result
+  loop: "{{ __rulesets_list }}"
+  loop_control:
+    label: "{{ _ruleset.name | d(none) }}"
+    loop_var: _ruleset
+  async: "{{ ansible_check_mode | ternary(0, rulesets_async) }}"
+  poll: "{{ rulesets_poll }}"
+  when:
+    - rulesets_api_token is not none
+    - _ruleset.name is defined
+    - _ruleset.zone_id is defined
+  changed_when:
+    - ansible_check_mode | bool
+    - __rulesets_result.changed | bool
+
+- name: Ensure managed cloudflare ruleset jobs are complete
+  tags:
+    - rulesets
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __rulesets_status
+  loop: "{{ __rulesets_result.results }}"
+  loop_control:
+    label: "{{ _jid._ruleset.name | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __rulesets_status.finished | bool
+  retries: "{{ rulesets_retries }}"
+  delay: "{{ rulesets_delay }}"
+...

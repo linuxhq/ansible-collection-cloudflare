@@ -2,8 +2,26 @@
 - name: Converge
   hosts: all
   roles:
+    - role: zones
+      tags:
+        - molecule-idempotence-notest
+      check_mode: false
+
     - role: rulesets
       rulesets_list: []
+      tags:
+        - molecule-idempotence-notest
+
+    - role: rulesets
+      rulesets_list:
+        - zone_id: "{{ _zones_info_dict[zones_list.0.name].id }}"
+          name: default
+          rules:
+            - action: block
+              description: US
+              enabled: true
+              expression: >-
+                  (ip.geoip.country ne "US")
       tags:
         - molecule-idempotence-notest
 

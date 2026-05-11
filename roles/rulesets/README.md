@@ -11,12 +11,17 @@ Manage cloudflare rulesets
 ## Role Variables
 
     rulesets_api_token: null
+    rulesets_async: 300
+    rulesets_batch: 10
+    rulesets_delay: 3
     rulesets_list: []
     rulesets_phase: http_request_firewall_custom
+    rulesets_poll: 0
+    rulesets_retries: 100
 
 ## Dependencies
 
-* [linuxhq.cloudflare.zones\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zones_info)
+* [zones\_info](../zones_info)
 
 ## Example Playbook
 
@@ -24,8 +29,6 @@ Manage cloudflare rulesets
       connection: local
       roles:
         - role: linuxhq.cloudflare.rulesets
-          zones_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          rulesets_api_token: "{{ zones_info_api_token }}"
           rulesets_list:
             - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"
               name: default
