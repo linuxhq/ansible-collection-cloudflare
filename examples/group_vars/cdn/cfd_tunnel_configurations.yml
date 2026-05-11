@@ -9,10 +9,10 @@ cfd_tunnel_configurations_list:
   - tunnel_id: "{{ _cfd_tunnel_info_dict[cloudflare_domain ~ '-remote'].id }}"
     config:
       ingress:
-        - hostname: remote.linuxhq.dev
+        - hostname: "remote.{{ cloudflare_domain }}"
           originRequest:
             http2Origin: true
-            originServerName: remote.linuxhq.dev
+            originServerName: "remote.{{ cloudflare_domain }}"
           service: https://nginx:8443
         - service: http_status:404
 ...

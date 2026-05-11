@@ -6,11 +6,11 @@
       ansible.builtin.include_role:
         name: "{{ _role }}"
       loop:
+        - accounts_info
         - access_apps_info
         - access_groups_info
         - access_policies_info
         - access_service_tokens_info
-        - accounts_info
         - cfd_tunnel_info
         - devices_policy_info
         - devices_settings_info
