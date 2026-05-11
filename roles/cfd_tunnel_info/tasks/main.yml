@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare cfd tunnel information is gathered
+- name: Ensure cloudflare cfd tunnels information is gathered
   tags:
     - cfd_tunnel_info
   linuxhq.cloudflare.cfd_tunnel_info:
@@ -10,7 +10,7 @@
     - cfd_tunnel_info_account_id is not none
     - cfd_tunnel_info_api_token is not none
 
-- name: Ensure list of cloudflare cfd tunnel information is generated
+- name: Ensure list of cloudflare cfd tunnels information is generated
   tags:
     - cfd_tunnel_info
   ansible.builtin.set_fact:
@@ -18,7 +18,7 @@
       "{{ __cfd_tunnel_info_query.cfd_tunnels |
           d([]) }}"
 
-- name: Ensure dict of cloudflare cfd tunnel information is generated
+- name: Ensure dict of cloudflare cfd tunnels information is generated
   tags:
     - cfd_tunnel_info
   ansible.builtin.set_fact:
