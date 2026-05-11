@@ -1,5 +1,10 @@
 ---
 rulesets_api_token: null
+rulesets_async: 300
+rulesets_batch: 10
+rulesets_delay: 3
 rulesets_list: []
 rulesets_phase: http_request_firewall_custom
+rulesets_poll: 0
+rulesets_retries: 100
 ...

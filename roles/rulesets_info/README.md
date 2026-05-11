@@ -10,8 +10,8 @@ Gather information about cloudflare rulesets
 
 ## Role Variables
 
-    rulesets_info_async: 300
     rulesets_info_api_token: null
+    rulesets_info_async: 300
     rulesets_info_delay: 3
     rulesets_info_phase: http_request_firewall_custom
     rulesets_info_poll: 0
@@ -27,5 +27,4 @@ Gather information about cloudflare rulesets
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.rulesets_info
-          rulesets_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+        - linuxhq.cloudflare.rulesets_info
