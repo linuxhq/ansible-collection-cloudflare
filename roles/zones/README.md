@@ -16,9 +16,6 @@ Manage cloudflare zones
     zones_batch: 10
     zones_delay: 3
     zones_list: []
-    zones_match: all
-    zones_page: 1
-    zones_per_page: 20
     zones_poll: 0
     zones_retries: 100
 

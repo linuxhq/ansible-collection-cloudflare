@@ -36,7 +36,9 @@
     - _dns.1.record is defined
     - _dns.1.type is defined
     - _dns.1.value is defined
-  changed_when: false
+  changed_when:
+    - ansible_check_mode | bool
+    - __dns_result.changed | bool
   async: "{{ ansible_check_mode | ternary(0, dns_async) }}"
   poll: "{{ dns_poll }}"
 
@@ -53,7 +55,7 @@
   when:
     - _jid.ansible_job_id is defined
   until:
-    - __dns_status.finished
+    - __dns_status.finished | bool
   retries: "{{ dns_retries }}"
   delay: "{{ dns_delay }}"
 ...

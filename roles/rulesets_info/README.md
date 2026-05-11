@@ -11,11 +11,7 @@ Gather information about cloudflare rulesets
 ## Role Variables
 
     rulesets_info_api_token: null
-    rulesets_info_async: 300
-    rulesets_info_delay: 3
     rulesets_info_phase: http_request_firewall_custom
-    rulesets_info_poll: 0
-    rulesets_info_retries: 100
 
 ## Return Values
 
