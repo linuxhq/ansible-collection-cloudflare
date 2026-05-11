@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare access apps resources are batched
+- name: Ensure cloudflare access apps are batched
   tags:
     - access_apps
   ansible.builtin.include_tasks:

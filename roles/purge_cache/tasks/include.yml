@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare cache purge is executed
+- name: Ensure cloudflare cache purges are executed
   tags:
     - purge_cache
   linuxhq.cloudflare.purge_cache:

@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare pages projects resources are batched
+- name: Ensure cloudflare pages projects are batched
   tags:
     - pages_projects
   ansible.builtin.include_tasks:

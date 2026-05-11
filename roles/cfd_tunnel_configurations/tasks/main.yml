@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare cfd tunnel configurations resources are batched
+- name: Ensure cloudflare cfd tunnel configurations are batched
   tags:
     - cfd_tunnel_configurations
   ansible.builtin.include_tasks:

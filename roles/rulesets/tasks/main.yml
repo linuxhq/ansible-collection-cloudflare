@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare rulesets resources are batched
+- name: Ensure cloudflare rulesets are batched
   tags:
     - rulesets
   ansible.builtin.include_tasks:

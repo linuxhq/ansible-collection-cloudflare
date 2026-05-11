@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare rules lists resources are batched
+- name: Ensure cloudflare rules lists are batched
   tags:
     - rules_lists
   ansible.builtin.include_tasks:
