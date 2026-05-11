@@ -11,11 +11,16 @@ Manage cloudflare purging of cache
 ## Role Variables
 
     purge_cache_api_token: null
+    purge_cache_async: 300
+    purge_cache_batch: 10
+    purge_cache_delay: 3
     purge_cache_list: []
+    purge_cache_poll: 0
+    purge_cache_retries: 100
 
 ## Dependencies
 
-* [linuxhq.cloudflare.zones\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/zones_info)
+* [zones\_info](../zones_info)
 
 ## Example Playbook
 
@@ -23,8 +28,6 @@ Manage cloudflare purging of cache
       connection: local
       roles:
         - role: linuxhq.cloudflare.purge_cache
-          zones_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          purge_cache_api_token: "{{ zones_info_api_token }}"
           purge_cache_list:
             - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"
               cache:

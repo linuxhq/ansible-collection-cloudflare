@@ -8,13 +8,19 @@
     - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _zones_info_dict['linuxhq.dev'].account.id is defined
-          - _zones_info_dict['linuxhq.dev'].account.name is defined
-          - _zones_info_dict['linuxhq.dev'].id is defined
-          - _zones_info_dict['linuxhq.dev'].name is defined
-          - _zones_info_dict['linuxhq.dev'].name_servers | length == 2
-          - _zones_info_dict['linuxhq.dev'].status is defined
-          - _zones_info_dict['linuxhq.dev'].type == 'full'
+          - _zones_info_dict[_item].account.id is defined
+          - _zones_info_dict[_item].account.name is defined
+          - _zones_info_dict[_item].id is defined
+          - _zones_info_dict[_item].name is defined
+          - _zones_info_dict[_item].name_servers | length == 2
+          - _zones_info_dict[_item].status is defined
+          - _zones_info_dict[_item].type == 'full'
+      loop:
+        "{{ zones_list |
+            map(attribute='name', default=[]) }}"
+      loop_control:
+        label: "{{ _item | d(none) }}"
+        loop_var: _item
 
     - name: Ensure inventory lists are formatted
       ansible.builtin.set_fact:

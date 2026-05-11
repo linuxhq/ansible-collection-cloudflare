@@ -1,7 +1,7 @@
 # .gitignore
 
-.ansible
+.ansible/
 .DS_Store
 __pycache__/
-*.py[cod]
+*.py[co]
 venv

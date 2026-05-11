@@ -9,7 +9,7 @@
 
     - role: zones
       zones_list:
-        - name: linuxhq.dev
+        - name: molecule.com
           type: full
           settings:
             - id: min_tls_version

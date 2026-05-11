@@ -1,0 +1,41 @@
+---
+- name: Ensure cloudflare cache purge is executed
+  tags:
+    - purge_cache
+  linuxhq.cloudflare.purge_cache:
+    api_token: "{{ purge_cache_api_token }}"
+    cache: "{{ _cache.cache }}"
+    zone_id: "{{ _cache.zone_id }}"
+  register: __purge_cache_result
+  loop: "{{ __purge_cache_list }}"
+  loop_control:
+    label: "{{ _cache.zone_id | d(none) }}"
+    loop_var: _cache
+  async: "{{ ansible_check_mode | ternary(0, purge_cache_async) }}"
+  poll: "{{ purge_cache_poll }}"
+  when:
+    - purge_cache_api_token is not none
+    - _cache.cache is defined
+    - _cache.cache | length > 0
+    - _cache.zone_id is defined
+  changed_when:
+    - ansible_check_mode | bool
+    - __purge_cache_result.changed | bool
+
+- name: Ensure managed cloudflare cache purge jobs are complete
+  tags:
+    - purge_cache
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __purge_cache_status
+  loop: "{{ __purge_cache_result.results }}"
+  loop_control:
+    label: "{{ _jid._cache.zone_id | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __purge_cache_status.finished | bool
+  retries: "{{ purge_cache_retries }}"
+  delay: "{{ purge_cache_delay }}"
+...

@@ -5,7 +5,7 @@
     - zerotrust_connectivity_settings_info
 
   post_tasks:
-    - name: Ensure cloudflare zerotrust connectivity settings information is verified
+    - name: Ensure info is verified
       ansible.builtin.assert:
         that:
           - _zerotrust_connectivity_settings_info_dict.icmp_proxy_enabled is defined
