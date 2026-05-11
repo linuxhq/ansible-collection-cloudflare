@@ -12,14 +12,19 @@ Manage cloudflare zones
 
     zones_account_id: null
     zones_api_token: null
+    zones_async: 300
+    zones_batch: 10
+    zones_delay: 3
     zones_list: []
     zones_match: all
     zones_page: 1
     zones_per_page: 20
+    zones_poll: 0
+    zones_retries: 100
 
 ## Dependencies
 
-* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
+* [accounts\_info](../accounts_info)
 
 ## Example Playbook
 
@@ -27,10 +32,6 @@ Manage cloudflare zones
       connection: local
       roles:
         - role: linuxhq.cloudflare.zones
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
-          zones_account_id: "{{ _accounts_info_id }}"
-          zones_api_token: "{{ accounts_info_api_token }}"
           zones_list:
             - name: linuxhq.dev
               type: full

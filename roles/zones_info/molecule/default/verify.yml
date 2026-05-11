@@ -5,9 +5,29 @@
     - zones_info
 
   post_tasks:
-    - name: Ensure cloudflare zones information is verified
+    - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _zones_info_dict | length > 0
-          - _zones_info_list | length > 0
+          - _zones_info_dict['linuxhq.dev'].account.id is defined
+          - _zones_info_dict['linuxhq.dev'].account.name is defined
+          - _zones_info_dict['linuxhq.dev'].id is defined
+          - _zones_info_dict['linuxhq.dev'].name is defined
+          - _zones_info_dict['linuxhq.dev'].name_servers | length == 2
+          - _zones_info_dict['linuxhq.dev'].status is defined
+          - _zones_info_dict['linuxhq.dev'].type == 'full'
+
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        zones_list:
+          "{{ zones_list |
+              map('combine', {'state': 'absent'}) }}"
+
+    - name: Ensure roles are included
+      ansible.builtin.include_role:
+        name: "{{ _role }}"
+      loop:
+        - zones
+      loop_control:
+        label: "{{ _role | d(none) }}"
+        loop_var: _role
 ...

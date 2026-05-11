@@ -115,11 +115,12 @@ def endpoint(account_id):
     return "/accounts/%s/access/groups" % account_id
 
 
+def validate_present(module):
+    if not module.params.get("include"):
+        module.fail_json(msg="include is required when state=present")
+
+
 def main():
-    run_module()
-
-
-def run_module():
     module = AnsibleModule(
         argument_spec={
             "account_id": {"required": True, "type": "str"},
@@ -204,11 +205,6 @@ def run_module():
             message="Access group updated",
             access_group=access_group,
         )
-
-
-def validate_present(module):
-    if not module.params.get("include"):
-        module.fail_json(msg="include is required when state=present")
 
 
 if __name__ == "__main__":

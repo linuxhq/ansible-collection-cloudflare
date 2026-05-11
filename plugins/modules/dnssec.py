@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-
 DOCUMENTATION = r"""
 ---
 module: dnssec
@@ -105,10 +104,6 @@ def get_dnssec(client, zone_id):
     return client.dns.dnssec.get(zone_id=zone_id)
 
 
-def main():
-    run_module()
-
-
 def needs_update(current, params):
     comparisons = (
         (
@@ -152,7 +147,7 @@ def normalize_status(status):
     return status
 
 
-def run_module():
+def main():
     module = AnsibleModule(
         argument_spec={
             "api_token": {"required": True, "type": "str", "no_log": True},

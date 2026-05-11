@@ -20,8 +20,8 @@ Manage cloudflare dns records
 
 ## Dependencies
 
-* [linuxhq.cloudflare.cfd\_tunnel\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/cfd_tunnel_info)
-* [linuxhq.cloudflare.warp\_connector\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/warp_connector_info)
+* [cfd\_tunnel\_info](../cfd_tunnel_info)
+* [warp\_connector\_info](../warp_connector_info)
 
 ## Example Playbook
 
@@ -29,7 +29,6 @@ Manage cloudflare dns records
       connection: local
       roles:
         - role: linuxhq.cloudflare.dns
-          dns_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
           dns_records:
             - zone: linuxhq.dev
               records:

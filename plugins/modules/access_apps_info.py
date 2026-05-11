@@ -58,10 +58,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 
 
 def main():
-    run_module()
-
-
-def run_module():
     module = AnsibleModule(
         argument_spec={
             "account_id": {"required": True, "type": "str"},

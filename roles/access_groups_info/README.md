@@ -27,6 +27,4 @@ Gather information about cloudflare access groups
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.access_groups_info
-          access_groups_info_account_id: "{{ _accounts_info_id }}"
-          access_groups_info_api_token: "{{ accounts_info_api_token }}"
+        - linuxhq.cloudflare.access_groups_info

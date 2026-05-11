@@ -1,5 +1,15 @@
 ---
 - name: Verify
   hosts: all
-  tasks: []
+
+  roles:
+    - devices_settings_info
+
+  post_tasks:
+    - name: Ensure cloudflare devices settings information is verified
+      ansible.builtin.assert:
+        that:
+          - _devices_settings_info_dict.gateway_proxy_enabled | bool
+          - _devices_settings_info_dict.gateway_udp_proxy_enabled | bool
+          - _devices_settings_info_dict.use_zt_virtual_ip  | bool
 ...

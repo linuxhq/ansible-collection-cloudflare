@@ -5,8 +5,11 @@
     - role: cfd_tunnel
       tags:
         - molecule-idempotence-notest
+      check_mode: false
 
     - role: cfd_tunnel_configurations
+      cfd_tunnel_configurations_info_account_id: null
+      cfd_tunnel_configurations_info_api_token: null
       tags:
         - molecule-idempotence-notest
 

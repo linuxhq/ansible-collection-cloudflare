@@ -2,6 +2,11 @@
 - name: Converge
   hosts: all
   roles:
+    - role: devices_settings
+      tags:
+        - molecule-idempotence-notest
+      check_mode: false
+
     - role: devices_settings_info
       devices_settings_info_account_id: null
       devices_settings_info_api_token: null

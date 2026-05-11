@@ -1,22 +1,30 @@
 ---
-- name: Ensure cloudflare devices policy are managed
+- name: Ensure cloudflare devices policy is managed
   tags:
     - devices_policy
-  ansible.builtin.uri:
-    body: "{{ devices_policy_dict }}"
-    body_format: json
-    headers:
-      Authorization: "Bearer {{ devices_policy_api_token }}"
-    method: PATCH
-    status_code:
-      - 200
-    url:
-      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
-          devices_policy_account_id ~
-          '/devices/policy' }}"
-  changed_when: true
+  linuxhq.cloudflare.devices_policy:
+    account_id: "{{ devices_policy_account_id }}"
+    allow_mode_switch: "{{ devices_policy_allow_mode_switch or omit }}"
+    allow_updates: "{{ devices_policy_allow_updates or omit }}"
+    allowed_to_leave: "{{ devices_policy_allowed_to_leave or omit }}"
+    api_token: "{{ devices_policy_api_token }}"
+    auto_connect: "{{ devices_policy_auto_connect or omit }}"
+    captive_portal: "{{ devices_policy_captive_portal or omit }}"
+    disable_auto_fallback: "{{ devices_policy_disable_auto_fallback or omit }}"
+    exclude: "{{ devices_policy_exclude or omit }}"
+    exclude_office_ips: "{{ devices_policy_exclude_office_ips or omit }}"
+    include: "{{ devices_policy_include or omit }}"
+    lan_allow_minutes: "{{ devices_policy_lan_allow_minutes or omit }}"
+    lan_allow_subnet_size: "{{ devices_policy_lan_allow_subnet_size or omit }}"
+    register_interface_ip_with_dns:
+      "{{ devices_policy_register_interface_ip_with_dns or omit }}"
+    sccm_vpn_boundary_support:
+      "{{ devices_policy_sccm_vpn_boundary_support or omit }}"
+    service_mode_v2: "{{ devices_policy_service_mode_v2 or omit }}"
+    support_url: "{{ devices_policy_support_url or omit }}"
+    switch_locked: "{{ devices_policy_switch_locked or omit }}"
+    tunnel_protocol: "{{ devices_policy_tunnel_protocol or omit }}"
   when:
     - devices_policy_account_id is not none
     - devices_policy_api_token is not none
-    - devices_policy_dict | length > 0
 ...

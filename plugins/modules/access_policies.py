@@ -163,11 +163,20 @@ def endpoint(account_id):
     return "/accounts/%s/access/policies" % account_id
 
 
+def validate_present(module):
+    missing = [
+        field
+        for field in ("decision", "include")
+        if module.params.get(field) in (None, [], "")
+    ]
+    if missing:
+        module.fail_json(
+            msg="decision and include are required when state=present",
+            missing=missing,
+        )
+
+
 def main():
-    run_module()
-
-
-def run_module():
     module = AnsibleModule(
         argument_spec={
             "account_id": {"required": True, "type": "str"},
@@ -257,19 +266,6 @@ def run_module():
             changed=True,
             message="Access policy updated",
             access_policy=access_policy,
-        )
-
-
-def validate_present(module):
-    missing = [
-        field
-        for field in ("decision", "include")
-        if module.params.get(field) in (None, [], "")
-    ]
-    if missing:
-        module.fail_json(
-            msg="decision and include are required when state=present",
-            missing=missing,
         )
 
 

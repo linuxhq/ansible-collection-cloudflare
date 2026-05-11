@@ -23,5 +23,4 @@ Gather information about cloudflare dnssec settings
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.dnssec_info
-          dnssec_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
+        - linuxhq.cloudflare.dnssec_info

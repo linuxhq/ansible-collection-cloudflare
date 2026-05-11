@@ -1,0 +1,42 @@
+---
+- name: Ensure cloudflare cfd tunnel configurations are managed
+  tags:
+    - cfd_tunnel_configurations
+  linuxhq.cloudflare.cfd_tunnel_configurations:
+    account_id: "{{ cfd_tunnel_configurations_account_id }}"
+    api_token: "{{ cfd_tunnel_configurations_api_token }}"
+    config: "{{ _configuration.config }}"
+    tunnel_id: "{{ _configuration.tunnel_id }}"
+  register: __cfd_tunnel_configurations_result
+  loop: "{{ __cfd_tunnel_configurations_list }}"
+  loop_control:
+    label: "{{ _configuration.tunnel_id | d(none) }}"
+    loop_var: _configuration
+  async: "{{ ansible_check_mode | ternary(0, cfd_tunnel_configurations_async) }}"
+  poll: "{{ cfd_tunnel_configurations_poll }}"
+  when:
+    - cfd_tunnel_configurations_account_id is not none
+    - cfd_tunnel_configurations_api_token is not none
+    - _configuration.config is defined
+    - _configuration.tunnel_id is defined
+  changed_when:
+    - ansible_check_mode | bool
+    - __cfd_tunnel_configurations_result.changed | bool
+
+- name: Ensure managed cloudflare cfd tunnel configuration jobs are complete
+  tags:
+    - cfd_tunnel_configurations
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __cfd_tunnel_configurations_status
+  loop: "{{ __cfd_tunnel_configurations_result.results }}"
+  loop_control:
+    label: "{{ _jid._configuration.tunnel_id | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __cfd_tunnel_configurations_status.finished | bool
+  retries: "{{ cfd_tunnel_configurations_retries }}"
+  delay: "{{ cfd_tunnel_configurations_delay }}"
+...

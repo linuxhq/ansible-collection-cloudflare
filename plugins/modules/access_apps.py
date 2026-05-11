@@ -208,10 +208,6 @@ def item_endpoint(account_id, app_id):
     return "%s/%s" % (endpoint(account_id), app_id)
 
 
-def main():
-    run_module()
-
-
 def normalize_current_list_by_desired_fields(current, desired):
     if not isinstance(current, list) or not isinstance(desired, list):
         return current
@@ -234,7 +230,18 @@ def normalize_current_list_by_desired_fields(current, desired):
     return normalized
 
 
-def run_module():
+def validate_present(module):
+    missing = [
+        field for field in ("domain", "type") if module.params.get(field) in (None, "")
+    ]
+    if missing:
+        module.fail_json(
+            msg="domain and type are required when state=present",
+            missing=missing,
+        )
+
+
+def main():
     module = AnsibleModule(
         argument_spec={
             "account_id": {"required": True, "type": "str"},
@@ -333,17 +340,6 @@ def run_module():
             changed=True,
             message="Access application updated",
             access_app=access_app,
-        )
-
-
-def validate_present(module):
-    missing = [
-        field for field in ("domain", "type") if module.params.get(field) in (None, "")
-    ]
-    if missing:
-        module.fail_json(
-            msg="domain and type are required when state=present",
-            missing=missing,
         )
 
 

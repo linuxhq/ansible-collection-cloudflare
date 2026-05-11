@@ -30,8 +30,6 @@ Manage cloudflare access service tokens
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_service_tokens
-          access_service_tokens_account_id: "{{ _accounts_info_id }}"
-          access_service_tokens_api_token: "{{ accounts_info_api_token }}"
           access_service_tokens_list:
             - name: molecule-00
               duration: forever

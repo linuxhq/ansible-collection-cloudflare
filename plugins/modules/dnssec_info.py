@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-
 DOCUMENTATION = r"""
 ---
 module: dnssec_info
@@ -140,17 +139,13 @@ def list_zones(client):
     return zones
 
 
-def main():
-    run_module()
-
-
 def raise_zone_error(exc, zone, message):
     setattr(exc, "_cloudflare_message", message)
     setattr(exc, "_cloudflare_context", {"zone": zone})
     raise exc
 
 
-def run_module():
+def main():
     module = AnsibleModule(
         argument_spec={
             "api_token": {"required": True, "type": "str", "no_log": True},
