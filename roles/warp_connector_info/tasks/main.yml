@@ -1,5 +1,5 @@
 ---
-- name: Ensure cloudflare warp connector information is gathered
+- name: Ensure cloudflare warp connectors information is gathered
   tags:
     - warp_connector_info
   linuxhq.cloudflare.warp_connector_info:
@@ -10,7 +10,7 @@
     - warp_connector_info_account_id is not none
     - warp_connector_info_api_token is not none
 
-- name: Ensure list of cloudflare warp connector information is generated
+- name: Ensure list of cloudflare warp connectors information is generated
   tags:
     - warp_connector_info
   ansible.builtin.set_fact:
@@ -18,7 +18,7 @@
       "{{ __warp_connector_info_query.warp_connectors |
           d([]) }}"
 
-- name: Ensure dict of cloudflare warp connector information is generated
+- name: Ensure dict of cloudflare warp connectors information is generated
   tags:
     - warp_connector_info
   ansible.builtin.set_fact:
