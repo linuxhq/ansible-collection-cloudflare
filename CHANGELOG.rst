@@ -22,6 +22,7 @@ Breaking Changes / Porting Guide
 --------------------------------
 
 - device_policy - defaults have been broken out into individual variables
+- pages_projects - dns additions removed, use dns role instead
 
 v2.0.5
 ======

@@ -2,11 +2,10 @@
 - name: Converge
   hosts: all
   roles:
-    - role: pages_projects_info
-      pages_projects_info_account_id: null
-      pages_projects_info_api_token: null
+    - role: pages_projects
       tags:
         - molecule-idempotence-notest
+      check_mode: false
 
     - pages_projects_info
 ...

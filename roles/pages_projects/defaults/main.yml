@@ -1,5 +1,10 @@
 ---
 pages_projects_account_id: null
 pages_projects_api_token: null
+pages_projects_async: 300
+pages_projects_batch: 10
+pages_projects_delay: 3
 pages_projects_list: []
+pages_projects_poll: 0
+pages_projects_retries: 100
 ...

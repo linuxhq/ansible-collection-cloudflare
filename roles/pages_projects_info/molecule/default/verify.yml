@@ -1,13 +1,40 @@
 ---
 - name: Verify
   hosts: all
+
   roles:
     - pages_projects_info
 
   post_tasks:
-    - name: Ensure cloudflare pages projects information is verified
+    - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _pages_projects_info_dict | length > 0
-          - _pages_projects_info_list | length > 0
+          - _pages_projects_info_dict[_item].deployment_configs.preview | length > 0
+          - _pages_projects_info_dict[_item].deployment_configs.production | length > 0
+          - _pages_projects_info_dict[_item].domains.0 == _item ~ '.pages.dev'
+          - _pages_projects_info_dict[_item].id is defined
+          - _pages_projects_info_dict[_item].name is defined
+          - _pages_projects_info_dict[_item].production_branch == 'main'
+          - _pages_projects_info_dict[_item].subdomain == _item ~ '.pages.dev'
+      loop:
+        "{{ pages_projects_list |
+            map(attribute='name', default=[]) }}"
+      loop_control:
+        label: "{{ _item | d(none) }}"
+        loop_var: _item
+
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        pages_projects_list:
+          "{{ pages_projects_list |
+              map('combine', {'state': 'absent'}) }}"
+
+    - name: Ensure roles are included
+      ansible.builtin.include_role:
+        name: "{{ _role }}"
+      loop:
+        - pages_projects
+      loop_control:
+        label: "{{ _role | d(none) }}"
+        loop_var: _role
 ...

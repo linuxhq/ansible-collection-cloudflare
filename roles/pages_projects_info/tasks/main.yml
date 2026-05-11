@@ -2,18 +2,10 @@
 - name: Ensure cloudflare pages projects information is gathered
   tags:
     - pages_projects_info
-  ansible.builtin.uri:
-    headers:
-      Authorization: "Bearer {{ pages_projects_info_api_token }}"
-    method: GET
-    status_code:
-      - 200
-    url:
-      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
-          pages_projects_info_account_id ~
-          '/pages/projects' }}"
+  linuxhq.cloudflare.pages_projects_info:
+    account_id: "{{ pages_projects_info_account_id }}"
+    api_token: "{{ pages_projects_info_api_token }}"
   register: __pages_projects_info_query
-  check_mode: false
   when:
     - pages_projects_info_account_id is not none
     - pages_projects_info_api_token is not none
@@ -23,7 +15,7 @@
     - pages_projects_info
   ansible.builtin.set_fact:
     _pages_projects_info_list:
-      "{{ __pages_projects_info_query.json.result |
+      "{{ __pages_projects_info_query.pages_projects |
           d([]) }}"
 
 - name: Ensure dict of cloudflare pages project information is generated

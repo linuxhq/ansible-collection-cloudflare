@@ -10,5 +10,4 @@ pages_projects_list:
     production_branch: main
     domains:
       - name: "pages.{{ cloudflare_domain }}"
-        zone: "{{ cloudflare_domain }}"
 ...

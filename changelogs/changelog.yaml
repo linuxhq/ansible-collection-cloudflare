@@ -5,6 +5,7 @@ releases:
     changes:
       breaking_changes:
         - device_policy - defaults have been broken out into individual variables
+        - pages_projects - dns additions removed, use dns role instead
       minor_changes:
         - all - migrated from uri wrappers to custom ansible modules
         - all - added async support to applicable roles
