@@ -1,4 +1,5 @@
 ---
+allow_duplicates: true
 dependencies:
   - role: accounts_info
     tags: zerotrust_connectivity_settings_info
