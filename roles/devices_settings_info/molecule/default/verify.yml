@@ -5,7 +5,7 @@
     - devices_settings_info
 
   post_tasks:
-    - name: Ensure cloudflare devices settings information is verified
+    - name: Ensure info is verified
       ansible.builtin.assert:
         that:
           - _devices_settings_info_dict.disable_for_time is defined

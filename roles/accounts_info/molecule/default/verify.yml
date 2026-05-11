@@ -5,7 +5,7 @@
     - accounts_info
 
   post_tasks:
-    - name: Ensure cloudflare accounts information is verified
+    - name: Ensure info is verified
       ansible.builtin.assert:
         that:
           - _accounts_info_id is defined

@@ -6,7 +6,7 @@
     - access_identity_providers_info
 
   post_tasks:
-    - name: Ensure cloudflare access identity providers information is verified
+    - name: Ensure info is verified
       ansible.builtin.assert:
         that:
           - _access_identity_providers_info_dict['onetimepin'].config.redirect_url is defined
