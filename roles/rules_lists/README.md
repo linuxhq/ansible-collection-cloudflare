@@ -12,11 +12,16 @@ Manage cloudflare rules lists
 
     rules_lists_account_id: null
     rules_lists_api_token: null
+    rules_lists_async: 300
+    rules_lists_batch: 10
+    rules_lists_delay: 3
     rules_lists_list: []
+    rules_lists_poll: 0
+    rules_lists_retries: 100
 
 ## Dependencies
 
-* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
+* [accounts\_info](../accounts_info)
 
 ## Example Playbook
 
@@ -24,10 +29,6 @@ Manage cloudflare rules lists
       connection: local
       roles:
         - role: linuxhq.cloudflare.rules_lists
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
-          rules_lists_account_id: "{{ _accounts_info_id }}"
-          rules_lists_api_token: "{{ accounts_info_api_token }}"
           rules_lists_list:
             - kind: ip
               name: uptime_robot

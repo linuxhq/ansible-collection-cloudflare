@@ -1,5 +1,10 @@
 ---
 rules_lists_account_id: null
 rules_lists_api_token: null
+rules_lists_async: 300
+rules_lists_batch: 10
+rules_lists_delay: 3
 rules_lists_list: []
+rules_lists_poll: 0
+rules_lists_retries: 100
 ...

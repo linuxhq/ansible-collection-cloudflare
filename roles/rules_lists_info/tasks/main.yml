@@ -2,18 +2,10 @@
 - name: Ensure cloudflare rules lists information is gathered
   tags:
     - rules_lists_info
-  ansible.builtin.uri:
-    headers:
-      Authorization: "Bearer {{ rules_lists_info_api_token }}"
-    method: GET
-    status_code:
-      - 200
-    url:
-      "{{ 'https://api.cloudflare.com/client/v4/accounts/' ~
-          rules_lists_info_account_id ~
-          '/rules/lists' }}"
+  linuxhq.cloudflare.rules_lists_info:
+    account_id: "{{ rules_lists_info_account_id }}"
+    api_token: "{{ rules_lists_info_api_token }}"
   register: __rules_lists_info_query
-  check_mode: false
   when:
     - rules_lists_info_account_id is not none
     - rules_lists_info_api_token is not none
@@ -23,7 +15,7 @@
     - rules_lists_info
   ansible.builtin.set_fact:
     _rules_lists_info_list:
-      "{{ __rules_lists_info_query.json.result |
+      "{{ __rules_lists_info_query.rules_lists |
           d([]) }}"
 
 - name: Ensure dict of cloudflare rule lists information is generated
