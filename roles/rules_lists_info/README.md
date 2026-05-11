@@ -15,7 +15,7 @@ Gather information about cloudflare rules lists
 
 ## Dependencies
 
-* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
+* [accounts\_info](../accounts_info)
 
 ## Return Values
 
@@ -27,8 +27,4 @@ Gather information about cloudflare rules lists
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.rules_lists_info
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
-          rules_lists_info_account_id: "{{ _accounts_info_id }}"
-          rules_lists_info_api_token: "{{ accounts_info_api_token }}"
+        - linuxhq.cloudflare.rules_lists_info

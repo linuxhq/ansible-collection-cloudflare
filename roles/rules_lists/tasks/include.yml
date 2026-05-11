@@ -1,0 +1,44 @@
+---
+- name: Ensure cloudflare rules lists are managed
+  tags:
+    - rules_lists
+  linuxhq.cloudflare.rules_lists:
+    account_id: "{{ rules_lists_account_id }}"
+    api_token: "{{ rules_lists_api_token }}"
+    description: "{{ _rules_list.description | d(omit) }}"
+    elements: "{{ _rules_list.elements | d(omit) }}"
+    kind: "{{ _rules_list.kind | d(omit) }}"
+    name: "{{ _rules_list.name }}"
+    state: "{{ _rules_list.state | d('present') }}"
+  register: __rules_lists_result
+  loop: "{{ __rules_lists_list }}"
+  loop_control:
+    label: "{{ _rules_list.name | d(none) }}"
+    loop_var: _rules_list
+  async: "{{ ansible_check_mode | ternary(0, rules_lists_async) }}"
+  poll: "{{ rules_lists_poll }}"
+  when:
+    - rules_lists_account_id is not none
+    - rules_lists_api_token is not none
+    - _rules_list.name is defined
+  changed_when:
+    - ansible_check_mode | bool
+    - __rules_lists_result.changed | bool
+
+- name: Ensure managed cloudflare rules list jobs are complete
+  tags:
+    - rules_lists
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __rules_lists_status
+  loop: "{{ __rules_lists_result.results }}"
+  loop_control:
+    label: "{{ _jid._rules_list.name | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __rules_lists_status.finished | bool
+  retries: "{{ rules_lists_retries }}"
+  delay: "{{ rules_lists_delay }}"
+...

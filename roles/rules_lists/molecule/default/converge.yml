@@ -7,5 +7,14 @@
       tags:
         - molecule-idempotence-notest
 
+    - role: rules_lists
+      rules_lists_list:
+        - kind: ip
+          name: uptime_robot
+          elements:
+            - ip: 127.0.0.1
+      tags:
+        - molecule-idempotence-notest
+
     - rules_lists
 ...

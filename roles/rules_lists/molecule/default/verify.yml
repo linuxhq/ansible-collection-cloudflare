@@ -2,13 +2,19 @@
 - name: Verify
   hosts: all
 
-  pre_tasks:
+  tasks:
     - name: Ensure inventory lists are formatted
       ansible.builtin.set_fact:
         rules_lists_list:
           "{{ rules_lists_list |
               map('combine', {'state': 'absent'}) }}"
 
-  roles:
-    - rules_lists
+    - name: Ensure roles are included
+      ansible.builtin.include_role:
+        name: "{{ _role }}"
+      loop:
+        - rules_lists
+      loop_control:
+        label: "{{ _role | d(none) }}"
+        loop_var: _role
 ...

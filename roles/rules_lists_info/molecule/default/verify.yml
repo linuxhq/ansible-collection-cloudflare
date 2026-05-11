@@ -1,13 +1,33 @@
 ---
 - name: Verify
   hosts: all
+
   roles:
     - rules_lists_info
 
   post_tasks:
-    - name: Ensure cloudflare rules lists information is verified
+    - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _rules_lists_info_dict | length > 0
-          - _rules_lists_info_list | length > 0
+          - _rules_lists_info_dict[rules_lists_list.0.name].description is defined
+          - _rules_lists_info_dict[rules_lists_list.0.name].id is defined
+          - _rules_lists_info_dict[rules_lists_list.0.name].kind == 'ip'
+          - _rules_lists_info_dict[rules_lists_list.0.name].name is defined
+          - _rules_lists_info_dict[rules_lists_list.0.name].num_items > 0
+          - _rules_lists_info_dict[rules_lists_list.0.name].num_referencing_filters is defined
+
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        rules_lists_list:
+          "{{ rules_lists_list |
+              map('combine', {'state': 'absent'}) }}"
+
+    - name: Ensure roles are included
+      ansible.builtin.include_role:
+        name: "{{ _role }}"
+      loop:
+        - rules_lists
+      loop_control:
+        label: "{{ _role | d(none) }}"
+        loop_var: _role
 ...
