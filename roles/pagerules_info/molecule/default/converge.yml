@@ -2,6 +2,16 @@
 - name: Converge
   hosts: all
   roles:
+    - role: zones
+      tags:
+        - molecule-idempotence-notest
+      check_mode: false
+
+    - role: pagerules
+      tags:
+        - molecule-idempotence-notest
+      check_mode: false
+
     - role: pagerules_info
       pagerules_info_api_token: null
       tags:

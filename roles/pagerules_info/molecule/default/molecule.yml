@@ -21,7 +21,56 @@ provisioner:
   inventory:
     group_vars:
       all:
-        pagerules_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+        accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+
+        pagerules_api_token: "{{ accounts_info_api_token }}"
+        pagerules_list:
+          - zone_id: "{{ _zones_info_dict[zones_list.0.name].id }}"
+            pagerules:
+              - actions:
+                  - id: forwarding_url
+                    value:
+                      status_code: 301
+                      url: https://docs.ansible.com/projects/molecule
+                status: active
+                targets:
+                  - constraint:
+                      operator: matches
+                      value: "molecule.org/*"
+                    target: url
+              - actions:
+                  - id: forwarding_url
+                    value:
+                      status_code: 301
+                      url: https://docs.ansible.com/projects/molecule
+                status: active
+                targets:
+                  - constraint:
+                      operator: matches
+                      value: "www.molecule.org/*"
+                    target: url
+
+        pagerules_info_api_token: "{{ accounts_info_api_token }}"
+
+        zones_account_id: "{{ _accounts_info_id }}"
+        zones_api_token: "{{ accounts_info_api_token }}"
+        zones_list:
+          - name: molecule.org
+            type: full
+            settings:
+              - id: always_use_https
+                value: 'on'
+              - id: development_mode
+                value: 'on'
+              - id: ipv6
+                value: 'off'
+              - id: min_tls_version
+                value: 1.3
+              - id: ssl
+                value: strict
+
+        zones_info_api_token: "{{ accounts_info_api_token }}"
 
 scenario:
   test_sequence:
