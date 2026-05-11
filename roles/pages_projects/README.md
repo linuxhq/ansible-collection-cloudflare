@@ -29,8 +29,18 @@ Manage cloudflare pages projects
       connection: local
       roles:
         - role: linuxhq.cloudflare.pages_projects
+          pages_projects_account_id: '{{ _accounts_info_id }}'
+          pages_projects_api_token: '{{ accounts_info_api_token }}'
           pages_projects_list:
-            - name: linuxhq-dev
+            - name: molecule-com
               production_branch: main
               domains:
-                - name: linuxhq.dev
+                - name: molecule.com
+            - name: molecule-net
+              production_branch: main
+              domains:
+                - name: molecule.net
+            - name: molecule-org
+              production_branch: main
+              domains:
+                - name: molecule.org

@@ -29,6 +29,8 @@ Manage cloudflare rules lists
       connection: local
       roles:
         - role: linuxhq.cloudflare.rules_lists
+          rules_lists_account_id: '{{ _accounts_info_id }}'
+          rules_lists_api_token: '{{ accounts_info_api_token }}'
           rules_lists_list:
             - kind: ip
               name: uptime_robot
@@ -36,5 +38,6 @@ Manage cloudflare rules lists
                 "{{ lookup('ansible.builtin.url',
                            'https://uptimerobot.com/inc/files/ips/IPv4.txt',
                            wantlist=true) |
-                    map('community.general.dict_kv', 'ip') |
+                    map('community.general.dict_kv',
+                        'ip') |
                     sort(attribute='ip') }}"

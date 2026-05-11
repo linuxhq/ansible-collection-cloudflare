@@ -27,4 +27,6 @@ Gather information about cloudflare access identity providers
     - hosts: cloudflare
       connection: local
       roles:
-        - linuxhq.cloudflare.access_identity_providers_info
+        - role: linuxhq.cloudflare.access_identity_providers_info
+          access_identity_providers_info_account_id: '{{ _accounts_info_id }}'
+          access_identity_providers_info_api_token: '{{ accounts_info_api_token }}'

@@ -27,4 +27,6 @@ Gather information about cloudflare rules lists
     - hosts: cloudflare
       connection: local
       roles:
-        - linuxhq.cloudflare.rules_lists_info
+        - role: linuxhq.cloudflare.rules_lists_info
+          rules_lists_info_account_id: '{{ _accounts_info_id }}'
+          rules_lists_info_api_token: '{{ accounts_info_api_token }}'

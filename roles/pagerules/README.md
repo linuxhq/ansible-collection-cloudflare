@@ -28,28 +28,29 @@ Manage cloudflare page rules
       connection: local
       roles:
         - role: linuxhq.cloudflare.pagerules
+          pagerules_api_token: '{{ accounts_info_api_token }}'
           pagerules_list:
-            - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"
+            - zone_id: '{{ _zones_info_dict[zones_list.0.name].id }}'
               pagerules:
                 - actions:
                     - id: forwarding_url
                       value:
                         status_code: 301
-                        url: https://github.com/linuxhq
+                        url: https://docs.ansible.com/projects/molecule
                   status: active
                   targets:
                     - constraint:
                         operator: matches
-                        value: "linuxhq.dev/*"
+                        value: molecule.org/*
                       target: url
                 - actions:
                     - id: forwarding_url
                       value:
                         status_code: 301
-                        url: https://github.com/linuxhq
+                        url: https://docs.ansible.com/projects/molecule
                   status: active
                   targets:
                     - constraint:
                         operator: matches
-                        value: "www.linuxhq.dev/*"
+                        value: www.molecule.org/*
                       target: url

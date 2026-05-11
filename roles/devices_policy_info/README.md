@@ -26,4 +26,6 @@ Gather information about cloudflare devices policy
     - hosts: cloudflare
       connection: local
       roles:
-        - linuxhq.cloudflare.devices_policy_info
+        - role: linuxhq.cloudflare.devices_policy_info
+          devices_policy_info_account_id: '{{ _accounts_info_id }}'
+          devices_policy_info_api_token: '{{ accounts_info_api_token }}'

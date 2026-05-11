@@ -27,4 +27,6 @@ Gather information about cloudflare pages projects
     - hosts: cloudflare
       connection: local
       roles:
-        - linuxhq.cloudflare.pages_projects_info
+        - role: linuxhq.cloudflare.pages_projects_info
+          pages_projects_info_account_id: '{{ _accounts_info_id }}'
+          pages_projects_info_api_token: '{{ accounts_info_api_token }}'

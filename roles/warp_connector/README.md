@@ -29,6 +29,8 @@ Manage cloudflare warp connectors
       connection: local
       roles:
         - role: linuxhq.cloudflare.warp_connector
+          warp_connector_account_id: '{{ _accounts_info_id }}'
+          warp_connector_api_token: '{{ accounts_info_api_token }}'
           warp_connector_list:
             - name: molecule-00
             - name: molecule-01

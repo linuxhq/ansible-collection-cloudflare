@@ -29,10 +29,59 @@ Manage cloudflare dns records
       connection: local
       roles:
         - role: linuxhq.cloudflare.dns
+          dns_api_token: '{{ accounts_info_api_token }}'
           dns_records:
-            - zone: linuxhq.dev
+            - zone: '{{ zones_list.0.name }}'
               records:
-                - record: ansible
+                - record: one
+                  proxied: true
+                  type: A
+                  value: 8.8.8.1
+                - record: two
                   proxied: false
-                  type: CNAME
-                  value: ansible.com
+                  type: A
+                  value: 8.8.8.2
+                - record: three
+                  proxied: true
+                  type: A
+                  value: 8.8.8.3
+                - record: four
+                  proxied: false
+                  type: A
+                  value: 8.8.8.4
+                - record: five
+                  proxied: true
+                  type: A
+                  value: 8.8.8.5
+                - record: six
+                  proxied: false
+                  type: A
+                  value: 8.8.8.6
+                - record: seven
+                  proxied: true
+                  type: A
+                  value: 8.8.8.7
+                - record: eight
+                  proxied: false
+                  type: A
+                  value: 8.8.8.8
+                - record: nine
+                  proxied: true
+                  type: A
+                  value: 8.8.8.9
+                - record: ten
+                  proxied: false
+                  type: A
+                  value: 8.8.8.10
+                - record: eleven
+                  proxied: true
+                  type: A
+                  value: 8.8.8.11
+                - record: twelve
+                  proxied: false
+                  type: A
+                  value: 8.8.8.12
+                - record: thirteen
+                  proxied: true
+                  type: A
+                  value: 8.8.8.13

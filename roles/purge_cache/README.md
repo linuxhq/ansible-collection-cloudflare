@@ -28,7 +28,8 @@ Manage cloudflare purging of cache
       connection: local
       roles:
         - role: linuxhq.cloudflare.purge_cache
+          purge_cache_api_token: '{{ accounts_info_api_token }}'
           purge_cache_list:
-            - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"
+            - zone_id: '{{ _zones_info_dict[zones_list.0.name].id }}'
               cache:
                 purge_everything: true
