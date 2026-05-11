@@ -6,12 +6,16 @@
     - name: Ensure inventory lists are formatted
       ansible.builtin.set_fact:
         dns_records:
-          - zone: linuxhq.dev
+          - zone: "{{ zones_list.0.name }}"
             records:
               "{{ dns_records[0].records |
                   map('combine', {'state': 'absent'}) |
                   list }}"
+        zones_list:
+          "{{ zones_list |
+              map('combine', {'state': 'absent'}) }}"
 
   roles:
     - dns
+    - zones
 ...
