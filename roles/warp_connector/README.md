@@ -12,11 +12,16 @@ Manage cloudflare warp connectors
 
     warp_connector_account_id: null
     warp_connector_api_token: null
+    warp_connector_async: 300
+    warp_connector_batch: 10
+    warp_connector_delay: 3
     warp_connector_list: []
+    warp_connector_poll: 0
+    warp_connector_retries: 100
 
 ## Dependencies
 
-* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
+* [accounts\_info](../accounts_info)
 
 ## Example Playbook
 
@@ -24,9 +29,9 @@ Manage cloudflare warp connectors
       connection: local
       roles:
         - role: linuxhq.cloudflare.warp_connector
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
-          warp_connector_account_id: "{{ _accounts_info_id }}"
-          warp_connector_api_token: "{{ accounts_info_api_token }}"
           warp_connector_list:
-            - name: linuxhq.dev
+            - name: molecule-00
+            - name: molecule-01
+            - name: molecule-02
+            - name: molecule-03
+            - name: molecule-04

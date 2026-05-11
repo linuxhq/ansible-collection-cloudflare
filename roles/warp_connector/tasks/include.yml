@@ -1,0 +1,42 @@
+---
+- name: Ensure cloudflare warp connectors are managed
+  tags:
+    - warp_connector
+  linuxhq.cloudflare.warp_connector:
+    account_id: "{{ warp_connector_account_id }}"
+    api_token: "{{ warp_connector_api_token }}"
+    name: "{{ _warp_connector.name }}"
+    state: "{{ _warp_connector.state | d('present') }}"
+    tunnel_secret: "{{ _warp_connector.tunnel_secret | d(omit) }}"
+  register: __warp_connector_result
+  loop: "{{ __warp_connector_list }}"
+  loop_control:
+    label: "{{ _warp_connector.name | d(none) }}"
+    loop_var: _warp_connector
+  async: "{{ ansible_check_mode | ternary(0, warp_connector_async) }}"
+  poll: "{{ warp_connector_poll }}"
+  when:
+    - warp_connector_account_id is not none
+    - warp_connector_api_token is not none
+    - _warp_connector.name is defined
+  changed_when:
+    - ansible_check_mode | bool
+    - __warp_connector_result.changed | bool
+
+- name: Ensure managed cloudflare warp connector jobs are complete
+  tags:
+    - warp_connector
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __warp_connector_status
+  loop: "{{ __warp_connector_result.results }}"
+  loop_control:
+    label: "{{ _jid._warp_connector.name | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __warp_connector_status.finished | bool
+  retries: "{{ warp_connector_retries }}"
+  delay: "{{ warp_connector_delay }}"
+...

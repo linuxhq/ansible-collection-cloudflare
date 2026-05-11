@@ -1,5 +1,10 @@
 ---
 warp_connector_account_id: null
 warp_connector_api_token: null
+warp_connector_async: 300
+warp_connector_batch: 10
+warp_connector_delay: 3
 warp_connector_list: []
+warp_connector_poll: 0
+warp_connector_retries: 100
 ...
