@@ -13,6 +13,7 @@
     - access_policies
     - access_apps
     - cfd_tunnel
+    - cfd_tunnel_configurations
     - devices_policy
     - devices_settings
     - zerotrust_connectivity_settings
