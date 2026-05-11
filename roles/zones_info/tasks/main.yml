@@ -2,22 +2,12 @@
 - name: Ensure cloudflare zones information is gathered
   tags:
     - zones_info
-  ansible.builtin.uri:
-    headers:
-      Authorization: "Bearer {{ zones_info_api_token }}"
-    method: GET
-    status_code:
-      - 200
-    url:
-      "{{ 'https://api.cloudflare.com/client/v4/zones' ~
-          '?match=' ~
-          zones_info_match ~
-          '&page=' ~
-          zones_info_page ~
-          '&per_page=' ~
-          zones_info_per_page }}"
+  linuxhq.cloudflare.zones_info:
+    api_token: "{{ zones_info_api_token }}"
+    match: "{{ zones_info_match }}"
+    page: "{{ zones_info_page }}"
+    per_page: "{{ zones_info_per_page }}"
   register: __zones_info_query
-  check_mode: false
   when:
     - zones_info_api_token is not none
 
@@ -26,7 +16,7 @@
     - zones_info
   ansible.builtin.set_fact:
     _zones_info_list:
-      "{{ __zones_info_query.json.result |
+      "{{ __zones_info_query.zones |
           d([]) }}"
 
 - name: Ensure dict of cloudflare zones information is generated

@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-
 DOCUMENTATION = r"""
 ---
 module: accounts_info
@@ -78,10 +77,6 @@ def iter_accounts(page):
 
 
 def main():
-    run_module()
-
-
-def run_module():
     module = AnsibleModule(
         argument_spec={
             "api_token": {"required": True, "type": "str", "no_log": True},

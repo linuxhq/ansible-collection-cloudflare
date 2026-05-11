@@ -1,0 +1,43 @@
+---
+- name: Ensure cloudflare zones are managed
+  tags:
+    - zones
+  linuxhq.cloudflare.zones:
+    account_id: "{{ zones_account_id | d(omit) }}"
+    api_token: "{{ zones_api_token }}"
+    name: "{{ _zone.name }}"
+    settings: "{{ _zone.settings | d(omit) }}"
+    state: "{{ _zone.state | d('present') }}"
+    type: "{{ _zone.type | d('full') }}"
+    vanity_name_servers: "{{ _zone.vanity_name_servers | d(omit) }}"
+  register: __zones_result
+  loop: "{{ __zones_list }}"
+  loop_control:
+    label: "{{ _zone.name | d(none) }}"
+    loop_var: _zone
+  async: "{{ ansible_check_mode | ternary(0, zones_async) }}"
+  poll: "{{ zones_poll }}"
+  when:
+    - zones_api_token is not none
+    - _zone.name is defined
+  changed_when:
+    - ansible_check_mode | bool
+    - __zones_result.changed | bool
+
+- name: Ensure managed cloudflare zone jobs are complete
+  tags:
+    - zones
+  ansible.builtin.async_status:
+    jid: "{{ _jid.ansible_job_id }}"
+  register: __zones_status
+  loop: "{{ __zones_result.results }}"
+  loop_control:
+    label: "{{ _jid._zone.name | d(none) }}"
+    loop_var: _jid
+  when:
+    - _jid.ansible_job_id is defined
+  until:
+    - __zones_status.finished | bool
+  retries: "{{ zones_retries }}"
+  delay: "{{ zones_delay }}"
+...

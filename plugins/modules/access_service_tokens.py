@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-
 DOCUMENTATION = r"""
 ---
 module: access_service_tokens
@@ -129,10 +128,6 @@ def iter_service_tokens(page):
     return page
 
 
-def main():
-    run_module()
-
-
 def needs_update(current, params):
     if getattr(current, "name", None) != params["name"]:
         return True
@@ -157,7 +152,18 @@ def normalize_duration(current, desired_duration):
     return False
 
 
-def run_module():
+def update_service_token(client, account_id, token_id, params):
+    payload = {"account_id": account_id, "name": params["name"]}
+    if params.get("duration") is not None:
+        payload["duration"] = params["duration"]
+
+    return client.zero_trust.access.service_tokens.update(
+        token_id,
+        **payload,
+    )
+
+
+def main():
     module = AnsibleModule(
         argument_spec={
             "account_id": {"required": True, "type": "str"},
@@ -237,17 +243,6 @@ def run_module():
             message="Service token updated",
             service_token=serialize_resource(service_token),
         )
-
-
-def update_service_token(client, account_id, token_id, params):
-    payload = {"account_id": account_id, "name": params["name"]}
-    if params.get("duration") is not None:
-        payload["duration"] = params["duration"]
-
-    return client.zero_trust.access.service_tokens.update(
-        token_id,
-        **payload,
-    )
 
 
 if __name__ == "__main__":

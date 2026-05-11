@@ -9,23 +9,36 @@ __metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
-module: access_groups_info
-short_description: Gather Cloudflare Access group information
+module: zones_info
+short_description: Gather Cloudflare zone information
 description:
-- Gather Cloudflare Access groups for an account.
+- Gather Cloudflare zones visible to the supplied API token.
 author:
 - Taylor Kimball (@tkimball83)
 options:
-  account_id:
-    required: true
-    type: str
-    description:
-    - Cloudflare account identifier.
   api_token:
     required: true
     type: str
     description:
     - Cloudflare API token.
+  match:
+    type: str
+    choices:
+    - any
+    - all
+    default: all
+    description:
+    - Match.
+  page:
+    type: int
+    default: 1
+    description:
+    - Page.
+  per_page:
+    type: int
+    default: 20
+    description:
+    - Per page.
 requirements:
 - python >= 3.9
 - cloudflare >= 4.3.1, < 5
@@ -33,16 +46,15 @@ requirements:
 """
 
 EXAMPLES = r"""
-- name: Gather Access groups
-  linuxhq.cloudflare.access_groups_info:
-    account_id: "{{ account_id }}"
+- name: Gather zones
+  linuxhq.cloudflare.zones_info:
     api_token: "{{ cloudflare_api_token }}"
 """
 
 RETURN = r"""
 ---
-access_groups:
-  description: Cloudflare Access groups.
+zones:
+  description: Cloudflare zones.
   returned: always
   type: list
   elements: dict
@@ -57,23 +69,29 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
+def zones_path(params):
+    return "/zones?match=%s&page=%s&per_page=%s" % (
+        params["match"],
+        params["page"],
+        params["per_page"],
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
-            "account_id": {"required": True, "type": "str"},
             "api_token": {"required": True, "type": "str", "no_log": True},
+            "match": {"type": "str", "choices": ["any", "all"], "default": "all"},
+            "page": {"type": "int", "default": 1},
+            "per_page": {"type": "int", "default": 20},
         },
         supports_check_mode=True,
     )
 
     with cloudflare_client(module) as client:
-        access_groups = get_result(
-            client,
-            "/accounts/%s/access/groups" % module.params["account_id"],
-            default=[],
-        )
+        zones = get_result(client, zones_path(module.params), default=[])
 
-    module.exit_json(changed=False, access_groups=access_groups)
+    module.exit_json(changed=False, zones=zones)
 
 
 if __name__ == "__main__":

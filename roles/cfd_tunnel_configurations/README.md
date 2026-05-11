@@ -12,12 +12,17 @@ Manage cloudflare cfd tunnel configurations
 
     cfd_tunnel_configurations_account_id: null
     cfd_tunnel_configurations_api_token: null
+    cfd_tunnel_configurations_async: 300
+    cfd_tunnel_configurations_batch: 10
+    cfd_tunnel_configurations_delay: 3
     cfd_tunnel_configurations_list: []
+    cfd_tunnel_configurations_poll: 0
+    cfd_tunnel_configurations_retries: 100
 
 ## Dependencies
 
-* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
-* [linuxhq.cloudflare.cfd\_tunnel\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/cfd_tunnel_info)
+* [accounts\_info](../accounts_info)
+* [cfd\_tunnel\_info](../cfd_tunnel_info)
 
 ## Example Playbook
 
@@ -25,20 +30,6 @@ Manage cloudflare cfd tunnel configurations
       connection: local
       roles:
         - role: linuxhq.cloudflare.cfd_tunnel_configurations
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
-
-          cfd_tunnel_account_id: "{{ _accounts_info_id }}"
-          cfd_tunnel_api_token: "{{ accounts_info_api_token }}"
-          cfd_tunnel_list:
-            - name: linuxhq.dev-remote
-              config_src: cloudflare
-
-          cfd_tunnel_info_account_id: "{{ _accounts_info_id }}"
-          cfd_tunnel_info_api_token: "{{ accounts_info_api_token }}"
-
-          cfd_tunnel_configurations_account_id: "{{ _accounts_info_id }}"
-          cfd_tunnel_configurations_api_token: "{{ accounts_info_api_token }}"
           cfd_tunnel_configurations_list:
             - tunnel_id: "{{ _cfd_tunnel_info_dict['linuxhq.dev-remote'].id }}"
               config:

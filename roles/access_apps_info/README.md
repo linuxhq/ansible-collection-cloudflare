@@ -27,6 +27,4 @@ Gather information about cloudflare access apps
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.access_apps_info
-          access_apps_info_account_id: "{{ _accounts_info_id }}"
-          access_apps_info_api_token: "{{ accounts_info_api_token }}"
+        - linuxhq.cloudflare.access_apps_info

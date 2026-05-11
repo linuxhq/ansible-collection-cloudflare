@@ -11,12 +11,28 @@ Manage cloudflare devices policy
 ## Role Variables
 
     devices_policy_account_id: null
+    devices_policy_allow_mode_switch: null
+    devices_policy_allow_updates: null
+    devices_policy_allowed_to_leave: null
     devices_policy_api_token: null
-    devices_policy_dict: {}
+    devices_policy_auto_connect: null
+    devices_policy_captive_portal: null
+    devices_policy_disable_auto_fallback: null
+    devices_policy_exclude: null
+    devices_policy_exclude_office_ips: null
+    devices_policy_include: null
+    devices_policy_lan_allow_minutes: null
+    devices_policy_lan_allow_subnet_size: null
+    devices_policy_register_interface_ip_with_dns: null
+    devices_policy_sccm_vpn_boundary_support: null
+    devices_policy_service_mode_v2: null
+    devices_policy_support_url: null
+    devices_policy_switch_locked: null
+    devices_policy_tunnel_protocol: null
 
 ## Dependencies
 
-* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
+* [accounts\_info](../accounts_info)
 
 ## Example Playbook
 
@@ -24,13 +40,8 @@ Manage cloudflare devices policy
       connection: local
       roles:
         - role: linuxhq.cloudflare.devices_policy
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
-          devices_policy_account_id: "{{ _accounts_info_id }}"
-          devices_policy_api_token: "{{ accounts_info_api_token }}"
-          devices_policy_dict:
-            auto_connect: 60
-            include:
-              - address: 100.64.0.0/10
-            service_mode_v2:
-              mode: warp_tunnel_only
+          devices_policy_auto_connect: 60
+          devices_policy_include:
+            - address: 100.64.0.0/10
+          devices_policy_service_mode_v2:
+            mode: warp_tunnel_only

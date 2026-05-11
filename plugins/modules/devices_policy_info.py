@@ -9,10 +9,10 @@ __metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
-module: access_groups_info
-short_description: Gather Cloudflare Access group information
+module: devices_policy_info
+short_description: Gather Cloudflare Zero Trust device policy information
 description:
-- Gather Cloudflare Access groups for an account.
+- Gather the Cloudflare Zero Trust default device policy for an account.
 author:
 - Taylor Kimball (@tkimball83)
 options:
@@ -33,19 +33,18 @@ requirements:
 """
 
 EXAMPLES = r"""
-- name: Gather Access groups
-  linuxhq.cloudflare.access_groups_info:
+- name: Gather device policy
+  linuxhq.cloudflare.devices_policy_info:
     account_id: "{{ account_id }}"
     api_token: "{{ cloudflare_api_token }}"
 """
 
 RETURN = r"""
 ---
-access_groups:
-  description: Cloudflare Access groups.
+devices_policy:
+  description: Cloudflare device policy.
   returned: always
-  type: list
-  elements: dict
+  type: dict
 
 """
 
@@ -67,13 +66,13 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        access_groups = get_result(
+        policy = get_result(
             client,
-            "/accounts/%s/access/groups" % module.params["account_id"],
-            default=[],
+            "/accounts/%s/devices/policy" % module.params["account_id"],
+            default={},
         )
 
-    module.exit_json(changed=False, access_groups=access_groups)
+    module.exit_json(changed=False, devices_policy=policy)
 
 
 if __name__ == "__main__":

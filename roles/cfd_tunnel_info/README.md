@@ -27,6 +27,4 @@ Gather information about cloudflare cfd tunnels
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.cfd_tunnel_info
-          cfd_tunnel_info_account_id: "{{ _accounts_info_id }}"
-          cfd_tunnel_info_api_token: "{{ accounts_info_api_token }}"
+        - linuxhq.cloudflare.cfd_tunnel_info

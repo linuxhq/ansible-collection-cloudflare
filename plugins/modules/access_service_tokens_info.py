@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-
 DOCUMENTATION = r"""
 ---
 module: access_service_tokens_info
@@ -75,10 +74,6 @@ def list_service_tokens(client, account_id):
 
 
 def main():
-    run_module()
-
-
-def run_module():
     module = AnsibleModule(
         argument_spec={
             "account_id": {"required": True, "type": "str"},

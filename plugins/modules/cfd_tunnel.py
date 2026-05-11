@@ -102,10 +102,6 @@ def list_endpoint(account_id):
 
 
 def main():
-    run_module()
-
-
-def run_module():
     module = AnsibleModule(
         argument_spec={
             "account_id": {"required": True, "type": "str"},

@@ -29,8 +29,6 @@ Manage cloudflare access groups
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_groups
-          access_groups_account_id: "{{ _accounts_info_id }}"
-          access_groups_api_token: "{{ accounts_info_api_token }}"
           access_groups_list:
             - name: linuxhq.dev
               include:

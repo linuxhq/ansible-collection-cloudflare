@@ -28,7 +28,6 @@ Manage cloudflare dnssec settings
       connection: local
       roles:
         - role: linuxhq.cloudflare.dnssec
-          dnssec_api_token: "{{ zones_info_api_token }}"
           dnssec_list:
             - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"
               status: active

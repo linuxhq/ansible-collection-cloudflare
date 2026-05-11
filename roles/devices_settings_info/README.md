@@ -19,15 +19,11 @@ Gather information about cloudflare devices settings
 
 ## Dependencies
 
-* [linuxhq.cloudflare.accounts\_info](https://github.com/linuxhq/ansible-collection-cloudflare/tree/main/roles/accounts_info)
+* [accounts\_info](../accounts_info)
 
 ## Example Playbook
 
     - hosts: cloudflare
       connection: local
       roles:
-        - role: linuxhq.cloudflare.devices_settings_info
-          accounts_info_api_token: m4wxAwXmmLVWyKLwqchybVh9F3LnmTKJtsrheV77
-          accounts_info_name: linuxhq
-          devices_settings_info_account_id: "{{ _accounts_info_id }}"
-          devices_settings_info_api_token: "{{ accounts_info_api_token }}"
+        - linuxhq.cloudflare.devices_settings_info

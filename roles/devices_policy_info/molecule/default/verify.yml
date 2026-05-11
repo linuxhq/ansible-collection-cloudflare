@@ -1,13 +1,15 @@
 ---
 - name: Verify
   hosts: all
+
   roles:
     - devices_policy_info
 
   post_tasks:
-    - name: Ensure cloudflare devices policy information is verified
+    - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _devices_policy_info_dict is defined
-          - _devices_policy_info_dict | length > 0
+          - _devices_policy_info_dict.auto_connect == 60
+          - _devices_policy_info_dict.include.0.address == '100.64.0.0/10'
+          - _devices_policy_info_dict.service_mode_v2.mode == 'warp_tunnel_only'
 ...

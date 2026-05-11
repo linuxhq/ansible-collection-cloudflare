@@ -9,10 +9,10 @@ __metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
-module: access_groups_info
-short_description: Gather Cloudflare Access group information
+module: cfd_tunnel_configurations_info
+short_description: Gather Cloudflare cloudflared tunnel configuration information
 description:
-- Gather Cloudflare Access groups for an account.
+- Gather configurations for active cloudflared tunnels in an account.
 author:
 - Taylor Kimball (@tkimball83)
 options:
@@ -33,16 +33,16 @@ requirements:
 """
 
 EXAMPLES = r"""
-- name: Gather Access groups
-  linuxhq.cloudflare.access_groups_info:
+- name: Gather cloudflared tunnel configurations
+  linuxhq.cloudflare.cfd_tunnel_configurations_info:
     account_id: "{{ account_id }}"
     api_token: "{{ cloudflare_api_token }}"
 """
 
 RETURN = r"""
 ---
-access_groups:
-  description: Cloudflare Access groups.
+cfd_tunnel_configurations:
+  description: Cloudflare tunnel configurations.
   returned: always
   type: list
   elements: dict
@@ -66,14 +66,32 @@ def main():
         supports_check_mode=True,
     )
 
+    account_id = module.params["account_id"]
+    configurations = []
     with cloudflare_client(module) as client:
-        access_groups = get_result(
+        tunnels = get_result(
             client,
-            "/accounts/%s/access/groups" % module.params["account_id"],
+            "/accounts/%s/cfd_tunnel?is_deleted=false" % account_id,
             default=[],
         )
+        for tunnel in tunnels:
+            if tunnel.get("id") is None:
+                continue
+            configuration = get_result(
+                client,
+                "/accounts/%s/cfd_tunnel/%s/configurations"
+                % (account_id, tunnel["id"]),
+                default={},
+            )
+            configurations.append(
+                {
+                    "id": tunnel["id"],
+                    "name": tunnel.get("name"),
+                    "config": configuration.get("config", {}),
+                }
+            )
 
-    module.exit_json(changed=False, access_groups=access_groups)
+    module.exit_json(changed=False, cfd_tunnel_configurations=configurations)
 
 
 if __name__ == "__main__":
