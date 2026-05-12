@@ -68,7 +68,6 @@ def iter_service_tokens(page):
 def list_service_tokens(client, account_id):
     page = client.zero_trust.access.service_tokens.list(
         account_id=account_id,
-        per_page=1000,
     )
     return [serialize_resource(item) for item in iter_service_tokens(page)]
 
