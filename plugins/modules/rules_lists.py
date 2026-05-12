@@ -7,8 +7,6 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-from urllib.parse import urlencode
-
 DOCUMENTATION = r"""
 ---
 module: rules_lists
@@ -93,6 +91,8 @@ message:
   - Operation summary.
 
 """
+
+from urllib.parse import urlencode
 
 from ansible.module_utils.basic import AnsibleModule
 
