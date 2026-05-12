@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: access_apps
-short_description: Manage Cloudflare Access applications
+short_description: Manage cloudflare access apps
 description:
 - Create, update, and delete Cloudflare Access applications by name.
 author:

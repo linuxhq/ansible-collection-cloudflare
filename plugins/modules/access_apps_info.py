@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: access_apps_info
-short_description: Gather Cloudflare Access application information
+short_description: Gather information about cloudflare access apps
 description:
 - Gather Cloudflare Access applications for an account.
 author:

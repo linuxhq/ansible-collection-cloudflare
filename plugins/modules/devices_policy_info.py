@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: devices_policy_info
-short_description: Gather Cloudflare Zero Trust device policy information
+short_description: Gather information about cloudflare devices policy
 description:
 - Gather the Cloudflare Zero Trust default device policy for an account.
 author:

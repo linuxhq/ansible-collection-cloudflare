@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](https://www.gnu.org/licenses/gpl-3.0.txt)
 
-Manage cloudflare page rules
+Manage cloudflare pagerules
 
 ## Requirements
 

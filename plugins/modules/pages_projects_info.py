@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: pages_projects_info
-short_description: Gather Cloudflare Pages project information
+short_description: Gather information about cloudflare pages projects
 description:
 - Gather Cloudflare Pages projects for an account.
 author:

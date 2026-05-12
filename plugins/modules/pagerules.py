@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: pagerules
-short_description: Manage Cloudflare page rules
+short_description: Manage cloudflare pagerules
 description:
 - Create, update, and delete Cloudflare page rules identified by their targets.
 author:

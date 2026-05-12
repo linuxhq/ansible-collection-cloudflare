@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: cfd_tunnel_configurations
-short_description: Manage Cloudflare cloudflared tunnel configurations
+short_description: Manage cloudflare cfd tunnel configurations
 description:
 - Update the remotely managed configuration for a cloudflared tunnel.
 author:

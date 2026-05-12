@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: cfd_tunnel
-short_description: Manage Cloudflare cloudflared tunnels
+short_description: Manage cloudflare cfd tunnels
 description:
 - Create and delete Cloudflare cloudflared tunnels by name.
 - Tunnel secrets are only sent when creating a tunnel because Cloudflare does not return the current secret for idempotent comparison.

@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: rules_lists_info
-short_description: Gather Cloudflare Rules list information
+short_description: Gather information about cloudflare rules lists
 description:
 - Gather Cloudflare Rules lists for an account.
 author:

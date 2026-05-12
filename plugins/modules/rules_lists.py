@@ -12,7 +12,7 @@ from urllib.parse import urlencode
 DOCUMENTATION = r"""
 ---
 module: rules_lists
-short_description: Manage Cloudflare Rules lists
+short_description: Manage cloudflare rules lists
 description:
 - Create, update, populate, and delete Cloudflare Rules lists by name.
 author:

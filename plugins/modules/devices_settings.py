@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: devices_settings
-short_description: Manage Cloudflare Zero Trust device settings
+short_description: Manage cloudflare devices settings
 description:
 - Manage account-wide Cloudflare Zero Trust device settings.
 author:

@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: zerotrust_connectivity_settings_info
-short_description: Gather Cloudflare Zero Trust connectivity settings information
+short_description: Gather information about cloudflare zerotrust connectivity settings
 description:
 - Gather Cloudflare Zero Trust connectivity settings for an account.
 author:

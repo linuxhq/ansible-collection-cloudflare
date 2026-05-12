@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: access_identity_providers_info
-short_description: Gather Cloudflare Access identity provider information
+short_description: Gather information about cloudflare access identity providers
 description:
 - Gather Cloudflare Access identity providers for an account.
 author:

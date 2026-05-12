@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: dnssec_info
-short_description: Gather Cloudflare DNSSEC information
+short_description: Gather information about cloudflare dnssec settings
 description:
 - Gather Cloudflare DNSSEC information for all accessible zones.
 author:

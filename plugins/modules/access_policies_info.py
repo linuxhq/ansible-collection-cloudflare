@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: access_policies_info
-short_description: Gather Cloudflare Access policy information
+short_description: Gather information about cloudflare access policies
 description:
 - Gather Cloudflare Access policies for an account.
 author:

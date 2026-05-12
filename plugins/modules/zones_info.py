@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: zones_info
-short_description: Gather Cloudflare zone information
+short_description: Gather information about cloudflare zones
 description:
 - Gather Cloudflare zones visible to the supplied API token.
 author:

@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](https://www.gnu.org/licenses/gpl-3.0.txt)
 
-Gather information cloudflare cfd tunnel configurations
+Gather information about cloudflare cfd tunnel configurations
 
 ## Requirements
 

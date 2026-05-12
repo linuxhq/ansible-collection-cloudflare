@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: access_service_tokens
-short_description: Manage Cloudflare Access service tokens
+short_description: Manage cloudflare access service tokens
 description:
 - Create, update, and delete Cloudflare Access service tokens.
 - The module identifies service tokens by C(name) within an account.

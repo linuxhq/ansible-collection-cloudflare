@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: rulesets
-short_description: Manage Cloudflare zone ruleset entrypoints
+short_description: Manage cloudflare rulesets
 description:
 - Create, update, and delete a Cloudflare zone ruleset entrypoint for a phase.
 author:
