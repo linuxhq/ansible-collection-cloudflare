@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: pages_projects
-short_description: Manage Cloudflare Pages projects
+short_description: Manage cloudflare pages projects
 description:
 - Create, update, and delete Cloudflare Pages projects by name.
 - Optionally ensures listed custom domains are attached to the project.

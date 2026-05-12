@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: access_groups_info
-short_description: Gather Cloudflare Access group information
+short_description: Gather information about cloudflare access groups
 description:
 - Gather Cloudflare Access groups for an account.
 author:

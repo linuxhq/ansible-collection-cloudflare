@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: access_service_tokens_info
-short_description: Gather Cloudflare Access service token information
+short_description: Gather information about cloudflare access service tokens
 description:
 - Gather Cloudflare Access service tokens for an account.
 author:

@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: devices_settings_info
-short_description: Gather Cloudflare Zero Trust device settings information
+short_description: Gather information about cloudflare devices settings
 description:
 - Gather account-wide Cloudflare Zero Trust device settings.
 author:

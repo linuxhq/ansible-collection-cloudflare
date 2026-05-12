@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: pagerules_info
-short_description: Gather Cloudflare page rule information
+short_description: Gather information about cloudflare pagerules
 description:
 - Gather page rules for all accessible zones.
 author:

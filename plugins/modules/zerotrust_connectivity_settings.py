@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: zerotrust_connectivity_settings
-short_description: Manage Cloudflare Zero Trust connectivity settings
+short_description: Manage cloudflare zerotrust connectivity settings
 description:
 - Manage Cloudflare Zero Trust connectivity settings for an account.
 author:

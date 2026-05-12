@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: dnssec
-short_description: Manage Cloudflare DNSSEC settings
+short_description: Manage cloudflare dnssec settings
 description:
 - Manage Cloudflare DNSSEC settings for a zone.
 author:

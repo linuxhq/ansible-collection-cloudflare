@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: access_policies
-short_description: Manage Cloudflare Access policies
+short_description: Manage cloudflare access policies
 description:
 - Create, update, and delete Cloudflare Access policies by name.
 author:

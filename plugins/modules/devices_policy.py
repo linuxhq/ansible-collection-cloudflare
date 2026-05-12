@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: devices_policy
-short_description: Manage Cloudflare Zero Trust device policy
+short_description: Manage cloudflare devices policy
 description:
 - Patch the Cloudflare Zero Trust default device policy for an account.
 author:

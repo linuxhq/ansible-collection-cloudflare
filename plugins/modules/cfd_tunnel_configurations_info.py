@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: cfd_tunnel_configurations_info
-short_description: Gather Cloudflare cloudflared tunnel configuration information
+short_description: Gather information about cloudflare cfd tunnel configurations
 description:
 - Gather configurations for active cloudflared tunnels in an account.
 author:

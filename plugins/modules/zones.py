@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: zones
-short_description: Manage Cloudflare zones
+short_description: Manage cloudflare zones
 description:
 - Create, update, delete Cloudflare zones, and manage zone settings.
 author:

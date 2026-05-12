@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: access_groups
-short_description: Manage Cloudflare Access groups
+short_description: Manage cloudflare access groups
 description:
 - Create, update, and delete Cloudflare Access groups by name.
 author:

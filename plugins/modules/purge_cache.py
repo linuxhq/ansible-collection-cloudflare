@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: purge_cache
-short_description: Purge Cloudflare cache
+short_description: Manage cloudflare purging of cache
 description:
 - Execute a Cloudflare cache purge request for a zone.
 author:

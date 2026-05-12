@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: warp_connector_info
-short_description: Gather Cloudflare WARP Connector information
+short_description: Gather information about cloudflare warp connectors
 description:
 - Gather active Cloudflare WARP Connectors and optionally their connector tokens.
 author:

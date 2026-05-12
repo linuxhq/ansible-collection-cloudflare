@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: warp_connector
-short_description: Manage Cloudflare WARP Connector tunnels
+short_description: Manage cloudflare warp connectors
 description:
 - Create and delete Cloudflare WARP Connector tunnels by name.
 - Tunnel secrets are only sent when creating a connector because Cloudflare does not return the current secret for idempotent comparison.

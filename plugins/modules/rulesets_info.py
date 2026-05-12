@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: rulesets_info
-short_description: Gather Cloudflare zone ruleset entrypoint information
+short_description: Gather information about cloudflare rulesets
 description:
 - Gather a ruleset entrypoint phase for all accessible zones.
 author:

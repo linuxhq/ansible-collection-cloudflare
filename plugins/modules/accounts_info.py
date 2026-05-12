@@ -10,7 +10,7 @@ __metaclass__ = type
 DOCUMENTATION = r"""
 ---
 module: accounts_info
-short_description: Gather Cloudflare account information
+short_description: Gather information about cloudflare accounts
 description:
 - Gather Cloudflare account information by name.
 author:
