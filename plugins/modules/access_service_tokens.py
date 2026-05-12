@@ -112,7 +112,6 @@ def find_service_token(client, account_id, name):
     page = client.zero_trust.access.service_tokens.list(
         account_id=account_id,
         name=name,
-        per_page=1000,
     )
     for service_token in iter_service_tokens(page):
         if getattr(service_token, "name", None) == name:
