@@ -40,6 +40,7 @@ options:
     - asn
     description:
     - Resource kind.
+    - Required when creating a Rules list.
   description:
     type: str
     description:

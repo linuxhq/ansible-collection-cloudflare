@@ -36,6 +36,7 @@ options:
     elements: dict
     description:
     - Include.
+    - Required when state is C(present).
   exclude:
     type: list
     elements: dict
@@ -99,7 +100,8 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     post_result,
     put_result,
-    selected_values_differ,
+    select_fields,
+    values_differ,
 )
 
 FIELDS = ("exclude", "include", "is_default", "name", "require")
@@ -113,11 +115,6 @@ def comparable_current(current):
 
 def endpoint(account_id):
     return "/accounts/%s/access/groups" % account_id
-
-
-def validate_present(module):
-    if not module.params.get("include"):
-        module.fail_json(msg="include is required when state=present")
 
 
 def main():
@@ -136,12 +133,13 @@ def main():
                 "default": "present",
             },
         },
+        required_if=[("state", "present", ["include"])],
         supports_check_mode=True,
     )
 
     params = module.params
-    if params["state"] == "present":
-        validate_present(module)
+    if params["state"] == "present" and not params.get("include"):
+        module.fail_json(msg="include is required when state=present")
 
     with cloudflare_client(module) as client:
         current = find_by_field(
@@ -177,10 +175,9 @@ def main():
                 access_group=access_group,
             )
 
-        if not selected_values_differ(
-            comparable_current(current),
+        if not values_differ(
+            select_fields(comparable_current(current), payload.keys()),
             payload,
-            tuple(payload.keys()),
         ):
             module.exit_json(
                 changed=False,

@@ -93,48 +93,20 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
-def create_service_token(client, account_id, params):
-    payload = {"account_id": account_id, "name": params["name"]}
-    if params.get("duration") is not None:
-        payload["duration"] = params["duration"]
-
-    return client.zero_trust.access.service_tokens.create(**payload)
-
-
-def delete_service_token(client, account_id, token_id):
-    return client.zero_trust.access.service_tokens.delete(
-        token_id,
-        account_id=account_id,
-    )
-
-
 def find_service_token(client, account_id, name):
     page = client.zero_trust.access.service_tokens.list(
         account_id=account_id,
         name=name,
     )
-    for service_token in iter_service_tokens(page):
+    result = getattr(page, "result", None)
+    service_tokens = result if result is not None else page
+    for service_token in service_tokens:
         if getattr(service_token, "name", None) == name:
             return service_token
     return None
 
 
-def iter_service_tokens(page):
-    result = getattr(page, "result", None)
-    if result is not None:
-        return result
-
-    return page
-
-
-def needs_update(current, params):
-    if getattr(current, "name", None) != params["name"]:
-        return True
-
-    return not normalize_duration(current, params.get("duration"))
-
-
-def normalize_duration(current, desired_duration):
+def duration_matches(current, desired_duration):
     if desired_duration is None:
         return True
 
@@ -151,15 +123,12 @@ def normalize_duration(current, desired_duration):
     return False
 
 
-def update_service_token(client, account_id, token_id, params):
-    payload = {"account_id": account_id, "name": params["name"]}
+def service_token_payload(params):
+    payload = {"account_id": params["account_id"], "name": params["name"]}
     if params.get("duration") is not None:
         payload["duration"] = params["duration"]
 
-    return client.zero_trust.access.service_tokens.update(
-        token_id,
-        **payload,
-    )
+    return payload
 
 
 def main():
@@ -198,7 +167,10 @@ def main():
                     service_token=current_dict,
                 )
 
-            delete_service_token(client, account_id, current.id)
+            client.zero_trust.access.service_tokens.delete(
+                current.id,
+                account_id=account_id,
+            )
             module.exit_json(
                 changed=True,
                 message="Service token deleted",
@@ -209,7 +181,9 @@ def main():
             if module.check_mode:
                 module.exit_json(changed=True, message="Service token would be created")
 
-            service_token = create_service_token(client, account_id, params)
+            service_token = client.zero_trust.access.service_tokens.create(
+                **service_token_payload(params)
+            )
             module.exit_json(
                 changed=True,
                 message="Service token created",
@@ -217,7 +191,7 @@ def main():
             )
 
         current_dict = serialize_resource(current)
-        if not needs_update(current, params):
+        if duration_matches(current, params.get("duration")):
             module.exit_json(
                 changed=False,
                 message="Service token already present",
@@ -231,11 +205,9 @@ def main():
                 service_token=current_dict,
             )
 
-        service_token = update_service_token(
-            client,
-            account_id,
+        service_token = client.zero_trust.access.service_tokens.update(
             current.id,
-            params,
+            **service_token_payload(params),
         )
         module.exit_json(
             changed=True,

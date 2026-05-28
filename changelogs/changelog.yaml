@@ -1,6 +1,19 @@
 ---
 ancestor: null
 releases:
+  2.0.8:
+    changes:
+      minor_changes:
+        - all - module cleanup
+        - all - add support for agent workflows
+      release_summary:
+        Add support for agent workflows and additional cleanup
+  2.0.7:
+    changes:
+      minor_changes:
+        - access_service_token - do not pass per_page
+      release_summary:
+        Minor fix around per_page in access service token module
   2.0.6:
     changes:
       breaking_changes:

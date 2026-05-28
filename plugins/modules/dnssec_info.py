@@ -84,17 +84,6 @@ def build_error_details(exc):
     return details
 
 
-def iter_zones(page):
-    if page is None:
-        return []
-
-    result = getattr(page, "result", None)
-    if result is not None:
-        return result or []
-
-    return page or []
-
-
 def list_dnssec(client):
     dnssec = []
     skipped_zones = []
@@ -129,9 +118,11 @@ def list_dnssec(client):
 
 def list_zones(client):
     page = client.zones.list(per_page=1000)
+    result = getattr(page, "result", None)
+    page_zones = result if result is not None else page
     zones = []
 
-    for zone in iter_zones(page):
+    for zone in page_zones or []:
         zone_dict = serialize_resource(zone)
         if zone_dict.get("id") is not None and zone_dict.get("name") is not None:
             zones.append({"id": zone_dict["id"], "name": zone_dict["name"]})

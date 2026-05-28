@@ -36,6 +36,7 @@ options:
     type: str
     description:
     - Production branch.
+    - Required when creating a new Pages project.
   build_config:
     type: dict
     description:
@@ -105,14 +106,11 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     patch_result,
     payload_from_params,
     post_result,
+    select_fields,
     values_differ,
 )
 
 FIELDS = ("build_config", "deployment_configs", "name", "production_branch", "source")
-
-
-def comparable_current(current, payload):
-    return {field: current.get(field) for field in payload.keys()}
 
 
 def current_domain_names(project, domains):
@@ -219,7 +217,7 @@ def main():
                 module.exit_json(changed=True, message="Pages project would be created")
             current = post_result(client, endpoint(params["account_id"]), payload)
             changed = True
-        elif values_differ(comparable_current(current, payload), payload):
+        elif values_differ(select_fields(current, payload.keys()), payload):
             if module.check_mode:
                 module.exit_json(
                     changed=True,
