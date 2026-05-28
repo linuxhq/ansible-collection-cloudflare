@@ -61,19 +61,13 @@ def find_account(client, name):
         name=name,
         per_page=1000,
     )
-    for account in iter_accounts(page):
+    result = getattr(page, "result", None)
+    accounts = result if result is not None else page
+    for account in accounts:
         if getattr(account, "name", None) == name:
             return serialize_resource(account)
 
     return None
-
-
-def iter_accounts(page):
-    result = getattr(page, "result", None)
-    if result is not None:
-        return result
-
-    return page
 
 
 def main():

@@ -23,9 +23,7 @@ def api_request(client, method, path, body=None, ok_statuses=None):
     request = getattr(client, method)
 
     try:
-        if method in ("post", "put", "patch"):
-            return request(path, cast_to=object, body=body)
-        if method == "delete":
+        if method in ("post", "put", "patch", "delete"):
             return request(path, cast_to=object, body=body)
         return request(path, cast_to=object)
     except cloudflare.APIStatusError as exc:
@@ -36,7 +34,11 @@ def api_request(client, method, path, body=None, ok_statuses=None):
 
 @contextmanager
 def cloudflare_client(module):
-    fail_if_cloudflare_missing(module)
+    if Cloudflare is None:
+        module.fail_json(
+            msg=missing_required_lib("cloudflare"),
+            missing_python_package="cloudflare",
+        )
 
     try:
         with Cloudflare(api_token=module.params["api_token"]) as client:
@@ -55,10 +57,6 @@ def cloudflare_client(module):
             exc,
             **getattr(exc, "_cloudflare_context", {})
         )
-
-
-def compact_dict(value):
-    return {key: item for key, item in value.items() if item is not None}
 
 
 def delete_result(client, path):
@@ -88,27 +86,14 @@ def fail_from_cloudflare_error(module, message, exc, **context):
     )
 
 
-def fail_if_cloudflare_missing(module):
-    if Cloudflare is None:
-        module.fail_json(
-            msg=missing_required_lib("cloudflare"),
-            missing_python_package="cloudflare",
-        )
-
-
 def find_by_field(client, path, field, value):
-    for item in iter_results(api_request(client, "get", path)):
+    result = response_result(api_request(client, "get", path), default=[])
+    if isinstance(result, dict):
+        result = result.get("result", [])
+
+    for item in result:
         if isinstance(item, dict) and item.get(field) == value:
             return item
-
-    return None
-
-
-def find_zone_by_name(client, name):
-    zones = get_result(client, "/zones?name=%s&per_page=50" % name, default=[])
-    for zone in zones:
-        if zone.get("name") == name:
-            return zone
 
     return None
 
@@ -118,18 +103,6 @@ def get_result(client, path, default=None, ok_statuses=None):
         api_request(client, "get", path, ok_statuses=ok_statuses),
         default=default,
     )
-
-
-def iter_results(response):
-    result = response_result(response, default=[])
-
-    if result is None:
-        return []
-
-    if isinstance(result, dict):
-        return result.get("result", [])
-
-    return result
 
 
 def patch_result(client, path, body):
@@ -174,19 +147,6 @@ def response_result(response, default=None):
 def select_fields(value, fields):
     value = serialize_resource(value) or {}
     return {field: value.get(field) for field in fields if field in value}
-
-
-def selected_values_differ(current, desired, fields):
-    current_values = select_fields(current, fields)
-    desired_values = compact_dict(
-        {
-            field: desired.get(field)
-            for field in fields
-            if desired.get(field) is not None
-        }
-    )
-
-    return values_differ(current_values, desired_values)
 
 
 def serialize_resource(resource):

@@ -35,11 +35,13 @@ options:
     type: str
     description:
     - Decision.
+    - Required when state is C(present).
   include:
     type: list
     elements: dict
     description:
     - Include.
+    - Required when state is C(present).
   exclude:
     type: list
     elements: dict
@@ -127,7 +129,8 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     post_result,
     put_result,
-    selected_values_differ,
+    select_fields,
+    values_differ,
 )
 
 FIELDS = (
@@ -163,19 +166,6 @@ def endpoint(account_id):
     return "/accounts/%s/access/policies" % account_id
 
 
-def validate_present(module):
-    missing = [
-        field
-        for field in ("decision", "include")
-        if module.params.get(field) in (None, [], "")
-    ]
-    if missing:
-        module.fail_json(
-            msg="decision and include are required when state=present",
-            missing=missing,
-        )
-
-
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -198,12 +188,21 @@ def main():
                 "default": "present",
             },
         },
+        required_if=[("state", "present", ["decision", "include"])],
         supports_check_mode=True,
     )
 
     params = module.params
     if params["state"] == "present":
-        validate_present(module)
+        missing = [f for f in ("decision", "include") if not params.get(f)]
+        if missing:
+            module.fail_json(
+                msg="%s %s required when state=present"
+                % (
+                    " and ".join(missing),
+                    "are" if len(missing) > 1 else "is",
+                ),
+            )
 
     with cloudflare_client(module) as client:
         current = find_by_field(
@@ -239,10 +238,9 @@ def main():
                 access_policy=access_policy,
             )
 
-        if not selected_values_differ(
-            comparable_current(current),
+        if not values_differ(
+            select_fields(comparable_current(current), payload.keys()),
             payload,
-            tuple(payload.keys()),
         ):
             module.exit_json(
                 changed=False,

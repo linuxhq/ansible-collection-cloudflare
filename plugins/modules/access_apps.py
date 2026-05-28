@@ -34,10 +34,12 @@ options:
   domain:
     description:
     - Application domain.
+    - Required when state is C(present).
     type: str
   type:
     description:
     - Access application type.
+    - Required when state is C(present).
     type: str
   allowed_idps:
     type: list
@@ -153,7 +155,8 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     post_result,
     put_result,
-    selected_values_differ,
+    select_fields,
+    values_differ,
 )
 
 FIELDS = (
@@ -230,17 +233,6 @@ def normalize_current_list_by_desired_fields(current, desired):
     return normalized
 
 
-def validate_present(module):
-    missing = [
-        field for field in ("domain", "type") if module.params.get(field) in (None, "")
-    ]
-    if missing:
-        module.fail_json(
-            msg="domain and type are required when state=present",
-            missing=missing,
-        )
-
-
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -270,12 +262,21 @@ def main():
                 "default": "present",
             },
         },
+        required_if=[("state", "present", ["domain", "type"])],
         supports_check_mode=True,
     )
 
     params = module.params
     if params["state"] == "present":
-        validate_present(module)
+        missing = [f for f in ("domain", "type") if not params.get(f)]
+        if missing:
+            module.fail_json(
+                msg="%s %s required when state=present"
+                % (
+                    " and ".join(missing),
+                    "are" if len(missing) > 1 else "is",
+                ),
+            )
 
     with cloudflare_client(module) as client:
         current = find_by_field(
@@ -313,10 +314,9 @@ def main():
                 access_app=access_app,
             )
 
-        if not selected_values_differ(
-            comparable_current(current, payload),
+        if not values_differ(
+            select_fields(comparable_current(current, payload), payload.keys()),
             payload,
-            tuple(payload.keys()),
         ):
             module.exit_json(
                 changed=False,

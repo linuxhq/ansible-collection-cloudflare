@@ -87,23 +87,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
-def edit_dnssec(client, params):
-    payload = {
-        "zone_id": params["zone_id"],
-        "status": params["status"],
-    }
-
-    for field in ("dnssec_multi_signer", "dnssec_presigned", "dnssec_use_nsec3"):
-        if params.get(field) is not None:
-            payload[field] = params[field]
-
-    return client.dns.dnssec.edit(**payload)
-
-
-def get_dnssec(client, zone_id):
-    return client.dns.dnssec.get(zone_id=zone_id)
-
-
 def needs_update(current, params):
     comparisons = (
         (
@@ -165,7 +148,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        current = get_dnssec(client, module.params["zone_id"])
+        current = client.dns.dnssec.get(zone_id=module.params["zone_id"])
         current_dict = serialize_resource(current)
 
         if not needs_update(current, module.params):
@@ -182,7 +165,15 @@ def main():
                 dnssec=current_dict,
             )
 
-        dnssec = edit_dnssec(client, module.params)
+        payload = {
+            "zone_id": module.params["zone_id"],
+            "status": module.params["status"],
+        }
+        for field in ("dnssec_multi_signer", "dnssec_presigned", "dnssec_use_nsec3"):
+            if module.params.get(field) is not None:
+                payload[field] = module.params[field]
+
+        dnssec = client.dns.dnssec.edit(**payload)
 
     module.exit_json(
         changed=True,

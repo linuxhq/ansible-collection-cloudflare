@@ -93,6 +93,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     get_result,
     post_result,
     put_result,
+    select_fields,
     values_differ,
 )
 
@@ -136,10 +137,6 @@ def payload_from_params(params, include_kind_phase):
 
 def rulesets_endpoint(zone_id):
     return "/zones/%s/rulesets" % zone_id
-
-
-def selected_current(current, payload):
-    return {key: current.get(key) for key in payload.keys()}
 
 
 def main():
@@ -194,7 +191,7 @@ def main():
 
         if not values_differ(
             normalize_current_by_desired_fields(
-                selected_current(current, payload),
+                select_fields(current, payload.keys()),
                 payload,
             ),
             payload,

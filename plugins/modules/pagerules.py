@@ -31,6 +31,7 @@ options:
     elements: dict
     description:
     - Actions.
+    - Required when state is C(present).
   targets:
     required: true
     type: list
@@ -100,16 +101,14 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     delete_result,
     get_result,
+    payload_from_params,
     post_result,
     put_result,
+    select_fields,
     values_differ,
 )
 
 FIELDS = ("actions", "priority", "status", "targets")
-
-
-def comparable_current(current, payload):
-    return {field: current.get(field) for field in payload.keys()}
 
 
 def endpoint(zone_id):
@@ -125,17 +124,6 @@ def find_by_targets(pagerules, targets):
 
 def item_endpoint(zone_id, pagerule_id):
     return "%s/%s" % (endpoint(zone_id), pagerule_id)
-
-
-def payload_from_params(params):
-    payload = {"targets": params["targets"]}
-    if params.get("actions") is not None:
-        payload["actions"] = params["actions"]
-    if params.get("priority") is not None:
-        payload["priority"] = params["priority"]
-    if params.get("status") is not None:
-        payload["status"] = params["status"]
-    return payload
 
 
 def main():
@@ -157,6 +145,7 @@ def main():
                 "default": "present",
             },
         },
+        required_if=[("state", "present", ["actions"])],
         supports_check_mode=True,
     )
 
@@ -184,7 +173,7 @@ def main():
         if not params.get("actions"):
             module.fail_json(msg="actions is required when state=present")
 
-        payload = payload_from_params(params)
+        payload = payload_from_params(params, FIELDS)
         if current is None:
             if module.check_mode:
                 module.exit_json(changed=True, message="Page rule would be created")
@@ -195,7 +184,7 @@ def main():
                 pagerule=pagerule,
             )
 
-        if not values_differ(comparable_current(current, payload), payload):
+        if not values_differ(select_fields(current, payload.keys()), payload):
             module.exit_json(
                 changed=False,
                 message="Page rule already present",

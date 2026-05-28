@@ -97,11 +97,11 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     delete_result,
-    find_zone_by_name,
     get_result,
     patch_result,
     post_result,
-    selected_values_differ,
+    select_fields,
+    values_differ,
 )
 
 
@@ -111,6 +111,15 @@ def create_payload(params):
         "name": params["name"],
         "type": params["type"],
     }
+
+
+def find_zone_by_name(client, name):
+    zones = get_result(client, "/zones?name=%s&per_page=50" % name, default=[])
+    for zone in zones:
+        if zone.get("name") == name:
+            return zone
+
+    return None
 
 
 def settings_endpoint(zone_id, setting_id):
@@ -197,7 +206,7 @@ def main():
             changed = True
         else:
             payload = update_payload(params)
-            changed = selected_values_differ(current, payload, tuple(payload.keys()))
+            changed = values_differ(select_fields(current, payload.keys()), payload)
             if changed:
                 if module.check_mode:
                     module.exit_json(

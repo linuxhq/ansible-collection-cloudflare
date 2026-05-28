@@ -86,7 +86,8 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     get_result,
     payload_from_params,
     put_result,
-    selected_values_differ,
+    select_fields,
+    values_differ,
 )
 
 FIELDS = (
@@ -120,7 +121,7 @@ def main():
     payload = payload_from_params(params, FIELDS)
     with cloudflare_client(module) as client:
         current = get_result(client, endpoint(params["account_id"]), default={})
-        if not selected_values_differ(current, payload, FIELDS):
+        if not values_differ(select_fields(current, payload.keys()), payload):
             module.exit_json(
                 changed=False,
                 message="Device settings already present",

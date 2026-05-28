@@ -39,6 +39,7 @@ options:
     - cloudflare
     description:
     - Config src.
+    - Required when creating a cloudflared tunnel.
   tunnel_secret:
     type: str
     description:

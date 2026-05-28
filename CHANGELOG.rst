@@ -4,6 +4,33 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.0.8
+======
+
+Release Summary
+---------------
+
+Add support for agent workflows and additional cleanup
+
+Minor Changes
+-------------
+
+- all - add support for agent workflows
+- all - module cleanup
+
+v2.0.7
+======
+
+Release Summary
+---------------
+
+Minor fix around per_page in access service token module
+
+Minor Changes
+-------------
+
+- access_service_token - do not pass per_page
+
 v2.0.6
 ======
 

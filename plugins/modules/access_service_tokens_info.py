@@ -57,21 +57,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
-def iter_service_tokens(page):
-    result = getattr(page, "result", None)
-    if result is not None:
-        return result
-
-    return page
-
-
-def list_service_tokens(client, account_id):
-    page = client.zero_trust.access.service_tokens.list(
-        account_id=account_id,
-    )
-    return [serialize_resource(item) for item in iter_service_tokens(page)]
-
-
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -82,11 +67,15 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        service_tokens = list_service_tokens(client, module.params["account_id"])
+        page = client.zero_trust.access.service_tokens.list(
+            account_id=module.params["account_id"],
+        )
+        result = getattr(page, "result", None)
+        service_tokens = result if result is not None else page
 
     module.exit_json(
         changed=False,
-        service_tokens=service_tokens,
+        service_tokens=[serialize_resource(item) for item in service_tokens],
     )
 
 

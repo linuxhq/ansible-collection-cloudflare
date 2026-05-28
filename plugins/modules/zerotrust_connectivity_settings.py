@@ -71,7 +71,8 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     get_result,
     patch_result,
     payload_from_params,
-    selected_values_differ,
+    select_fields,
+    values_differ,
 )
 
 FIELDS = ("icmp_proxy_enabled", "offramp_warp_enabled")
@@ -96,7 +97,7 @@ def main():
     payload = payload_from_params(params, FIELDS)
     with cloudflare_client(module) as client:
         current = get_result(client, endpoint(params["account_id"]), default={})
-        if not selected_values_differ(current, payload, FIELDS):
+        if not values_differ(select_fields(current, payload.keys()), payload):
             module.exit_json(
                 changed=False,
                 message="Connectivity settings already present",
