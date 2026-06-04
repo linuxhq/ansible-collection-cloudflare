@@ -121,6 +121,7 @@ def main():
     payload = payload_from_params(params, FIELDS)
     with cloudflare_client(module) as client:
         current = get_result(client, endpoint(params["account_id"]), default={})
+
         if not values_differ(select_fields(current, payload.keys()), payload):
             module.exit_json(
                 changed=False,

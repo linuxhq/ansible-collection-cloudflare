@@ -154,14 +154,6 @@ FALSE_FIELDS = (
 )
 
 
-def comparable_current(current):
-    current = current.copy()
-    for field in FALSE_FIELDS:
-        current.setdefault(field, False)
-
-    return current
-
-
 def endpoint(account_id):
     return "/accounts/%s/access/policies" % account_id
 
@@ -193,23 +185,14 @@ def main():
     )
 
     params = module.params
-    if params["state"] == "present":
-        missing = [f for f in ("decision", "include") if not params.get(f)]
-        if missing:
-            module.fail_json(
-                msg="%s %s required when state=present"
-                % (
-                    " and ".join(missing),
-                    "are" if len(missing) > 1 else "is",
-                ),
-            )
+    state = params["state"]
 
     with cloudflare_client(module) as client:
         current = find_by_field(
             client, endpoint(params["account_id"]), "name", params["name"]
         )
 
-        if params["state"] == "absent":
+        if state == "absent":
             if current is None:
                 module.exit_json(changed=False, message="Access policy already absent")
             if module.check_mode:
@@ -227,44 +210,56 @@ def main():
                 access_policy=current,
             )
 
-        payload = payload_from_params(params, FIELDS)
-        if current is None:
+        elif state == "present":
+            payload = payload_from_params(params, FIELDS)
+            if current is None:
+                if module.check_mode:
+                    module.exit_json(
+                        changed=True, message="Access policy would be created"
+                    )
+                access_policy = post_result(
+                    client, endpoint(params["account_id"]), payload
+                )
+                module.exit_json(
+                    changed=True,
+                    message="Access policy created",
+                    access_policy=access_policy,
+                )
+
+            comparable_current = current.copy()
+            for field in FALSE_FIELDS:
+                comparable_current.setdefault(field, False)
+
+            if not values_differ(
+                select_fields(comparable_current, payload.keys()),
+                payload,
+            ):
+                module.exit_json(
+                    changed=False,
+                    message="Access policy already present",
+                    access_policy=current,
+                )
+
             if module.check_mode:
-                module.exit_json(changed=True, message="Access policy would be created")
-            access_policy = post_result(client, endpoint(params["account_id"]), payload)
+                module.exit_json(
+                    changed=True,
+                    message="Access policy would be updated",
+                    access_policy=current,
+                )
+
+            access_policy = put_result(
+                client,
+                "%s/%s" % (endpoint(params["account_id"]), current["id"]),
+                payload,
+            )
             module.exit_json(
                 changed=True,
-                message="Access policy created",
+                message="Access policy updated",
                 access_policy=access_policy,
             )
 
-        if not values_differ(
-            select_fields(comparable_current(current), payload.keys()),
-            payload,
-        ):
-            module.exit_json(
-                changed=False,
-                message="Access policy already present",
-                access_policy=current,
-            )
-
-        if module.check_mode:
-            module.exit_json(
-                changed=True,
-                message="Access policy would be updated",
-                access_policy=current,
-            )
-
-        access_policy = put_result(
-            client,
-            "%s/%s" % (endpoint(params["account_id"]), current["id"]),
-            payload,
-        )
-        module.exit_json(
-            changed=True,
-            message="Access policy updated",
-            access_policy=access_policy,
-        )
+        else:
+            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":

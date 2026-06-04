@@ -4,6 +4,15 @@
 
 gpt-5.5 high
 
+## Workflow
+
+* Read this entire file before making changes
+* Apply every section relevant to the requested change
+* Use existing collection patterns and helpers before introducing new implementations
+* Complete the requested implementation before stopping
+* Run the required validation steps after plugin changes
+* Do not commit changes to git
+
 ## Standards
 
 ### Module behavior
@@ -12,30 +21,30 @@ gpt-5.5 high
 
 * Ensure modules remain idempotent and avoid unnecessary cloudflare api calls
 
-* Support check mode
-  * Do not make mutating cloudflare api calls in check mode
-  * Info modules
-    * Set `supports_check_mode=True`
-    * Return `changed=False`
-  * Return the predicted result shape when practical
+* Support check mode: never make mutating cloudflare api calls in check mode; set
+  `supports_check_mode=True` and return `changed=False` in info modules;
+  return the predicted result shape when practical
 
-* Long-running operations
-  * Keep modules synchronous unless an existing module intentionally does
-    otherwise
-  * Let roles handle async execution, polling, delay, retry, and batching
+* Long-running operations: keep modules synchronous unless an existing module
+  intentionally does otherwise; let roles handle async execution, polling,
+  delay, retry, and batching
 
 ### Arguments
 
 * Accept module parameters in snake_case and transform to cloudflare sdk request
   formats using existing helpers
 
-* Prefer base `AnsibleModule` validation arguments such as `required_if`,
-  `required_one_of`, `required_together`, and `mutually_exclusive` over manual
-  parameter validation when they express the rule clearly
+* Use base `AnsibleModule` validation arguments such as `required_by`,
+  `required_if`, `required_one_of`, `required_together`, and `mutually_exclusive`
+  over manual parameter validation when they express the rule clearly
 
-* Secret module parameters
-  * Mark parameters with `no_log=True`
-  * Do not include secret values in examples, return values, or error messages
+* Mark secret parameters with `no_log=True` and exclude their values from
+  examples, return values, and error messages
+
+* When writing info modules, expose singular lookup parameters (`name`, `id`,
+  `zone_id`) only when the underlying api accepts a singular identifier. Do not
+  substitute plural list parameters (`names`, `ids`) for the api's
+  native parameter shape
 
 ### Documentation
 
@@ -43,14 +52,12 @@ gpt-5.5 high
   adding or changing module parameters, return fields, aliases, choices, or
   defaults
 
-* For cloudflare modules, include the relevant `cloudflare` python sdk
-  requirements
+* Include the relevant `cloudflare` python sdk requirements
 
 * For list options and list return values, include `elements` in
   `DOCUMENTATION` and `RETURN`
 
-* Use the collection fqcn in `EXAMPLES`, such as
-  `linuxhq.cloudflare.<plugin_name>`
+* Use the collection fqcn in `EXAMPLES`, such as `linuxhq.cloudflare.<plugin_name>`
 
 * When an option is conditionally required through `required_if`, document
   the condition in the description instead of marking the option `required: true`
@@ -62,8 +69,10 @@ gpt-5.5 high
 
 * Use the official `cloudflare` python sdk for cloudflare api calls
 
-* When using cloudflare apis that may be missing from older `cloudflare` sdk
-  versions, fail with a clear module error
+* When cloudflare apis or request parameters may be missing from older
+  `cloudflare` sdk versions, validate sdk support in `main()` before dispatching
+  to state handlers; fail with `module.fail_json()` naming the unsupported
+  api or parameter
 
 * Scrub unset optional parameters before passing request dictionaries to
   cloudflare operations
@@ -77,45 +86,53 @@ gpt-5.5 high
 
 ### Result data
 
-* Return ansible-facing data in snake_case when the module owns the result
-  shape; preserve cloudflare api field names for raw cloudflare resources unless
-  the existing module normalizes them
+* Return ansible-facing data in snake_case; preserve cloudflare api field names
+  for raw cloudflare resources unless the existing module normalizes them
 
 * Normalize cloudflare sdk responses with `serialize_resource` before including
   them in `exit_json`
 
 ### Implementation style
 
-* Keep changes focused on measurable behavior, consistency, or documentation
-  correctness; avoid broad style churn
+* Cache a `module.params[...]` value in a local variable only when it is
+  accessed two or more times, requires normalization, or its name meaningfully
+  clarifies request construction; use `module.params[...]` directly otherwise
 
-* Keep implementations consistent with existing cloudflare module patterns
-  * Use direct `module.params[...]` access for simple or one-off values
-  * Introduce local variables only when the value is reused, normalized,
-    or clarifies request construction
-  * Do not pass `module` and `module.params[...]` to the same function call;
-    when the value is only forwarded from `module.params`, read it inside the
-    callee
-  * Do not add optional fallback parameters such as `name=None` for values that
-    are owned by `module.params`; make the callee read `module.params[...]`
-    directly
-  * If a helper must also handle non-parameter values returned by cloudflare,
-    keep that value as a required explicit argument or use a separate helper
-    instead of mixing explicit arguments with `module.params` fallbacks
-  * Never mutate `module.params` after module initialization
+* Pass only `module` to helpers that need `module.params` values; read them
+  inside the helper rather than extracting and passing them at the call site,
+  and do not add `name=None`-style fallback parameters for values owned by
+  `module.params`
 
-* Prefer explicit loops over nested comprehensions when the loop performs
+* If a helper also needs returned values, pass those as required explicit
+  arguments rather than mixing explicit and `module.params` fallback parameters
+
+* Never mutate `module.params` after module initialization
+
+* Dispatch on `state` with an explicit `if`/`elif`/`else` chain; always close
+  with `module.fail_json(msg=f"Unsupported state: {state}")` in the final
+  branch, even when `choices` validation makes it unreachable
+
+* Use explicit loops over nested comprehensions when the loop performs
   cloudflare api calls or filters missing cloudflare resources
 
+* Inline a helper into its one call site when it is called from exactly one
+  place and is not passed as a callback reference; if the helper catches a
+  specific exception and returns `None` with the caller checking for `None`,
+  replace that pattern with `continue` when inlining
+
+* Separate logical phases with a single blank line at every level of nesting.
+  Apply a blank line before each of the following transitions, unless the
+  statement is the very first line in its enclosing block:
+  * Before every `try:` statement
+  * After the last `except` clause before the next statement at the same level
+  * After a guard `continue` or `break` before the next statement in the loop
+  * Between any result assignment and subsequent processing of that result
+
 * Do not extract shared module_utils helpers unless several modules genuinely
-  need the same stable behavior and the abstraction clearly reduces complexity
-  * Keep cloudflare module_utils helpers generic across modules
-  * Keep resource-specific lookup and endpoint helpers in the module that owns
-    the resource
-  * Inline single-use wrappers, iterator adapters, and guard helpers into their
-    only caller
-  * Prefer composing small shared primitives such as `select_fields` and
-    `values_differ` over adding thin convenience wrappers
+  need the same stable behavior and the abstraction clearly reduces complexity;
+  keep module_utils helpers generic across modules, resource-specific helpers in
+  the module that owns the resource, and inline single-use wrappers into their
+  only caller
 
 ### Lookup plugins
 
@@ -124,85 +141,89 @@ gpt-5.5 high
 
 ## Helper reference
 
-* Prefer existing ansible helpers before implementing custom logic
+Use existing helpers before implementing custom logic.
 
-* Use existing ansible helpers, including
-  * ansible.module_utils.basic.get_all_subclasses
-  * ansible.module_utils.basic.get_module_path
-  * ansible.module_utils.basic.get_platform
-  * ansible.module_utils.basic.heuristic_log_sanitize
-  * ansible.module_utils.basic.load_platform_subclass
-  * ansible.module_utils.basic.missing_required_lib
-  * ansible.module_utils.common.collections.count
-  * ansible.module_utils.common.collections.is_iterable
-  * ansible.module_utils.common.collections.is_sequence
-  * ansible.module_utils.common.collections.is_string
-  * ansible.module_utils.common.dict_transformations.camel_dict_to_snake_dict
-  * ansible.module_utils.common.dict_transformations.dict_merge
-  * ansible.module_utils.common.dict_transformations.recursive_diff
-  * ansible.module_utils.common.dict_transformations.snake_dict_to_camel_dict
-  * ansible.module_utils.common.json.get_decoder
-  * ansible.module_utils.common.json.get_encoder
-  * ansible.module_utils.common.json.get_module_decoder
-  * ansible.module_utils.common.json.get_module_encoder
-  * ansible.module_utils.common.parameters.env_fallback
-  * ansible.module_utils.common.parameters.remove_values
-  * ansible.module_utils.common.parameters.sanitize_keys
-  * ansible.module_utils.common.parameters.set_fallbacks
-  * ansible.module_utils.common.text.converters.container_to_bytes
-  * ansible.module_utils.common.text.converters.container_to_text
-  * ansible.module_utils.common.text.converters.jsonify
-  * ansible.module_utils.common.text.converters.to_bytes
-  * ansible.module_utils.common.text.converters.to_text
-  * ansible.module_utils.common.text.formatters.bytes_to_human
-  * ansible.module_utils.common.text.formatters.human_to_bytes
-  * ansible.module_utils.common.text.formatters.lenient_lowercase
-  * ansible.module_utils.common.validation.check_missing_parameters
-  * ansible.module_utils.common.validation.check_mutually_exclusive
-  * ansible.module_utils.common.validation.check_required_arguments
-  * ansible.module_utils.common.validation.check_required_by
-  * ansible.module_utils.common.validation.check_required_if
-  * ansible.module_utils.common.validation.check_required_one_of
-  * ansible.module_utils.common.validation.check_required_together
-  * ansible.module_utils.common.validation.check_type_bits
-  * ansible.module_utils.common.validation.check_type_bool
-  * ansible.module_utils.common.validation.check_type_bytes
-  * ansible.module_utils.common.validation.check_type_dict
-  * ansible.module_utils.common.validation.check_type_float
-  * ansible.module_utils.common.validation.check_type_int
-  * ansible.module_utils.common.validation.check_type_jsonarg
-  * ansible.module_utils.common.validation.check_type_list
-  * ansible.module_utils.common.validation.check_type_path
-  * ansible.module_utils.common.validation.check_type_raw
-  * ansible.module_utils.common.validation.check_type_str
-  * ansible.module_utils.common.validation.count_terms
+* `ansible.module_utils`:
+  * **basic**:
+    * get_all_subclasses
+    * get_module_path
+    * get_platform
+    * heuristic_log_sanitize
+    * load_platform_subclass
+    * missing_required_lib
+  * **common.collections**:
+    * count
+    * is_iterable
+    * is_sequence
+    * is_string
+  * **common.dict_transformations**:
+    * camel_dict_to_snake_dict
+    * dict_merge
+    * recursive_diff
+    * snake_dict_to_camel_dict
+  * **common.json**:
+    * get_decoder
+    * get_encoder
+    * get_module_decoder
+    * get_module_encoder
+  * **common.parameters**:
+    * env_fallback
+    * remove_values
+    * sanitize_keys
+    * set_fallbacks
+  * **common.text.converters**:
+    * container_to_bytes
+    * container_to_text
+    * jsonify
+    * to_bytes
+    * to_text
+  * **common.text.formatters**:
+    * bytes_to_human
+    * human_to_bytes
+    * lenient_lowercase
+  * **common.validation**:
+    * check_missing_parameters
+    * check_mutually_exclusive
+    * check_required_arguments
+    * check_required_by
+    * check_required_if
+    * check_required_one_of
+    * check_required_together
+    * check_type_bits
+    * check_type_bool
+    * check_type_bytes
+    * check_type_dict
+    * check_type_float
+    * check_type_int
+    * check_type_jsonarg
+    * check_type_list
+    * check_type_path
+    * check_type_raw
+    * check_type_str
+    * count_terms
 
 ## Validation
 
-* After plugin changes, run
-  * ansible-test
-    * Use the collection path `venv/ansible_collections/linuxhq/cloudflare`
-    * Use a real git worktree or real directory for that collection path;
-      symlinks are not sufficient because `ansible-test` resolves the physical
-      path
-    * If the worktree does not exist, create it
-      * `mkdir -p venv/ansible_collections/linuxhq`
-      * `git worktree add --detach venv/ansible_collections/linuxhq/cloudflare HEAD`
-    * To test uncommitted changes from the root checkout, overlay the current
-      tree into the worktree
-      * `rsync -a --delete --exclude='.git' --exclude='venv' ./ venv/ansible_collections/linuxhq/cloudflare/`
-    * If the default python discovery fails because local shims are unavailable,
-      run sanity from the worktree with the python version from the active venv
-      * `../../../bin/ansible-test sanity --color no --python 3.12`
-  * black
-    * `venv/bin/black --check plugins`
-  * git
-    * `git diff --check`
-  * python
-    * `venv/bin/python -m compileall -q plugins`
+After plugin changes, run:
 
-## Workflow
-
-* Complete the requested implementation before stopping
-
-* Do not commit changes
+* **ansible-test**
+  * Use the collection path `venv/ansible_collections/linuxhq/cloudflare`
+  * Use a real git worktree or real directory; symlinks are not sufficient
+    because `ansible-test` resolves the physical path
+  * If the worktree does not exist, create it:
+    ```
+    mkdir -p venv/ansible_collections/linuxhq
+    git worktree add --detach venv/ansible_collections/linuxhq/cloudflare HEAD
+    ```
+  * Overlay uncommitted changes from the root checkout before running:
+    ```
+    rsync -a --delete --exclude='.git' --exclude='venv' ./ venv/ansible_collections/linuxhq/cloudflare/
+    ```
+  * Run from the worktree, using the Python version from the active venv if
+    local shim discovery fails:
+    ```
+    ../../../bin/ansible-test sanity --color no --python 3.12
+    ```
+* **black**: `venv/bin/black --check plugins`
+* **git**: `git diff --check`
+* **python**: `venv/bin/python -m compileall -q plugins`

@@ -89,10 +89,6 @@ def endpoint(account_id):
     return "/accounts/%s/warp_connector" % account_id
 
 
-def list_endpoint(account_id):
-    return "%s?is_deleted=false" % endpoint(account_id)
-
-
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -110,12 +106,17 @@ def main():
     )
 
     params = module.params
+    state = params["state"]
+
     with cloudflare_client(module) as client:
         current = find_by_field(
-            client, list_endpoint(params["account_id"]), "name", params["name"]
+            client,
+            "%s?is_deleted=false" % endpoint(params["account_id"]),
+            "name",
+            params["name"],
         )
 
-        if params["state"] == "absent":
+        if state == "absent":
             if current is None:
                 module.exit_json(changed=False, message="WARP Connector already absent")
             if module.check_mode:
@@ -133,26 +134,32 @@ def main():
                 warp_connector=current,
             )
 
-        if current is not None:
+        elif state == "present":
+            if current is not None:
+                module.exit_json(
+                    changed=False,
+                    message="WARP Connector already present",
+                    warp_connector=current,
+                )
+
+            if module.check_mode:
+                module.exit_json(
+                    changed=True, message="WARP Connector would be created"
+                )
+
+            warp_connector = post_result(
+                client,
+                endpoint(params["account_id"]),
+                payload_from_params(params, FIELDS),
+            )
             module.exit_json(
-                changed=False,
-                message="WARP Connector already present",
-                warp_connector=current,
+                changed=True,
+                message="WARP Connector created",
+                warp_connector=warp_connector,
             )
 
-        if module.check_mode:
-            module.exit_json(changed=True, message="WARP Connector would be created")
-
-        warp_connector = post_result(
-            client,
-            endpoint(params["account_id"]),
-            payload_from_params(params, FIELDS),
-        )
-        module.exit_json(
-            changed=True,
-            message="WARP Connector created",
-            warp_connector=warp_connector,
-        )
+        else:
+            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":

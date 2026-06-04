@@ -102,10 +102,6 @@ def entrypoint_endpoint(zone_id, phase):
     return "/zones/%s/rulesets/phases/%s/entrypoint" % (zone_id, phase)
 
 
-def item_endpoint(zone_id, ruleset_id):
-    return "%s/%s" % (rulesets_endpoint(zone_id), ruleset_id)
-
-
 def normalize_current_by_desired_fields(current, desired):
     if isinstance(current, dict) and isinstance(desired, dict):
         return {
@@ -122,17 +118,6 @@ def normalize_current_by_desired_fields(current, desired):
         ]
 
     return current
-
-
-def payload_from_params(params, include_kind_phase):
-    payload = {
-        "name": params["name"],
-        "rules": params.get("rules") or [],
-    }
-    if include_kind_phase:
-        payload["kind"] = params["kind"]
-        payload["phase"] = params["phase"]
-    return payload
 
 
 def rulesets_endpoint(zone_id):
@@ -158,6 +143,8 @@ def main():
     )
 
     params = module.params
+    state = params["state"]
+
     with cloudflare_client(module) as client:
         current = get_result(
             client,
@@ -166,7 +153,7 @@ def main():
             ok_statuses=[404],
         )
 
-        if params["state"] == "absent":
+        if state == "absent":
             if not current or current.get("id") is None:
                 module.exit_json(changed=False, message="Ruleset already absent")
             if module.check_mode:
@@ -175,46 +162,63 @@ def main():
                     message="Ruleset would be deleted",
                     ruleset=current,
                 )
-            delete_result(client, item_endpoint(params["zone_id"], current["id"]))
+            delete_result(
+                client, "%s/%s" % (rulesets_endpoint(params["zone_id"]), current["id"])
+            )
             module.exit_json(
                 changed=True,
                 message="Ruleset deleted",
                 ruleset=current,
             )
 
-        payload = payload_from_params(params, current is None)
-        if current is None:
-            if module.check_mode:
-                module.exit_json(changed=True, message="Ruleset would be created")
-            ruleset = post_result(client, rulesets_endpoint(params["zone_id"]), payload)
-            module.exit_json(changed=True, message="Ruleset created", ruleset=ruleset)
+        elif state == "present":
+            payload = {
+                "name": params["name"],
+                "rules": params.get("rules") or [],
+            }
+            if current is None:
+                payload["kind"] = params["kind"]
+                payload["phase"] = params["phase"]
 
-        if not values_differ(
-            normalize_current_by_desired_fields(
-                select_fields(current, payload.keys()),
+            if current is None:
+                if module.check_mode:
+                    module.exit_json(changed=True, message="Ruleset would be created")
+                ruleset = post_result(
+                    client, rulesets_endpoint(params["zone_id"]), payload
+                )
+                module.exit_json(
+                    changed=True, message="Ruleset created", ruleset=ruleset
+                )
+
+            if not values_differ(
+                normalize_current_by_desired_fields(
+                    select_fields(current, payload.keys()),
+                    payload,
+                ),
                 payload,
-            ),
-            payload,
-        ):
-            module.exit_json(
-                changed=False,
-                message="Ruleset already present",
-                ruleset=current,
-            )
+            ):
+                module.exit_json(
+                    changed=False,
+                    message="Ruleset already present",
+                    ruleset=current,
+                )
 
-        if module.check_mode:
-            module.exit_json(
-                changed=True,
-                message="Ruleset would be updated",
-                ruleset=current,
-            )
+            if module.check_mode:
+                module.exit_json(
+                    changed=True,
+                    message="Ruleset would be updated",
+                    ruleset=current,
+                )
 
-        ruleset = put_result(
-            client,
-            entrypoint_endpoint(params["zone_id"], params["phase"]),
-            payload,
-        )
-        module.exit_json(changed=True, message="Ruleset updated", ruleset=ruleset)
+            ruleset = put_result(
+                client,
+                entrypoint_endpoint(params["zone_id"], params["phase"]),
+                payload,
+            )
+            module.exit_json(changed=True, message="Ruleset updated", ruleset=ruleset)
+
+        else:
+            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":

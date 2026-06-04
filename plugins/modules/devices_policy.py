@@ -216,6 +216,7 @@ def main():
 
     with cloudflare_client(module) as client:
         current = get_result(client, endpoint(params["account_id"]), default={})
+
         if not values_differ(
             normalize_current_by_desired_fields(current, payload),
             payload,

@@ -121,18 +121,6 @@ def current_domain_names(project, domains):
     return names
 
 
-def desired_domain_names(domains):
-    return [
-        domain["name"]
-        for domain in domains or []
-        if isinstance(domain, dict) and domain.get("name") is not None
-    ]
-
-
-def domain_item_endpoint(account_id, project_name, domain_name):
-    return "%s/%s" % (domains_endpoint(account_id, project_name), domain_name)
-
-
 def domains_endpoint(account_id, project_name):
     return "%s/domains" % item_endpoint(account_id, project_name)
 
@@ -166,13 +154,18 @@ def main():
     )
 
     params = module.params
+    state = params["state"]
+
     with cloudflare_client(module) as client:
         current = find_by_field(
             client, endpoint(params["account_id"]), "name", params["name"]
         )
-        domain_names = desired_domain_names(params.get("domains"))
+        domain_names = []
+        for domain in params.get("domains") or []:
+            if isinstance(domain, dict) and domain.get("name") is not None:
+                domain_names.append(domain["name"])
 
-        if params["state"] == "absent":
+        if state == "absent":
             if current is None:
                 module.exit_json(changed=False, message="Pages project already absent")
             if module.check_mode:
@@ -191,8 +184,10 @@ def main():
                 if domain_name in existing_names:
                     delete_result(
                         client,
-                        domain_item_endpoint(
-                            params["account_id"], params["name"], domain_name
+                        "%s/%s"
+                        % (
+                            domains_endpoint(params["account_id"], params["name"]),
+                            domain_name,
                         ),
                     )
             delete_result(client, item_endpoint(params["account_id"], params["name"]))
@@ -202,74 +197,82 @@ def main():
                 pages_project=current,
             )
 
-        if current is None and not params.get("production_branch"):
-            module.fail_json(
-                msg="production_branch is required when creating a Pages project"
-            )
-
-        payload = payload_from_params(params, FIELDS)
-        changed = False
-        domains_changed = False
-        managed_domains = []
-
-        if current is None:
-            if module.check_mode:
-                module.exit_json(changed=True, message="Pages project would be created")
-            current = post_result(client, endpoint(params["account_id"]), payload)
-            changed = True
-        elif values_differ(select_fields(current, payload.keys()), payload):
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Pages project would be updated",
-                    pages_project=current,
+        elif state == "present":
+            if current is None and not params.get("production_branch"):
+                module.fail_json(
+                    msg="production_branch is required when creating a Pages project"
                 )
-            current = patch_result(
-                client, item_endpoint(params["account_id"], params["name"]), payload
-            )
-            changed = True
 
-        if domain_names:
-            existing_domains = get_result(
-                client,
-                domains_endpoint(params["account_id"], params["name"]),
-                default=[],
-            )
-            existing_names = current_domain_names(current, existing_domains)
-            missing_domains = [
-                domain_name
-                for domain_name in domain_names
-                if domain_name not in existing_names
-            ]
-            domains_changed = bool(missing_domains)
-            if module.check_mode and domains_changed:
-                module.exit_json(
-                    changed=True,
-                    message="Pages project domains would be updated",
-                    pages_project=current,
-                )
-            for domain_name in missing_domains:
-                managed_domains.append(
-                    post_result(
-                        client,
-                        domains_endpoint(params["account_id"], params["name"]),
-                        {"name": domain_name},
+            payload = payload_from_params(params, FIELDS)
+            changed = False
+            domains_changed = False
+            managed_domains = []
+
+            if current is None:
+                if module.check_mode:
+                    module.exit_json(
+                        changed=True, message="Pages project would be created"
                     )
+                current = post_result(client, endpoint(params["account_id"]), payload)
+                changed = True
+            elif values_differ(select_fields(current, payload.keys()), payload):
+                if module.check_mode:
+                    module.exit_json(
+                        changed=True,
+                        message="Pages project would be updated",
+                        pages_project=current,
+                    )
+                current = patch_result(
+                    client,
+                    item_endpoint(params["account_id"], params["name"]),
+                    payload,
+                )
+                changed = True
+
+            if domain_names:
+                existing_domains = get_result(
+                    client,
+                    domains_endpoint(params["account_id"], params["name"]),
+                    default=[],
+                )
+                existing_names = current_domain_names(current, existing_domains)
+                missing_domains = []
+                for domain_name in domain_names:
+                    if domain_name not in existing_names:
+                        missing_domains.append(domain_name)
+
+                domains_changed = bool(missing_domains)
+                if module.check_mode and domains_changed:
+                    module.exit_json(
+                        changed=True,
+                        message="Pages project domains would be updated",
+                        pages_project=current,
+                    )
+                for domain_name in missing_domains:
+                    managed_domains.append(
+                        post_result(
+                            client,
+                            domains_endpoint(params["account_id"], params["name"]),
+                            {"name": domain_name},
+                        )
+                    )
+
+            if not changed and not domains_changed:
+                module.exit_json(
+                    changed=False,
+                    message="Pages project already present",
+                    pages_project=current,
                 )
 
-        if not changed and not domains_changed:
             module.exit_json(
-                changed=False,
-                message="Pages project already present",
+                changed=True,
+                message="Pages project updated",
                 pages_project=current,
+                domains=managed_domains,
             )
 
-        module.exit_json(
-            changed=True,
-            message="Pages project updated",
-            pages_project=current,
-            domains=managed_domains,
-        )
+        else:
+            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":

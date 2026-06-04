@@ -56,20 +56,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
-def find_account(client, name):
-    page = client.accounts.list(
-        name=name,
-        per_page=1000,
-    )
-    result = getattr(page, "result", None)
-    accounts = result if result is not None else page
-    for account in accounts:
-        if getattr(account, "name", None) == name:
-            return serialize_resource(account)
-
-    return None
-
-
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -79,8 +65,20 @@ def main():
         supports_check_mode=True,
     )
 
+    account = None
     with cloudflare_client(module) as client:
-        account = find_account(client, module.params["name"])
+        page = client.accounts.list(
+            name=module.params["name"],
+            per_page=1000,
+        )
+
+        result = getattr(page, "result", None)
+        accounts = result if result is not None else page
+
+        for account_info in accounts:
+            if getattr(account_info, "name", None) == module.params["name"]:
+                account = serialize_resource(account_info)
+                break
 
     module.exit_json(
         changed=False,
