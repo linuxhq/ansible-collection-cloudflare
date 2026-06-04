@@ -77,12 +77,14 @@ def main():
         for tunnel in tunnels:
             if tunnel.get("id") is None:
                 continue
+
             configuration = get_result(
                 client,
                 "/accounts/%s/cfd_tunnel/%s/configurations"
                 % (account_id, tunnel["id"]),
                 default={},
             )
+
             configurations.append(
                 {
                     "id": tunnel["id"],

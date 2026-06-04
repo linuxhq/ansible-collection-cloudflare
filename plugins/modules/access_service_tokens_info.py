@@ -70,6 +70,7 @@ def main():
         page = client.zero_trust.access.service_tokens.list(
             account_id=module.params["account_id"],
         )
+
         result = getattr(page, "result", None)
         service_tokens = result if result is not None else page
 

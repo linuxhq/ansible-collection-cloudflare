@@ -69,14 +69,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
-def zones_path(params):
-    return "/zones?match=%s&page=%s&per_page=%s" % (
-        params["match"],
-        params["page"],
-        params["per_page"],
-    )
-
-
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -89,7 +81,16 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        zones = get_result(client, zones_path(module.params), default=[])
+        zones = get_result(
+            client,
+            "/zones?match=%s&page=%s&per_page=%s"
+            % (
+                module.params["match"],
+                module.params["page"],
+                module.params["per_page"],
+            ),
+            default=[],
+        )
 
     module.exit_json(changed=False, zones=zones)
 

@@ -65,11 +65,13 @@ def main():
         for zone in zones:
             if zone.get("id") is None:
                 continue
+
             rules = get_result(
                 client,
                 "/zones/%s/pagerules" % zone["id"],
                 default=[],
             )
+
             pagerules.append(
                 {
                     "id": zone["id"],

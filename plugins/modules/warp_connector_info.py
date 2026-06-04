@@ -79,6 +79,7 @@ def main():
             "/accounts/%s/warp_connector?is_deleted=false" % account_id,
             default=[],
         )
+
         if module.params["include_token"]:
             for connector in warp_connectors:
                 if connector.get("id") is not None:

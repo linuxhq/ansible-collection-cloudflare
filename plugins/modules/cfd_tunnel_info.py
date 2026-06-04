@@ -79,6 +79,7 @@ def main():
             "/accounts/%s/cfd_tunnel?is_deleted=false" % account_id,
             default=[],
         )
+
         if module.params["include_token"]:
             for tunnel in cfd_tunnels:
                 if tunnel.get("id") is not None:

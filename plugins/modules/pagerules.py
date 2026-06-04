@@ -115,13 +115,6 @@ def endpoint(zone_id):
     return "/zones/%s/pagerules" % zone_id
 
 
-def find_by_targets(pagerules, targets):
-    for pagerule in pagerules:
-        if not values_differ(pagerule.get("targets"), targets):
-            return pagerule
-    return None
-
-
 def item_endpoint(zone_id, pagerule_id):
     return "%s/%s" % (endpoint(zone_id), pagerule_id)
 
@@ -150,11 +143,18 @@ def main():
     )
 
     params = module.params
+    state = params["state"]
+
     with cloudflare_client(module) as client:
         pagerules = get_result(client, endpoint(params["zone_id"]), default=[])
-        current = find_by_targets(pagerules, params["targets"])
+        current = None
 
-        if params["state"] == "absent":
+        for pagerule in pagerules:
+            if not values_differ(pagerule.get("targets"), params["targets"]):
+                current = pagerule
+                break
+
+        if state == "absent":
             if current is None:
                 module.exit_json(changed=False, message="Page rule already absent")
             if module.check_mode:
@@ -170,44 +170,45 @@ def main():
                 pagerule=current,
             )
 
-        if not params.get("actions"):
-            module.fail_json(msg="actions is required when state=present")
+        elif state == "present":
+            payload = payload_from_params(params, FIELDS)
+            if current is None:
+                if module.check_mode:
+                    module.exit_json(changed=True, message="Page rule would be created")
+                pagerule = post_result(client, endpoint(params["zone_id"]), payload)
+                module.exit_json(
+                    changed=True,
+                    message="Page rule created",
+                    pagerule=pagerule,
+                )
 
-        payload = payload_from_params(params, FIELDS)
-        if current is None:
+            if not values_differ(select_fields(current, payload.keys()), payload):
+                module.exit_json(
+                    changed=False,
+                    message="Page rule already present",
+                    pagerule=current,
+                )
+
             if module.check_mode:
-                module.exit_json(changed=True, message="Page rule would be created")
-            pagerule = post_result(client, endpoint(params["zone_id"]), payload)
+                module.exit_json(
+                    changed=True,
+                    message="Page rule would be updated",
+                    pagerule=current,
+                )
+
+            pagerule = put_result(
+                client,
+                item_endpoint(params["zone_id"], current["id"]),
+                payload,
+            )
             module.exit_json(
                 changed=True,
-                message="Page rule created",
+                message="Page rule updated",
                 pagerule=pagerule,
             )
 
-        if not values_differ(select_fields(current, payload.keys()), payload):
-            module.exit_json(
-                changed=False,
-                message="Page rule already present",
-                pagerule=current,
-            )
-
-        if module.check_mode:
-            module.exit_json(
-                changed=True,
-                message="Page rule would be updated",
-                pagerule=current,
-            )
-
-        pagerule = put_result(
-            client,
-            item_endpoint(params["zone_id"], current["id"]),
-            payload,
-        )
-        module.exit_json(
-            changed=True,
-            message="Page rule updated",
-            pagerule=pagerule,
-        )
+        else:
+            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":

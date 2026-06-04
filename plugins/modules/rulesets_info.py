@@ -56,10 +56,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
-def entrypoint_endpoint(zone_id, phase):
-    return "/zones/%s/rulesets/phases/%s/entrypoint" % (zone_id, phase)
-
-
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -75,12 +71,15 @@ def main():
         for zone in zones:
             if zone.get("id") is None:
                 continue
+
             ruleset = get_result(
                 client,
-                entrypoint_endpoint(zone["id"], module.params["phase"]),
+                "/zones/%s/rulesets/phases/%s/entrypoint"
+                % (zone["id"], module.params["phase"]),
                 default={},
                 ok_statuses=[404],
             )
+
             rulesets.append(
                 {
                     "id": ruleset.get("id"),

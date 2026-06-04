@@ -118,6 +118,7 @@ def main():
             endpoint(params["account_id"], params["tunnel_id"]),
             default={},
         )
+
         current_config = current.get("config", {}) if isinstance(current, dict) else {}
 
         if not values_differ(

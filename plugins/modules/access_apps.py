@@ -189,48 +189,12 @@ DEFAULT_FIELDS = {
 }
 
 
-def comparable_current(current, desired):
-    current = current.copy()
-    for field, value in DEFAULT_FIELDS.items():
-        current.setdefault(field, value)
-
-    for field, value in desired.items():
-        current[field] = normalize_current_list_by_desired_fields(
-            current.get(field),
-            value,
-        )
-
-    return current
-
-
 def endpoint(account_id):
     return "/accounts/%s/access/apps" % account_id
 
 
 def item_endpoint(account_id, app_id):
     return "%s/%s" % (endpoint(account_id), app_id)
-
-
-def normalize_current_list_by_desired_fields(current, desired):
-    if not isinstance(current, list) or not isinstance(desired, list):
-        return current
-
-    if len(current) != len(desired):
-        return current
-
-    normalized = []
-    for current_item, desired_item in zip(current, desired):
-        if not isinstance(current_item, dict) or not isinstance(desired_item, dict):
-            return current
-        normalized.append(
-            {
-                key: current_item.get(key)
-                for key in desired_item.keys()
-                if key in current_item
-            }
-        )
-
-    return normalized
 
 
 def main():
@@ -267,23 +231,14 @@ def main():
     )
 
     params = module.params
-    if params["state"] == "present":
-        missing = [f for f in ("domain", "type") if not params.get(f)]
-        if missing:
-            module.fail_json(
-                msg="%s %s required when state=present"
-                % (
-                    " and ".join(missing),
-                    "are" if len(missing) > 1 else "is",
-                ),
-            )
+    state = params["state"]
 
     with cloudflare_client(module) as client:
         current = find_by_field(
             client, endpoint(params["account_id"]), "name", params["name"]
         )
 
-        if params["state"] == "absent":
+        if state == "absent":
             if current is None:
                 module.exit_json(
                     changed=False, message="Access application already absent"
@@ -301,46 +256,84 @@ def main():
                 access_app=current,
             )
 
-        payload = payload_from_params(params, FIELDS)
-        if current is None:
+        elif state == "present":
+            payload = payload_from_params(params, FIELDS)
+            if current is None:
+                if module.check_mode:
+                    module.exit_json(
+                        changed=True, message="Access application would be created"
+                    )
+                access_app = post_result(
+                    client, endpoint(params["account_id"]), payload
+                )
+                module.exit_json(
+                    changed=True,
+                    message="Access application created",
+                    access_app=access_app,
+                )
+
+            comparable_current = current.copy()
+            for field, value in DEFAULT_FIELDS.items():
+                comparable_current.setdefault(field, value)
+
+            for field, value in payload.items():
+                if not isinstance(comparable_current.get(field), list):
+                    continue
+
+                if not isinstance(value, list):
+                    continue
+
+                if len(comparable_current[field]) != len(value):
+                    continue
+
+                normalized = []
+                for current_item, desired_item in zip(comparable_current[field], value):
+                    if not isinstance(current_item, dict) or not isinstance(
+                        desired_item, dict
+                    ):
+                        normalized = comparable_current[field]
+                        break
+
+                    normalized.append(
+                        {
+                            key: current_item.get(key)
+                            for key in desired_item.keys()
+                            if key in current_item
+                        }
+                    )
+
+                comparable_current[field] = normalized
+
+            if not values_differ(
+                select_fields(comparable_current, payload.keys()),
+                payload,
+            ):
+                module.exit_json(
+                    changed=False,
+                    message="Access application already present",
+                    access_app=current,
+                )
+
             if module.check_mode:
                 module.exit_json(
-                    changed=True, message="Access application would be created"
+                    changed=True,
+                    message="Access application would be updated",
+                    access_app=current,
                 )
-            access_app = post_result(client, endpoint(params["account_id"]), payload)
+
+            access_app = put_result(
+                client,
+                item_endpoint(params["account_id"], current["id"]),
+                payload,
+            )
             module.exit_json(
                 changed=True,
-                message="Access application created",
+                message="Access application updated",
                 access_app=access_app,
             )
 
-        if not values_differ(
-            select_fields(comparable_current(current, payload), payload.keys()),
-            payload,
-        ):
-            module.exit_json(
-                changed=False,
-                message="Access application already present",
-                access_app=current,
-            )
-
-        if module.check_mode:
-            module.exit_json(
-                changed=True,
-                message="Access application would be updated",
-                access_app=current,
-            )
-
-        access_app = put_result(
-            client,
-            item_endpoint(params["account_id"], current["id"]),
-            payload,
-        )
-        module.exit_json(
-            changed=True,
-            message="Access application updated",
-            access_app=access_app,
-        )
+        else:
+            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":
