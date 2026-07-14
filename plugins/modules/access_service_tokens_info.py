@@ -53,7 +53,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    serialize_resource,
+    list_all,
 )
 
 
@@ -67,16 +67,14 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        page = client.zero_trust.access.service_tokens.list(
-            account_id=module.params["account_id"],
+        service_tokens = list_all(
+            client,
+            "/accounts/%s/access/service_tokens" % module.params["account_id"],
         )
-
-        result = getattr(page, "result", None)
-        service_tokens = result if result is not None else page
 
     module.exit_json(
         changed=False,
-        service_tokens=[serialize_resource(item) for item in service_tokens],
+        service_tokens=service_tokens,
     )
 
 

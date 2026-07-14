@@ -13,7 +13,9 @@ module: cfd_tunnel
 short_description: Manage cloudflare cfd tunnels
 description:
 - Create and delete Cloudflare cloudflared tunnels by name.
-- Tunnel secrets are only sent when creating a tunnel because Cloudflare does not return the current secret for idempotent comparison.
+- Tunnel secrets are sent when creating a tunnel, or when C(rotate_secrets) is
+  enabled, because Cloudflare does not return the current secret for idempotent
+  comparison.
 author:
 - Taylor Kimball (@tkimball83)
 options:
@@ -43,7 +45,16 @@ options:
   tunnel_secret:
     type: str
     description:
-    - Tunnel secret.
+    - Tunnel secret for locally-managed tunnels.
+    - Applied when creating a tunnel. Cloudflare does not return the current
+      secret, so changes are not detected; use C(rotate_secrets) to apply the
+      secret to an existing tunnel.
+  rotate_secrets:
+    type: bool
+    default: false
+    description:
+    - Apply C(tunnel_secret) to an existing tunnel, rotating its secret.
+    - The module always reports C(changed) when enabled and a secret is given.
   state:
     type: str
     choices:
@@ -81,12 +92,15 @@ message:
 
 """
 
+from urllib.parse import quote
+
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     delete_result,
     find_by_field,
+    patch_result,
     payload_from_params,
     post_result,
 )
@@ -106,6 +120,7 @@ def main():
             "name": {"required": True, "type": "str"},
             "config_src": {"type": "str", "choices": ["local", "cloudflare"]},
             "tunnel_secret": {"type": "str", "no_log": True},
+            "rotate_secrets": {"type": "bool", "default": False},
             "state": {
                 "type": "str",
                 "choices": ["present", "absent"],
@@ -121,7 +136,8 @@ def main():
     with cloudflare_client(module) as client:
         current = find_by_field(
             client,
-            "%s?is_deleted=false" % endpoint(params["account_id"]),
+            "%s?is_deleted=false&name=%s"
+            % (endpoint(params["account_id"]), quote(params["name"], safe="")),
             "name",
             params["name"],
         )
@@ -148,6 +164,23 @@ def main():
 
         elif state == "present":
             if current is not None:
+                if params["rotate_secrets"] and params.get("tunnel_secret") is not None:
+                    if module.check_mode:
+                        module.exit_json(
+                            changed=True,
+                            message="Cloudflared tunnel would be updated",
+                            cfd_tunnel=current,
+                        )
+                    cfd_tunnel = patch_result(
+                        client,
+                        "%s/%s" % (endpoint(params["account_id"]), current["id"]),
+                        {"tunnel_secret": params["tunnel_secret"]},
+                    )
+                    module.exit_json(
+                        changed=True,
+                        message="Cloudflared tunnel updated",
+                        cfd_tunnel=cfd_tunnel,
+                    )
                 module.exit_json(
                     changed=False,
                     message="Cloudflared tunnel already present",

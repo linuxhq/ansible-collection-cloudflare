@@ -17,6 +17,11 @@ Gather information about cloudflare cfd tunnel configurations
 
 * [accounts\_info](../accounts_info)
 
+## Return Values
+
+    _cfd_tunnel_configurations_info_dict
+    _cfd_tunnel_configurations_info_list
+
 ## Example Playbook
 
     - hosts: cloudflare

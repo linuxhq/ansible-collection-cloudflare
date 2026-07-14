@@ -26,15 +26,30 @@ provisioner:
 
         rules_lists_account_id: "{{ _accounts_info_id }}"
         rules_lists_api_token: "{{ accounts_info_api_token }}"
-        rules_lists_list:
+        rules_lists_hetrixtools:
+          "{{ lookup('ansible.builtin.url',
+                     'https://hetrixtools.com/resources/uptime-monitor-only-ips.txt',
+                     wantlist=true) |
+              map('community.general.dict_kv', 'ip') }}"
+
+        rules_lists_uptimerobot:
+          "{{ lookup('ansible.builtin.url',
+                     'https://uptimerobot.com/inc/files/ips/IPv4.txt',
+                     wantlist=true) |
+              map('community.general.dict_kv', 'ip') }}"
+
+        rules_lists_list_create:
           - kind: ip
-            name: uptime_robot
+            name: monitoring
             elements:
-              "{{ lookup('ansible.builtin.url',
-                         'https://uptimerobot.com/inc/files/ips/IPv4.txt',
-                         wantlist=true) |
-                  map('community.general.dict_kv', 'ip') |
-                  sort(attribute='ip') }}"
+              "{{ rules_lists_hetrixtools }}"
+
+        rules_lists_list_update:
+          - kind: ip
+            name: monitoring
+            elements:
+              "{{ rules_lists_hetrixtools +
+                  rules_lists_uptimerobot }}"
 
 scenario:
   test_sequence:

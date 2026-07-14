@@ -6,6 +6,7 @@
     account_id: "{{ warp_connector_account_id }}"
     api_token: "{{ warp_connector_api_token }}"
     name: "{{ _warp_connector.name }}"
+    rotate_secrets: "{{ _warp_connector.rotate_secrets | d(omit) }}"
     state: "{{ _warp_connector.state | d('present') }}"
     tunnel_secret: "{{ _warp_connector.tunnel_secret | d(omit) }}"
   register: __warp_connector_result

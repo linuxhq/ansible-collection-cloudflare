@@ -53,8 +53,11 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare,
     cloudflare_client,
+    fail_from_cloudflare_error,
     serialize_resource,
 )
+
+SKIP_STATUSES = (400, 404)
 
 
 def main():
@@ -69,13 +72,9 @@ def main():
     skipped_zones = []
 
     with cloudflare_client(module) as client:
-        page = client.zones.list(per_page=1000)
-
-        result = getattr(page, "result", None)
-        page_zones = result if result is not None else page
         zones = []
 
-        for zone in page_zones or []:
+        for zone in client.zones.list():
             zone_dict = serialize_resource(zone)
             if zone_dict.get("id") is not None and zone_dict.get("name") is not None:
                 zones.append({"id": zone_dict["id"], "name": zone_dict["name"]})
@@ -84,8 +83,16 @@ def main():
             try:
                 dnssec_settings = client.dns.dnssec.get(zone_id=zone["id"])
             except cloudflare.APIStatusError as exc:
-                response = getattr(exc, "response", None)
                 status_code = getattr(exc, "status_code", None)
+                if status_code not in SKIP_STATUSES:
+                    fail_from_cloudflare_error(
+                        module,
+                        "Cloudflare API request failed while gathering DNSSEC information",
+                        exc,
+                        zone=zone,
+                    )
+
+                response = getattr(exc, "response", None)
                 response_body = None
 
                 if response is not None:

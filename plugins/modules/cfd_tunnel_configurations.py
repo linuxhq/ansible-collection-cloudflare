@@ -72,6 +72,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     get_result,
+    normalize_current_by_desired_fields,
     put_result,
     values_differ,
 )
@@ -79,25 +80,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 
 def endpoint(account_id, tunnel_id):
     return "/accounts/%s/cfd_tunnel/%s/configurations" % (account_id, tunnel_id)
-
-
-def normalize_current_by_desired_fields(current, desired):
-    if isinstance(current, dict) and isinstance(desired, dict):
-        return {
-            key: normalize_current_by_desired_fields(current.get(key), value)
-            for key, value in desired.items()
-            if key in current
-        }
-
-    if isinstance(current, list) and isinstance(desired, list):
-        if len(current) != len(desired):
-            return current
-        return [
-            normalize_current_by_desired_fields(current_item, desired_item)
-            for current_item, desired_item in zip(current, desired)
-        ]
-
-    return current
 
 
 def main():

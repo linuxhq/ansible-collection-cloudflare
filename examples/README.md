@@ -15,12 +15,14 @@ Define and export the following environment variables
 * `CLOUDFLARE_ACCOUNT_NAME`
 * `CLOUDFLARE_API_TOKEN`
 * `CLOUDFLARE_DOMAIN`
+* `CLOUDFLARE_TUNNEL_SECRET`
 
 Command-line examples
 
     export CLOUDFLARE_ACCOUNT_NAME=linuxhq
     export CLOUDFLARE_API_TOKEN=7f15527b20d04645e27dd16eb8e350c0
     export CLOUDFLARE_DOMAIN=linuxhq.dev
+    export CLOUDFLARE_TUNNEL_SECRET="$(head -c 48 /dev/urandom | base64)"
 
 # Inventory
 

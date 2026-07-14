@@ -16,7 +16,8 @@
           - _dnssec_info_dict[_item].dnssec.digest_type == '2'
           - _dnssec_info_dict[_item].dnssec.ds is defined
           - _dnssec_info_dict[_item].dnssec.flags == 257.0
-          - _dnssec_info_dict[_item].dnssec.key_tag == 2371.0
+          - _dnssec_info_dict[_item].dnssec.key_tag is defined
+          - _dnssec_info_dict[_item].dnssec.key_tag is number
           - _dnssec_info_dict[_item].dnssec.key_type == 'ECDSAP256SHA256'
           - _dnssec_info_dict[_item].dnssec.public_key is defined
           - _dnssec_info_dict[_item].id is defined

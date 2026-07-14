@@ -53,7 +53,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    get_result,
+    list_all,
 )
 
 
@@ -67,10 +67,9 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        access_groups = get_result(
+        access_groups = list_all(
             client,
             "/accounts/%s/access/groups" % module.params["account_id"],
-            default=[],
         )
 
     module.exit_json(changed=False, access_groups=access_groups)

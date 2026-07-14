@@ -134,6 +134,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     get_result,
+    normalize_current_by_desired_fields,
     patch_result,
     payload_from_params,
     values_differ,
@@ -162,24 +163,6 @@ FIELDS = (
 
 def endpoint(account_id):
     return "/accounts/%s/devices/policy" % account_id
-
-
-def normalize_current_by_desired_fields(current, desired):
-    if isinstance(current, dict) and isinstance(desired, dict):
-        return {
-            key: normalize_current_by_desired_fields(current.get(key), value)
-            for key, value in desired.items()
-        }
-
-    if isinstance(current, list) and isinstance(desired, list):
-        if len(current) != len(desired):
-            return current
-        return [
-            normalize_current_by_desired_fields(current_item, desired_item)
-            for current_item, desired_item in zip(current, desired)
-        ]
-
-    return current
 
 
 def main():

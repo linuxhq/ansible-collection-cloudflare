@@ -12,7 +12,6 @@
     include: "{{ _access_policy.include | d(omit) }}"
     isolation_required: "{{ _access_policy.isolation_required | d(false) }}"
     name: "{{ _access_policy.name }}"
-    precedence: "{{ _access_policy.precedence | d(omit) }}"
     purpose_justification_prompt: "{{ _access_policy.purpose_justification_prompt | d(omit) }}"
     purpose_justification_required: "{{ _access_policy.purpose_justification_required | d(false) }}"
     require: "{{ _access_policy.require | d(omit) }}"

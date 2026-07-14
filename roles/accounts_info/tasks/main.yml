@@ -14,14 +14,8 @@
   tags:
     - accounts_info
   ansible.builtin.set_fact:
-    _accounts_info_id: "{{ __accounts_info_query.account.id }}"
-    _accounts_info_name: "{{ __accounts_info_query.account.name }}"
-    _accounts_info_settings: "{{ __accounts_info_query.account.settings }}"
-    _accounts_info_type: "{{ __accounts_info_query.account.type }}"
-  when:
-    - __accounts_info_query.account is defined
-    - __accounts_info_query.account.name is defined
-    - __accounts_info_query.account.id is defined
-    - __accounts_info_query.account.settings is defined
-    - __accounts_info_query.account.type is defined
+    _accounts_info_id: "{{ __accounts_info_query.account.id | d(none) }}"
+    _accounts_info_name: "{{ __accounts_info_query.account.name | d(none) }}"
+    _accounts_info_settings: "{{ __accounts_info_query.account.settings | d({}) }}"
+    _accounts_info_type: "{{ __accounts_info_query.account.type | d(none) }}"
 ...

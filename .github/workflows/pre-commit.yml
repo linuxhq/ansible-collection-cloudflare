@@ -2,8 +2,12 @@
 name: pre-commit
 'on':
   push:
-    branches: '*'
+    branches: '**'
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   pre-commit:
@@ -15,4 +19,3 @@ jobs:
         with:
           python-version: '3.13'
       - uses: pre-commit/action@v3.0.1
-...

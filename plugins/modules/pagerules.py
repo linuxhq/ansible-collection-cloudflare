@@ -42,14 +42,16 @@ options:
     type: int
     description:
     - Priority.
+    - An existing rule's priority is preserved when omitted.
   status:
     type: str
     choices:
     - active
     - disabled
-    default: active
     description:
     - Status.
+    - Defaults to C(active) when creating a page rule; an existing rule's
+      status is preserved when omitted.
   state:
     type: str
     choices:
@@ -130,7 +132,6 @@ def main():
             "status": {
                 "type": "str",
                 "choices": ["active", "disabled"],
-                "default": "active",
             },
             "state": {
                 "type": "str",
@@ -173,6 +174,7 @@ def main():
         elif state == "present":
             payload = payload_from_params(params, FIELDS)
             if current is None:
+                payload.setdefault("status", "active")
                 if module.check_mode:
                     module.exit_json(changed=True, message="Page rule would be created")
                 pagerule = post_result(client, endpoint(params["zone_id"]), payload)
@@ -181,6 +183,10 @@ def main():
                     message="Page rule created",
                     pagerule=pagerule,
                 )
+
+            for field in ("priority", "status"):
+                if field not in payload and current.get(field) is not None:
+                    payload[field] = current[field]
 
             if not values_differ(select_fields(current, payload.keys()), payload):
                 module.exit_json(

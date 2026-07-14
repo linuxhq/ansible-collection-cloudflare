@@ -8,6 +8,10 @@
       check_mode: false
 
     - role: cfd_tunnel_configurations
+      tags:
+        - molecule-idempotence-notest
+
+    - role: cfd_tunnel_configurations_info
       cfd_tunnel_configurations_info_account_id: null
       cfd_tunnel_configurations_info_api_token: null
       tags:

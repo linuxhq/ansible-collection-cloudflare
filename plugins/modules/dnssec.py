@@ -41,11 +41,11 @@ options:
   status:
     description:
     - Desired DNSSEC status.
+    - Only changed when explicitly provided.
     type: str
     choices:
     - active
     - disabled
-    default: active
 requirements:
 - python >= 3.9
 - cloudflare >= 4.3.1, < 5
@@ -98,7 +98,6 @@ def main():
             "status": {
                 "type": "str",
                 "choices": ["active", "disabled"],
-                "default": "active",
             },
         },
         supports_check_mode=True,
@@ -157,11 +156,13 @@ def main():
                 dnssec=current_dict,
             )
 
-        payload = {
-            "zone_id": module.params["zone_id"],
-            "status": module.params["status"],
-        }
-        for field in ("dnssec_multi_signer", "dnssec_presigned", "dnssec_use_nsec3"):
+        payload = {"zone_id": module.params["zone_id"]}
+        for field in (
+            "dnssec_multi_signer",
+            "dnssec_presigned",
+            "dnssec_use_nsec3",
+            "status",
+        ):
             if module.params.get(field) is not None:
                 payload[field] = module.params[field]
 

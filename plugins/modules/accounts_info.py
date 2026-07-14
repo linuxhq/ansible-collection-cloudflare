@@ -67,15 +67,7 @@ def main():
 
     account = None
     with cloudflare_client(module) as client:
-        page = client.accounts.list(
-            name=module.params["name"],
-            per_page=1000,
-        )
-
-        result = getattr(page, "result", None)
-        accounts = result if result is not None else page
-
-        for account_info in accounts:
+        for account_info in client.accounts.list(name=module.params["name"]):
             if getattr(account_info, "name", None) == module.params["name"]:
                 account = serialize_resource(account_info)
                 break

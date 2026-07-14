@@ -85,10 +85,13 @@ message:
 
 """
 
+from urllib.parse import quote
+
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    find_by_field,
     serialize_resource,
 )
 
@@ -125,41 +128,34 @@ def main():
     state = params["state"]
 
     with cloudflare_client(module) as client:
-        current = None
-        page = client.zero_trust.access.service_tokens.list(
-            account_id=account_id,
-            name=params["name"],
+        current = find_by_field(
+            client,
+            "/accounts/%s/access/service_tokens?name=%s"
+            % (account_id, quote(params["name"], safe="")),
+            "name",
+            params["name"],
+            paginate=False,
         )
-
-        result = getattr(page, "result", None)
-        service_tokens = result if result is not None else page
-
-        for service_token_info in service_tokens:
-            if getattr(service_token_info, "name", None) == params["name"]:
-                current = service_token_info
-                break
 
         if state == "absent":
             if current is None:
                 module.exit_json(changed=False, message="Service token already absent")
 
-            current_dict = serialize_resource(current)
-
             if module.check_mode:
                 module.exit_json(
                     changed=True,
                     message="Service token would be deleted",
-                    service_token=current_dict,
+                    service_token=current,
                 )
 
             client.zero_trust.access.service_tokens.delete(
-                current.id,
+                current["id"],
                 account_id=account_id,
             )
             module.exit_json(
                 changed=True,
                 message="Service token deleted",
-                service_token=current_dict,
+                service_token=current,
             )
 
         elif state == "present":
@@ -178,13 +174,12 @@ def main():
                     service_token=serialize_resource(service_token),
                 )
 
-            current_dict = serialize_resource(current)
             duration = params["duration"]
             duration_matches = duration is None
-            current_duration = getattr(current, "duration", None)
+            current_duration = current.get("duration")
             if duration is not None and current_duration is not None:
                 duration_matches = current_duration == duration
-            elif duration == "forever" and getattr(current, "expires_at", None) in (
+            elif duration == "forever" and current.get("expires_at") in (
                 None,
                 "",
             ):
@@ -194,18 +189,18 @@ def main():
                 module.exit_json(
                     changed=False,
                     message="Service token already present",
-                    service_token=current_dict,
+                    service_token=current,
                 )
 
             if module.check_mode:
                 module.exit_json(
                     changed=True,
                     message="Service token would be updated",
-                    service_token=current_dict,
+                    service_token=current,
                 )
 
             service_token = client.zero_trust.access.service_tokens.update(
-                current.id,
+                current["id"],
                 **service_token_payload(module),
             )
             module.exit_json(

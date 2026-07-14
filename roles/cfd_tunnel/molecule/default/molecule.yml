@@ -29,8 +29,7 @@ provisioner:
         cfd_tunnel_list:
           - name: molecule-local
             config_src: local
-            tunnel_secret: >-
-              YjNhS3ZzQ0puNzNxdFljY0VmbkpGdWlOb3M3dWNxUlJ5YmhVUkx6S2NUNFBZN3k3bUZUb21McnUzd1BhTkh2aQo=
+            tunnel_secret: "{{ lookup('env', 'CLOUDFLARE_TUNNEL_SECRET') }}"
 
           - name: molecule-remote
             config_src: cloudflare

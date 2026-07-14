@@ -13,6 +13,8 @@ module: rules_lists
 short_description: Manage cloudflare rules lists
 description:
 - Create, update, populate, and delete Cloudflare Rules lists by name.
+- Item updates wait for the resulting bulk operation to complete and fail when
+  Cloudflare reports the operation failed.
 author:
 - Taylor Kimball (@tkimball83)
 options:
@@ -50,6 +52,17 @@ options:
     elements: dict
     description:
     - Elements.
+  operation_timeout:
+    type: int
+    default: 240
+    description:
+    - Maximum seconds to wait for the bulk item operation to complete, including
+      retrying submission while another bulk operation is pending on the account.
+    - Enforced as an upper bound; the remaining budget is applied to every
+      submission and polling request as a single attempt, and the module handles
+      retries within the budget.
+    - Must be at least 1 second.
+    - When executed asynchronously, the async budget must exceed this value.
   state:
     type: str
     choices:
@@ -93,14 +106,21 @@ message:
 
 """
 
+import json
+import time
+
 from urllib.parse import urlencode
 
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    cloudflare,
     cloudflare_client,
     delete_result,
+    fail_from_cloudflare_error,
     find_by_field,
+    get_result,
+    parse_list_response,
     post_result,
     put_result,
     serialize_resource,
@@ -108,7 +128,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 ITEMS_PER_PAGE = 500
-MAX_ITEMS = 10000
+OPERATION_POLL_SECONDS = 2
 
 ITEM_META_FIELDS = (
     "created_on",
@@ -118,10 +138,15 @@ ITEM_META_FIELDS = (
 
 REDIRECT_DEFAULTS = {
     "include_subdomains": False,
-    "preserve_path_suffix": False,
+    "preserve_path_suffix": True,
     "preserve_query_string": False,
+    "status_code": 301,
     "subpath_matching": False,
 }
+
+
+def canonical_item(item):
+    return json.dumps(item, sort_keys=True, separators=(",", ":"))
 
 
 def endpoint(account_id):
@@ -134,6 +159,95 @@ def item_endpoint(account_id, list_id):
 
 def items_endpoint(account_id, list_id):
     return "%s/items" % item_endpoint(account_id, list_id)
+
+
+def operation_endpoint(account_id, operation_id):
+    return "/accounts/%s/rules/lists/bulk_operations/%s" % (account_id, operation_id)
+
+
+def pending_operation_error(exc):
+    if getattr(exc, "status_code", None) not in (400, 409, 429):
+        return False
+    return "operation" in str(exc).lower()
+
+
+def transient_error(exc):
+    if isinstance(exc, cloudflare.APIConnectionError):
+        return True
+
+    status_code = getattr(exc, "status_code", None)
+    return status_code == 429 or (isinstance(status_code, int) and status_code >= 500)
+
+
+def submit_items(client, account_id, list_id, elements, deadline):
+    while True:
+        try:
+            return put_result(
+                client,
+                items_endpoint(account_id, list_id),
+                elements,
+                timeout=max(deadline - time.monotonic(), 1),
+            )
+        except (cloudflare.APIConnectionError, cloudflare.APIStatusError) as exc:
+            if (
+                not (pending_operation_error(exc) or transient_error(exc))
+                or deadline - time.monotonic() < OPERATION_POLL_SECONDS + 1
+            ):
+                raise
+
+        time.sleep(OPERATION_POLL_SECONDS)
+
+
+def wait_for_operation(module, client, account_id, operation, deadline):
+    operation_id = None
+    if isinstance(operation, dict):
+        operation_id = operation.get("operation_id") or operation.get("id")
+    if operation_id is None:
+        module.fail_json(
+            msg="Rules list items submission did not return an operation id",
+            operation=operation,
+        )
+
+    status = {}
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining < 1:
+            module.fail_json(
+                msg="Timed out waiting for the rules list items operation to complete",
+                operation_id=operation_id,
+                operation=status,
+            )
+
+        try:
+            status = get_result(
+                client,
+                operation_endpoint(account_id, operation_id),
+                default={},
+                timeout=remaining,
+            )
+        except (cloudflare.APIConnectionError, cloudflare.APIStatusError) as exc:
+            if not transient_error(exc) or deadline - time.monotonic() < 1:
+                fail_from_cloudflare_error(
+                    module,
+                    "Cloudflare API request failed while waiting for the rules "
+                    "list items operation",
+                    exc,
+                    operation_id=operation_id,
+                    operation=status,
+                )
+            status = {}
+
+        if status.get("status") == "completed":
+            return status
+
+        if status.get("status") == "failed":
+            module.fail_json(
+                msg="Rules list items operation failed",
+                operation_id=operation_id,
+                operation=status,
+            )
+
+        time.sleep(min(OPERATION_POLL_SECONDS, max(deadline - time.monotonic(), 0)))
 
 
 def normalize_items(items):
@@ -176,12 +290,9 @@ def normalize_items(items):
 
             normalized[key] = value
 
-        normalized_items[repr(sorted(normalized.items()))] = normalized
+        normalized_items[canonical_item(normalized)] = normalized
 
-    return sorted(
-        normalized_items.values(),
-        key=lambda item: repr(sorted(item.items())),
-    )
+    return sorted(normalized_items.values(), key=canonical_item)
 
 
 def main():
@@ -193,6 +304,7 @@ def main():
             "kind": {"type": "str", "choices": ["ip", "redirect", "hostname", "asn"]},
             "description": {"type": "str"},
             "elements": {"type": "list", "elements": "dict"},
+            "operation_timeout": {"type": "int", "default": 240},
             "state": {
                 "type": "str",
                 "choices": ["present", "absent"],
@@ -205,9 +317,16 @@ def main():
     params = module.params
     state = params["state"]
 
+    if params["operation_timeout"] < 1:
+        module.fail_json(msg="operation_timeout must be at least 1 second")
+
     with cloudflare_client(module) as client:
         current = find_by_field(
-            client, endpoint(params["account_id"]), "name", params["name"]
+            client,
+            endpoint(params["account_id"]),
+            "name",
+            params["name"],
+            paginate=False,
         )
 
         if state == "absent":
@@ -243,15 +362,22 @@ def main():
                     client,
                     endpoint(params["account_id"]),
                     {
-                        "description": params.get("description") or params["name"],
+                        "description": (
+                            params["name"]
+                            if params.get("description") is None
+                            else params["description"]
+                        ),
                         "kind": params["kind"],
                         "name": params["name"],
                     },
                 )
                 changed = True
             else:
-                desired_description = params.get("description") or params["name"]
-                if current.get("description") != desired_description:
+                desired_description = params.get("description")
+                if (
+                    desired_description is not None
+                    and current.get("description") != desired_description
+                ):
                     if module.check_mode:
                         module.exit_json(
                             changed=True,
@@ -266,59 +392,40 @@ def main():
                     changed = True
 
             if params.get("elements") is not None:
-                if len(params["elements"]) > MAX_ITEMS:
-                    module.fail_json(
-                        msg="Rules lists support a maximum of %s elements" % MAX_ITEMS
+                desired_items = normalize_items(params["elements"])
+                current_count = current.get("num_items")
+
+                if current_count is not None and current_count != len(desired_items):
+                    items_changed = True
+                else:
+                    current_items = []
+                    cursor = None
+
+                    while True:
+                        query = {"cursor": cursor, "per_page": ITEMS_PER_PAGE}
+                        query = {
+                            key: value
+                            for key, value in query.items()
+                            if value is not None
+                        }
+                        path = items_endpoint(params["account_id"], current["id"])
+                        if query:
+                            path = "%s?%s" % (path, urlencode(query))
+
+                        result, result_info = parse_list_response(
+                            serialize_resource(client.get(path, cast_to=object))
+                        )
+
+                        current_items.extend(result)
+
+                        cursor = (result_info.get("cursors") or {}).get("after")
+                        if not cursor:
+                            break
+
+                    items_changed = values_differ(
+                        normalize_items(current_items),
+                        desired_items,
                     )
-
-                expected_count = min(
-                    max(current.get("num_items") or 0, len(params["elements"])),
-                    MAX_ITEMS,
-                )
-                current_items = []
-                cursor = None
-
-                while len(current_items) < MAX_ITEMS:
-                    query = {"cursor": cursor, "per_page": ITEMS_PER_PAGE}
-                    query = {
-                        key: value for key, value in query.items() if value is not None
-                    }
-                    path = items_endpoint(params["account_id"], current["id"])
-                    if query:
-                        path = "%s?%s" % (path, urlencode(query))
-
-                    response = (
-                        serialize_resource(client.get(path, cast_to=object)) or {}
-                    )
-
-                    if isinstance(response, dict) and "result" in response:
-                        result = response.get("result") or []
-                        result_info = response.get("result_info") or {}
-                    else:
-                        result = response or []
-                        result_info = {}
-
-                    if isinstance(result, list):
-                        page_items = result
-                    else:
-                        page_items = [result]
-
-                    current_items.extend(page_items)
-
-                    if len(current_items) >= expected_count:
-                        break
-
-                    if len(page_items) < ITEMS_PER_PAGE:
-                        break
-
-                    cursor = (result_info.get("cursors") or {}).get("after")
-                    if not cursor:
-                        break
-
-                items_changed = values_differ(
-                    normalize_items(current_items),
-                    normalize_items(params["elements"]),
-                )
                 if module.check_mode and items_changed:
                     module.exit_json(
                         changed=True,
@@ -326,10 +433,24 @@ def main():
                         rules_list=current,
                     )
                 if items_changed:
-                    items_operation = put_result(
+                    deadline = time.monotonic() + params["operation_timeout"]
+                    items_operation = wait_for_operation(
+                        module,
                         client,
-                        items_endpoint(params["account_id"], current["id"]),
-                        params["elements"],
+                        params["account_id"],
+                        submit_items(
+                            client,
+                            params["account_id"],
+                            current["id"],
+                            params["elements"],
+                            deadline,
+                        ),
+                        deadline,
+                    )
+                    current = get_result(
+                        client,
+                        item_endpoint(params["account_id"], current["id"]),
+                        default=current,
                     )
 
             if not changed and not items_changed:

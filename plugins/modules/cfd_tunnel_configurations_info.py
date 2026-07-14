@@ -13,6 +13,8 @@ module: cfd_tunnel_configurations_info
 short_description: Gather information about cloudflare cfd tunnel configurations
 description:
 - Gather configurations for active cloudflared tunnels in an account.
+- Only remotely-managed tunnels are queried; locally-managed tunnel
+  configurations are stored on the origin host.
 author:
 - Taylor Kimball (@tkimball83)
 options:
@@ -54,6 +56,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     get_result,
+    list_all,
 )
 
 
@@ -69,13 +72,16 @@ def main():
     account_id = module.params["account_id"]
     configurations = []
     with cloudflare_client(module) as client:
-        tunnels = get_result(
+        tunnels = list_all(
             client,
             "/accounts/%s/cfd_tunnel?is_deleted=false" % account_id,
-            default=[],
+            per_page=1000,
         )
         for tunnel in tunnels:
             if tunnel.get("id") is None:
+                continue
+
+            if tunnel.get("remote_config") is False:
                 continue
 
             configuration = get_result(
