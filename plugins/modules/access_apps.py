@@ -42,12 +42,7 @@ options:
     description:
     - Access application type.
     - Required when state is C(present).
-    - Only self-hosted application shapes are supported.
     type: str
-    choices:
-    - self_hosted
-    - ssh
-    - vnc
   allowed_idps:
     type: list
     elements: str
@@ -215,7 +210,7 @@ def main():
             "api_token": {"required": True, "type": "str", "no_log": True},
             "name": {"required": True, "type": "str"},
             "domain": {"type": "str"},
-            "type": {"type": "str", "choices": ["self_hosted", "ssh", "vnc"]},
+            "type": {"type": "str"},
             "allowed_idps": {"type": "list", "elements": "str"},
             "app_launcher_visible": {"type": "bool", "default": True},
             "auto_redirect_to_identity": {"type": "bool", "default": False},

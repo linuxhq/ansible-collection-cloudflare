@@ -4,6 +4,19 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.1.1
+======
+
+Release Summary
+---------------
+
+Bugfix release that restores support for all Cloudflare Access application types.
+
+Bugfixes
+--------
+
+- access_apps - the ``type`` option is no longer restricted to a subset of application types; ``warp`` and other valid Cloudflare Access application types are accepted again.
+
 v2.1.0
 ======
 
