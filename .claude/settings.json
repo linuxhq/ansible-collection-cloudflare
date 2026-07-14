@@ -1,0 +1,21 @@
+{
+  "attribution": {
+    "commit": ""
+  },
+  "effortLevel": "high",
+  "enabledPlugins": {
+    "codex@openai-codex": true
+  },
+  "extraKnownMarketplaces": {
+    "openai-codex": {
+      "source": {
+        "repo": "openai/codex-plugin-cc",
+        "source": "github"
+      }
+    }
+  },
+  "feedbackSurveyRate": 0,
+  "model": "claude-fable-5",
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "dark"
+}
