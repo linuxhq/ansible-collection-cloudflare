@@ -1,6 +1,16 @@
 ---
 ancestor: null
 releases:
+  2.1.1:
+    release_date: '2026-07-14'
+    changes:
+      release_summary: >-
+        Bugfix release that restores support for all Cloudflare Access
+        application types.
+      bugfixes:
+        - access_apps - the ``type`` option is no longer restricted to a subset of
+          application types; ``warp`` and other valid Cloudflare Access application
+          types are accepted again.
   2.1.0:
     release_date: '2026-07-14'
     changes:
