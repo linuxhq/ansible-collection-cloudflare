@@ -9,6 +9,7 @@
     elements: "{{ _rules_list.elements | d(omit) }}"
     kind: "{{ _rules_list.kind | d(omit) }}"
     name: "{{ _rules_list.name }}"
+    operation_timeout: "{{ _rules_list.operation_timeout | d(omit) }}"
     state: "{{ _rules_list.state | d('present') }}"
   register: __rules_lists_result
   loop: "{{ __rules_lists_list }}"

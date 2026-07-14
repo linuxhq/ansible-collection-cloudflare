@@ -91,6 +91,8 @@ message:
 
 """
 
+from urllib.parse import quote
+
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
@@ -136,7 +138,12 @@ def main():
 
     with cloudflare_client(module) as client:
         current = find_by_field(
-            client, endpoint(params["account_id"]), "name", params["name"]
+            client,
+            "%s?name=%s"
+            % (endpoint(params["account_id"]), quote(params["name"], safe="")),
+            "name",
+            params["name"],
+            paginate=False,
         )
 
         if state == "absent":

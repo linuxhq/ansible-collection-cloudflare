@@ -7,6 +7,7 @@
     api_token: "{{ cfd_tunnel_api_token }}"
     config_src: "{{ _cfd_tunnel.config_src | d(omit) }}"
     name: "{{ _cfd_tunnel.name }}"
+    rotate_secrets: "{{ _cfd_tunnel.rotate_secrets | d(omit) }}"
     state: "{{ _cfd_tunnel.state | d('present') }}"
     tunnel_secret: "{{ _cfd_tunnel.tunnel_secret | d(omit) }}"
   register: __cfd_tunnel_result

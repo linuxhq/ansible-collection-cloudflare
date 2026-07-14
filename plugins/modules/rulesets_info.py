@@ -53,6 +53,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     get_result,
+    list_all,
 )
 
 
@@ -67,7 +68,7 @@ def main():
 
     rulesets = []
     with cloudflare_client(module) as client:
-        zones = get_result(client, "/zones?per_page=1000", default=[])
+        zones = list_all(client, "/zones")
         for zone in zones:
             if zone.get("id") is None:
                 continue

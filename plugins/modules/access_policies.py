@@ -33,6 +33,11 @@ options:
     - Resource name.
   decision:
     type: str
+    choices:
+    - allow
+    - deny
+    - non_identity
+    - bypass
     description:
     - Decision.
     - Required when state is C(present).
@@ -67,10 +72,6 @@ options:
     default: false
     description:
     - Isolation required.
-  precedence:
-    type: int
-    description:
-    - Precedence.
   purpose_justification_prompt:
     type: str
     description:
@@ -141,7 +142,6 @@ FIELDS = (
     "include",
     "isolation_required",
     "name",
-    "precedence",
     "purpose_justification_prompt",
     "purpose_justification_required",
     "require",
@@ -166,11 +166,13 @@ def main():
             "name": {"required": True, "type": "str"},
             "approval_groups": {"type": "list", "elements": "dict"},
             "approval_required": {"type": "bool", "default": False},
-            "decision": {"type": "str"},
+            "decision": {
+                "type": "str",
+                "choices": ["allow", "deny", "non_identity", "bypass"],
+            },
             "exclude": {"type": "list", "elements": "dict"},
             "include": {"type": "list", "elements": "dict"},
             "isolation_required": {"type": "bool", "default": False},
-            "precedence": {"type": "int"},
             "purpose_justification_prompt": {"type": "str"},
             "purpose_justification_required": {"type": "bool", "default": False},
             "require": {"type": "list", "elements": "dict"},

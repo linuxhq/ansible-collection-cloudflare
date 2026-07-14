@@ -59,6 +59,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     get_result,
+    list_all,
 )
 
 
@@ -74,10 +75,10 @@ def main():
 
     account_id = module.params["account_id"]
     with cloudflare_client(module) as client:
-        cfd_tunnels = get_result(
+        cfd_tunnels = list_all(
             client,
             "/accounts/%s/cfd_tunnel?is_deleted=false" % account_id,
-            default=[],
+            per_page=1000,
         )
 
         if module.params["include_token"]:

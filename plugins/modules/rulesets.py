@@ -27,15 +27,17 @@ options:
     description:
     - Cloudflare zone identifier.
   name:
-    required: true
     type: str
     description:
     - Resource name.
+    - Required when creating the ruleset; an existing ruleset cannot be renamed.
   rules:
     type: list
     elements: dict
     description:
     - Ruleset rules.
+    - When omitted, the existing rules are preserved.
+    - An explicit empty list clears the ruleset.
   phase:
     type: str
     default: http_request_firewall_custom
@@ -91,33 +93,15 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     delete_result,
     get_result,
+    normalize_current_by_desired_fields,
     post_result,
     put_result,
-    select_fields,
     values_differ,
 )
 
 
 def entrypoint_endpoint(zone_id, phase):
     return "/zones/%s/rulesets/phases/%s/entrypoint" % (zone_id, phase)
-
-
-def normalize_current_by_desired_fields(current, desired):
-    if isinstance(current, dict) and isinstance(desired, dict):
-        return {
-            key: normalize_current_by_desired_fields(current.get(key), value)
-            for key, value in desired.items()
-        }
-
-    if isinstance(current, list) and isinstance(desired, list):
-        if len(current) != len(desired):
-            return current
-        return [
-            normalize_current_by_desired_fields(current_item, desired_item)
-            for current_item, desired_item in zip(current, desired)
-        ]
-
-    return current
 
 
 def rulesets_endpoint(zone_id):
@@ -129,7 +113,7 @@ def main():
         argument_spec={
             "api_token": {"required": True, "type": "str", "no_log": True},
             "zone_id": {"required": True, "type": "str"},
-            "name": {"required": True, "type": "str"},
+            "name": {"type": "str"},
             "rules": {"type": "list", "elements": "dict"},
             "phase": {"type": "str", "default": "http_request_firewall_custom"},
             "kind": {"type": "str", "default": "zone"},
@@ -172,27 +156,46 @@ def main():
             )
 
         elif state == "present":
-            payload = {
-                "name": params["name"],
-                "rules": params.get("rules") or [],
-            }
             if current is None:
-                payload["kind"] = params["kind"]
-                payload["phase"] = params["phase"]
-
-            if current is None:
+                if params.get("name") is None:
+                    module.fail_json(msg="name is required when creating a ruleset")
                 if module.check_mode:
                     module.exit_json(changed=True, message="Ruleset would be created")
                 ruleset = post_result(
-                    client, rulesets_endpoint(params["zone_id"]), payload
+                    client,
+                    rulesets_endpoint(params["zone_id"]),
+                    {
+                        "kind": params["kind"],
+                        "name": params["name"],
+                        "phase": params["phase"],
+                        "rules": params.get("rules") or [],
+                    },
                 )
                 module.exit_json(
                     changed=True, message="Ruleset created", ruleset=ruleset
                 )
 
+            if (
+                params.get("name") is not None
+                and current.get("name") is not None
+                and params["name"] != current["name"]
+            ):
+                module.fail_json(
+                    msg="An existing ruleset cannot be renamed",
+                    ruleset=current,
+                )
+
+            payload = {
+                "rules": (
+                    current.get("rules") or []
+                    if params.get("rules") is None
+                    else params["rules"]
+                ),
+            }
+
             if not values_differ(
                 normalize_current_by_desired_fields(
-                    select_fields(current, payload.keys()),
+                    {"rules": current.get("rules") or []},
                     payload,
                 ),
                 payload,

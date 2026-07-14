@@ -13,6 +13,8 @@ module: access_identity_providers_info
 short_description: Gather information about cloudflare access identity providers
 description:
 - Gather Cloudflare Access identity providers for an account.
+- Secret fields such as C(config.client_secret) and C(scim_config.secret) are
+  redacted from the results.
 author:
 - Taylor Kimball (@tkimball83)
 options:
@@ -53,7 +55,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    get_result,
+    list_all,
 )
 
 
@@ -67,11 +69,17 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        providers = get_result(
+        providers = list_all(
             client,
             "/accounts/%s/access/identity_providers" % module.params["account_id"],
-            default=[],
         )
+
+    for provider in providers:
+        if not isinstance(provider, dict):
+            continue
+        for section, field in (("config", "client_secret"), ("scim_config", "secret")):
+            if isinstance(provider.get(section), dict):
+                provider[section].pop(field, None)
 
     module.exit_json(changed=False, access_identity_providers=providers)
 

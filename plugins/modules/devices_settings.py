@@ -27,7 +27,7 @@ options:
     description:
     - Cloudflare API token.
   disable_for_time:
-    type: int
+    type: float
     default: 0
     description:
     - Disable for time.
@@ -84,8 +84,8 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     get_result,
+    patch_result,
     payload_from_params,
-    put_result,
     select_fields,
     values_differ,
 )
@@ -108,7 +108,7 @@ def main():
         argument_spec={
             "account_id": {"required": True, "type": "str"},
             "api_token": {"required": True, "type": "str", "no_log": True},
-            "disable_for_time": {"type": "int", "default": 0},
+            "disable_for_time": {"type": "float", "default": 0},
             "gateway_proxy_enabled": {"type": "bool", "default": False},
             "gateway_udp_proxy_enabled": {"type": "bool", "default": False},
             "root_certificate_installation_enabled": {"type": "bool", "default": False},
@@ -136,7 +136,7 @@ def main():
                 devices_settings=current,
             )
 
-        settings = put_result(client, endpoint(params["account_id"]), payload)
+        settings = patch_result(client, endpoint(params["account_id"]), payload)
         module.exit_json(
             changed=True,
             message="Device settings updated",

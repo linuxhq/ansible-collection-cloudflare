@@ -18,14 +18,15 @@ except ImportError:
     Cloudflare = None
 
 
-def api_request(client, method, path, body=None, ok_statuses=None):
+def api_request(client, method, path, body=None, ok_statuses=None, timeout=None):
     ok_statuses = ok_statuses or []
     request = getattr(client, method)
+    options = {"timeout": timeout, "max_retries": 0} if timeout is not None else {}
 
     try:
         if method in ("post", "put", "patch", "delete"):
-            return request(path, cast_to=object, body=body)
-        return request(path, cast_to=object)
+            return request(path, cast_to=object, body=body, options=options)
+        return request(path, cast_to=object, options=options)
     except cloudflare.APIStatusError as exc:
         if getattr(exc, "status_code", None) in ok_statuses:
             return None
@@ -54,6 +55,13 @@ def cloudflare_client(module):
         fail_from_cloudflare_error(
             module,
             getattr(exc, "_cloudflare_message", "Cloudflare API request failed"),
+            exc,
+            **getattr(exc, "_cloudflare_context", {})
+        )
+    except cloudflare.APIError as exc:
+        fail_from_cloudflare_error(
+            module,
+            getattr(exc, "_cloudflare_message", "Cloudflare API error"),
             exc,
             **getattr(exc, "_cloudflare_context", {})
         )
@@ -86,23 +94,101 @@ def fail_from_cloudflare_error(module, message, exc, **context):
     )
 
 
-def find_by_field(client, path, field, value):
-    result = response_result(api_request(client, "get", path), default=[])
-    if isinstance(result, dict):
-        result = result.get("result", [])
-
-    for item in result:
+def find_by_field(client, path, field, value, paginate=True):
+    for item in iter_items(client, path, paginate=paginate):
         if isinstance(item, dict) and item.get(field) == value:
             return item
 
     return None
 
 
-def get_result(client, path, default=None, ok_statuses=None):
+def get_result(client, path, default=None, ok_statuses=None, timeout=None):
     return response_result(
-        api_request(client, "get", path, ok_statuses=ok_statuses),
+        api_request(client, "get", path, ok_statuses=ok_statuses, timeout=timeout),
         default=default,
     )
+
+
+def iter_items(client, path, per_page=50, paginate=True):
+    if not paginate:
+        result, dummy = parse_list_response(
+            serialize_resource(api_request(client, "get", path))
+        )
+        yield from result
+        return
+
+    fetched = 0
+    page = 1
+    separator = "&" if "?" in path else "?"
+
+    while True:
+        result, result_info = parse_list_response(
+            serialize_resource(
+                api_request(
+                    client,
+                    "get",
+                    "%s%spage=%s&per_page=%s" % (path, separator, page, per_page),
+                )
+            )
+        )
+
+        yield from result
+
+        fetched += len(result)
+
+        if not result_info or not result:
+            return
+
+        total_pages = result_info.get("total_pages")
+        total_count = result_info.get("total_count")
+        if total_pages is not None:
+            if page >= total_pages:
+                return
+        elif total_count is not None:
+            if fetched >= total_count:
+                return
+        elif len(result) < per_page:
+            return
+
+        page += 1
+
+
+def list_all(client, path, per_page=50, paginate=True):
+    return list(iter_items(client, path, per_page=per_page, paginate=paginate))
+
+
+def normalize_current_by_desired_fields(current, desired):
+    if isinstance(current, dict) and isinstance(desired, dict):
+        if not desired:
+            return current
+        return {
+            key: normalize_current_by_desired_fields(current.get(key), value)
+            for key, value in desired.items()
+        }
+
+    if isinstance(current, list) and isinstance(desired, list):
+        if len(current) != len(desired):
+            return current
+        return [
+            normalize_current_by_desired_fields(current_item, desired_item)
+            for current_item, desired_item in zip(current, desired)
+        ]
+
+    return current
+
+
+def parse_list_response(response):
+    if isinstance(response, dict) and ("result" in response or "success" in response):
+        result = response.get("result") or []
+        result_info = response.get("result_info") or {}
+    else:
+        result = response or []
+        result_info = {}
+
+    if not isinstance(result, list):
+        result = [result]
+
+    return result, result_info
 
 
 def patch_result(client, path, body):
@@ -125,14 +211,32 @@ def post_result(client, path, body):
     return response_result(api_request(client, "post", path, body=body))
 
 
-def put_result(client, path, body):
-    return response_result(api_request(client, "put", path, body=body))
+def put_result(client, path, body, timeout=None):
+    return response_result(api_request(client, "put", path, body=body, timeout=timeout))
+
+
+def redact_scim_secrets(resource):
+    if not isinstance(resource, dict):
+        return resource
+
+    scim_config = resource.get("scim_config")
+    if not isinstance(scim_config, dict):
+        return resource
+
+    authentication = scim_config.get("authentication")
+    entries = authentication if isinstance(authentication, list) else [authentication]
+    for entry in entries:
+        if isinstance(entry, dict):
+            for field in ("client_secret", "password", "token"):
+                entry.pop(field, None)
+
+    return resource
 
 
 def response_result(response, default=None):
     response = serialize_resource(response)
 
-    if isinstance(response, dict) and "result" in response:
+    if isinstance(response, dict) and ("result" in response or "success" in response):
         result = response.get("result")
         if result is None:
             return default

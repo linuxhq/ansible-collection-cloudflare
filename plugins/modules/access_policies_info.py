@@ -53,7 +53,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    get_result,
+    list_all,
 )
 
 
@@ -67,10 +67,9 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        access_policies = get_result(
+        access_policies = list_all(
             client,
             "/accounts/%s/access/policies" % module.params["account_id"],
-            default=[],
         )
 
     module.exit_json(changed=False, access_policies=access_policies)

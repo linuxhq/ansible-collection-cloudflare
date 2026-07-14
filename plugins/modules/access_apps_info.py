@@ -13,6 +13,8 @@ module: access_apps_info
 short_description: Gather information about cloudflare access apps
 description:
 - Gather Cloudflare Access applications for an account.
+- Secret fields under C(scim_config.authentication) are redacted from the
+  results.
 author:
 - Taylor Kimball (@tkimball83)
 options:
@@ -53,7 +55,8 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    get_result,
+    list_all,
+    redact_scim_secrets,
 )
 
 
@@ -67,11 +70,13 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        access_apps = get_result(
+        access_apps = list_all(
             client,
             "/accounts/%s/access/apps" % module.params["account_id"],
-            default=[],
         )
+
+    for access_app in access_apps:
+        redact_scim_secrets(access_app)
 
     module.exit_json(changed=False, access_apps=access_apps)
 

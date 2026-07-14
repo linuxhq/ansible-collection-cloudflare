@@ -6,7 +6,7 @@
     - name: Ensure inventory lists are formatted
       ansible.builtin.set_fact:
         rules_lists_list:
-          "{{ rules_lists_list |
+          "{{ rules_lists_list_update |
               map('combine', {'state': 'absent'}) }}"
 
     - name: Ensure roles are included

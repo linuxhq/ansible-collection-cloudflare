@@ -36,10 +36,10 @@ options:
     - full
     - partial
     - secondary
-    - internal
-    default: full
     description:
     - Resource type.
+    - Defaults to C(full) when creating a zone.
+    - An existing zone's type is only changed when explicitly provided.
   vanity_name_servers:
     type: list
     elements: str
@@ -139,8 +139,7 @@ def main():
             "account_id": {"type": "str"},
             "type": {
                 "type": "str",
-                "choices": ["full", "partial", "secondary", "internal"],
-                "default": "full",
+                "choices": ["full", "partial", "secondary"],
             },
             "vanity_name_servers": {"type": "list", "elements": "str"},
             "settings": {"type": "list", "elements": "dict"},
@@ -191,16 +190,31 @@ def main():
                     {
                         "account": {"id": params["account_id"]},
                         "name": params["name"],
-                        "type": params["type"],
+                        "type": params.get("type") or "full",
                     },
                 )
+                if params.get("vanity_name_servers") is not None:
+                    current = patch_result(
+                        client,
+                        zone_endpoint(current["id"]),
+                        {"vanity_name_servers": params["vanity_name_servers"]},
+                    )
                 changed = True
             else:
-                payload = {"type": params["type"]}
+                payloads = []
+                if params.get("type") is not None:
+                    payloads.append({"type": params["type"]})
                 if params.get("vanity_name_servers") is not None:
-                    payload["vanity_name_servers"] = params["vanity_name_servers"]
-                changed = values_differ(select_fields(current, payload.keys()), payload)
-                if changed:
+                    payloads.append(
+                        {"vanity_name_servers": params["vanity_name_servers"]}
+                    )
+
+                changed = False
+                for payload in payloads:
+                    if not values_differ(
+                        select_fields(current, payload.keys()), payload
+                    ):
+                        continue
                     if module.check_mode:
                         module.exit_json(
                             changed=True,
@@ -210,6 +224,7 @@ def main():
                     current = patch_result(
                         client, zone_endpoint(current["id"]), payload
                     )
+                    changed = True
 
             updated_settings = []
             for setting in params.get("settings") or []:

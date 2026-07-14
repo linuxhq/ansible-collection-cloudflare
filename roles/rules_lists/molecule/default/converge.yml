@@ -9,12 +9,11 @@
 
     - role: rules_lists
       rules_lists_list:
-        - kind: ip
-          name: uptime_robot
-          elements:
-            - ip: 127.0.0.1
+        "{{ rules_lists_list_create }}"
       tags:
         - molecule-idempotence-notest
 
-    - rules_lists
+    - role: rules_lists
+      rules_lists_list:
+        "{{ rules_lists_list_update }}"
 ...

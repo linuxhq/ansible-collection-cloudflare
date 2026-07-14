@@ -13,6 +13,8 @@ module: access_apps
 short_description: Manage cloudflare access apps
 description:
 - Create, update, and delete Cloudflare Access applications by name.
+- Secret fields under C(scim_config.authentication) are redacted from returned
+  applications.
 author:
 - Taylor Kimball (@tkimball83)
 options:
@@ -40,7 +42,12 @@ options:
     description:
     - Access application type.
     - Required when state is C(present).
+    - Only self-hosted application shapes are supported.
     type: str
+    choices:
+    - self_hosted
+    - ssh
+    - vnc
   allowed_idps:
     type: list
     elements: str
@@ -146,15 +153,19 @@ message:
 
 """
 
+from urllib.parse import quote
+
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     delete_result,
     find_by_field,
+    normalize_current_by_desired_fields,
     payload_from_params,
     post_result,
     put_result,
+    redact_scim_secrets,
     select_fields,
     values_differ,
 )
@@ -204,7 +215,7 @@ def main():
             "api_token": {"required": True, "type": "str", "no_log": True},
             "name": {"required": True, "type": "str"},
             "domain": {"type": "str"},
-            "type": {"type": "str"},
+            "type": {"type": "str", "choices": ["self_hosted", "ssh", "vnc"]},
             "allowed_idps": {"type": "list", "elements": "str"},
             "app_launcher_visible": {"type": "bool", "default": True},
             "auto_redirect_to_identity": {"type": "bool", "default": False},
@@ -234,8 +245,15 @@ def main():
     state = params["state"]
 
     with cloudflare_client(module) as client:
-        current = find_by_field(
-            client, endpoint(params["account_id"]), "name", params["name"]
+        current = redact_scim_secrets(
+            find_by_field(
+                client,
+                "%s?name=%s&exact=true"
+                % (endpoint(params["account_id"]), quote(params["name"], safe="")),
+                "name",
+                params["name"],
+                paginate=False,
+            )
         )
 
         if state == "absent":
@@ -269,43 +287,18 @@ def main():
                 module.exit_json(
                     changed=True,
                     message="Access application created",
-                    access_app=access_app,
+                    access_app=redact_scim_secrets(access_app),
                 )
 
             comparable_current = current.copy()
             for field, value in DEFAULT_FIELDS.items():
                 comparable_current.setdefault(field, value)
 
-            for field, value in payload.items():
-                if not isinstance(comparable_current.get(field), list):
-                    continue
-
-                if not isinstance(value, list):
-                    continue
-
-                if len(comparable_current[field]) != len(value):
-                    continue
-
-                normalized = []
-                for current_item, desired_item in zip(comparable_current[field], value):
-                    if not isinstance(current_item, dict) or not isinstance(
-                        desired_item, dict
-                    ):
-                        normalized = comparable_current[field]
-                        break
-
-                    normalized.append(
-                        {
-                            key: current_item.get(key)
-                            for key in desired_item.keys()
-                            if key in current_item
-                        }
-                    )
-
-                comparable_current[field] = normalized
-
             if not values_differ(
-                select_fields(comparable_current, payload.keys()),
+                normalize_current_by_desired_fields(
+                    select_fields(comparable_current, payload.keys()),
+                    payload,
+                ),
                 payload,
             ):
                 module.exit_json(
@@ -329,7 +322,7 @@ def main():
             module.exit_json(
                 changed=True,
                 message="Access application updated",
-                access_app=access_app,
+                access_app=redact_scim_secrets(access_app),
             )
 
         else:

@@ -45,6 +45,18 @@ options:
     type: dict
     description:
     - Deployment configs.
+    - Values of C(secret_text) variables are write-only; changes to them are not
+      detected and they are only resent when another change triggers an update.
+    - Use C(rotate_secrets) to force an update that resends secret values.
+    - Environment variables removed from C(env_vars) are deleted from the
+      project.
+  rotate_secrets:
+    type: bool
+    default: false
+    description:
+    - Force an update that resends C(deployment_configs), including C(secret_text)
+      values, even when no other change is detected.
+    - Use to rotate secrets; the module always reports C(changed) when enabled.
   source:
     type: dict
     description:
@@ -54,6 +66,7 @@ options:
     elements: dict
     description:
     - Domains.
+    - Each entry requires a C(name).
   state:
     type: str
     choices:
@@ -96,13 +109,16 @@ message:
 
 """
 
+import copy
+
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     delete_result,
-    find_by_field,
     get_result,
+    list_all,
+    normalize_current_by_desired_fields,
     patch_result,
     payload_from_params,
     post_result,
@@ -111,6 +127,55 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 FIELDS = ("build_config", "deployment_configs", "name", "production_branch", "source")
+
+
+def comparable_payload(payload):
+    comparable = copy.deepcopy(payload)
+    configs = comparable.get("deployment_configs")
+    if not isinstance(configs, dict):
+        return comparable
+
+    for environment in configs.values():
+        if not isinstance(environment, dict):
+            continue
+
+        env_vars = environment.get("env_vars")
+        if not isinstance(env_vars, dict):
+            continue
+
+        for variable in env_vars.values():
+            if isinstance(variable, dict) and variable.get("type") == "secret_text":
+                variable.pop("value", None)
+
+    return comparable
+
+
+def payload_with_removed_env_vars(payload, current):
+    merged = copy.deepcopy(payload)
+    configs = merged.get("deployment_configs")
+    current_configs = (
+        current.get("deployment_configs") if isinstance(current, dict) else None
+    )
+    if not isinstance(configs, dict) or not isinstance(current_configs, dict):
+        return merged
+
+    for environment, desired_env in configs.items():
+        if not isinstance(desired_env, dict):
+            continue
+
+        desired_vars = desired_env.get("env_vars")
+        current_env = current_configs.get(environment)
+        current_vars = (
+            current_env.get("env_vars") if isinstance(current_env, dict) else None
+        )
+        if not isinstance(desired_vars, dict) or not isinstance(current_vars, dict):
+            continue
+
+        for name in current_vars:
+            if name not in desired_vars:
+                desired_vars[name] = None
+
+    return merged
 
 
 def current_domain_names(project, domains):
@@ -142,6 +207,7 @@ def main():
             "production_branch": {"type": "str"},
             "build_config": {"type": "dict"},
             "deployment_configs": {"type": "dict"},
+            "rotate_secrets": {"type": "bool", "default": False},
             "source": {"type": "dict"},
             "domains": {"type": "list", "elements": "dict"},
             "state": {
@@ -157,13 +223,18 @@ def main():
     state = params["state"]
 
     with cloudflare_client(module) as client:
-        current = find_by_field(
-            client, endpoint(params["account_id"]), "name", params["name"]
+        current = get_result(
+            client,
+            item_endpoint(params["account_id"], params["name"]),
+            ok_statuses=[404],
         )
         domain_names = []
         for domain in params.get("domains") or []:
-            if isinstance(domain, dict) and domain.get("name") is not None:
-                domain_names.append(domain["name"])
+            domain_name = domain.get("name") if isinstance(domain, dict) else None
+            if not domain_name:
+                module.fail_json(msg="Each Pages project domain requires a name")
+            if domain_name not in domain_names:
+                domain_names.append(domain_name)
 
         if state == "absent":
             if current is None:
@@ -174,10 +245,10 @@ def main():
                     message="Pages project would be deleted",
                     pages_project=current,
                 )
-            existing_domains = get_result(
+            existing_domains = list_all(
                 client,
                 domains_endpoint(params["account_id"], params["name"]),
-                default=[],
+                paginate=False,
             )
             existing_names = current_domain_names(current, existing_domains)
             for domain_name in domain_names:
@@ -215,25 +286,36 @@ def main():
                     )
                 current = post_result(client, endpoint(params["account_id"]), payload)
                 changed = True
-            elif values_differ(select_fields(current, payload.keys()), payload):
-                if module.check_mode:
-                    module.exit_json(
-                        changed=True,
-                        message="Pages project would be updated",
-                        pages_project=current,
+            else:
+                payload = payload_with_removed_env_vars(payload, current)
+                if (
+                    params["rotate_secrets"]
+                    and params.get("deployment_configs") is not None
+                ) or values_differ(
+                    normalize_current_by_desired_fields(
+                        select_fields(current, payload.keys()),
+                        comparable_payload(payload),
+                    ),
+                    comparable_payload(payload),
+                ):
+                    if module.check_mode:
+                        module.exit_json(
+                            changed=True,
+                            message="Pages project would be updated",
+                            pages_project=current,
+                        )
+                    current = patch_result(
+                        client,
+                        item_endpoint(params["account_id"], params["name"]),
+                        payload,
                     )
-                current = patch_result(
-                    client,
-                    item_endpoint(params["account_id"], params["name"]),
-                    payload,
-                )
-                changed = True
+                    changed = True
 
             if domain_names:
-                existing_domains = get_result(
+                existing_domains = list_all(
                     client,
                     domains_endpoint(params["account_id"], params["name"]),
-                    default=[],
+                    paginate=False,
                 )
                 existing_names = current_domain_names(current, existing_domains)
                 missing_domains = []

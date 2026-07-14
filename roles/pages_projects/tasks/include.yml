@@ -10,6 +10,7 @@
     domains: "{{ _pages_project.domains | d(omit) }}"
     name: "{{ _pages_project.name }}"
     production_branch: "{{ _pages_project.production_branch | d(omit) }}"
+    rotate_secrets: "{{ _pages_project.rotate_secrets | d(omit) }}"
     source: "{{ _pages_project.source | d(omit) }}"
     state: "{{ _pages_project.state | d('present') }}"
   register: __pages_projects_result

@@ -53,7 +53,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    get_result,
+    list_all,
 )
 
 
@@ -67,10 +67,10 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        rules_lists = get_result(
+        rules_lists = list_all(
             client,
             "/accounts/%s/rules/lists" % module.params["account_id"],
-            default=[],
+            paginate=False,
         )
 
     module.exit_json(changed=False, rules_lists=rules_lists)
