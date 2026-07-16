@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,53 +11,53 @@ DOCUMENTATION = r"""
 module: rulesets
 short_description: Manage cloudflare rulesets
 description:
-- Create, update, and delete a Cloudflare zone ruleset entrypoint for a phase.
+  - Create, update, and delete a Cloudflare zone ruleset entrypoint for a phase.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   api_token:
     required: true
     type: str
     description:
-    - Cloudflare API token.
+      - Cloudflare API token.
   zone_id:
     required: true
     type: str
     description:
-    - Cloudflare zone identifier.
+      - Cloudflare zone identifier.
   name:
     type: str
     description:
-    - Resource name.
-    - Required when creating the ruleset; an existing ruleset cannot be renamed.
+      - Resource name.
+      - Required when creating the ruleset; an existing ruleset cannot be renamed.
   rules:
     type: list
     elements: dict
     description:
-    - Ruleset rules.
-    - When omitted, the existing rules are preserved.
-    - An explicit empty list clears the ruleset.
+      - Ruleset rules.
+      - When omitted, the existing rules are preserved.
+      - An explicit empty list clears the ruleset.
   phase:
     type: str
     default: http_request_firewall_custom
     description:
-    - Ruleset phase.
+      - Ruleset phase.
   kind:
     type: str
     default: zone
     description:
-    - Resource kind.
+      - Resource kind.
   state:
     type: str
     choices:
-    - present
-    - absent
+      - present
+      - absent
     default: present
     description:
-    - Desired state of the resource.
+      - Desired state of the resource.
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 
@@ -140,12 +139,14 @@ def main():
         if state == "absent":
             if not current or current.get("id") is None:
                 module.exit_json(changed=False, message="Ruleset already absent")
+
             if module.check_mode:
                 module.exit_json(
                     changed=True,
                     message="Ruleset would be deleted",
                     ruleset=current,
                 )
+
             delete_result(
                 client, "%s/%s" % (rulesets_endpoint(params["zone_id"]), current["id"])
             )
@@ -155,12 +156,14 @@ def main():
                 ruleset=current,
             )
 
-        elif state == "present":
+        if state == "present":
             if current is None:
                 if params.get("name") is None:
                     module.fail_json(msg="name is required when creating a ruleset")
+
                 if module.check_mode:
                     module.exit_json(changed=True, message="Ruleset would be created")
+
                 ruleset = post_result(
                     client,
                     rulesets_endpoint(params["zone_id"]),
@@ -219,9 +222,6 @@ def main():
                 payload,
             )
             module.exit_json(changed=True, message="Ruleset updated", ruleset=ruleset)
-
-        else:
-            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":

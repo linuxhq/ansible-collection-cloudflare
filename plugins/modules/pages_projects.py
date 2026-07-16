@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,72 +11,72 @@ DOCUMENTATION = r"""
 module: pages_projects
 short_description: Manage cloudflare pages projects
 description:
-- Create, update, and delete Cloudflare Pages projects by name.
-- Optionally ensures listed custom domains are attached to the project.
+  - Create, update, and delete Cloudflare Pages projects by name.
+  - Optionally ensures listed custom domains are attached to the project.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   account_id:
     required: true
     type: str
     description:
-    - Cloudflare account identifier.
+      - Cloudflare account identifier.
   api_token:
     required: true
     type: str
     description:
-    - Cloudflare API token.
+      - Cloudflare API token.
   name:
     required: true
     type: str
     description:
-    - Resource name.
+      - Resource name.
   production_branch:
     type: str
     description:
-    - Production branch.
-    - Required when creating a new Pages project.
+      - Production branch.
+      - Required when creating a new Pages project.
   build_config:
     type: dict
     description:
-    - Build config.
+      - Build config.
   deployment_configs:
     type: dict
     description:
-    - Deployment configs.
-    - Values of C(secret_text) variables are write-only; changes to them are not
-      detected and they are only resent when another change triggers an update.
-    - Use C(rotate_secrets) to force an update that resends secret values.
-    - Environment variables removed from C(env_vars) are deleted from the
-      project.
+      - Deployment configs.
+      - Values of C(secret_text) variables are write-only; changes to them are not
+        detected and they are only resent when another change triggers an update.
+      - Use C(rotate_secrets) to force an update that resends secret values.
+      - Environment variables removed from C(env_vars) are deleted from the
+        project.
   rotate_secrets:
     type: bool
     default: false
     description:
-    - Force an update that resends C(deployment_configs), including C(secret_text)
-      values, even when no other change is detected.
-    - Use to rotate secrets; the module always reports C(changed) when enabled.
+      - Force an update that resends C(deployment_configs), including C(secret_text)
+        values, even when no other change is detected.
+      - Use to rotate secrets; the module always reports C(changed) when enabled.
   source:
     type: dict
     description:
-    - Source.
+      - Source.
   domains:
     type: list
     elements: dict
     description:
-    - Domains.
-    - Each entry requires a C(name).
+      - Domains.
+      - Each entry requires a C(name).
   state:
     type: str
     choices:
-    - present
-    - absent
+      - present
+      - absent
     default: present
     description:
-    - Desired state of the resource.
+      - Desired state of the resource.
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 
@@ -239,12 +238,14 @@ def main():
         if state == "absent":
             if current is None:
                 module.exit_json(changed=False, message="Pages project already absent")
+
             if module.check_mode:
                 module.exit_json(
                     changed=True,
                     message="Pages project would be deleted",
                     pages_project=current,
                 )
+
             existing_domains = list_all(
                 client,
                 domains_endpoint(params["account_id"], params["name"]),
@@ -268,7 +269,7 @@ def main():
                 pages_project=current,
             )
 
-        elif state == "present":
+        if state == "present":
             if current is None and not params.get("production_branch"):
                 module.fail_json(
                     msg="production_branch is required when creating a Pages project"
@@ -284,10 +285,12 @@ def main():
                     module.exit_json(
                         changed=True, message="Pages project would be created"
                     )
+
                 current = post_result(client, endpoint(params["account_id"]), payload)
                 changed = True
             else:
                 payload = payload_with_removed_env_vars(payload, current)
+
                 if (
                     params["rotate_secrets"]
                     and params.get("deployment_configs") is not None
@@ -304,6 +307,7 @@ def main():
                             message="Pages project would be updated",
                             pages_project=current,
                         )
+
                     current = patch_result(
                         client,
                         item_endpoint(params["account_id"], params["name"]),
@@ -324,12 +328,14 @@ def main():
                         missing_domains.append(domain_name)
 
                 domains_changed = bool(missing_domains)
+
                 if module.check_mode and domains_changed:
                     module.exit_json(
                         changed=True,
                         message="Pages project domains would be updated",
                         pages_project=current,
                     )
+
                 for domain_name in missing_domains:
                     managed_domains.append(
                         post_result(
@@ -352,9 +358,6 @@ def main():
                 pages_project=current,
                 domains=managed_domains,
             )
-
-        else:
-            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":

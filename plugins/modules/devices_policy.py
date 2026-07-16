@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,93 +11,93 @@ DOCUMENTATION = r"""
 module: devices_policy
 short_description: Manage cloudflare devices policy
 description:
-- Patch the Cloudflare Zero Trust default device policy for an account.
+  - Patch the Cloudflare Zero Trust default device policy for an account.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   account_id:
     required: true
     type: str
     description:
-    - Cloudflare account identifier.
+      - Cloudflare account identifier.
   allow_mode_switch:
     type: bool
     description:
-    - Whether to allow the user to switch WARP between modes.
+      - Whether to allow the user to switch WARP between modes.
   allow_updates:
     type: bool
     description:
-    - Whether to receive WARP client update notifications.
+      - Whether to receive WARP client update notifications.
   allowed_to_leave:
     type: bool
     description:
-    - Whether to allow devices to leave the organization.
+      - Whether to allow devices to leave the organization.
   api_token:
     required: true
     type: str
     description:
-    - Cloudflare API token.
+      - Cloudflare API token.
   auto_connect:
     type: float
     description:
-    - Seconds before reconnecting after WARP has been disabled.
+      - Seconds before reconnecting after WARP has been disabled.
   captive_portal:
     type: float
     description:
-    - Seconds before turning on captive portal handling.
+      - Seconds before turning on captive portal handling.
   disable_auto_fallback:
     type: bool
     description:
-    - Whether to disable automatic fallback DNS resolver selection.
+      - Whether to disable automatic fallback DNS resolver selection.
   exclude:
     type: list
     elements: dict
     description:
-    - Split tunnel routes excluded from the WARP tunnel.
+      - Split tunnel routes excluded from the WARP tunnel.
   exclude_office_ips:
     type: bool
     description:
-    - Whether to add Microsoft IPs to split tunnel exclusions.
+      - Whether to add Microsoft IPs to split tunnel exclusions.
   include:
     type: list
     elements: dict
     description:
-    - Split tunnel routes included in the WARP tunnel.
+      - Split tunnel routes included in the WARP tunnel.
   lan_allow_minutes:
     type: float
     description:
-    - Minutes a user is allowed access to their LAN.
+      - Minutes a user is allowed access to their LAN.
   lan_allow_subnet_size:
     type: float
     description:
-    - Subnet size for local access.
+      - Subnet size for local access.
   register_interface_ip_with_dns:
     type: bool
     description:
-    - Whether the operating system registers WARP's local interface IP with DNS.
+      - Whether the operating system registers WARP's local interface IP with DNS.
   sccm_vpn_boundary_support:
     type: bool
     description:
-    - Whether the WARP client indicates to SCCM that it is inside a VPN boundary.
+      - Whether the WARP client indicates to SCCM that it is inside a VPN boundary.
   service_mode_v2:
     type: dict
     description:
-    - WARP client service mode configuration.
+      - WARP client service mode configuration.
   support_url:
     type: str
     description:
-    - URL launched by the WARP client Send Feedback button.
+      - URL launched by the WARP client Send Feedback button.
   switch_locked:
     type: bool
     description:
-    - Whether to allow the user to turn off WARP and disconnect the client.
+      - Whether to allow the user to turn off WARP and disconnect the client.
   tunnel_protocol:
     type: str
     description:
-    - Tunnel protocol to use.
+      - Tunnel protocol to use.
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 

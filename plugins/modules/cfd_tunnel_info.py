@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,28 +11,28 @@ DOCUMENTATION = r"""
 module: cfd_tunnel_info
 short_description: Gather information about cloudflare cfd tunnels
 description:
-- Gather active Cloudflare cloudflared tunnels and optionally their connector tokens.
+  - Gather active Cloudflare cloudflared tunnels and optionally their connector tokens.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   account_id:
     required: true
     type: str
     description:
-    - Cloudflare account identifier.
+      - Cloudflare account identifier.
   api_token:
     required: true
     type: str
     description:
-    - Cloudflare API token.
+      - Cloudflare API token.
   include_token:
     type: bool
     default: true
     description:
-    - Include token.
+      - Include token.
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 

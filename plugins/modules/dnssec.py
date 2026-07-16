@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,43 +11,43 @@ DOCUMENTATION = r"""
 module: dnssec
 short_description: Manage cloudflare dnssec settings
 description:
-- Manage Cloudflare DNSSEC settings for a zone.
+  - Manage Cloudflare DNSSEC settings for a zone.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   api_token:
     description:
-    - Cloudflare API token with permissions to manage DNS settings.
+      - Cloudflare API token with permissions to manage DNS settings.
     required: true
     type: str
   zone_id:
     description:
-    - Cloudflare zone identifier.
+      - Cloudflare zone identifier.
     required: true
     type: str
   dnssec_multi_signer:
     description:
-    - Whether multi-signer DNSSEC is enabled.
+      - Whether multi-signer DNSSEC is enabled.
     type: bool
   dnssec_presigned:
     description:
-    - Whether presigned DNSSEC is enabled.
+      - Whether presigned DNSSEC is enabled.
     type: bool
   dnssec_use_nsec3:
     description:
-    - Whether NSEC3 is enabled.
+      - Whether NSEC3 is enabled.
     type: bool
   status:
     description:
-    - Desired DNSSEC status.
-    - Only changed when explicitly provided.
+      - Desired DNSSEC status.
+      - Only changed when explicitly provided.
     type: str
     choices:
-    - active
-    - disabled
+      - active
+      - disabled
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 

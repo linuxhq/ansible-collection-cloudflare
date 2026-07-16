@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,86 +11,86 @@ DOCUMENTATION = r"""
 module: access_policies
 short_description: Manage cloudflare access policies
 description:
-- Create, update, and delete Cloudflare Access policies by name.
+  - Create, update, and delete Cloudflare Access policies by name.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   account_id:
     required: true
     type: str
     description:
-    - Cloudflare account identifier.
+      - Cloudflare account identifier.
   api_token:
     required: true
     type: str
     description:
-    - Cloudflare API token.
+      - Cloudflare API token.
   name:
     required: true
     type: str
     description:
-    - Resource name.
+      - Resource name.
   decision:
     type: str
     choices:
-    - allow
-    - deny
-    - non_identity
-    - bypass
+      - allow
+      - deny
+      - non_identity
+      - bypass
     description:
-    - Decision.
-    - Required when state is C(present).
+      - Decision.
+      - Required when state is C(present).
   include:
     type: list
     elements: dict
     description:
-    - Include.
-    - Required when state is C(present).
+      - Include.
+      - Required when state is C(present).
   exclude:
     type: list
     elements: dict
     description:
-    - Exclude.
+      - Exclude.
   require:
     type: list
     elements: dict
     description:
-    - Require.
+      - Require.
   approval_groups:
     type: list
     elements: dict
     description:
-    - Approval groups.
+      - Approval groups.
   approval_required:
     type: bool
     default: false
     description:
-    - Approval required.
+      - Approval required.
   isolation_required:
     type: bool
     default: false
     description:
-    - Isolation required.
+      - Isolation required.
   purpose_justification_prompt:
     type: str
     description:
-    - Purpose justification prompt.
+      - Purpose justification prompt.
   purpose_justification_required:
     type: bool
     default: false
     description:
-    - Purpose justification required.
+      - Purpose justification required.
   state:
     type: str
     choices:
-    - present
-    - absent
+      - present
+      - absent
     default: present
     description:
-    - Desired state of the resource.
+      - Desired state of the resource.
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 
@@ -197,12 +196,14 @@ def main():
         if state == "absent":
             if current is None:
                 module.exit_json(changed=False, message="Access policy already absent")
+
             if module.check_mode:
                 module.exit_json(
                     changed=True,
                     message="Access policy would be deleted",
                     access_policy=current,
                 )
+
             delete_result(
                 client, "%s/%s" % (endpoint(params["account_id"]), current["id"])
             )
@@ -212,13 +213,14 @@ def main():
                 access_policy=current,
             )
 
-        elif state == "present":
+        if state == "present":
             payload = payload_from_params(params, FIELDS)
             if current is None:
                 if module.check_mode:
                     module.exit_json(
                         changed=True, message="Access policy would be created"
                     )
+
                 access_policy = post_result(
                     client, endpoint(params["account_id"]), payload
                 )
@@ -259,9 +261,6 @@ def main():
                 message="Access policy updated",
                 access_policy=access_policy,
             )
-
-        else:
-            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":

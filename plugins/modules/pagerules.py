@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,57 +11,57 @@ DOCUMENTATION = r"""
 module: pagerules
 short_description: Manage cloudflare pagerules
 description:
-- Create, update, and delete Cloudflare page rules identified by their targets.
+  - Create, update, and delete Cloudflare page rules identified by their targets.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   api_token:
     required: true
     type: str
     description:
-    - Cloudflare API token.
+      - Cloudflare API token.
   zone_id:
     required: true
     type: str
     description:
-    - Cloudflare zone identifier.
+      - Cloudflare zone identifier.
   actions:
     type: list
     elements: dict
     description:
-    - Actions.
-    - Required when state is C(present).
+      - Actions.
+      - Required when state is C(present).
   targets:
     required: true
     type: list
     elements: dict
     description:
-    - Targets.
+      - Targets.
   priority:
     type: int
     description:
-    - Priority.
-    - An existing rule's priority is preserved when omitted.
+      - Priority.
+      - An existing rule's priority is preserved when omitted.
   status:
     type: str
     choices:
-    - active
-    - disabled
+      - active
+      - disabled
     description:
-    - Status.
-    - Defaults to C(active) when creating a page rule; an existing rule's
-      status is preserved when omitted.
+      - Status.
+      - Defaults to C(active) when creating a page rule; an existing rule's
+        status is preserved when omitted.
   state:
     type: str
     choices:
-    - present
-    - absent
+      - present
+      - absent
     default: present
     description:
-    - Desired state of the resource.
+      - Desired state of the resource.
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 
@@ -158,12 +157,14 @@ def main():
         if state == "absent":
             if current is None:
                 module.exit_json(changed=False, message="Page rule already absent")
+
             if module.check_mode:
                 module.exit_json(
                     changed=True,
                     message="Page rule would be deleted",
                     pagerule=current,
                 )
+
             delete_result(client, item_endpoint(params["zone_id"], current["id"]))
             module.exit_json(
                 changed=True,
@@ -171,12 +172,14 @@ def main():
                 pagerule=current,
             )
 
-        elif state == "present":
+        if state == "present":
             payload = payload_from_params(params, FIELDS)
             if current is None:
                 payload.setdefault("status", "active")
+
                 if module.check_mode:
                     module.exit_json(changed=True, message="Page rule would be created")
+
                 pagerule = post_result(client, endpoint(params["zone_id"]), payload)
                 module.exit_json(
                     changed=True,
@@ -212,9 +215,6 @@ def main():
                 message="Page rule updated",
                 pagerule=pagerule,
             )
-
-        else:
-            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 
 .ansible/
 .DS_Store
+.ruff_cache/
 __pycache__/
 *.py[co]
 venv

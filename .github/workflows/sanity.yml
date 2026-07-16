@@ -17,9 +17,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ansible: 'ansible-core==2.15.*'
-            python: '3.11'
-          - ansible: 'ansible>11,<12'
+          - ansible: 'ansible-core==2.18.*'
+            python: '3.12'
+          - ansible: 'ansible>14,<15'
             python: '3.13'
     defaults:
       run:

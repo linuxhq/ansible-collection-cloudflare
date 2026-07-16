@@ -2,6 +2,8 @@
 authors:
   - Taylor Kimball (https://github.com/tkimball83)
 build_ignore:
+  - .agents
+  - .agents/**
   - .ansible
   - .ansible/**
   - .ansible-lint
@@ -14,8 +16,13 @@ build_ignore:
   - .gitignore
   - .pre-commit-config.yaml
   - .python-version
+  - .ruff.toml
+  - .ruff_cache
+  - .ruff_cache/**
   - .yamllint
+  - AGENTS.md
   - ansible.cfg
+  - CLAUDE.md
   - Makefile
   - requirements.txt
   - requirements.yml
@@ -32,7 +39,7 @@ build_ignore:
   - '*.tgz'
 description: A collection of cloudflare roles
 dependencies:
-  community.general: '>=8.0.0,<11.0.0'
+  community.general: '>=12.0.0,<14.0.0'
 documentation: https://github.com/linuxhq/ansible-collection-cloudflare/blob/main/README.md
 homepage: https://www.linuxhq.org
 issues: https://github.com/linuxhq/ansible-collection-cloudflare/issues

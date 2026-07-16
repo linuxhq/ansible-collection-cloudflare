@@ -27,4 +27,20 @@ repos:
         language_version: python3
         types: [file, yaml]
         entry: yamllint --strict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.21
+    hooks:
+      - id: ruff-check
+        exclude: ^venv/
+        files: \.(py)$
+        verbose: true
+
+  - repo: https://github.com/ansible-community/antsibull-changelog
+    rev: 0.34.0
+    hooks:
+      - id: antsibull-changelog-lint
+        verbose: true
+      - id: antsibull-changelog-lint-changelog-yaml
+        verbose: true
 ...
