@@ -37,7 +37,7 @@ repos:
         verbose: true
 
   - repo: https://github.com/ansible-community/antsibull-changelog
-    rev: 0.34.0
+    rev: 0.35.1
     hooks:
       - id: antsibull-changelog-lint
         verbose: true
