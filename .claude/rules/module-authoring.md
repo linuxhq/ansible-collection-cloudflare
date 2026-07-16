@@ -1,0 +1,1 @@
+../../.agents/rules/module-authoring.md
