@@ -7,7 +7,7 @@ galaxy_info:
   author: Taylor Kimball
   description: Manage cloudflare cfd tunnels
   license: GPL-3.0-or-later
-  min_ansible_version: 2.15.0
+  min_ansible_version: 2.18.0
   namespace: linuxhq
   platforms:
     - name: GenericLinux

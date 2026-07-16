@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,68 +11,68 @@ DOCUMENTATION = r"""
 module: rules_lists
 short_description: Manage cloudflare rules lists
 description:
-- Create, update, populate, and delete Cloudflare Rules lists by name.
-- Item updates wait for the resulting bulk operation to complete and fail when
-  Cloudflare reports the operation failed.
+  - Create, update, populate, and delete Cloudflare Rules lists by name.
+  - Item updates wait for the resulting bulk operation to complete and fail when
+    Cloudflare reports the operation failed.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   account_id:
     required: true
     type: str
     description:
-    - Cloudflare account identifier.
+      - Cloudflare account identifier.
   api_token:
     required: true
     type: str
     description:
-    - Cloudflare API token.
+      - Cloudflare API token.
   name:
     required: true
     type: str
     description:
-    - Resource name.
+      - Resource name.
   kind:
     type: str
     choices:
-    - ip
-    - redirect
-    - hostname
-    - asn
+      - ip
+      - redirect
+      - hostname
+      - asn
     description:
-    - Resource kind.
-    - Required when creating a Rules list.
+      - Resource kind.
+      - Required when creating a Rules list.
   description:
     type: str
     description:
-    - Description.
+      - Description.
   elements:
     type: list
     elements: dict
     description:
-    - Elements.
+      - Elements.
   operation_timeout:
     type: int
     default: 240
     description:
-    - Maximum seconds to wait for the bulk item operation to complete, including
-      retrying submission while another bulk operation is pending on the account.
-    - Enforced as an upper bound; the remaining budget is applied to every
-      submission and polling request as a single attempt, and the module handles
-      retries within the budget.
-    - Must be at least 1 second.
-    - When executed asynchronously, the async budget must exceed this value.
+      - Maximum seconds to wait for the bulk item operation to complete, including
+        retrying submission while another bulk operation is pending on the account.
+      - Enforced as an upper bound; the remaining budget is applied to every
+        submission and polling request as a single attempt, and the module handles
+        retries within the budget.
+      - Must be at least 1 second.
+      - When executed asynchronously, the async budget must exceed this value.
   state:
     type: str
     choices:
-    - present
-    - absent
+      - present
+      - absent
     default: present
     description:
-    - Desired state of the resource.
+      - Desired state of the resource.
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 
@@ -332,12 +331,14 @@ def main():
         if state == "absent":
             if current is None:
                 module.exit_json(changed=False, message="Rules list already absent")
+
             if module.check_mode:
                 module.exit_json(
                     changed=True,
                     message="Rules list would be deleted",
                     rules_list=current,
                 )
+
             delete_result(client, item_endpoint(params["account_id"], current["id"]))
             module.exit_json(
                 changed=True,
@@ -345,7 +346,7 @@ def main():
                 rules_list=current,
             )
 
-        elif state == "present":
+        if state == "present":
             if current is None and params.get("kind") is None:
                 module.fail_json(msg="kind is required when creating a Rules list")
 
@@ -358,6 +359,7 @@ def main():
                     module.exit_json(
                         changed=True, message="Rules list would be created"
                     )
+
                 current = post_result(
                     client,
                     endpoint(params["account_id"]),
@@ -384,6 +386,7 @@ def main():
                             message="Rules list would be updated",
                             rules_list=current,
                         )
+
                     current = put_result(
                         client,
                         item_endpoint(params["account_id"], current["id"]),
@@ -426,12 +429,14 @@ def main():
                         normalize_items(current_items),
                         desired_items,
                     )
+
                 if module.check_mode and items_changed:
                     module.exit_json(
                         changed=True,
                         message="Rules list items would be updated",
                         rules_list=current,
                     )
+
                 if items_changed:
                     deadline = time.monotonic() + params["operation_timeout"]
                     items_operation = wait_for_operation(
@@ -466,9 +471,6 @@ def main():
                 rules_list=current,
                 items_operation=items_operation,
             )
-
-        else:
-            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":

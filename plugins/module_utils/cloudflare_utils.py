@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 from contextlib import contextmanager
+from urllib.parse import quote
 
 from ansible.module_utils.basic import missing_required_lib
 from ansible.module_utils.common.dict_transformations import recursive_diff
@@ -100,6 +101,23 @@ def find_by_field(client, path, field, value, paginate=True):
             return item
 
     return None
+
+
+def find_by_name(client, path, name, extra_query=None, paginate=True):
+    query = list((extra_query or {}).items())
+    query.append(("name", name))
+    query_string = "&".join(
+        "%s=%s" % (key, quote(str(value), safe="")) for key, value in query
+    )
+    separator = "&" if "?" in path else "?"
+
+    return find_by_field(
+        client,
+        "%s%s%s" % (path, separator, query_string),
+        "name",
+        name,
+        paginate=paginate,
+    )
 
 
 def get_result(client, path, default=None, ok_statuses=None, timeout=None):

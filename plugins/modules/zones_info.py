@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,36 +11,36 @@ DOCUMENTATION = r"""
 module: zones_info
 short_description: Gather information about cloudflare zones
 description:
-- Gather Cloudflare zones visible to the supplied API token.
+  - Gather Cloudflare zones visible to the supplied API token.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   api_token:
     required: true
     type: str
     description:
-    - Cloudflare API token.
+      - Cloudflare API token.
   match:
     type: str
     choices:
-    - any
-    - all
+      - any
+      - all
     default: all
     description:
-    - Match.
+      - Match.
   page:
     type: int
     default: 1
     description:
-    - Page.
+      - Page.
   per_page:
     type: int
     default: 20
     description:
-    - Per page.
+      - Per page.
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 

@@ -1,0 +1,4 @@
+[lint.per-file-ignores]
+# Ansible plugins place DOCUMENTATION/EXAMPLES/RETURN and __metaclass__
+# before imports, so module-level imports are never at the top of the file.
+"plugins/**/*.py" = ["E402"]

@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,23 +11,23 @@ DOCUMENTATION = r"""
 module: access_service_tokens_info
 short_description: Gather information about cloudflare access service tokens
 description:
-- Gather Cloudflare Access service tokens for an account.
+  - Gather Cloudflare Access service tokens for an account.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   account_id:
     description:
-    - Cloudflare account identifier.
+      - Cloudflare account identifier.
     required: true
     type: str
   api_token:
     description:
-    - Cloudflare API token with permissions to read Access service tokens.
+      - Cloudflare API token with permissions to read Access service tokens.
     required: true
     type: str
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 

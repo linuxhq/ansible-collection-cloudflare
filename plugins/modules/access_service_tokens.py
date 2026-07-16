@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,44 +11,44 @@ DOCUMENTATION = r"""
 module: access_service_tokens
 short_description: Manage cloudflare access service tokens
 description:
-- Create, update, and delete Cloudflare Access service tokens.
-- The module identifies service tokens by C(name) within an account.
+  - Create, update, and delete Cloudflare Access service tokens.
+  - The module identifies service tokens by C(name) within an account.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   account_id:
     description:
-    - Cloudflare account identifier.
+      - Cloudflare account identifier.
     required: true
     type: str
   api_token:
     description:
-    - Cloudflare API token with permissions to manage Access service tokens.
+      - Cloudflare API token with permissions to manage Access service tokens.
     required: true
     type: str
   name:
     description:
-    - Name of the service token.
+      - Name of the service token.
     required: true
     type: str
   duration:
     description:
-    - Lifetime for the service token.
-    - When omitted for C(state=present), the module does not manage the token duration.
+      - Lifetime for the service token.
+      - When omitted for C(state=present), the module does not manage the token duration.
     type: str
   state:
     description:
-    - Desired state of the service token.
+      - Desired state of the service token.
     type: str
     choices:
-    - present
-    - absent
+      - present
+      - absent
     default: present
 notes:
-- Cloudflare only returns the client secret when a token is created.
+  - Cloudflare only returns the client secret when a token is created.
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 
@@ -85,13 +84,11 @@ message:
 
 """
 
-from urllib.parse import quote
-
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    find_by_field,
+    find_by_name,
     serialize_resource,
 )
 
@@ -128,13 +125,10 @@ def main():
     state = params["state"]
 
     with cloudflare_client(module) as client:
-        current = find_by_field(
+        current = find_by_name(
             client,
-            "/accounts/%s/access/service_tokens?name=%s"
-            % (account_id, quote(params["name"], safe="")),
-            "name",
+            "/accounts/%s/access/service_tokens" % account_id,
             params["name"],
-            paginate=False,
         )
 
         if state == "absent":
@@ -158,7 +152,7 @@ def main():
                 service_token=current,
             )
 
-        elif state == "present":
+        if state == "present":
             if current is None:
                 if module.check_mode:
                     module.exit_json(
@@ -208,9 +202,6 @@ def main():
                 message="Service token updated",
                 service_token=serialize_resource(service_token),
             )
-
-        else:
-            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":
