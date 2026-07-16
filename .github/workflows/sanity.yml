@@ -25,7 +25,7 @@ jobs:
       run:
         working-directory: ansible_collections/linuxhq/cloudflare
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: ansible_collections/linuxhq/cloudflare
       - uses: actions/setup-python@v5
