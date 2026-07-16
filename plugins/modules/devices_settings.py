@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,48 +11,48 @@ DOCUMENTATION = r"""
 module: devices_settings
 short_description: Manage cloudflare devices settings
 description:
-- Manage account-wide Cloudflare Zero Trust device settings.
+  - Manage account-wide Cloudflare Zero Trust device settings.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   account_id:
     required: true
     type: str
     description:
-    - Cloudflare account identifier.
+      - Cloudflare account identifier.
   api_token:
     required: true
     type: str
     description:
-    - Cloudflare API token.
+      - Cloudflare API token.
   disable_for_time:
     type: float
     default: 0
     description:
-    - Disable for time.
+      - Disable for time.
   gateway_proxy_enabled:
     type: bool
     default: false
     description:
-    - Gateway proxy enabled.
+      - Gateway proxy enabled.
   gateway_udp_proxy_enabled:
     type: bool
     default: false
     description:
-    - Gateway udp proxy enabled.
+      - Gateway udp proxy enabled.
   root_certificate_installation_enabled:
     type: bool
     default: false
     description:
-    - Root certificate installation enabled.
+      - Root certificate installation enabled.
   use_zt_virtual_ip:
     type: bool
     default: false
     description:
-    - Use zt virtual ip.
+      - Use zt virtual ip.
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 

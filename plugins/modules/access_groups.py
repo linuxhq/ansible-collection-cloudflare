@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,57 +11,57 @@ DOCUMENTATION = r"""
 module: access_groups
 short_description: Manage cloudflare access groups
 description:
-- Create, update, and delete Cloudflare Access groups by name.
+  - Create, update, and delete Cloudflare Access groups by name.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   account_id:
     required: true
     type: str
     description:
-    - Cloudflare account identifier.
+      - Cloudflare account identifier.
   api_token:
     required: true
     type: str
     description:
-    - Cloudflare API token.
+      - Cloudflare API token.
   name:
     required: true
     type: str
     description:
-    - Resource name.
+      - Resource name.
   include:
     type: list
     elements: dict
     description:
-    - Include.
-    - Required when state is C(present).
+      - Include.
+      - Required when state is C(present).
   exclude:
     type: list
     elements: dict
     description:
-    - Exclude.
+      - Exclude.
   require:
     type: list
     elements: dict
     description:
-    - Require.
+      - Require.
   is_default:
     type: bool
     default: false
     description:
-    - Is default.
+      - Is default.
   state:
     type: str
     choices:
-    - present
-    - absent
+      - present
+      - absent
     default: present
     description:
-    - Desired state of the resource.
+      - Desired state of the resource.
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 
@@ -91,14 +90,12 @@ message:
 
 """
 
-from urllib.parse import quote
-
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     delete_result,
-    find_by_field,
+    find_by_name,
     payload_from_params,
     post_result,
     put_result,
@@ -137,24 +134,23 @@ def main():
     state = params["state"]
 
     with cloudflare_client(module) as client:
-        current = find_by_field(
+        current = find_by_name(
             client,
-            "%s?name=%s"
-            % (endpoint(params["account_id"]), quote(params["name"], safe="")),
-            "name",
+            endpoint(params["account_id"]),
             params["name"],
-            paginate=False,
         )
 
         if state == "absent":
             if current is None:
                 module.exit_json(changed=False, message="Access group already absent")
+
             if module.check_mode:
                 module.exit_json(
                     changed=True,
                     message="Access group would be deleted",
                     access_group=current,
                 )
+
             delete_result(
                 client, "%s/%s" % (endpoint(params["account_id"]), current["id"])
             )
@@ -164,13 +160,14 @@ def main():
                 access_group=current,
             )
 
-        elif state == "present":
+        if state == "present":
             payload = payload_from_params(params, FIELDS)
             if current is None:
                 if module.check_mode:
                     module.exit_json(
                         changed=True, message="Access group would be created"
                     )
+
                 access_group = post_result(
                     client, endpoint(params["account_id"]), payload
                 )
@@ -210,9 +207,6 @@ def main():
                 message="Access group updated",
                 access_group=access_group,
             )
-
-        else:
-            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,55 +11,55 @@ DOCUMENTATION = r"""
 module: zones
 short_description: Manage cloudflare zones
 description:
-- Create, update, delete Cloudflare zones, and manage zone settings.
+  - Create, update, delete Cloudflare zones, and manage zone settings.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   api_token:
     required: true
     type: str
     description:
-    - Cloudflare API token.
+      - Cloudflare API token.
   name:
     required: true
     type: str
     description:
-    - Resource name.
+      - Resource name.
   account_id:
     description:
-    - Account identifier used when creating a zone.
+      - Account identifier used when creating a zone.
     type: str
   type:
     type: str
     choices:
-    - full
-    - partial
-    - secondary
+      - full
+      - partial
+      - secondary
     description:
-    - Resource type.
-    - Defaults to C(full) when creating a zone.
-    - An existing zone's type is only changed when explicitly provided.
+      - Resource type.
+      - Defaults to C(full) when creating a zone.
+      - An existing zone's type is only changed when explicitly provided.
   vanity_name_servers:
     type: list
     elements: str
     description:
-    - Vanity name servers.
+      - Vanity name servers.
   settings:
     type: list
     elements: dict
     description:
-    - Zone settings to manage.
+      - Zone settings to manage.
   state:
     type: str
     choices:
-    - present
-    - absent
+      - present
+      - absent
     default: present
     description:
-    - Desired state of the resource.
+      - Desired state of the resource.
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 
@@ -169,21 +168,25 @@ def main():
         if state == "absent":
             if current is None:
                 module.exit_json(changed=False, message="Zone already absent")
+
             if module.check_mode:
                 module.exit_json(
                     changed=True,
                     message="Zone would be deleted",
                     zone=current,
                 )
+
             delete_result(client, zone_endpoint(current["id"]))
             module.exit_json(changed=True, message="Zone deleted", zone=current)
 
-        elif state == "present":
+        if state == "present":
             if current is None:
                 if params.get("account_id") is None:
                     module.fail_json(msg="account_id is required when creating a zone")
+
                 if module.check_mode:
                     module.exit_json(changed=True, message="Zone would be created")
+
                 current = post_result(
                     client,
                     zone_endpoint(),
@@ -193,12 +196,14 @@ def main():
                         "type": params.get("type") or "full",
                     },
                 )
+
                 if params.get("vanity_name_servers") is not None:
                     current = patch_result(
                         client,
                         zone_endpoint(current["id"]),
                         {"vanity_name_servers": params["vanity_name_servers"]},
                     )
+
                 changed = True
             else:
                 payloads = []
@@ -215,12 +220,14 @@ def main():
                         select_fields(current, payload.keys()), payload
                     ):
                         continue
+
                     if module.check_mode:
                         module.exit_json(
                             changed=True,
                             message="Zone would be updated",
                             zone=current,
                         )
+
                     current = patch_result(
                         client, zone_endpoint(current["id"]), payload
                     )
@@ -247,6 +254,7 @@ def main():
                         message="Zone settings would be updated",
                         zone=current,
                     )
+
                 updated_settings.append(
                     patch_result(
                         client,
@@ -266,9 +274,6 @@ def main():
                 zone=current,
                 settings=updated_settings,
             )
-
-        else:
-            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":

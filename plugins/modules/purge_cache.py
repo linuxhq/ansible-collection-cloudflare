@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,28 +11,28 @@ DOCUMENTATION = r"""
 module: purge_cache
 short_description: Manage cloudflare purging of cache
 description:
-- Execute a Cloudflare cache purge request for a zone.
+  - Execute a Cloudflare cache purge request for a zone.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   api_token:
     required: true
     type: str
     description:
-    - Cloudflare API token.
+      - Cloudflare API token.
   zone_id:
     required: true
     type: str
     description:
-    - Cloudflare zone identifier.
+      - Cloudflare zone identifier.
   cache:
     description:
-    - Cache purge payload such as C(purge_everything), C(files), C(tags), C(hosts), or C(prefixes).
+      - Cache purge payload such as C(purge_everything), C(files), C(tags), C(hosts), or C(prefixes).
     required: true
     type: dict
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 

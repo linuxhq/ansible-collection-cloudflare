@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,18 +11,18 @@ DOCUMENTATION = r"""
 module: dnssec_info
 short_description: Gather information about cloudflare dnssec settings
 description:
-- Gather Cloudflare DNSSEC information for all accessible zones.
+  - Gather Cloudflare DNSSEC information for all accessible zones.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   api_token:
     description:
-    - Cloudflare API token with permissions to read DNS settings.
+      - Cloudflare API token with permissions to read DNS settings.
     required: true
     type: str
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 

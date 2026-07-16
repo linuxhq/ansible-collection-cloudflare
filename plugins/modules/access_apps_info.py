@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,25 +11,25 @@ DOCUMENTATION = r"""
 module: access_apps_info
 short_description: Gather information about cloudflare access apps
 description:
-- Gather Cloudflare Access applications for an account.
-- Secret fields under C(scim_config.authentication) are redacted from the
-  results.
+  - Gather Cloudflare Access applications for an account.
+  - Secret fields under C(scim_config.authentication) are redacted from the
+    results.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   account_id:
     description:
-    - Cloudflare account identifier.
+      - Cloudflare account identifier.
     required: true
     type: str
   api_token:
     description:
-    - Cloudflare API token with permissions to read Access applications.
+      - Cloudflare API token with permissions to read Access applications.
     required: true
     type: str
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 

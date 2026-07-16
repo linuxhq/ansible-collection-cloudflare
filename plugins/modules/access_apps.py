@@ -1,6 +1,5 @@
 #!/usr/bin/python
-
-# Copyright: (c) 2026, Taylor Kimball
+# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -12,116 +11,116 @@ DOCUMENTATION = r"""
 module: access_apps
 short_description: Manage cloudflare access apps
 description:
-- Create, update, and delete Cloudflare Access applications by name.
-- Secret fields under C(scim_config.authentication) are redacted from returned
-  applications.
+  - Create, update, and delete Cloudflare Access applications by name.
+  - Secret fields under C(scim_config.authentication) are redacted from returned
+    applications.
 author:
-- Taylor Kimball (@tkimball83)
+  - Taylor Kimball (@tkimball83)
 options:
   account_id:
     description:
-    - Cloudflare account identifier.
+      - Cloudflare account identifier.
     required: true
     type: str
   api_token:
     description:
-    - Cloudflare API token with permissions to manage Access applications.
+      - Cloudflare API token with permissions to manage Access applications.
     required: true
     type: str
   name:
     description:
-    - Access application name.
+      - Access application name.
     required: true
     type: str
   domain:
     description:
-    - Application domain.
-    - Required when state is C(present).
+      - Application domain.
+      - Required when state is C(present).
     type: str
   type:
     description:
-    - Access application type.
-    - Required when state is C(present).
+      - Access application type.
+      - Required when state is C(present).
     type: str
   allowed_idps:
     type: list
     elements: str
     description:
-    - Allowed idps.
+      - Allowed idps.
   app_launcher_visible:
     type: bool
     default: true
     description:
-    - App launcher visible.
+      - App launcher visible.
   auto_redirect_to_identity:
     type: bool
     default: false
     description:
-    - Auto redirect to identity.
+      - Auto redirect to identity.
   cors_headers:
     type: dict
     description:
-    - Cors headers.
+      - Cors headers.
   custom_deny_message:
     type: str
     description:
-    - Custom deny message.
+      - Custom deny message.
   custom_deny_url:
     type: str
     description:
-    - Custom deny url.
+      - Custom deny url.
   destinations:
     type: list
     elements: dict
     description:
-    - Destinations.
+      - Destinations.
   enable_binding_cookie:
     type: bool
     default: false
     description:
-    - Enable binding cookie.
+      - Enable binding cookie.
   http_only_cookie_attribute:
     type: bool
     default: true
     description:
-    - Http only cookie attribute.
+      - Http only cookie attribute.
   logo_url:
     type: str
     description:
-    - Logo url.
+      - Logo url.
   policies:
     type: list
     elements: dict
     description:
-    - Policies.
+      - Policies.
   same_site_cookie_attribute:
     type: str
     description:
-    - Same site cookie attribute.
+      - Same site cookie attribute.
   service_auth_401_redirect:
     type: bool
     description:
-    - Service auth 401 redirect.
+      - Service auth 401 redirect.
   session_duration:
     type: str
     default: 24h
     description:
-    - Session duration.
+      - Session duration.
   skip_interstitial:
     type: bool
     description:
-    - Skip interstitial.
+      - Skip interstitial.
   state:
     type: str
     choices:
-    - present
-    - absent
+      - present
+      - absent
     default: present
     description:
-    - Desired state of the resource.
+      - Desired state of the resource.
 requirements:
-- python >= 3.9
-- cloudflare >= 4.3.1, < 5
+  - python >= 3.9
+  - cloudflare >= 4.3.1, < 5
 
 """
 
@@ -148,14 +147,12 @@ message:
 
 """
 
-from urllib.parse import quote
-
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     delete_result,
-    find_by_field,
+    find_by_name,
     normalize_current_by_desired_fields,
     payload_from_params,
     post_result,
@@ -241,12 +238,11 @@ def main():
 
     with cloudflare_client(module) as client:
         current = redact_scim_secrets(
-            find_by_field(
+            find_by_name(
                 client,
-                "%s?name=%s&exact=true"
-                % (endpoint(params["account_id"]), quote(params["name"], safe="")),
-                "name",
+                endpoint(params["account_id"]),
                 params["name"],
+                extra_query={"exact": "true"},
                 paginate=False,
             )
         )
@@ -256,12 +252,14 @@ def main():
                 module.exit_json(
                     changed=False, message="Access application already absent"
                 )
+
             if module.check_mode:
                 module.exit_json(
                     changed=True,
                     message="Access application would be deleted",
                     access_app=current,
                 )
+
             delete_result(client, item_endpoint(params["account_id"], current["id"]))
             module.exit_json(
                 changed=True,
@@ -269,13 +267,14 @@ def main():
                 access_app=current,
             )
 
-        elif state == "present":
+        if state == "present":
             payload = payload_from_params(params, FIELDS)
             if current is None:
                 if module.check_mode:
                     module.exit_json(
                         changed=True, message="Access application would be created"
                     )
+
                 access_app = post_result(
                     client, endpoint(params["account_id"]), payload
                 )
@@ -319,9 +318,6 @@ def main():
                 message="Access application updated",
                 access_app=redact_scim_secrets(access_app),
             )
-
-        else:
-            module.fail_json(msg=f"Unsupported state: {state}")
 
 
 if __name__ == "__main__":
