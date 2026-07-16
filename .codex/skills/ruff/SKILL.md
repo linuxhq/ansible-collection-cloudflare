@@ -1,1 +1,0 @@
-../../../.agents/skills/ruff/SKILL.md
