@@ -1,0 +1,1 @@
+../../../.agents/skills/molecule/SKILL.md

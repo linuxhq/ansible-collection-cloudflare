@@ -1,0 +1,1 @@
+../../../.agents/skills/ansible-lint/SKILL.md
