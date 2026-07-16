@@ -1,1 +1,0 @@
-../../../.agents/skills/pyenv/SKILL.md
