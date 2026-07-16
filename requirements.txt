@@ -14,4 +14,4 @@ pre-commit==4.4.0
 python-vagrant==1.0.0
 requests<2.29
 urllib3<2
-yamllint==1.37.1
+yamllint==1.38.0
