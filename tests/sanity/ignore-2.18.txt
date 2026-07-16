@@ -1,0 +1,4 @@
+.claude/rules/ symlinks
+.claude/skills/ symlinks
+.codex/rules/ symlinks
+.codex/skills/ symlinks

@@ -1,1 +1,0 @@
-../../../.agents/skills/changelog/SKILL.md

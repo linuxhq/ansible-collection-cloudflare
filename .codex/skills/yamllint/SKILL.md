@@ -1,1 +1,0 @@
-../../../.agents/skills/yamllint/SKILL.md
