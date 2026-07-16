@@ -1,9 +1,0 @@
----
-bugfixes:
-  - pages_projects_info - paginate the Pages projects listing so accounts with
-    more projects than one API page return complete results.
-  - access_groups - paginate the name lookup so groups beyond the first page
-    of name-filter matches are found instead of recreated.
-  - access_service_tokens - paginate the name lookup so tokens beyond the
-    first page of name-filter matches are found instead of recreated.
-...

@@ -4,6 +4,26 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.1.2
+======
+
+Release Summary
+---------------
+
+Maintenance release. Listing and name lookups follow API pagination everywhere, and the collection now requires ansible-core 2.18 and community.general 12.
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- Raised the minimum supported ansible-core version to 2.18.0 and the community.general dependency to ``>=12.0.0,<14.0.0``.
+
+Bugfixes
+--------
+
+- access_groups - paginate the name lookup so groups beyond the first page of name-filter matches are found instead of recreated.
+- access_service_tokens - paginate the name lookup so tokens beyond the first page of name-filter matches are found instead of recreated.
+- pages_projects_info - paginate the Pages projects listing so accounts with more projects than one API page return complete results.
+
 v2.1.1
 ======
 
