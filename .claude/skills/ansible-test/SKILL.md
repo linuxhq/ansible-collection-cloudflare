@@ -1,0 +1,1 @@
+../../../.agents/skills/ansible-test/SKILL.md
