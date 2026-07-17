@@ -3,30 +3,29 @@ default_stages:
   - pre-commit
 
 repos:
-  - repo: https://github.com/ansible/ansible-lint.git
-    rev: v26.6.0
-    hooks:
-      - id: ansible-lint
-        files: \.(yaml|yml)$
-        language_version: python3
-        verbose: true
-
-  - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 26.5.1
-    hooks:
-      - id: black
-        exclude: ^venv/
-        files: \.(py)$
-        verbose: true
-
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.38.0
     hooks:
       - id: yamllint
         files: \.(yaml|yml)$
-        language_version: python3
         types: [file, yaml]
         entry: yamllint --strict
+
+  - repo: https://github.com/ansible-community/antsibull-changelog
+    rev: 0.35.1
+    hooks:
+      - id: antsibull-changelog-lint
+        verbose: true
+      - id: antsibull-changelog-lint-changelog-yaml
+        verbose: true
+
+  - repo: https://github.com/ansible/ansible-lint.git
+    rev: v26.6.0
+    hooks:
+      - id: ansible-lint
+        language_version: python3
+        files: \.(yaml|yml)$
+        verbose: true
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.22
@@ -36,11 +35,11 @@ repos:
         files: \.(py)$
         verbose: true
 
-  - repo: https://github.com/ansible-community/antsibull-changelog
-    rev: 0.35.1
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 26.5.1
     hooks:
-      - id: antsibull-changelog-lint
-        verbose: true
-      - id: antsibull-changelog-lint-changelog-yaml
+      - id: black
+        exclude: ^venv/
+        files: \.(py)$
         verbose: true
 ...
