@@ -5,8 +5,6 @@
   linuxhq.cloudflare.zones_info:
     api_token: "{{ zones_info_api_token }}"
     match: "{{ zones_info_match }}"
-    page: "{{ zones_info_page }}"
-    per_page: "{{ zones_info_per_page }}"
   register: __zones_info_query
   when:
     - zones_info_api_token is not none
