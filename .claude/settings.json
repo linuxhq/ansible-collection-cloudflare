@@ -17,5 +17,6 @@
   "feedbackSurveyRate": 0,
   "model": "claude-fable-5",
   "skipDangerousModePermissionPrompt": true,
-  "theme": "dark"
+  "theme": "dark",
+  "verbose": true
 }
