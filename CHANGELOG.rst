@@ -4,6 +4,19 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.1.3
+======
+
+Release Summary
+---------------
+
+Pagination release. ``zones_info`` follows API pagination and returns all zones; the ``page`` and ``per_page`` options were removed. Review the breaking change before upgrading.
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- zones_info - removed the ``page`` and ``per_page`` options; the module now follows API pagination and returns all zones.
+
 v2.1.2
 ======
 
