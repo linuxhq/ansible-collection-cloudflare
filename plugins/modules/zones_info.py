@@ -28,16 +28,6 @@ options:
     default: all
     description:
       - Match.
-  page:
-    type: int
-    default: 1
-    description:
-      - Page.
-  per_page:
-    type: int
-    default: 20
-    description:
-      - Per page.
 requirements:
   - python >= 3.9
   - cloudflare >= 4.3.1, < 5
@@ -64,7 +54,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    get_result,
+    list_all,
 )
 
 
@@ -73,23 +63,12 @@ def main():
         argument_spec={
             "api_token": {"required": True, "type": "str", "no_log": True},
             "match": {"type": "str", "choices": ["any", "all"], "default": "all"},
-            "page": {"type": "int", "default": 1},
-            "per_page": {"type": "int", "default": 20},
         },
         supports_check_mode=True,
     )
 
     with cloudflare_client(module) as client:
-        zones = get_result(
-            client,
-            "/zones?match=%s&page=%s&per_page=%s"
-            % (
-                module.params["match"],
-                module.params["page"],
-                module.params["per_page"],
-            ),
-            default=[],
-        )
+        zones = list_all(client, "/zones?match=%s" % module.params["match"])
 
     module.exit_json(changed=False, zones=zones)
 

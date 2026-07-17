@@ -1,0 +1,5 @@
+---
+breaking_changes:
+  - zones_info - removed the ``page`` and ``per_page`` options; the module now
+    follows API pagination and returns all zones.
+...

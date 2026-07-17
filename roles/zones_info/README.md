@@ -12,8 +12,6 @@ Gather information about cloudflare zones
 
     zones_info_api_token: null
     zones_info_match: all
-    zones_info_page: 1
-    zones_info_per_page: 20
 
 ## Return Values
 
