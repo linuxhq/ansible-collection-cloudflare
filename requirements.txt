@@ -2,7 +2,7 @@ ansible>=14,<15
 ansible-lint==26.2.0
 antsibull-changelog==0.35.1
 black==26.5.1
-cloudflare>=4.3.1,<5
+cloudflare>=5.5.0,<6
 jmespath==1.1.0
 json2yaml==1.2.0
 molecule==25.1.0
