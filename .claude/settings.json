@@ -2,6 +2,7 @@
   "attribution": {
     "commit": ""
   },
+  "autoMemoryEnabled": false,
   "effortLevel": "high",
   "enabledPlugins": {
     "codex@openai-codex": true
@@ -18,5 +19,5 @@
   "model": "claude-fable-5",
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark",
-  "verbose": true
+  "verbose": false
 }
