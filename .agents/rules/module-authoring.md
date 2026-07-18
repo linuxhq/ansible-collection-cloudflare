@@ -52,8 +52,7 @@ When starting a new module, copy the structure of an existing pair.
 
 ### Types
 
-- Accept parameters and return data in snake_case; convert input parameters to boto3 shapes
-  with the existing helpers.
+- Accept parameters and return data in snake_case.
 
 ### Validation
 
@@ -74,7 +73,5 @@ When starting a new module, copy the structure of an existing pair.
 
 ### Info lookups
 
-- Only offer a singular lookup (`name`, `id`, `arn`) when the API itself accepts one — don't
-  emulate it with plural parameters.
 - If the singular lookup and the list/filter options drive different API calls, make the two
   modes mutually exclusive.

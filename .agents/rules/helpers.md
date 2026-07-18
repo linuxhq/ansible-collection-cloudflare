@@ -3,7 +3,6 @@
 Prefer these `module_utils` helpers over hand-rolled logic — reimplementing one fails review and
 sanity. They cover:
 
-- ARNs
 - case conversion
 - filters
 - pagination
@@ -29,10 +28,10 @@ from ansible.module_utils.{{ module }} import {{ name }}
 | `.common.collections`          | `is_iterable`              | Is it iterable?               |
 | `.common.collections`          | `is_sequence`              | Is it a sequence?             |
 | `.common.collections`          | `is_string`                | Is it a string?               |
-| `.common.dict_transformations` | `camel_dict_to_snake_dict` | boto3 → snake_case.           |
+| `.common.dict_transformations` | `camel_dict_to_snake_dict` | camel_case → snake_case.      |
 | `.common.dict_transformations` | `dict_merge`               | Deep-merge dicts.             |
 | `.common.dict_transformations` | `recursive_diff`           | Structural diff.              |
-| `.common.dict_transformations` | `snake_dict_to_camel_dict` | snake_case → boto3.           |
+| `.common.dict_transformations` | `snake_dict_to_camel_dict` | snake_case → camel_case.      |
 | `.common.json`                 | `get_decoder`              | JSON decoder.                 |
 | `.common.json`                 | `get_encoder`              | JSON encoder.                 |
 | `.common.json`                 | `get_module_decoder`       | Module JSON decoder.          |

@@ -4,11 +4,6 @@ Keep `DOCUMENTATION`, `EXAMPLES`, `RETURN`, and `argument_spec` in lockstep: eve
 return field, alias, choice, and default must agree across all four. The sections below cover the
 details that are easy to miss.
 
-## Fragments
-
-- Pull in the standard documentation fragments for common options, region handling, and boto3
-  requirements with `extends_documentation_fragment`, the same way the nearest module does.
-
 ## Options and returns
 
 - Give list options and list return values an `elements` entry.

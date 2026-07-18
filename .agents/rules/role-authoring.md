@@ -60,8 +60,6 @@ exact shape varies, so match the nearest role, but the list-driven pattern works
 
 - Default optional values with `| d(omit)`.
 - Pin `purge_*` booleans with `| d(true)` or `| d(false)` — never `| d(omit)`.
-- Merge a `Name` tag into the resource's tags:
-  - `tags: "{{ _x.tags | d({}) | combine({'Name': _x.name}) }}"`
 - Set `validate_certs: true`.
 - Register `__{{ role }}_result` if a later task needs it.
 
