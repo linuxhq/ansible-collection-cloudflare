@@ -4,6 +4,19 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.1.4
+======
+
+Release Summary
+---------------
+
+Dependency release. The collection now requires the cloudflare Python SDK 5.x (``cloudflare >= 5.5.0, < 6``); support for the 4.x SDK has been dropped. Review the breaking change before upgrading.
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- all modules - the collection now requires ``cloudflare >= 5.5.0, < 6``; support for the 4.x SDK has been dropped (https://github.com/linuxhq/ansible-collection-cloudflare/pull/32).
+
 v2.1.3
 ======
 

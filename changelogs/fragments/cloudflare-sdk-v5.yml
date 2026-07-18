@@ -1,9 +1,0 @@
----
-release_summary: >-
-  Dependency release. The collection now requires the cloudflare Python SDK 5.x
-  (``cloudflare >= 5.5.0, < 6``); support for the 4.x SDK has been dropped.
-  Review the breaking change before upgrading.
-breaking_changes:
-  - all modules - the collection now requires ``cloudflare >= 5.5.0, < 6``; support for
-    the 4.x SDK has been dropped
-    (https://github.com/linuxhq/ansible-collection-cloudflare/pull/32).
