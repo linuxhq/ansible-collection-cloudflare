@@ -1,6 +1,7 @@
 {
   "attribution": {
-    "commit": ""
+    "commit": "",
+    "sessionUrl": false
   },
   "autoMemoryEnabled": false,
   "effortLevel": "high",
