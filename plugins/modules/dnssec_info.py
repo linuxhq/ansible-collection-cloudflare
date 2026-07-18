@@ -22,7 +22,7 @@ options:
     type: str
 requirements:
   - python >= 3.9
-  - cloudflare >= 4.3.1, < 5
+  - cloudflare >= 5.5.0, < 6
 
 """
 

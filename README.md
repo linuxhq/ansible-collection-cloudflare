@@ -22,7 +22,7 @@ A collection of cloudflare roles
 * Python `>= 3.11`
 * `ansible-core >= 2.18.0`
 * `community.general >= 12.0.0, < 14.0.0`
-* `cloudflare >= 4.3.1, < 5`
+* `cloudflare >= 5.5.0, < 6`
 
 # Examples
 
