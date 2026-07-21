@@ -4,6 +4,18 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.1.5
+======
+
+Release Summary
+---------------
+
+Maintenance release. The resource and info modules were refactored to the
+documented house layout: resource modules now dispatch state through
+``ensure_present`` and ``ensure_absent`` helpers, and info modules through
+``list``/``info`` helpers. This is an internal restructure only; no options,
+return values, or behavior changed.
+
 v2.1.4
 ======
 
