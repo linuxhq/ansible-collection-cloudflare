@@ -81,6 +81,35 @@ def endpoint(account_id):
     return "/accounts/%s/zerotrust/connectivity_settings" % account_id
 
 
+def ensure_present(module, client):
+    params = module.params
+
+    payload = payload_from_params(params, FIELDS)
+
+    current = get_result(client, endpoint(params["account_id"]), default={})
+
+    if not values_differ(select_fields(current, payload.keys()), payload):
+        module.exit_json(
+            changed=False,
+            message="Connectivity settings already present",
+            connectivity_settings=current,
+        )
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Connectivity settings would be updated",
+            connectivity_settings=current,
+        )
+
+    settings = patch_result(client, endpoint(params["account_id"]), payload)
+    module.exit_json(
+        changed=True,
+        message="Connectivity settings updated",
+        connectivity_settings=settings,
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -92,31 +121,8 @@ def main():
         supports_check_mode=True,
     )
 
-    params = module.params
-    payload = payload_from_params(params, FIELDS)
     with cloudflare_client(module) as client:
-        current = get_result(client, endpoint(params["account_id"]), default={})
-
-        if not values_differ(select_fields(current, payload.keys()), payload):
-            module.exit_json(
-                changed=False,
-                message="Connectivity settings already present",
-                connectivity_settings=current,
-            )
-
-        if module.check_mode:
-            module.exit_json(
-                changed=True,
-                message="Connectivity settings would be updated",
-                connectivity_settings=current,
-            )
-
-        settings = patch_result(client, endpoint(params["account_id"]), payload)
-        module.exit_json(
-            changed=True,
-            message="Connectivity settings updated",
-            connectivity_settings=settings,
-        )
+        ensure_present(module, client)
 
 
 if __name__ == "__main__":

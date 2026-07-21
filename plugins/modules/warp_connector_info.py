@@ -62,6 +62,26 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
+def list(module, client):
+    account_id = module.params["account_id"]
+    warp_connectors = list_all(
+        client,
+        "/accounts/%s/warp_connector?is_deleted=false" % account_id,
+        per_page=1000,
+    )
+
+    if module.params["include_token"]:
+        for connector in warp_connectors:
+            if connector.get("id") is not None:
+                connector["token"] = get_result(
+                    client,
+                    "/accounts/%s/warp_connector/%s/token"
+                    % (account_id, connector["id"]),
+                )
+
+    module.exit_json(changed=False, warp_connectors=warp_connectors)
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -72,24 +92,8 @@ def main():
         supports_check_mode=True,
     )
 
-    account_id = module.params["account_id"]
     with cloudflare_client(module) as client:
-        warp_connectors = list_all(
-            client,
-            "/accounts/%s/warp_connector?is_deleted=false" % account_id,
-            per_page=1000,
-        )
-
-        if module.params["include_token"]:
-            for connector in warp_connectors:
-                if connector.get("id") is not None:
-                    connector["token"] = get_result(
-                        client,
-                        "/accounts/%s/warp_connector/%s/token"
-                        % (account_id, connector["id"]),
-                    )
-
-    module.exit_json(changed=False, warp_connectors=warp_connectors)
+        list(module, client)
 
 
 if __name__ == "__main__":

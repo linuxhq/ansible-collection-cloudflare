@@ -59,6 +59,39 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
+def list(module, client):
+    account_id = module.params["account_id"]
+    configurations = []
+    tunnels = list_all(
+        client,
+        "/accounts/%s/cfd_tunnel?is_deleted=false" % account_id,
+        per_page=1000,
+    )
+
+    for tunnel in tunnels:
+        if tunnel.get("id") is None:
+            continue
+
+        if tunnel.get("remote_config") is False:
+            continue
+
+        configuration = get_result(
+            client,
+            "/accounts/%s/cfd_tunnel/%s/configurations" % (account_id, tunnel["id"]),
+            default={},
+        )
+
+        configurations.append(
+            {
+                "id": tunnel["id"],
+                "name": tunnel.get("name"),
+                "config": configuration.get("config", {}),
+            }
+        )
+
+    module.exit_json(changed=False, cfd_tunnel_configurations=configurations)
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -68,37 +101,8 @@ def main():
         supports_check_mode=True,
     )
 
-    account_id = module.params["account_id"]
-    configurations = []
     with cloudflare_client(module) as client:
-        tunnels = list_all(
-            client,
-            "/accounts/%s/cfd_tunnel?is_deleted=false" % account_id,
-            per_page=1000,
-        )
-        for tunnel in tunnels:
-            if tunnel.get("id") is None:
-                continue
-
-            if tunnel.get("remote_config") is False:
-                continue
-
-            configuration = get_result(
-                client,
-                "/accounts/%s/cfd_tunnel/%s/configurations"
-                % (account_id, tunnel["id"]),
-                default={},
-            )
-
-            configurations.append(
-                {
-                    "id": tunnel["id"],
-                    "name": tunnel.get("name"),
-                    "config": configuration.get("config", {}),
-                }
-            )
-
-    module.exit_json(changed=False, cfd_tunnel_configurations=configurations)
+        list(module, client)
 
 
 if __name__ == "__main__":

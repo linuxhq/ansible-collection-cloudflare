@@ -81,6 +81,46 @@ def endpoint(account_id, tunnel_id):
     return "/accounts/%s/cfd_tunnel/%s/configurations" % (account_id, tunnel_id)
 
 
+def ensure_present(module, client):
+    params = module.params
+
+    current = get_result(
+        client,
+        endpoint(params["account_id"], params["tunnel_id"]),
+        default={},
+    )
+
+    current_config = current.get("config", {}) if isinstance(current, dict) else {}
+
+    if not values_differ(
+        normalize_current_by_desired_fields(current_config, params["config"]),
+        params["config"],
+    ):
+        module.exit_json(
+            changed=False,
+            message="Tunnel configuration already present",
+            configuration=current,
+        )
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Tunnel configuration would be updated",
+            configuration=current,
+        )
+
+    configuration = put_result(
+        client,
+        endpoint(params["account_id"], params["tunnel_id"]),
+        {"config": params["config"]},
+    )
+    module.exit_json(
+        changed=True,
+        message="Tunnel configuration updated",
+        configuration=configuration,
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -92,43 +132,8 @@ def main():
         supports_check_mode=True,
     )
 
-    params = module.params
     with cloudflare_client(module) as client:
-        current = get_result(
-            client,
-            endpoint(params["account_id"], params["tunnel_id"]),
-            default={},
-        )
-
-        current_config = current.get("config", {}) if isinstance(current, dict) else {}
-
-        if not values_differ(
-            normalize_current_by_desired_fields(current_config, params["config"]),
-            params["config"],
-        ):
-            module.exit_json(
-                changed=False,
-                message="Tunnel configuration already present",
-                configuration=current,
-            )
-
-        if module.check_mode:
-            module.exit_json(
-                changed=True,
-                message="Tunnel configuration would be updated",
-                configuration=current,
-            )
-
-        configuration = put_result(
-            client,
-            endpoint(params["account_id"], params["tunnel_id"]),
-            {"config": params["config"]},
-        )
-        module.exit_json(
-            changed=True,
-            message="Tunnel configuration updated",
-            configuration=configuration,
-        )
+        ensure_present(module, client)
 
 
 if __name__ == "__main__":

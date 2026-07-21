@@ -51,6 +51,31 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
+def list(module, client):
+    pagerules = []
+    zones = list_all(client, "/zones")
+
+    for zone in zones:
+        if zone.get("id") is None:
+            continue
+
+        rules = get_result(
+            client,
+            "/zones/%s/pagerules" % zone["id"],
+            default=[],
+        )
+
+        pagerules.append(
+            {
+                "id": zone["id"],
+                "name": zone.get("name"),
+                "pagerules": rules,
+            }
+        )
+
+    module.exit_json(changed=False, pagerules=pagerules)
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -59,28 +84,8 @@ def main():
         supports_check_mode=True,
     )
 
-    pagerules = []
     with cloudflare_client(module) as client:
-        zones = list_all(client, "/zones")
-        for zone in zones:
-            if zone.get("id") is None:
-                continue
-
-            rules = get_result(
-                client,
-                "/zones/%s/pagerules" % zone["id"],
-                default=[],
-            )
-
-            pagerules.append(
-                {
-                    "id": zone["id"],
-                    "name": zone.get("name"),
-                    "pagerules": rules,
-                }
-            )
-
-    module.exit_json(changed=False, pagerules=pagerules)
+        list(module, client)
 
 
 if __name__ == "__main__":

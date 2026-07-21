@@ -56,6 +56,16 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
+def list(module, client):
+    projects = list_all(
+        client,
+        "/accounts/%s/pages/projects" % module.params["account_id"],
+        per_page=10,
+    )
+
+    module.exit_json(changed=False, pages_projects=projects)
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -66,13 +76,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        projects = list_all(
-            client,
-            "/accounts/%s/pages/projects" % module.params["account_id"],
-            per_page=10,
-        )
-
-    module.exit_json(changed=False, pages_projects=projects)
+        list(module, client)
 
 
 if __name__ == "__main__":

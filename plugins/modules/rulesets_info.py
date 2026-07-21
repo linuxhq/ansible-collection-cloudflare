@@ -56,6 +56,35 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
+def list(module, client):
+    rulesets = []
+    zones = list_all(client, "/zones")
+
+    for zone in zones:
+        if zone.get("id") is None:
+            continue
+
+        ruleset = get_result(
+            client,
+            "/zones/%s/rulesets/phases/%s/entrypoint"
+            % (zone["id"], module.params["phase"]),
+            default={},
+            ok_statuses=[404],
+        )
+
+        rulesets.append(
+            {
+                "id": ruleset.get("id"),
+                "name": zone.get("name"),
+                "phase": ruleset.get("phase"),
+                "rules": ruleset.get("rules") or [],
+                "zone_id": zone["id"],
+            }
+        )
+
+    module.exit_json(changed=False, rulesets=rulesets)
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -65,32 +94,8 @@ def main():
         supports_check_mode=True,
     )
 
-    rulesets = []
     with cloudflare_client(module) as client:
-        zones = list_all(client, "/zones")
-        for zone in zones:
-            if zone.get("id") is None:
-                continue
-
-            ruleset = get_result(
-                client,
-                "/zones/%s/rulesets/phases/%s/entrypoint"
-                % (zone["id"], module.params["phase"]),
-                default={},
-                ok_statuses=[404],
-            )
-
-            rulesets.append(
-                {
-                    "id": ruleset.get("id"),
-                    "name": zone.get("name"),
-                    "phase": ruleset.get("phase"),
-                    "rules": ruleset.get("rules") or [],
-                    "zone_id": zone["id"],
-                }
-            )
-
-    module.exit_json(changed=False, rulesets=rulesets)
+        list(module, client)
 
 
 if __name__ == "__main__":

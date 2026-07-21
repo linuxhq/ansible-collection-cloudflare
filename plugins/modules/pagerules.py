@@ -120,6 +120,91 @@ def item_endpoint(zone_id, pagerule_id):
     return "%s/%s" % (endpoint(zone_id), pagerule_id)
 
 
+def ensure_present(module, client):
+    params = module.params
+
+    pagerules = get_result(client, endpoint(params["zone_id"]), default=[])
+    current = None
+
+    for pagerule in pagerules:
+        if not values_differ(pagerule.get("targets"), params["targets"]):
+            current = pagerule
+            break
+
+    payload = payload_from_params(params, FIELDS)
+
+    if current is None:
+        payload.setdefault("status", "active")
+
+        if module.check_mode:
+            module.exit_json(changed=True, message="Page rule would be created")
+
+        pagerule = post_result(client, endpoint(params["zone_id"]), payload)
+        module.exit_json(
+            changed=True,
+            message="Page rule created",
+            pagerule=pagerule,
+        )
+
+    for field in ("priority", "status"):
+        if field not in payload and current.get(field) is not None:
+            payload[field] = current[field]
+
+    if not values_differ(select_fields(current, payload.keys()), payload):
+        module.exit_json(
+            changed=False,
+            message="Page rule already present",
+            pagerule=current,
+        )
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Page rule would be updated",
+            pagerule=current,
+        )
+
+    pagerule = put_result(
+        client,
+        item_endpoint(params["zone_id"], current["id"]),
+        payload,
+    )
+    module.exit_json(
+        changed=True,
+        message="Page rule updated",
+        pagerule=pagerule,
+    )
+
+
+def ensure_absent(module, client):
+    params = module.params
+
+    pagerules = get_result(client, endpoint(params["zone_id"]), default=[])
+    current = None
+
+    for pagerule in pagerules:
+        if not values_differ(pagerule.get("targets"), params["targets"]):
+            current = pagerule
+            break
+
+    if current is None:
+        module.exit_json(changed=False, message="Page rule already absent")
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Page rule would be deleted",
+            pagerule=current,
+        )
+
+    delete_result(client, item_endpoint(params["zone_id"], current["id"]))
+    module.exit_json(
+        changed=True,
+        message="Page rule deleted",
+        pagerule=current,
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -142,79 +227,11 @@ def main():
         supports_check_mode=True,
     )
 
-    params = module.params
-    state = params["state"]
-
     with cloudflare_client(module) as client:
-        pagerules = get_result(client, endpoint(params["zone_id"]), default=[])
-        current = None
-
-        for pagerule in pagerules:
-            if not values_differ(pagerule.get("targets"), params["targets"]):
-                current = pagerule
-                break
-
-        if state == "absent":
-            if current is None:
-                module.exit_json(changed=False, message="Page rule already absent")
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Page rule would be deleted",
-                    pagerule=current,
-                )
-
-            delete_result(client, item_endpoint(params["zone_id"], current["id"]))
-            module.exit_json(
-                changed=True,
-                message="Page rule deleted",
-                pagerule=current,
-            )
-
-        if state == "present":
-            payload = payload_from_params(params, FIELDS)
-            if current is None:
-                payload.setdefault("status", "active")
-
-                if module.check_mode:
-                    module.exit_json(changed=True, message="Page rule would be created")
-
-                pagerule = post_result(client, endpoint(params["zone_id"]), payload)
-                module.exit_json(
-                    changed=True,
-                    message="Page rule created",
-                    pagerule=pagerule,
-                )
-
-            for field in ("priority", "status"):
-                if field not in payload and current.get(field) is not None:
-                    payload[field] = current[field]
-
-            if not values_differ(select_fields(current, payload.keys()), payload):
-                module.exit_json(
-                    changed=False,
-                    message="Page rule already present",
-                    pagerule=current,
-                )
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Page rule would be updated",
-                    pagerule=current,
-                )
-
-            pagerule = put_result(
-                client,
-                item_endpoint(params["zone_id"], current["id"]),
-                payload,
-            )
-            module.exit_json(
-                changed=True,
-                message="Page rule updated",
-                pagerule=pagerule,
-            )
+        if module.params["state"] == "present":
+            ensure_present(module, client)
+        else:
+            ensure_absent(module, client)
 
 
 if __name__ == "__main__":

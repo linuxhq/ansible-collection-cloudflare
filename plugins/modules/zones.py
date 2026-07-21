@@ -130,6 +130,134 @@ def zone_endpoint(zone_id=None):
     return "/zones/%s" % zone_id
 
 
+def ensure_present(module, client):
+    params = module.params
+
+    current = None
+    zones = get_result(
+        client, "/zones?name=%s&per_page=50" % params["name"], default=[]
+    )
+
+    for zone in zones:
+        if zone.get("name") == params["name"]:
+            current = zone
+            break
+
+    if current is None:
+        if params.get("account_id") is None:
+            module.fail_json(msg="account_id is required when creating a zone")
+
+        if module.check_mode:
+            module.exit_json(changed=True, message="Zone would be created")
+
+        current = post_result(
+            client,
+            zone_endpoint(),
+            {
+                "account": {"id": params["account_id"]},
+                "name": params["name"],
+                "type": params.get("type") or "full",
+            },
+        )
+
+        if params.get("vanity_name_servers") is not None:
+            current = patch_result(
+                client,
+                zone_endpoint(current["id"]),
+                {"vanity_name_servers": params["vanity_name_servers"]},
+            )
+
+        changed = True
+    else:
+        payloads = []
+        if params.get("type") is not None:
+            payloads.append({"type": params["type"]})
+        if params.get("vanity_name_servers") is not None:
+            payloads.append({"vanity_name_servers": params["vanity_name_servers"]})
+
+        changed = False
+        for payload in payloads:
+            if not values_differ(select_fields(current, payload.keys()), payload):
+                continue
+
+            if module.check_mode:
+                module.exit_json(
+                    changed=True,
+                    message="Zone would be updated",
+                    zone=current,
+                )
+
+            current = patch_result(client, zone_endpoint(current["id"]), payload)
+            changed = True
+
+    updated_settings = []
+    for setting in params.get("settings") or []:
+        if setting.get("id") is None or "value" not in setting:
+            module.fail_json(msg="Each zone setting requires id and value")
+        existing = get_result(
+            client,
+            settings_endpoint(current["id"], setting["id"]),
+            default={},
+        )
+
+        if normalize_setting_value(existing.get("value")) == normalize_setting_value(
+            setting["value"]
+        ):
+            continue
+
+        if module.check_mode:
+            module.exit_json(
+                changed=True,
+                message="Zone settings would be updated",
+                zone=current,
+            )
+
+        updated_settings.append(
+            patch_result(
+                client,
+                settings_endpoint(current["id"], setting["id"]),
+                {"value": setting["value"]},
+            )
+        )
+
+    if not changed and not updated_settings:
+        module.exit_json(changed=False, message="Zone already present", zone=current)
+
+    module.exit_json(
+        changed=True,
+        message="Zone updated",
+        zone=current,
+        settings=updated_settings,
+    )
+
+
+def ensure_absent(module, client):
+    params = module.params
+
+    current = None
+    zones = get_result(
+        client, "/zones?name=%s&per_page=50" % params["name"], default=[]
+    )
+
+    for zone in zones:
+        if zone.get("name") == params["name"]:
+            current = zone
+            break
+
+    if current is None:
+        module.exit_json(changed=False, message="Zone already absent")
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Zone would be deleted",
+            zone=current,
+        )
+
+    delete_result(client, zone_endpoint(current["id"]))
+    module.exit_json(changed=True, message="Zone deleted", zone=current)
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -151,129 +279,11 @@ def main():
         supports_check_mode=True,
     )
 
-    params = module.params
-    state = params["state"]
-
     with cloudflare_client(module) as client:
-        current = None
-        zones = get_result(
-            client, "/zones?name=%s&per_page=50" % params["name"], default=[]
-        )
-
-        for zone in zones:
-            if zone.get("name") == params["name"]:
-                current = zone
-                break
-
-        if state == "absent":
-            if current is None:
-                module.exit_json(changed=False, message="Zone already absent")
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Zone would be deleted",
-                    zone=current,
-                )
-
-            delete_result(client, zone_endpoint(current["id"]))
-            module.exit_json(changed=True, message="Zone deleted", zone=current)
-
-        if state == "present":
-            if current is None:
-                if params.get("account_id") is None:
-                    module.fail_json(msg="account_id is required when creating a zone")
-
-                if module.check_mode:
-                    module.exit_json(changed=True, message="Zone would be created")
-
-                current = post_result(
-                    client,
-                    zone_endpoint(),
-                    {
-                        "account": {"id": params["account_id"]},
-                        "name": params["name"],
-                        "type": params.get("type") or "full",
-                    },
-                )
-
-                if params.get("vanity_name_servers") is not None:
-                    current = patch_result(
-                        client,
-                        zone_endpoint(current["id"]),
-                        {"vanity_name_servers": params["vanity_name_servers"]},
-                    )
-
-                changed = True
-            else:
-                payloads = []
-                if params.get("type") is not None:
-                    payloads.append({"type": params["type"]})
-                if params.get("vanity_name_servers") is not None:
-                    payloads.append(
-                        {"vanity_name_servers": params["vanity_name_servers"]}
-                    )
-
-                changed = False
-                for payload in payloads:
-                    if not values_differ(
-                        select_fields(current, payload.keys()), payload
-                    ):
-                        continue
-
-                    if module.check_mode:
-                        module.exit_json(
-                            changed=True,
-                            message="Zone would be updated",
-                            zone=current,
-                        )
-
-                    current = patch_result(
-                        client, zone_endpoint(current["id"]), payload
-                    )
-                    changed = True
-
-            updated_settings = []
-            for setting in params.get("settings") or []:
-                if setting.get("id") is None or "value" not in setting:
-                    module.fail_json(msg="Each zone setting requires id and value")
-                existing = get_result(
-                    client,
-                    settings_endpoint(current["id"], setting["id"]),
-                    default={},
-                )
-
-                if normalize_setting_value(
-                    existing.get("value")
-                ) == normalize_setting_value(setting["value"]):
-                    continue
-
-                if module.check_mode:
-                    module.exit_json(
-                        changed=True,
-                        message="Zone settings would be updated",
-                        zone=current,
-                    )
-
-                updated_settings.append(
-                    patch_result(
-                        client,
-                        settings_endpoint(current["id"], setting["id"]),
-                        {"value": setting["value"]},
-                    )
-                )
-
-            if not changed and not updated_settings:
-                module.exit_json(
-                    changed=False, message="Zone already present", zone=current
-                )
-
-            module.exit_json(
-                changed=True,
-                message="Zone updated",
-                zone=current,
-                settings=updated_settings,
-            )
+        if module.params["state"] == "present":
+            ensure_present(module, client)
+        else:
+            ensure_absent(module, client)
 
 
 if __name__ == "__main__":

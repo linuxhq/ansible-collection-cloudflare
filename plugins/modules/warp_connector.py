@@ -98,6 +98,111 @@ def endpoint(account_id):
     return "/accounts/%s/warp_connector" % account_id
 
 
+def ensure_present(module, client):
+    params = module.params
+
+    current = find_by_name(
+        client,
+        endpoint(params["account_id"]),
+        params["name"],
+        extra_query={"is_deleted": "false"},
+    )
+
+    if current is not None:
+        if params["rotate_secrets"] and params.get("tunnel_secret") is not None:
+            if module.check_mode:
+                module.exit_json(
+                    changed=True,
+                    message="WARP Connector would be updated",
+                    warp_connector=current,
+                )
+
+            warp_connector = patch_result(
+                client,
+                "%s/%s" % (endpoint(params["account_id"]), current["id"]),
+                {"tunnel_secret": params["tunnel_secret"]},
+            )
+            module.exit_json(
+                changed=True,
+                message="WARP Connector updated",
+                warp_connector=warp_connector,
+            )
+
+        module.exit_json(
+            changed=False,
+            message="WARP Connector already present",
+            warp_connector=current,
+        )
+
+    if module.check_mode:
+        module.exit_json(changed=True, message="WARP Connector would be created")
+
+    warp_connector = post_result(
+        client,
+        endpoint(params["account_id"]),
+        {"name": params["name"]},
+    )
+
+    if params.get("tunnel_secret") is not None:
+        connector_path = "%s/%s" % (
+            endpoint(params["account_id"]),
+            warp_connector["id"],
+        )
+        try:
+            warp_connector = patch_result(
+                client,
+                connector_path,
+                {"tunnel_secret": params["tunnel_secret"]},
+            )
+        except (cloudflare.APIConnectionError, cloudflare.APIStatusError):
+            try:
+                delete_result(client, connector_path)
+            except (cloudflare.APIConnectionError, cloudflare.APIStatusError):
+                module.fail_json(
+                    msg=(
+                        "Failed to apply tunnel_secret and to roll back "
+                        "the created WARP Connector; delete it manually "
+                        "and retry"
+                    ),
+                    warp_connector_id=warp_connector["id"],
+                )
+            raise
+
+    module.exit_json(
+        changed=True,
+        message="WARP Connector created",
+        warp_connector=warp_connector,
+    )
+
+
+def ensure_absent(module, client):
+    params = module.params
+
+    current = find_by_name(
+        client,
+        endpoint(params["account_id"]),
+        params["name"],
+        extra_query={"is_deleted": "false"},
+    )
+
+    if current is None:
+        module.exit_json(changed=False, message="WARP Connector already absent")
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="WARP Connector would be deleted",
+            warp_connector=current,
+        )
+
+    delete_result(client, "%s/%s" % (endpoint(params["account_id"]), current["id"]))
+    module.exit_json(
+        changed=True,
+        message="WARP Connector deleted",
+        warp_connector=current,
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -115,105 +220,11 @@ def main():
         supports_check_mode=True,
     )
 
-    params = module.params
-    state = params["state"]
-
     with cloudflare_client(module) as client:
-        current = find_by_name(
-            client,
-            endpoint(params["account_id"]),
-            params["name"],
-            extra_query={"is_deleted": "false"},
-        )
-
-        if state == "absent":
-            if current is None:
-                module.exit_json(changed=False, message="WARP Connector already absent")
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="WARP Connector would be deleted",
-                    warp_connector=current,
-                )
-
-            delete_result(
-                client, "%s/%s" % (endpoint(params["account_id"]), current["id"])
-            )
-            module.exit_json(
-                changed=True,
-                message="WARP Connector deleted",
-                warp_connector=current,
-            )
-
-        if state == "present":
-            if current is not None:
-                if params["rotate_secrets"] and params.get("tunnel_secret") is not None:
-                    if module.check_mode:
-                        module.exit_json(
-                            changed=True,
-                            message="WARP Connector would be updated",
-                            warp_connector=current,
-                        )
-
-                    warp_connector = patch_result(
-                        client,
-                        "%s/%s" % (endpoint(params["account_id"]), current["id"]),
-                        {"tunnel_secret": params["tunnel_secret"]},
-                    )
-                    module.exit_json(
-                        changed=True,
-                        message="WARP Connector updated",
-                        warp_connector=warp_connector,
-                    )
-
-                module.exit_json(
-                    changed=False,
-                    message="WARP Connector already present",
-                    warp_connector=current,
-                )
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True, message="WARP Connector would be created"
-                )
-
-            warp_connector = post_result(
-                client,
-                endpoint(params["account_id"]),
-                {"name": params["name"]},
-            )
-
-            if params.get("tunnel_secret") is not None:
-                connector_path = "%s/%s" % (
-                    endpoint(params["account_id"]),
-                    warp_connector["id"],
-                )
-                try:
-                    warp_connector = patch_result(
-                        client,
-                        connector_path,
-                        {"tunnel_secret": params["tunnel_secret"]},
-                    )
-                except (cloudflare.APIConnectionError, cloudflare.APIStatusError):
-                    try:
-                        delete_result(client, connector_path)
-                    except (cloudflare.APIConnectionError, cloudflare.APIStatusError):
-                        module.fail_json(
-                            msg=(
-                                "Failed to apply tunnel_secret and to roll back "
-                                "the created WARP Connector; delete it manually "
-                                "and retry"
-                            ),
-                            warp_connector_id=warp_connector["id"],
-                        )
-                    raise
-
-            module.exit_json(
-                changed=True,
-                message="WARP Connector created",
-                warp_connector=warp_connector,
-            )
+        if module.params["state"] == "present":
+            ensure_present(module, client)
+        else:
+            ensure_absent(module, client)
 
 
 if __name__ == "__main__":

@@ -55,6 +55,20 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
+def info(module, client):
+    account = None
+
+    for account_info in client.accounts.list(name=module.params["name"]):
+        if getattr(account_info, "name", None) == module.params["name"]:
+            account = serialize_resource(account_info)
+            break
+
+    module.exit_json(
+        changed=False,
+        account=account,
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -64,17 +78,8 @@ def main():
         supports_check_mode=True,
     )
 
-    account = None
     with cloudflare_client(module) as client:
-        for account_info in client.accounts.list(name=module.params["name"]):
-            if getattr(account_info, "name", None) == module.params["name"]:
-                account = serialize_resource(account_info)
-                break
-
-    module.exit_json(
-        changed=False,
-        account=account,
-    )
+        info(module, client)
 
 
 if __name__ == "__main__":

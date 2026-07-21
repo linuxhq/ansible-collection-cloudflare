@@ -157,6 +157,84 @@ def endpoint(account_id):
     return "/accounts/%s/access/policies" % account_id
 
 
+def ensure_present(module, client):
+    params = module.params
+
+    current = find_by_field(
+        client, endpoint(params["account_id"]), "name", params["name"]
+    )
+
+    payload = payload_from_params(params, FIELDS)
+
+    if current is None:
+        if module.check_mode:
+            module.exit_json(changed=True, message="Access policy would be created")
+
+        access_policy = post_result(client, endpoint(params["account_id"]), payload)
+        module.exit_json(
+            changed=True,
+            message="Access policy created",
+            access_policy=access_policy,
+        )
+
+    comparable_current = current.copy()
+    for field in FALSE_FIELDS:
+        comparable_current.setdefault(field, False)
+
+    if not values_differ(
+        select_fields(comparable_current, payload.keys()),
+        payload,
+    ):
+        module.exit_json(
+            changed=False,
+            message="Access policy already present",
+            access_policy=current,
+        )
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Access policy would be updated",
+            access_policy=current,
+        )
+
+    access_policy = put_result(
+        client,
+        "%s/%s" % (endpoint(params["account_id"]), current["id"]),
+        payload,
+    )
+    module.exit_json(
+        changed=True,
+        message="Access policy updated",
+        access_policy=access_policy,
+    )
+
+
+def ensure_absent(module, client):
+    params = module.params
+
+    current = find_by_field(
+        client, endpoint(params["account_id"]), "name", params["name"]
+    )
+
+    if current is None:
+        module.exit_json(changed=False, message="Access policy already absent")
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Access policy would be deleted",
+            access_policy=current,
+        )
+
+    delete_result(client, "%s/%s" % (endpoint(params["account_id"]), current["id"]))
+    module.exit_json(
+        changed=True,
+        message="Access policy deleted",
+        access_policy=current,
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -185,82 +263,11 @@ def main():
         supports_check_mode=True,
     )
 
-    params = module.params
-    state = params["state"]
-
     with cloudflare_client(module) as client:
-        current = find_by_field(
-            client, endpoint(params["account_id"]), "name", params["name"]
-        )
-
-        if state == "absent":
-            if current is None:
-                module.exit_json(changed=False, message="Access policy already absent")
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Access policy would be deleted",
-                    access_policy=current,
-                )
-
-            delete_result(
-                client, "%s/%s" % (endpoint(params["account_id"]), current["id"])
-            )
-            module.exit_json(
-                changed=True,
-                message="Access policy deleted",
-                access_policy=current,
-            )
-
-        if state == "present":
-            payload = payload_from_params(params, FIELDS)
-            if current is None:
-                if module.check_mode:
-                    module.exit_json(
-                        changed=True, message="Access policy would be created"
-                    )
-
-                access_policy = post_result(
-                    client, endpoint(params["account_id"]), payload
-                )
-                module.exit_json(
-                    changed=True,
-                    message="Access policy created",
-                    access_policy=access_policy,
-                )
-
-            comparable_current = current.copy()
-            for field in FALSE_FIELDS:
-                comparable_current.setdefault(field, False)
-
-            if not values_differ(
-                select_fields(comparable_current, payload.keys()),
-                payload,
-            ):
-                module.exit_json(
-                    changed=False,
-                    message="Access policy already present",
-                    access_policy=current,
-                )
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Access policy would be updated",
-                    access_policy=current,
-                )
-
-            access_policy = put_result(
-                client,
-                "%s/%s" % (endpoint(params["account_id"]), current["id"]),
-                payload,
-            )
-            module.exit_json(
-                changed=True,
-                message="Access policy updated",
-                access_policy=access_policy,
-            )
+        if module.params["state"] == "present":
+            ensure_present(module, client)
+        else:
+            ensure_absent(module, client)
 
 
 if __name__ == "__main__":

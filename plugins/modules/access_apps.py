@@ -200,6 +200,101 @@ def item_endpoint(account_id, app_id):
     return "%s/%s" % (endpoint(account_id), app_id)
 
 
+def ensure_present(module, client):
+    params = module.params
+
+    current = redact_scim_secrets(
+        find_by_name(
+            client,
+            endpoint(params["account_id"]),
+            params["name"],
+            extra_query={"exact": "true"},
+            paginate=False,
+        )
+    )
+
+    payload = payload_from_params(params, FIELDS)
+
+    if current is None:
+        if module.check_mode:
+            module.exit_json(
+                changed=True, message="Access application would be created"
+            )
+
+        access_app = post_result(client, endpoint(params["account_id"]), payload)
+        module.exit_json(
+            changed=True,
+            message="Access application created",
+            access_app=redact_scim_secrets(access_app),
+        )
+
+    comparable_current = current.copy()
+    for field, value in DEFAULT_FIELDS.items():
+        comparable_current.setdefault(field, value)
+
+    if not values_differ(
+        normalize_current_by_desired_fields(
+            select_fields(comparable_current, payload.keys()),
+            payload,
+        ),
+        payload,
+    ):
+        module.exit_json(
+            changed=False,
+            message="Access application already present",
+            access_app=current,
+        )
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Access application would be updated",
+            access_app=current,
+        )
+
+    access_app = put_result(
+        client,
+        item_endpoint(params["account_id"], current["id"]),
+        payload,
+    )
+    module.exit_json(
+        changed=True,
+        message="Access application updated",
+        access_app=redact_scim_secrets(access_app),
+    )
+
+
+def ensure_absent(module, client):
+    params = module.params
+
+    current = redact_scim_secrets(
+        find_by_name(
+            client,
+            endpoint(params["account_id"]),
+            params["name"],
+            extra_query={"exact": "true"},
+            paginate=False,
+        )
+    )
+
+    if current is None:
+        module.exit_json(changed=False, message="Access application already absent")
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Access application would be deleted",
+            access_app=current,
+        )
+
+    delete_result(client, item_endpoint(params["account_id"], current["id"]))
+    module.exit_json(
+        changed=True,
+        message="Access application deleted",
+        access_app=current,
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -233,91 +328,11 @@ def main():
         supports_check_mode=True,
     )
 
-    params = module.params
-    state = params["state"]
-
     with cloudflare_client(module) as client:
-        current = redact_scim_secrets(
-            find_by_name(
-                client,
-                endpoint(params["account_id"]),
-                params["name"],
-                extra_query={"exact": "true"},
-                paginate=False,
-            )
-        )
-
-        if state == "absent":
-            if current is None:
-                module.exit_json(
-                    changed=False, message="Access application already absent"
-                )
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Access application would be deleted",
-                    access_app=current,
-                )
-
-            delete_result(client, item_endpoint(params["account_id"], current["id"]))
-            module.exit_json(
-                changed=True,
-                message="Access application deleted",
-                access_app=current,
-            )
-
-        if state == "present":
-            payload = payload_from_params(params, FIELDS)
-            if current is None:
-                if module.check_mode:
-                    module.exit_json(
-                        changed=True, message="Access application would be created"
-                    )
-
-                access_app = post_result(
-                    client, endpoint(params["account_id"]), payload
-                )
-                module.exit_json(
-                    changed=True,
-                    message="Access application created",
-                    access_app=redact_scim_secrets(access_app),
-                )
-
-            comparable_current = current.copy()
-            for field, value in DEFAULT_FIELDS.items():
-                comparable_current.setdefault(field, value)
-
-            if not values_differ(
-                normalize_current_by_desired_fields(
-                    select_fields(comparable_current, payload.keys()),
-                    payload,
-                ),
-                payload,
-            ):
-                module.exit_json(
-                    changed=False,
-                    message="Access application already present",
-                    access_app=current,
-                )
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Access application would be updated",
-                    access_app=current,
-                )
-
-            access_app = put_result(
-                client,
-                item_endpoint(params["account_id"], current["id"]),
-                payload,
-            )
-            module.exit_json(
-                changed=True,
-                message="Access application updated",
-                access_app=redact_scim_secrets(access_app),
-            )
+        if module.params["state"] == "present":
+            ensure_present(module, client)
+        else:
+            ensure_absent(module, client)
 
 
 if __name__ == "__main__":

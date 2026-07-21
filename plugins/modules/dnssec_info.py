@@ -59,6 +59,80 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 SKIP_STATUSES = (400, 404)
 
 
+def list(module, client):
+    dnssec = []
+    skipped_zones = []
+    zones = []
+
+    for zone in client.zones.list():
+        zone_dict = serialize_resource(zone)
+        if zone_dict.get("id") is not None and zone_dict.get("name") is not None:
+            zones.append({"id": zone_dict["id"], "name": zone_dict["name"]})
+
+    for zone in zones:
+        try:
+            dnssec_settings = client.dns.dnssec.get(zone_id=zone["id"])
+        except cloudflare.APIStatusError as exc:
+            status_code = getattr(exc, "status_code", None)
+            if status_code not in SKIP_STATUSES:
+                fail_from_cloudflare_error(
+                    module,
+                    "Cloudflare API request failed while gathering DNSSEC information",
+                    exc,
+                    zone=zone,
+                )
+
+            response = getattr(exc, "response", None)
+            response_body = None
+
+            if response is not None:
+                if hasattr(response, "json"):
+                    try:
+                        response_body = response.json()
+                    except Exception:
+                        response_body = None
+
+                if response_body is None and hasattr(response, "text"):
+                    response_body = response.text
+
+            skipped_zone = {
+                "zone_id": zone["id"],
+                "zone_name": zone["name"],
+                "status_code": status_code,
+            }
+
+            if isinstance(response_body, dict):
+                skipped_zone["errors"] = response_body.get("errors", [])
+                skipped_zone["messages"] = response_body.get("messages", [])
+            else:
+                skipped_zone["error"] = str(exc)
+
+            skipped_zones.append(skipped_zone)
+            continue
+        except cloudflare.APIConnectionError as exc:
+            setattr(
+                exc,
+                "_cloudflare_message",
+                "Cloudflare API connection failed while gathering DNSSEC information",
+            )
+            setattr(exc, "_cloudflare_context", {"zone": zone})
+            raise exc
+
+        dnssec.append(
+            {
+                "name": zone["name"],
+                "id": zone["id"],
+                "dnssec": serialize_resource(dnssec_settings),
+            }
+        )
+
+    module.exit_json(
+        changed=False,
+        dnssec=dnssec,
+        skipped_zones=skipped_zones,
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -67,79 +141,8 @@ def main():
         supports_check_mode=True,
     )
 
-    dnssec = []
-    skipped_zones = []
-
     with cloudflare_client(module) as client:
-        zones = []
-
-        for zone in client.zones.list():
-            zone_dict = serialize_resource(zone)
-            if zone_dict.get("id") is not None and zone_dict.get("name") is not None:
-                zones.append({"id": zone_dict["id"], "name": zone_dict["name"]})
-
-        for zone in zones:
-            try:
-                dnssec_settings = client.dns.dnssec.get(zone_id=zone["id"])
-            except cloudflare.APIStatusError as exc:
-                status_code = getattr(exc, "status_code", None)
-                if status_code not in SKIP_STATUSES:
-                    fail_from_cloudflare_error(
-                        module,
-                        "Cloudflare API request failed while gathering DNSSEC information",
-                        exc,
-                        zone=zone,
-                    )
-
-                response = getattr(exc, "response", None)
-                response_body = None
-
-                if response is not None:
-                    if hasattr(response, "json"):
-                        try:
-                            response_body = response.json()
-                        except Exception:
-                            response_body = None
-
-                    if response_body is None and hasattr(response, "text"):
-                        response_body = response.text
-
-                skipped_zone = {
-                    "zone_id": zone["id"],
-                    "zone_name": zone["name"],
-                    "status_code": status_code,
-                }
-
-                if isinstance(response_body, dict):
-                    skipped_zone["errors"] = response_body.get("errors", [])
-                    skipped_zone["messages"] = response_body.get("messages", [])
-                else:
-                    skipped_zone["error"] = str(exc)
-
-                skipped_zones.append(skipped_zone)
-                continue
-            except cloudflare.APIConnectionError as exc:
-                setattr(
-                    exc,
-                    "_cloudflare_message",
-                    "Cloudflare API connection failed while gathering DNSSEC information",
-                )
-                setattr(exc, "_cloudflare_context", {"zone": zone})
-                raise exc
-
-            dnssec.append(
-                {
-                    "name": zone["name"],
-                    "id": zone["id"],
-                    "dnssec": serialize_resource(dnssec_settings),
-                }
-            )
-
-    module.exit_json(
-        changed=False,
-        dnssec=dnssec,
-        skipped_zones=skipped_zones,
-    )
+        list(module, client)
 
 
 if __name__ == "__main__":

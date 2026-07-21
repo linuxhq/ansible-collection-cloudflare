@@ -55,6 +55,16 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
+def info(module, client):
+    policy = get_result(
+        client,
+        "/accounts/%s/devices/policy" % module.params["account_id"],
+        default={},
+    )
+
+    module.exit_json(changed=False, devices_policy=policy)
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -65,13 +75,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        policy = get_result(
-            client,
-            "/accounts/%s/devices/policy" % module.params["account_id"],
-            default={},
-        )
-
-    module.exit_json(changed=False, devices_policy=policy)
+        info(module, client)
 
 
 if __name__ == "__main__":

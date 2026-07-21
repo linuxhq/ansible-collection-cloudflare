@@ -103,6 +103,91 @@ def service_token_payload(module):
     return payload
 
 
+def ensure_present(module, client):
+    params = module.params
+
+    current = find_by_name(
+        client,
+        "/accounts/%s/access/service_tokens" % params["account_id"],
+        params["name"],
+    )
+
+    if current is None:
+        if module.check_mode:
+            module.exit_json(changed=True, message="Service token would be created")
+
+        service_token = client.zero_trust.access.service_tokens.create(
+            **service_token_payload(module)
+        )
+        module.exit_json(
+            changed=True,
+            message="Service token created",
+            service_token=serialize_resource(service_token),
+        )
+
+    duration = params["duration"]
+    duration_matches = duration is None
+    current_duration = current.get("duration")
+    if duration is not None and current_duration is not None:
+        duration_matches = current_duration == duration
+    elif duration == "forever" and current.get("expires_at") in (None, ""):
+        duration_matches = True
+
+    if duration_matches:
+        module.exit_json(
+            changed=False,
+            message="Service token already present",
+            service_token=current,
+        )
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Service token would be updated",
+            service_token=current,
+        )
+
+    service_token = client.zero_trust.access.service_tokens.update(
+        current["id"],
+        **service_token_payload(module),
+    )
+    module.exit_json(
+        changed=True,
+        message="Service token updated",
+        service_token=serialize_resource(service_token),
+    )
+
+
+def ensure_absent(module, client):
+    params = module.params
+
+    current = find_by_name(
+        client,
+        "/accounts/%s/access/service_tokens" % params["account_id"],
+        params["name"],
+    )
+
+    if current is None:
+        module.exit_json(changed=False, message="Service token already absent")
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Service token would be deleted",
+            service_token=current,
+        )
+
+    client.zero_trust.access.service_tokens.delete(
+        current["id"],
+        account_id=params["account_id"],
+    )
+    module.exit_json(
+        changed=True,
+        message="Service token deleted",
+        service_token=current,
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -120,88 +205,11 @@ def main():
         supports_check_mode=True,
     )
 
-    params = module.params
-    account_id = params["account_id"]
-    state = params["state"]
-
     with cloudflare_client(module) as client:
-        current = find_by_name(
-            client,
-            "/accounts/%s/access/service_tokens" % account_id,
-            params["name"],
-        )
-
-        if state == "absent":
-            if current is None:
-                module.exit_json(changed=False, message="Service token already absent")
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Service token would be deleted",
-                    service_token=current,
-                )
-
-            client.zero_trust.access.service_tokens.delete(
-                current["id"],
-                account_id=account_id,
-            )
-            module.exit_json(
-                changed=True,
-                message="Service token deleted",
-                service_token=current,
-            )
-
-        if state == "present":
-            if current is None:
-                if module.check_mode:
-                    module.exit_json(
-                        changed=True, message="Service token would be created"
-                    )
-
-                service_token = client.zero_trust.access.service_tokens.create(
-                    **service_token_payload(module)
-                )
-                module.exit_json(
-                    changed=True,
-                    message="Service token created",
-                    service_token=serialize_resource(service_token),
-                )
-
-            duration = params["duration"]
-            duration_matches = duration is None
-            current_duration = current.get("duration")
-            if duration is not None and current_duration is not None:
-                duration_matches = current_duration == duration
-            elif duration == "forever" and current.get("expires_at") in (
-                None,
-                "",
-            ):
-                duration_matches = True
-
-            if duration_matches:
-                module.exit_json(
-                    changed=False,
-                    message="Service token already present",
-                    service_token=current,
-                )
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Service token would be updated",
-                    service_token=current,
-                )
-
-            service_token = client.zero_trust.access.service_tokens.update(
-                current["id"],
-                **service_token_payload(module),
-            )
-            module.exit_json(
-                changed=True,
-                message="Service token updated",
-                service_token=serialize_resource(service_token),
-            )
+        if module.params["state"] == "present":
+            ensure_present(module, client)
+        else:
+            ensure_absent(module, client)
 
 
 if __name__ == "__main__":

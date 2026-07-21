@@ -109,6 +109,90 @@ def endpoint(account_id):
     return "/accounts/%s/cfd_tunnel" % account_id
 
 
+def ensure_present(module, client):
+    params = module.params
+
+    current = find_by_name(
+        client,
+        endpoint(params["account_id"]),
+        params["name"],
+        extra_query={"is_deleted": "false"},
+    )
+
+    if current is not None:
+        if params["rotate_secrets"] and params.get("tunnel_secret") is not None:
+            if module.check_mode:
+                module.exit_json(
+                    changed=True,
+                    message="Cloudflared tunnel would be updated",
+                    cfd_tunnel=current,
+                )
+
+            cfd_tunnel = patch_result(
+                client,
+                "%s/%s" % (endpoint(params["account_id"]), current["id"]),
+                {"tunnel_secret": params["tunnel_secret"]},
+            )
+            module.exit_json(
+                changed=True,
+                message="Cloudflared tunnel updated",
+                cfd_tunnel=cfd_tunnel,
+            )
+
+        module.exit_json(
+            changed=False,
+            message="Cloudflared tunnel already present",
+            cfd_tunnel=current,
+        )
+
+    if not params.get("config_src"):
+        module.fail_json(
+            msg="config_src is required when creating a cloudflared tunnel"
+        )
+
+    if module.check_mode:
+        module.exit_json(changed=True, message="Cloudflared tunnel would be created")
+
+    cfd_tunnel = post_result(
+        client,
+        endpoint(params["account_id"]),
+        payload_from_params(params, FIELDS),
+    )
+    module.exit_json(
+        changed=True,
+        message="Cloudflared tunnel created",
+        cfd_tunnel=cfd_tunnel,
+    )
+
+
+def ensure_absent(module, client):
+    params = module.params
+
+    current = find_by_name(
+        client,
+        endpoint(params["account_id"]),
+        params["name"],
+        extra_query={"is_deleted": "false"},
+    )
+
+    if current is None:
+        module.exit_json(changed=False, message="Cloudflared tunnel already absent")
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Cloudflared tunnel would be deleted",
+            cfd_tunnel=current,
+        )
+
+    delete_result(client, "%s/%s" % (endpoint(params["account_id"]), current["id"]))
+    module.exit_json(
+        changed=True,
+        message="Cloudflared tunnel deleted",
+        cfd_tunnel=current,
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -127,86 +211,11 @@ def main():
         supports_check_mode=True,
     )
 
-    params = module.params
-    state = params["state"]
-
     with cloudflare_client(module) as client:
-        current = find_by_name(
-            client,
-            endpoint(params["account_id"]),
-            params["name"],
-            extra_query={"is_deleted": "false"},
-        )
-
-        if state == "absent":
-            if current is None:
-                module.exit_json(
-                    changed=False, message="Cloudflared tunnel already absent"
-                )
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Cloudflared tunnel would be deleted",
-                    cfd_tunnel=current,
-                )
-
-            delete_result(
-                client, "%s/%s" % (endpoint(params["account_id"]), current["id"])
-            )
-            module.exit_json(
-                changed=True,
-                message="Cloudflared tunnel deleted",
-                cfd_tunnel=current,
-            )
-
-        if state == "present":
-            if current is not None:
-                if params["rotate_secrets"] and params.get("tunnel_secret") is not None:
-                    if module.check_mode:
-                        module.exit_json(
-                            changed=True,
-                            message="Cloudflared tunnel would be updated",
-                            cfd_tunnel=current,
-                        )
-
-                    cfd_tunnel = patch_result(
-                        client,
-                        "%s/%s" % (endpoint(params["account_id"]), current["id"]),
-                        {"tunnel_secret": params["tunnel_secret"]},
-                    )
-                    module.exit_json(
-                        changed=True,
-                        message="Cloudflared tunnel updated",
-                        cfd_tunnel=cfd_tunnel,
-                    )
-
-                module.exit_json(
-                    changed=False,
-                    message="Cloudflared tunnel already present",
-                    cfd_tunnel=current,
-                )
-
-            if not params.get("config_src"):
-                module.fail_json(
-                    msg="config_src is required when creating a cloudflared tunnel"
-                )
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True, message="Cloudflared tunnel would be created"
-                )
-
-            cfd_tunnel = post_result(
-                client,
-                endpoint(params["account_id"]),
-                payload_from_params(params, FIELDS),
-            )
-            module.exit_json(
-                changed=True,
-                message="Cloudflared tunnel created",
-                cfd_tunnel=cfd_tunnel,
-            )
+        if module.params["state"] == "present":
+            ensure_present(module, client)
+        else:
+            ensure_absent(module, client)
 
 
 if __name__ == "__main__":

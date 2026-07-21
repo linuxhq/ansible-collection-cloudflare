@@ -164,6 +164,40 @@ def endpoint(account_id):
     return "/accounts/%s/devices/policy" % account_id
 
 
+def ensure_present(module, client):
+    params = module.params
+
+    payload = payload_from_params(params, FIELDS)
+    if not payload:
+        module.exit_json(changed=False, message="No device policy fields provided")
+
+    current = get_result(client, endpoint(params["account_id"]), default={})
+
+    if not values_differ(
+        normalize_current_by_desired_fields(current, payload),
+        payload,
+    ):
+        module.exit_json(
+            changed=False,
+            message="Device policy already present",
+            devices_policy=current,
+        )
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Device policy would be updated",
+            devices_policy=current,
+        )
+
+    policy = patch_result(client, endpoint(params["account_id"]), payload)
+    module.exit_json(
+        changed=True,
+        message="Device policy updated",
+        devices_policy=policy,
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -191,37 +225,8 @@ def main():
         supports_check_mode=True,
     )
 
-    params = module.params
-    payload = payload_from_params(params, FIELDS)
-    if not payload:
-        module.exit_json(changed=False, message="No device policy fields provided")
-
     with cloudflare_client(module) as client:
-        current = get_result(client, endpoint(params["account_id"]), default={})
-
-        if not values_differ(
-            normalize_current_by_desired_fields(current, payload),
-            payload,
-        ):
-            module.exit_json(
-                changed=False,
-                message="Device policy already present",
-                devices_policy=current,
-            )
-
-        if module.check_mode:
-            module.exit_json(
-                changed=True,
-                message="Device policy would be updated",
-                devices_policy=current,
-            )
-
-        policy = patch_result(client, endpoint(params["account_id"]), payload)
-        module.exit_json(
-            changed=True,
-            message="Device policy updated",
-            devices_policy=policy,
-        )
+        ensure_present(module, client)
 
 
 if __name__ == "__main__":

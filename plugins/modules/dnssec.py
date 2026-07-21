@@ -86,6 +86,77 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
+def ensure_present(module, client):
+    current = client.dns.dnssec.get(zone_id=module.params["zone_id"])
+
+    current_dict = serialize_resource(current)
+
+    current_status = getattr(current, "status", None)
+    if current_status == "pending":
+        current_status = "active"
+    elif current_status == "pending-disabled":
+        current_status = "disabled"
+
+    needs_update = False
+    comparisons = (
+        ("status", current_status, module.params["status"]),
+        (
+            "dnssec_multi_signer",
+            getattr(current, "dnssec_multi_signer", None),
+            module.params.get("dnssec_multi_signer"),
+        ),
+        (
+            "dnssec_presigned",
+            getattr(current, "dnssec_presigned", None),
+            module.params.get("dnssec_presigned"),
+        ),
+        (
+            "dnssec_use_nsec3",
+            getattr(current, "dnssec_use_nsec3", None),
+            module.params.get("dnssec_use_nsec3"),
+        ),
+    )
+
+    for field, current_value, desired in comparisons:
+        if desired is None:
+            continue
+
+        if current_value != desired:
+            needs_update = True
+            break
+
+    if not needs_update:
+        module.exit_json(
+            changed=False,
+            message="DNSSEC settings already present",
+            dnssec=current_dict,
+        )
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="DNSSEC settings would be updated",
+            dnssec=current_dict,
+        )
+
+    payload = {"zone_id": module.params["zone_id"]}
+    for field in (
+        "dnssec_multi_signer",
+        "dnssec_presigned",
+        "dnssec_use_nsec3",
+        "status",
+    ):
+        if module.params.get(field) is not None:
+            payload[field] = module.params[field]
+
+    dnssec = client.dns.dnssec.edit(**payload)
+    module.exit_json(
+        changed=True,
+        message="DNSSEC settings updated",
+        dnssec=serialize_resource(dnssec),
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -103,75 +174,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        current = client.dns.dnssec.get(zone_id=module.params["zone_id"])
-
-        current_dict = serialize_resource(current)
-
-        current_status = getattr(current, "status", None)
-        if current_status == "pending":
-            current_status = "active"
-        elif current_status == "pending-disabled":
-            current_status = "disabled"
-
-        needs_update = False
-        comparisons = (
-            ("status", current_status, module.params["status"]),
-            (
-                "dnssec_multi_signer",
-                getattr(current, "dnssec_multi_signer", None),
-                module.params.get("dnssec_multi_signer"),
-            ),
-            (
-                "dnssec_presigned",
-                getattr(current, "dnssec_presigned", None),
-                module.params.get("dnssec_presigned"),
-            ),
-            (
-                "dnssec_use_nsec3",
-                getattr(current, "dnssec_use_nsec3", None),
-                module.params.get("dnssec_use_nsec3"),
-            ),
-        )
-
-        for field, current_value, desired in comparisons:
-            if desired is None:
-                continue
-
-            if current_value != desired:
-                needs_update = True
-                break
-
-        if not needs_update:
-            module.exit_json(
-                changed=False,
-                message="DNSSEC settings already present",
-                dnssec=current_dict,
-            )
-
-        if module.check_mode:
-            module.exit_json(
-                changed=True,
-                message="DNSSEC settings would be updated",
-                dnssec=current_dict,
-            )
-
-        payload = {"zone_id": module.params["zone_id"]}
-        for field in (
-            "dnssec_multi_signer",
-            "dnssec_presigned",
-            "dnssec_use_nsec3",
-            "status",
-        ):
-            if module.params.get(field) is not None:
-                payload[field] = module.params[field]
-
-        dnssec = client.dns.dnssec.edit(**payload)
-
-    module.exit_json(
-        changed=True,
-        message="DNSSEC settings updated",
-        dnssec=serialize_resource(dnssec),
-    )
+        ensure_present(module, client)
 
 
 if __name__ == "__main__":

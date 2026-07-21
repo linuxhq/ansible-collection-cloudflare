@@ -58,6 +58,22 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
+def list(module, client):
+    providers = list_all(
+        client,
+        "/accounts/%s/access/identity_providers" % module.params["account_id"],
+    )
+
+    for provider in providers:
+        if not isinstance(provider, dict):
+            continue
+        for section, field in (("config", "client_secret"), ("scim_config", "secret")):
+            if isinstance(provider.get(section), dict):
+                provider[section].pop(field, None)
+
+    module.exit_json(changed=False, access_identity_providers=providers)
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -68,19 +84,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        providers = list_all(
-            client,
-            "/accounts/%s/access/identity_providers" % module.params["account_id"],
-        )
-
-    for provider in providers:
-        if not isinstance(provider, dict):
-            continue
-        for section, field in (("config", "client_secret"), ("scim_config", "secret")):
-            if isinstance(provider.get(section), dict):
-                provider[section].pop(field, None)
-
-    module.exit_json(changed=False, access_identity_providers=providers)
+        list(module, client)
 
 
 if __name__ == "__main__":

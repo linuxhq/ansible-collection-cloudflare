@@ -55,6 +55,16 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
+def info(module, client):
+    settings = get_result(
+        client,
+        "/accounts/%s/zerotrust/connectivity_settings" % module.params["account_id"],
+        default={},
+    )
+
+    module.exit_json(changed=False, connectivity_settings=settings)
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -65,14 +75,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        settings = get_result(
-            client,
-            "/accounts/%s/zerotrust/connectivity_settings"
-            % module.params["account_id"],
-            default={},
-        )
-
-    module.exit_json(changed=False, connectivity_settings=settings)
+        info(module, client)
 
 
 if __name__ == "__main__":

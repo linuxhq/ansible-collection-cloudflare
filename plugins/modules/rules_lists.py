@@ -294,6 +294,168 @@ def normalize_items(items):
     return sorted(normalized_items.values(), key=canonical_item)
 
 
+def ensure_present(module, client):
+    params = module.params
+
+    current = find_by_field(
+        client,
+        endpoint(params["account_id"]),
+        "name",
+        params["name"],
+        paginate=False,
+    )
+
+    if current is None and params.get("kind") is None:
+        module.fail_json(msg="kind is required when creating a Rules list")
+
+    changed = False
+    items_changed = False
+    items_operation = None
+
+    if current is None:
+        if module.check_mode:
+            module.exit_json(changed=True, message="Rules list would be created")
+
+        current = post_result(
+            client,
+            endpoint(params["account_id"]),
+            {
+                "description": (
+                    params["name"]
+                    if params.get("description") is None
+                    else params["description"]
+                ),
+                "kind": params["kind"],
+                "name": params["name"],
+            },
+        )
+        changed = True
+    else:
+        desired_description = params.get("description")
+        if (
+            desired_description is not None
+            and current.get("description") != desired_description
+        ):
+            if module.check_mode:
+                module.exit_json(
+                    changed=True,
+                    message="Rules list would be updated",
+                    rules_list=current,
+                )
+
+            current = put_result(
+                client,
+                item_endpoint(params["account_id"], current["id"]),
+                {"description": desired_description},
+            )
+            changed = True
+
+    if params.get("elements") is not None:
+        desired_items = normalize_items(params["elements"])
+        current_count = current.get("num_items")
+
+        if current_count is not None and current_count != len(desired_items):
+            items_changed = True
+        else:
+            current_items = []
+            cursor = None
+
+            while True:
+                query = {"cursor": cursor, "per_page": ITEMS_PER_PAGE}
+                query = {
+                    key: value for key, value in query.items() if value is not None
+                }
+                path = items_endpoint(params["account_id"], current["id"])
+                if query:
+                    path = "%s?%s" % (path, urlencode(query))
+
+                result, result_info = parse_list_response(
+                    serialize_resource(client.get(path, cast_to=object))
+                )
+
+                current_items.extend(result)
+
+                cursor = (result_info.get("cursors") or {}).get("after")
+                if not cursor:
+                    break
+
+            items_changed = values_differ(
+                normalize_items(current_items),
+                desired_items,
+            )
+
+        if module.check_mode and items_changed:
+            module.exit_json(
+                changed=True,
+                message="Rules list items would be updated",
+                rules_list=current,
+            )
+
+        if items_changed:
+            deadline = time.monotonic() + params["operation_timeout"]
+            items_operation = wait_for_operation(
+                module,
+                client,
+                params["account_id"],
+                submit_items(
+                    client,
+                    params["account_id"],
+                    current["id"],
+                    params["elements"],
+                    deadline,
+                ),
+                deadline,
+            )
+            current = get_result(
+                client,
+                item_endpoint(params["account_id"], current["id"]),
+                default=current,
+            )
+
+    if not changed and not items_changed:
+        module.exit_json(
+            changed=False,
+            message="Rules list already present",
+            rules_list=current,
+        )
+
+    module.exit_json(
+        changed=True,
+        message="Rules list updated",
+        rules_list=current,
+        items_operation=items_operation,
+    )
+
+
+def ensure_absent(module, client):
+    params = module.params
+
+    current = find_by_field(
+        client,
+        endpoint(params["account_id"]),
+        "name",
+        params["name"],
+        paginate=False,
+    )
+
+    if current is None:
+        module.exit_json(changed=False, message="Rules list already absent")
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Rules list would be deleted",
+            rules_list=current,
+        )
+
+    delete_result(client, item_endpoint(params["account_id"], current["id"]))
+    module.exit_json(
+        changed=True,
+        message="Rules list deleted",
+        rules_list=current,
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -313,164 +475,14 @@ def main():
         supports_check_mode=True,
     )
 
-    params = module.params
-    state = params["state"]
-
-    if params["operation_timeout"] < 1:
+    if module.params["operation_timeout"] < 1:
         module.fail_json(msg="operation_timeout must be at least 1 second")
 
     with cloudflare_client(module) as client:
-        current = find_by_field(
-            client,
-            endpoint(params["account_id"]),
-            "name",
-            params["name"],
-            paginate=False,
-        )
-
-        if state == "absent":
-            if current is None:
-                module.exit_json(changed=False, message="Rules list already absent")
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Rules list would be deleted",
-                    rules_list=current,
-                )
-
-            delete_result(client, item_endpoint(params["account_id"], current["id"]))
-            module.exit_json(
-                changed=True,
-                message="Rules list deleted",
-                rules_list=current,
-            )
-
-        if state == "present":
-            if current is None and params.get("kind") is None:
-                module.fail_json(msg="kind is required when creating a Rules list")
-
-            changed = False
-            items_changed = False
-            items_operation = None
-
-            if current is None:
-                if module.check_mode:
-                    module.exit_json(
-                        changed=True, message="Rules list would be created"
-                    )
-
-                current = post_result(
-                    client,
-                    endpoint(params["account_id"]),
-                    {
-                        "description": (
-                            params["name"]
-                            if params.get("description") is None
-                            else params["description"]
-                        ),
-                        "kind": params["kind"],
-                        "name": params["name"],
-                    },
-                )
-                changed = True
-            else:
-                desired_description = params.get("description")
-                if (
-                    desired_description is not None
-                    and current.get("description") != desired_description
-                ):
-                    if module.check_mode:
-                        module.exit_json(
-                            changed=True,
-                            message="Rules list would be updated",
-                            rules_list=current,
-                        )
-
-                    current = put_result(
-                        client,
-                        item_endpoint(params["account_id"], current["id"]),
-                        {"description": desired_description},
-                    )
-                    changed = True
-
-            if params.get("elements") is not None:
-                desired_items = normalize_items(params["elements"])
-                current_count = current.get("num_items")
-
-                if current_count is not None and current_count != len(desired_items):
-                    items_changed = True
-                else:
-                    current_items = []
-                    cursor = None
-
-                    while True:
-                        query = {"cursor": cursor, "per_page": ITEMS_PER_PAGE}
-                        query = {
-                            key: value
-                            for key, value in query.items()
-                            if value is not None
-                        }
-                        path = items_endpoint(params["account_id"], current["id"])
-                        if query:
-                            path = "%s?%s" % (path, urlencode(query))
-
-                        result, result_info = parse_list_response(
-                            serialize_resource(client.get(path, cast_to=object))
-                        )
-
-                        current_items.extend(result)
-
-                        cursor = (result_info.get("cursors") or {}).get("after")
-                        if not cursor:
-                            break
-
-                    items_changed = values_differ(
-                        normalize_items(current_items),
-                        desired_items,
-                    )
-
-                if module.check_mode and items_changed:
-                    module.exit_json(
-                        changed=True,
-                        message="Rules list items would be updated",
-                        rules_list=current,
-                    )
-
-                if items_changed:
-                    deadline = time.monotonic() + params["operation_timeout"]
-                    items_operation = wait_for_operation(
-                        module,
-                        client,
-                        params["account_id"],
-                        submit_items(
-                            client,
-                            params["account_id"],
-                            current["id"],
-                            params["elements"],
-                            deadline,
-                        ),
-                        deadline,
-                    )
-                    current = get_result(
-                        client,
-                        item_endpoint(params["account_id"], current["id"]),
-                        default=current,
-                    )
-
-            if not changed and not items_changed:
-                module.exit_json(
-                    changed=False,
-                    message="Rules list already present",
-                    rules_list=current,
-                )
-
-            module.exit_json(
-                changed=True,
-                message="Rules list updated",
-                rules_list=current,
-                items_operation=items_operation,
-            )
+        if module.params["state"] == "present":
+            ensure_present(module, client)
+        else:
+            ensure_absent(module, client)
 
 
 if __name__ == "__main__":

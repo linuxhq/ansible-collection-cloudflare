@@ -62,6 +62,25 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
+def list(module, client):
+    account_id = module.params["account_id"]
+    cfd_tunnels = list_all(
+        client,
+        "/accounts/%s/cfd_tunnel?is_deleted=false" % account_id,
+        per_page=1000,
+    )
+
+    if module.params["include_token"]:
+        for tunnel in cfd_tunnels:
+            if tunnel.get("id") is not None:
+                tunnel["token"] = get_result(
+                    client,
+                    "/accounts/%s/cfd_tunnel/%s/token" % (account_id, tunnel["id"]),
+                )
+
+    module.exit_json(changed=False, cfd_tunnels=cfd_tunnels)
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -72,23 +91,8 @@ def main():
         supports_check_mode=True,
     )
 
-    account_id = module.params["account_id"]
     with cloudflare_client(module) as client:
-        cfd_tunnels = list_all(
-            client,
-            "/accounts/%s/cfd_tunnel?is_deleted=false" % account_id,
-            per_page=1000,
-        )
-
-        if module.params["include_token"]:
-            for tunnel in cfd_tunnels:
-                if tunnel.get("id") is not None:
-                    tunnel["token"] = get_result(
-                        client,
-                        "/accounts/%s/cfd_tunnel/%s/token" % (account_id, tunnel["id"]),
-                    )
-
-    module.exit_json(changed=False, cfd_tunnels=cfd_tunnels)
+        list(module, client)
 
 
 if __name__ == "__main__":

@@ -59,6 +59,18 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
+def list(module, client):
+    access_apps = list_all(
+        client,
+        "/accounts/%s/access/apps" % module.params["account_id"],
+    )
+
+    for access_app in access_apps:
+        redact_scim_secrets(access_app)
+
+    module.exit_json(changed=False, access_apps=access_apps)
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -69,15 +81,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        access_apps = list_all(
-            client,
-            "/accounts/%s/access/apps" % module.params["account_id"],
-        )
-
-    for access_app in access_apps:
-        redact_scim_secrets(access_app)
-
-    module.exit_json(changed=False, access_apps=access_apps)
+        list(module, client)
 
 
 if __name__ == "__main__":

@@ -110,6 +110,87 @@ def endpoint(account_id):
     return "/accounts/%s/access/groups" % account_id
 
 
+def ensure_present(module, client):
+    params = module.params
+
+    current = find_by_name(
+        client,
+        endpoint(params["account_id"]),
+        params["name"],
+    )
+
+    payload = payload_from_params(params, FIELDS)
+
+    if current is None:
+        if module.check_mode:
+            module.exit_json(changed=True, message="Access group would be created")
+
+        access_group = post_result(client, endpoint(params["account_id"]), payload)
+        module.exit_json(
+            changed=True,
+            message="Access group created",
+            access_group=access_group,
+        )
+
+    comparable_current = current.copy()
+    comparable_current.setdefault("is_default", False)
+
+    if not values_differ(
+        select_fields(comparable_current, payload.keys()),
+        payload,
+    ):
+        module.exit_json(
+            changed=False,
+            message="Access group already present",
+            access_group=current,
+        )
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Access group would be updated",
+            access_group=current,
+        )
+
+    access_group = put_result(
+        client,
+        "%s/%s" % (endpoint(params["account_id"]), current["id"]),
+        payload,
+    )
+    module.exit_json(
+        changed=True,
+        message="Access group updated",
+        access_group=access_group,
+    )
+
+
+def ensure_absent(module, client):
+    params = module.params
+
+    current = find_by_name(
+        client,
+        endpoint(params["account_id"]),
+        params["name"],
+    )
+
+    if current is None:
+        module.exit_json(changed=False, message="Access group already absent")
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Access group would be deleted",
+            access_group=current,
+        )
+
+    delete_result(client, "%s/%s" % (endpoint(params["account_id"]), current["id"]))
+    module.exit_json(
+        changed=True,
+        message="Access group deleted",
+        access_group=current,
+    )
+
+
 def main():
     module = AnsibleModule(
         argument_spec={
@@ -130,83 +211,11 @@ def main():
         supports_check_mode=True,
     )
 
-    params = module.params
-    state = params["state"]
-
     with cloudflare_client(module) as client:
-        current = find_by_name(
-            client,
-            endpoint(params["account_id"]),
-            params["name"],
-        )
-
-        if state == "absent":
-            if current is None:
-                module.exit_json(changed=False, message="Access group already absent")
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Access group would be deleted",
-                    access_group=current,
-                )
-
-            delete_result(
-                client, "%s/%s" % (endpoint(params["account_id"]), current["id"])
-            )
-            module.exit_json(
-                changed=True,
-                message="Access group deleted",
-                access_group=current,
-            )
-
-        if state == "present":
-            payload = payload_from_params(params, FIELDS)
-            if current is None:
-                if module.check_mode:
-                    module.exit_json(
-                        changed=True, message="Access group would be created"
-                    )
-
-                access_group = post_result(
-                    client, endpoint(params["account_id"]), payload
-                )
-                module.exit_json(
-                    changed=True,
-                    message="Access group created",
-                    access_group=access_group,
-                )
-
-            comparable_current = current.copy()
-            comparable_current.setdefault("is_default", False)
-
-            if not values_differ(
-                select_fields(comparable_current, payload.keys()),
-                payload,
-            ):
-                module.exit_json(
-                    changed=False,
-                    message="Access group already present",
-                    access_group=current,
-                )
-
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Access group would be updated",
-                    access_group=current,
-                )
-
-            access_group = put_result(
-                client,
-                "%s/%s" % (endpoint(params["account_id"]), current["id"]),
-                payload,
-            )
-            module.exit_json(
-                changed=True,
-                message="Access group updated",
-                access_group=access_group,
-            )
+        if module.params["state"] == "present":
+            ensure_present(module, client)
+        else:
+            ensure_absent(module, client)
 
 
 if __name__ == "__main__":
