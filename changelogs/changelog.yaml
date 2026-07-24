@@ -230,3 +230,16 @@ releases:
     fragments:
     - ensure-helpers-refactor.yml
     release_date: '2026-07-21'
+  2.1.6:
+    changes:
+      minor_changes:
+      - all modules - raise the required cloudflare Python SDK floor to ``cloudflare
+        >= 5.6.0, < 6`` (https://github.com/linuxhq/ansible-collection-cloudflare/pull/41).
+      release_summary: 'Maintenance release. The required cloudflare Python SDK floor
+        moves to ``cloudflare >= 5.6.0, < 6``. The remaining changes are internal:
+        the modules dropped their Python 2 boilerplate and shebangs, and the lint
+        configuration was simplified for ruff 0.16. No options, return values, or
+        behavior changed.'
+    fragments:
+    - cloudflare-sdk-5.6.yml
+    release_date: '2026-07-24'

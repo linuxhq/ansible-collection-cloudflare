@@ -4,6 +4,19 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.1.6
+======
+
+Release Summary
+---------------
+
+Maintenance release. The required cloudflare Python SDK floor moves to ``cloudflare >= 5.6.0, < 6``. The remaining changes are internal: the modules dropped their Python 2 boilerplate and shebangs, and the lint configuration was simplified for ruff 0.16. No options, return values, or behavior changed.
+
+Minor Changes
+-------------
+
+- all modules - raise the required cloudflare Python SDK floor to ``cloudflare >= 5.6.0, < 6`` (https://github.com/linuxhq/ansible-collection-cloudflare/pull/41).
+
 v2.1.5
 ======
 
