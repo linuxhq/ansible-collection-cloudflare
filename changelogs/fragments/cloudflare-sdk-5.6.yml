@@ -6,3 +6,5 @@ trivial:
   - ruff - drop the legacy Python 2 module boilerplate, sort imports, and convert percent-formats
     to satisfy the rule set ruff 0.16 enables by default
     (https://github.com/linuxhq/ansible-collection-cloudflare/pull/36).
+  - all modules - drop the ``#!/usr/bin/python`` shebang, which ansible-core regenerates from the
+    discovered interpreter, leaving the ruff config with nothing left to ignore.
