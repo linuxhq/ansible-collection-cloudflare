@@ -3,6 +3,6 @@ minor_changes:
   - all modules - raise the required cloudflare Python SDK floor to ``cloudflare >= 5.6.0, < 6``
     (https://github.com/linuxhq/ansible-collection-cloudflare/pull/41).
 trivial:
-  - ruff - pin the lint rule set explicitly so ruff's changing defaults no longer alter what CI
-    enforces, and drop the legacy Python 2 module boilerplate it flagged
+  - ruff - drop the legacy Python 2 module boilerplate, sort imports, and convert percent-formats
+    to satisfy the rule set ruff 0.16 enables by default
     (https://github.com/linuxhq/ansible-collection-cloudflare/pull/36).
