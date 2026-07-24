@@ -1,5 +1,4 @@
 target-version = "py39"
 
 [lint.per-file-ignores]
-"plugins/lookup/*.py" = ["E402"]
-"plugins/modules/*.py" = ["E402", "EXE001"]
+"plugins/modules/*.py" = ["EXE001"]
