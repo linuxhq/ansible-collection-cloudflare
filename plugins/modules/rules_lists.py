@@ -1,10 +1,6 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import absolute_import, division, print_function
-
-__metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
@@ -72,7 +68,7 @@ options:
       - Desired state of the resource.
 requirements:
   - python >= 3.9
-  - cloudflare >= 5.5.0, < 6
+  - cloudflare >= 5.6.0, < 6
 
 """
 
@@ -107,11 +103,9 @@ message:
 
 import json
 import time
-
 from urllib.parse import urlencode
 
 from ansible.module_utils.basic import AnsibleModule
-
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare,
     cloudflare_client,
@@ -149,19 +143,19 @@ def canonical_item(item):
 
 
 def endpoint(account_id):
-    return "/accounts/%s/rules/lists" % account_id
+    return f"/accounts/{account_id}/rules/lists"
 
 
 def item_endpoint(account_id, list_id):
-    return "%s/%s" % (endpoint(account_id), list_id)
+    return f"{endpoint(account_id)}/{list_id}"
 
 
 def items_endpoint(account_id, list_id):
-    return "%s/items" % item_endpoint(account_id, list_id)
+    return f"{item_endpoint(account_id, list_id)}/items"
 
 
 def operation_endpoint(account_id, operation_id):
-    return "/accounts/%s/rules/lists/bulk_operations/%s" % (account_id, operation_id)
+    return f"/accounts/{account_id}/rules/lists/bulk_operations/{operation_id}"
 
 
 def pending_operation_error(exc):
@@ -367,7 +361,7 @@ def ensure_present(module, client):
                 }
                 path = items_endpoint(params["account_id"], current["id"])
                 if query:
-                    path = "%s?%s" % (path, urlencode(query))
+                    path = f"{path}?{urlencode(query)}"
 
                 result, result_info = parse_list_response(
                     serialize_resource(client.get(path, cast_to=object))

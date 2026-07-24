@@ -1,10 +1,6 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import absolute_import, division, print_function
-
-__metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
@@ -48,7 +44,7 @@ notes:
   - Cloudflare only returns the client secret when a token is created.
 requirements:
   - python >= 3.9
-  - cloudflare >= 5.5.0, < 6
+  - cloudflare >= 5.6.0, < 6
 
 """
 
@@ -85,7 +81,6 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
-
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     find_by_name,
@@ -108,7 +103,7 @@ def ensure_present(module, client):
 
     current = find_by_name(
         client,
-        "/accounts/%s/access/service_tokens" % params["account_id"],
+        "/accounts/{}/access/service_tokens".format(params["account_id"]),
         params["name"],
     )
 
@@ -163,7 +158,7 @@ def ensure_absent(module, client):
 
     current = find_by_name(
         client,
-        "/accounts/%s/access/service_tokens" % params["account_id"],
+        "/accounts/{}/access/service_tokens".format(params["account_id"]),
         params["name"],
     )
 

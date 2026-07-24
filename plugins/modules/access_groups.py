@@ -1,10 +1,6 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import absolute_import, division, print_function
-
-__metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
@@ -61,7 +57,7 @@ options:
       - Desired state of the resource.
 requirements:
   - python >= 3.9
-  - cloudflare >= 5.5.0, < 6
+  - cloudflare >= 5.6.0, < 6
 
 """
 
@@ -91,7 +87,6 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
-
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     delete_result,
@@ -107,7 +102,7 @@ FIELDS = ("exclude", "include", "is_default", "name", "require")
 
 
 def endpoint(account_id):
-    return "/accounts/%s/access/groups" % account_id
+    return f"/accounts/{account_id}/access/groups"
 
 
 def ensure_present(module, client):
@@ -154,7 +149,7 @@ def ensure_present(module, client):
 
     access_group = put_result(
         client,
-        "%s/%s" % (endpoint(params["account_id"]), current["id"]),
+        "{}/{}".format(endpoint(params["account_id"]), current["id"]),
         payload,
     )
     module.exit_json(
@@ -183,7 +178,7 @@ def ensure_absent(module, client):
             access_group=current,
         )
 
-    delete_result(client, "%s/%s" % (endpoint(params["account_id"]), current["id"]))
+    delete_result(client, "{}/{}".format(endpoint(params["account_id"]), current["id"]))
     module.exit_json(
         changed=True,
         message="Access group deleted",

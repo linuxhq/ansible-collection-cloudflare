@@ -1,10 +1,6 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import absolute_import, division, print_function
-
-__metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
@@ -56,7 +52,7 @@ options:
       - Desired state of the resource.
 requirements:
   - python >= 3.9
-  - cloudflare >= 5.5.0, < 6
+  - cloudflare >= 5.6.0, < 6
 
 """
 
@@ -83,7 +79,6 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
-
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare,
     cloudflare_client,
@@ -95,7 +90,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 
 
 def endpoint(account_id):
-    return "/accounts/%s/warp_connector" % account_id
+    return f"/accounts/{account_id}/warp_connector"
 
 
 def ensure_present(module, client):
@@ -119,7 +114,7 @@ def ensure_present(module, client):
 
             warp_connector = patch_result(
                 client,
-                "%s/%s" % (endpoint(params["account_id"]), current["id"]),
+                "{}/{}".format(endpoint(params["account_id"]), current["id"]),
                 {"tunnel_secret": params["tunnel_secret"]},
             )
             module.exit_json(
@@ -144,7 +139,7 @@ def ensure_present(module, client):
     )
 
     if params.get("tunnel_secret") is not None:
-        connector_path = "%s/%s" % (
+        connector_path = "{}/{}".format(
             endpoint(params["account_id"]),
             warp_connector["id"],
         )
@@ -195,7 +190,7 @@ def ensure_absent(module, client):
             warp_connector=current,
         )
 
-    delete_result(client, "%s/%s" % (endpoint(params["account_id"]), current["id"]))
+    delete_result(client, "{}/{}".format(endpoint(params["account_id"]), current["id"]))
     module.exit_json(
         changed=True,
         message="WARP Connector deleted",

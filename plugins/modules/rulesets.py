@@ -1,10 +1,6 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import absolute_import, division, print_function
-
-__metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
@@ -57,7 +53,7 @@ options:
       - Desired state of the resource.
 requirements:
   - python >= 3.9
-  - cloudflare >= 5.5.0, < 6
+  - cloudflare >= 5.6.0, < 6
 
 """
 
@@ -87,7 +83,6 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
-
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     delete_result,
@@ -100,11 +95,11 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 
 
 def entrypoint_endpoint(zone_id, phase):
-    return "/zones/%s/rulesets/phases/%s/entrypoint" % (zone_id, phase)
+    return f"/zones/{zone_id}/rulesets/phases/{phase}/entrypoint"
 
 
 def rulesets_endpoint(zone_id):
-    return "/zones/%s/rulesets" % zone_id
+    return f"/zones/{zone_id}/rulesets"
 
 
 def ensure_present(module, client):
@@ -203,7 +198,7 @@ def ensure_absent(module, client):
         )
 
     delete_result(
-        client, "%s/%s" % (rulesets_endpoint(params["zone_id"]), current["id"])
+        client, "{}/{}".format(rulesets_endpoint(params["zone_id"]), current["id"])
     )
     module.exit_json(
         changed=True,

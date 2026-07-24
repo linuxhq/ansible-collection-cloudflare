@@ -1,10 +1,6 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import absolute_import, division, print_function
-
-__metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
@@ -59,7 +55,7 @@ options:
       - Desired state of the resource.
 requirements:
   - python >= 3.9
-  - cloudflare >= 5.5.0, < 6
+  - cloudflare >= 5.6.0, < 6
 
 """
 
@@ -92,7 +88,6 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
-
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     delete_result,
@@ -105,7 +100,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 
 
 def settings_endpoint(zone_id, setting_id):
-    return "/zones/%s/settings/%s" % (zone_id, setting_id)
+    return f"/zones/{zone_id}/settings/{setting_id}"
 
 
 def normalize_setting_value(value):
@@ -127,7 +122,7 @@ def normalize_setting_value(value):
 def zone_endpoint(zone_id=None):
     if zone_id is None:
         return "/zones"
-    return "/zones/%s" % zone_id
+    return f"/zones/{zone_id}"
 
 
 def ensure_present(module, client):
@@ -135,7 +130,7 @@ def ensure_present(module, client):
 
     current = None
     zones = get_result(
-        client, "/zones?name=%s&per_page=50" % params["name"], default=[]
+        client, "/zones?name={}&per_page=50".format(params["name"]), default=[]
     )
 
     for zone in zones:
@@ -236,7 +231,7 @@ def ensure_absent(module, client):
 
     current = None
     zones = get_result(
-        client, "/zones?name=%s&per_page=50" % params["name"], default=[]
+        client, "/zones?name={}&per_page=50".format(params["name"]), default=[]
     )
 
     for zone in zones:

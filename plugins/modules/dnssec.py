@@ -1,10 +1,6 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import absolute_import, division, print_function
-
-__metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
@@ -47,7 +43,7 @@ options:
       - disabled
 requirements:
   - python >= 3.9
-  - cloudflare >= 5.5.0, < 6
+  - cloudflare >= 5.6.0, < 6
 
 """
 
@@ -79,7 +75,6 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
-
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     serialize_resource,
@@ -97,33 +92,26 @@ def ensure_present(module, client):
     elif current_status == "pending-disabled":
         current_status = "disabled"
 
-    needs_update = False
     comparisons = (
-        ("status", current_status, module.params["status"]),
+        (current_status, module.params["status"]),
         (
-            "dnssec_multi_signer",
             getattr(current, "dnssec_multi_signer", None),
             module.params.get("dnssec_multi_signer"),
         ),
         (
-            "dnssec_presigned",
             getattr(current, "dnssec_presigned", None),
             module.params.get("dnssec_presigned"),
         ),
         (
-            "dnssec_use_nsec3",
             getattr(current, "dnssec_use_nsec3", None),
             module.params.get("dnssec_use_nsec3"),
         ),
     )
 
-    for field, current_value, desired in comparisons:
-        if desired is None:
-            continue
-
-        if current_value != desired:
-            needs_update = True
-            break
+    needs_update = any(
+        desired is not None and current_value != desired
+        for current_value, desired in comparisons
+    )
 
     if not needs_update:
         module.exit_json(

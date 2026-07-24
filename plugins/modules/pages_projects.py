@@ -1,10 +1,6 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import absolute_import, division, print_function
-
-__metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
@@ -76,7 +72,7 @@ options:
       - Desired state of the resource.
 requirements:
   - python >= 3.9
-  - cloudflare >= 5.5.0, < 6
+  - cloudflare >= 5.6.0, < 6
 
 """
 
@@ -111,7 +107,6 @@ message:
 import copy
 
 from ansible.module_utils.basic import AnsibleModule
-
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     delete_result,
@@ -186,15 +181,15 @@ def current_domain_names(project, domains):
 
 
 def domains_endpoint(account_id, project_name):
-    return "%s/domains" % item_endpoint(account_id, project_name)
+    return f"{item_endpoint(account_id, project_name)}/domains"
 
 
 def endpoint(account_id):
-    return "/accounts/%s/pages/projects" % account_id
+    return f"/accounts/{account_id}/pages/projects"
 
 
 def item_endpoint(account_id, project_name):
-    return "%s/%s" % (endpoint(account_id), project_name)
+    return f"{endpoint(account_id)}/{project_name}"
 
 
 def ensure_present(module, client):
@@ -339,8 +334,7 @@ def ensure_absent(module, client):
         if domain_name in existing_names:
             delete_result(
                 client,
-                "%s/%s"
-                % (
+                "{}/{}".format(
                     domains_endpoint(params["account_id"], params["name"]),
                     domain_name,
                 ),

@@ -1,10 +1,6 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import absolute_import, division, print_function
-
-__metaclass__ = type
 
 DOCUMENTATION = r"""
 ---
@@ -22,7 +18,7 @@ options:
     type: str
 requirements:
   - python >= 3.9
-  - cloudflare >= 5.5.0, < 6
+  - cloudflare >= 5.6.0, < 6
 
 """
 
@@ -48,7 +44,6 @@ skipped_zones:
 """
 
 from ansible.module_utils.basic import AnsibleModule
-
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare,
     cloudflare_client,
@@ -89,7 +84,7 @@ def list(module, client):
                 if hasattr(response, "json"):
                     try:
                         response_body = response.json()
-                    except Exception:
+                    except ValueError:
                         response_body = None
 
                 if response_body is None and hasattr(response, "text"):
@@ -110,13 +105,11 @@ def list(module, client):
             skipped_zones.append(skipped_zone)
             continue
         except cloudflare.APIConnectionError as exc:
-            setattr(
-                exc,
-                "_cloudflare_message",
-                "Cloudflare API connection failed while gathering DNSSEC information",
+            exc._cloudflare_message = (
+                "Cloudflare API connection failed while gathering DNSSEC information"
             )
-            setattr(exc, "_cloudflare_context", {"zone": zone})
-            raise exc
+            exc._cloudflare_context = {"zone": zone}
+            raise
 
         dnssec.append(
             {

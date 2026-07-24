@@ -1,9 +1,6 @@
 # Copyright: (c) 2026, Taylor Kimball
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import absolute_import, division, print_function
-
-__metaclass__ = type
 
 from contextlib import contextmanager
 from urllib.parse import quote
@@ -50,21 +47,21 @@ def cloudflare_client(module):
             module,
             getattr(exc, "_cloudflare_message", "Cloudflare API connection failed"),
             exc,
-            **getattr(exc, "_cloudflare_context", {})
+            **getattr(exc, "_cloudflare_context", {}),
         )
     except cloudflare.APIStatusError as exc:
         fail_from_cloudflare_error(
             module,
             getattr(exc, "_cloudflare_message", "Cloudflare API request failed"),
             exc,
-            **getattr(exc, "_cloudflare_context", {})
+            **getattr(exc, "_cloudflare_context", {}),
         )
     except cloudflare.APIError as exc:
         fail_from_cloudflare_error(
             module,
             getattr(exc, "_cloudflare_message", "Cloudflare API error"),
             exc,
-            **getattr(exc, "_cloudflare_context", {})
+            **getattr(exc, "_cloudflare_context", {}),
         )
 
 
@@ -81,7 +78,7 @@ def fail_from_cloudflare_error(module, message, exc, **context):
         if hasattr(response, "json"):
             try:
                 response_body = response.json()
-            except Exception:
+            except ValueError:
                 response_body = None
         if response_body is None and hasattr(response, "text"):
             response_body = response.text
@@ -91,7 +88,7 @@ def fail_from_cloudflare_error(module, message, exc, **context):
         error=str(exc),
         status_code=status_code,
         response=response_body,
-        **context
+        **context,
     )
 
 
@@ -107,13 +104,13 @@ def find_by_name(client, path, name, extra_query=None, paginate=True):
     query = list((extra_query or {}).items())
     query.append(("name", name))
     query_string = "&".join(
-        "%s=%s" % (key, quote(str(value), safe="")) for key, value in query
+        "{}={}".format(key, quote(str(value), safe="")) for key, value in query
     )
     separator = "&" if "?" in path else "?"
 
     return find_by_field(
         client,
-        "%s%s%s" % (path, separator, query_string),
+        f"{path}{separator}{query_string}",
         "name",
         name,
         paginate=paginate,
@@ -129,10 +126,8 @@ def get_result(client, path, default=None, ok_statuses=None, timeout=None):
 
 def iter_items(client, path, per_page=50, paginate=True):
     if not paginate:
-        result, dummy = parse_list_response(
-            serialize_resource(api_request(client, "get", path))
-        )
-        yield from result
+        response = serialize_resource(api_request(client, "get", path))
+        yield from parse_list_response(response)[0]
         return
 
     fetched = 0
@@ -145,7 +140,7 @@ def iter_items(client, path, per_page=50, paginate=True):
                 api_request(
                     client,
                     "get",
-                    "%s%spage=%s&per_page=%s" % (path, separator, page, per_page),
+                    f"{path}{separator}page={page}&per_page={per_page}",
                 )
             )
         )
