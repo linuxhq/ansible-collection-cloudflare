@@ -19,7 +19,7 @@ class ZonesInfoTests(TestCase):
             patch.object(zones_info, "list_all", return_value=zones) as listed,
             self.assertRaises(ModuleExit) as raised,
         ):
-            zones_info.list(module, {})
+            zones_info.list_resources(module, {})
 
         listed.assert_called_once_with({}, "/zones?match=all")
         self.assertEqual(raised.exception.values["zones"], zones)

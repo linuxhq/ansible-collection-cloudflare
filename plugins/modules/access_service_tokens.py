@@ -1,13 +1,18 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: access_service_tokens
-short_description: Manage cloudflare access service tokens
+short_description: Manage Cloudflare Access service tokens
 description:
   - Create, update, and delete Cloudflare Access service tokens.
-  - The module identifies service tokens by C(name) within an account.
+  - The module identifies service tokens by O(name) within an account.
+  - Creation may return a sensitive client secret; protect registered results and
+    task output appropriately.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -29,7 +34,7 @@ options:
   duration:
     description:
       - Lifetime for the service token.
-      - When omitted for C(state=present), the module does not manage the token duration.
+      - When omitted for O(state=present), the module does not manage the token duration.
     type: str
   state:
     description:
@@ -44,6 +49,13 @@ notes:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -69,9 +81,27 @@ service_token:
   description: Cloudflare service token object after the requested operation.
   returned: when state is present or when the token existed before an absent operation
   type: dict
-  sample:
-    id: 023e105f4ecef8ad9ca31a8372d0c353
-    name: example.com
+  contains:
+    id:
+      description: Service token identifier.
+      returned: always
+      type: str
+    name:
+      description: Service token name.
+      returned: always
+      type: str
+    client_id:
+      description: Client identifier used to authenticate the service token.
+      returned: when available
+      type: str
+    client_secret:
+      description: Sensitive client secret returned only when created or rotated.
+      returned: when provided by Cloudflare
+      type: str
+    duration:
+      description: Configured service token lifetime.
+      returned: when available
+      type: str
 message:
   description: Summary of the action taken.
   returned: always
@@ -82,7 +112,9 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     find_by_name,
+    resource_id,
     serialize_resource,
 )
 
@@ -102,7 +134,7 @@ def ensure_present(module, client):
 
     current = find_by_name(
         client,
-        "/accounts/{}/access/service_tokens".format(params["account_id"]),
+        cloudflare_path("accounts", params["account_id"], "access", "service_tokens"),
         params["name"],
     )
 
@@ -110,15 +142,19 @@ def ensure_present(module, client):
         if module.check_mode:
             module.exit_json(changed=True, message="Service token would be created")
 
-        service_token = client.zero_trust.access.service_tokens.create(
-            **service_token_payload(module)
+        service_token = serialize_resource(
+            client.zero_trust.access.service_tokens.create(
+                **service_token_payload(module)
+            )
         )
+        resource_id(module, service_token, "service token")
         module.exit_json(
             changed=True,
             message="Service token created",
-            service_token=serialize_resource(service_token),
+            service_token=service_token,
         )
 
+    current_id = resource_id(module, current, "service token")
     duration = params["duration"]
     duration_matches = duration is None
     current_duration = current.get("duration")
@@ -142,13 +178,15 @@ def ensure_present(module, client):
         )
 
     service_token = client.zero_trust.access.service_tokens.update(
-        current["id"],
+        current_id,
         **service_token_payload(module),
     )
+    service_token = serialize_resource(service_token)
+    resource_id(module, service_token, "service token")
     module.exit_json(
         changed=True,
         message="Service token updated",
-        service_token=serialize_resource(service_token),
+        service_token=service_token,
     )
 
 
@@ -157,12 +195,14 @@ def ensure_absent(module, client):
 
     current = find_by_name(
         client,
-        "/accounts/{}/access/service_tokens".format(params["account_id"]),
+        cloudflare_path("accounts", params["account_id"], "access", "service_tokens"),
         params["name"],
     )
 
     if current is None:
         module.exit_json(changed=False, message="Service token already absent")
+
+    current_id = resource_id(module, current, "service token")
 
     if module.check_mode:
         module.exit_json(
@@ -172,7 +212,7 @@ def ensure_absent(module, client):
         )
 
     client.zero_trust.access.service_tokens.delete(
-        current["id"],
+        current_id,
         account_id=params["account_id"],
     )
     module.exit_json(
@@ -188,9 +228,8 @@ def main():
             "account_id": {"required": True, "type": "str"},
             "api_token": {"required": True, "type": "str", "no_log": True},
             "name": {"required": True, "type": "str"},
-            "duration": {"required": False, "type": "str"},
+            "duration": {"type": "str"},
             "state": {
-                "required": False,
                 "type": "str",
                 "choices": ["present", "absent"],
                 "default": "present",

@@ -13,7 +13,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 class RulesetsInfoTests(TestCase):
     def test_lists_entrypoints_for_zones_with_ids(self):
         module = FakeModule({"phase": "http_request_firewall_custom"})
-        zones = [{"id": "zone", "name": "example.com"}, {"name": "missing-id"}]
+        zones = [{"id": "zone", "name": "example.com"}]
         entrypoint = {"id": "ruleset", "phase": module.params["phase"]}
 
         with (
@@ -25,12 +25,12 @@ class RulesetsInfoTests(TestCase):
             ) as get,
             self.assertRaises(ModuleExit) as raised,
         ):
-            rulesets_info.list(module, {})
+            rulesets_info.list_resources(module, {})
 
         get.assert_called_once_with(
             {},
             "/zones/zone/rulesets/phases/http_request_firewall_custom/entrypoint",
-            default={},
+            default=None,
             ok_statuses=[404],
         )
         self.assertEqual(

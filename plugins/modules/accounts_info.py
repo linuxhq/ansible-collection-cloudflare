@@ -1,12 +1,15 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: accounts_info
-short_description: Gather information about cloudflare accounts
+short_description: Gather information about Cloudflare accounts
 description:
   - Gather Cloudflare account information by name.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -23,6 +26,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -39,12 +49,23 @@ account:
   description: Cloudflare account information.
   returned: always
   type: dict
+  contains:
+    id:
+      description: Cloudflare account identifier.
+      returned: when the account exists
+      type: str
+    name:
+      description: Cloudflare account name.
+      returned: when the account exists
+      type: str
 
 """
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    resource_field,
+    resource_id,
     serialize_resource,
 )
 
@@ -53,8 +74,11 @@ def info(module, client):
     account = None
 
     for account_info in client.accounts.list(name=module.params["name"]):
-        if getattr(account_info, "name", None) == module.params["name"]:
-            account = serialize_resource(account_info)
+        account_info = serialize_resource(account_info)
+        account_name = resource_field(module, account_info, "name", "account")
+        resource_id(module, account_info, "account")
+        if account_name == module.params["name"]:
+            account = account_info
             break
 
     module.exit_json(

@@ -13,14 +13,14 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 class CfdTunnelInfoTests(TestCase):
     def test_includes_tokens_when_requested(self):
         module = FakeModule({"account_id": "account", "include_token": True})
-        tunnels = [{"id": "tunnel"}, {"name": "missing-id"}]
+        tunnels = [{"id": "tunnel"}]
 
         with (
             patch.object(cfd_tunnel_info, "list_all", return_value=tunnels),
             patch.object(cfd_tunnel_info, "get_result", return_value="token") as get,
             self.assertRaises(ModuleExit) as raised,
         ):
-            cfd_tunnel_info.list(module, {})
+            cfd_tunnel_info.list_resources(module, {})
 
         get.assert_called_once_with(
             {},
@@ -28,7 +28,7 @@ class CfdTunnelInfoTests(TestCase):
         )
         self.assertEqual(
             raised.exception.values["cfd_tunnels"],
-            [{"id": "tunnel", "token": "token"}, {"name": "missing-id"}],
+            [{"id": "tunnel", "token": "token"}],
         )
 
     def test_omits_tokens_when_not_requested(self):
@@ -39,6 +39,6 @@ class CfdTunnelInfoTests(TestCase):
             patch.object(cfd_tunnel_info, "get_result") as get,
             self.assertRaises(ModuleExit),
         ):
-            cfd_tunnel_info.list(module, {})
+            cfd_tunnel_info.list_resources(module, {})
 
         get.assert_not_called()

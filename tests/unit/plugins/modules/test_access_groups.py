@@ -24,6 +24,14 @@ def params(**updates):
 class AccessGroupsTests(TestCase):
     def test_equivalent_group_is_unchanged(self):
         current = {"id": "group", **params()}
+        current["include"] = [
+            {
+                "email": {
+                    "email": "admin@example.com",
+                    "provider_field": "ignored",
+                }
+            }
+        ]
         module = FakeModule(params())
 
         with (

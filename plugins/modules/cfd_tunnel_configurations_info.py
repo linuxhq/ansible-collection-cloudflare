@@ -1,14 +1,17 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: cfd_tunnel_configurations_info
-short_description: Gather information about cloudflare cfd tunnel configurations
+short_description: Gather information about cloudflared tunnel configurations
 description:
   - Gather configurations for active cloudflared tunnels in an account.
   - Only remotely-managed tunnels are queried; locally-managed tunnel
     configurations are stored on the origin host.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -25,6 +28,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -42,46 +52,71 @@ cfd_tunnel_configurations:
   returned: always
   type: list
   elements: dict
+  contains:
+    id:
+      description: Cloudflared tunnel identifier.
+      returned: always
+      type: str
+    name:
+      description: Cloudflared tunnel name.
+      returned: when available
+      type: str
+    config:
+      description: Remotely managed tunnel configuration.
+      returned: always
+      type: dict
 
 """
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
+    cloudflare_query,
     get_result,
     list_all,
+    require_mapping,
+    resource_id,
 )
 
 
-def list(module, client):
+def list_resources(module, client):
     account_id = module.params["account_id"]
     configurations = []
     tunnels = list_all(
         client,
-        f"/accounts/{account_id}/cfd_tunnel?is_deleted=false",
+        cloudflare_query(
+            cloudflare_path("accounts", account_id, "cfd_tunnel"),
+            {"is_deleted": "false"},
+        ),
         per_page=1000,
     )
 
     for tunnel in tunnels:
-        if tunnel.get("id") is None:
-            continue
+        tunnel_id = resource_id(module, tunnel, "cloudflared tunnel")
 
         if tunnel.get("remote_config") is False:
             continue
 
         configuration = get_result(
             client,
-            "/accounts/{}/cfd_tunnel/{}/configurations".format(
-                account_id, tunnel["id"]
+            cloudflare_path(
+                "accounts",
+                account_id,
+                "cfd_tunnel",
+                tunnel_id,
+                "configurations",
             ),
             default={},
         )
+        require_mapping(module, configuration, "tunnel configuration")
+        require_mapping(module, configuration.get("config"), "tunnel configuration")
 
         configurations.append(
             {
-                "id": tunnel["id"],
+                "id": tunnel_id,
                 "name": tunnel.get("name"),
-                "config": configuration.get("config", {}),
+                "config": configuration["config"],
             }
         )
 
@@ -98,7 +133,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list(module, client)
+        list_resources(module, client)
 
 
 if __name__ == "__main__":

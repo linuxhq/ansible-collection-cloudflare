@@ -19,7 +19,7 @@ class AccessGroupsInfoTests(TestCase):
             patch.object(access_groups_info, "list_all", return_value=groups) as listed,
             self.assertRaises(ModuleExit) as raised,
         ):
-            access_groups_info.list(module, {})
+            access_groups_info.list_resources(module, {})
 
         listed.assert_called_once_with({}, "/accounts/account/access/groups")
         self.assertEqual(raised.exception.values["access_groups"], groups)

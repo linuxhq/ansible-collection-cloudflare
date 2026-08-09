@@ -1,13 +1,16 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: pages_projects
-short_description: Manage cloudflare pages projects
+short_description: Manage Cloudflare Pages projects
 description:
   - Create, update, and delete Cloudflare Pages projects by name.
   - Optionally ensures listed custom domains are attached to the project.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -25,42 +28,47 @@ options:
     required: true
     type: str
     description:
-      - Resource name.
+      - Pages project name.
   production_branch:
     type: str
     description:
-      - Production branch.
+      - Git branch deployed to the production environment.
       - Required when creating a new Pages project.
   build_config:
     type: dict
     description:
-      - Build config.
+      - Pages build command, output directory, and related settings.
   deployment_configs:
     type: dict
     description:
-      - Deployment configs.
+      - Environment variables and compatibility settings by environment.
       - Values of C(secret_text) variables are write-only; changes to them are not
         detected and they are only resent when another change triggers an update.
-      - Use C(rotate_secrets) to force an update that resends secret values.
+      - Use O(rotate_secrets) to force an update that resends secret values.
       - Environment variables removed from C(env_vars) are deleted from the
         project.
   rotate_secrets:
     type: bool
     default: false
     description:
-      - Force an update that resends C(deployment_configs), including C(secret_text)
+      - Force an update that resends O(deployment_configs), including C(secret_text)
         values, even when no other change is detected.
       - Use to rotate secrets; the module always reports C(changed) when enabled.
   source:
     type: dict
     description:
-      - Source.
+      - Git provider and repository configuration.
   domains:
     type: list
     elements: dict
     description:
-      - Domains.
-      - Each entry requires a C(name).
+      - Custom domains that must exist on the project.
+    suboptions:
+      name:
+        description:
+          - Fully qualified custom domain name.
+        required: true
+        type: str
   state:
     type: str
     choices:
@@ -72,6 +80,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -90,11 +105,30 @@ pages_project:
   description: Cloudflare Pages project.
   returned: when available
   type: dict
+  contains:
+    name:
+      description: Pages project name.
+      returned: always
+      type: str
+    production_branch:
+      description: Branch deployed to production.
+      returned: when available
+      type: str
+    domains:
+      description: Domains assigned to the project.
+      returned: when available
+      type: list
+      elements: str
 domains:
   description: Managed custom domains.
   returned: when domains were requested
   type: list
   elements: dict
+  contains:
+    name:
+      description: Managed custom domain name.
+      returned: always
+      type: str
 message:
   returned: always
   type: str
@@ -108,6 +142,7 @@ import copy
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     delete_result,
     get_result,
     list_all,
@@ -115,6 +150,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     patch_result,
     payload_from_params,
     post_result,
+    resource_field,
     select_fields,
     values_differ,
 )
@@ -171,24 +207,45 @@ def payload_with_removed_env_vars(payload, current):
     return merged
 
 
-def current_domain_names(project, domains):
-    names = set(project.get("domains") or [])
+def current_domain_names(module, project, domains):
+    names = set()
+    for name in project.get("domains") or []:
+        if not isinstance(name, str) or not name.strip():
+            module.fail_json(msg="Cloudflare API returned malformed Pages domain data")
+        names.add(name)
+
     for domain in domains:
-        if isinstance(domain, dict) and domain.get("name") is not None:
-            names.add(domain["name"])
+        names.add(resource_field(module, domain, "name", "Pages domain"))
+    return names
+
+
+def desired_domain_names(module):
+    names = []
+    for domain in module.params.get("domains") or []:
+        domain_name = domain.get("name") if isinstance(domain, dict) else None
+        if (
+            not isinstance(domain_name, str)
+            or not domain_name.strip()
+            or domain_name != domain_name.strip()
+        ):
+            module.fail_json(msg="Each Pages project domain requires a valid name")
+        if domain_name not in names:
+            names.append(domain_name)
     return names
 
 
 def domains_endpoint(account_id, project_name):
-    return f"{item_endpoint(account_id, project_name)}/domains"
+    return cloudflare_path(
+        "accounts", account_id, "pages", "projects", project_name, "domains"
+    )
 
 
 def endpoint(account_id):
-    return f"/accounts/{account_id}/pages/projects"
+    return cloudflare_path("accounts", account_id, "pages", "projects")
 
 
 def item_endpoint(account_id, project_name):
-    return f"{endpoint(account_id)}/{project_name}"
+    return cloudflare_path("accounts", account_id, "pages", "projects", project_name)
 
 
 def ensure_present(module, client):
@@ -200,21 +257,19 @@ def ensure_present(module, client):
         ok_statuses=[404],
     )
 
-    domain_names = []
-    for domain in params.get("domains") or []:
-        domain_name = domain.get("name") if isinstance(domain, dict) else None
-        if not domain_name:
-            module.fail_json(msg="Each Pages project domain requires a name")
-        if domain_name not in domain_names:
-            domain_names.append(domain_name)
+    domain_names = desired_domain_names(module)
 
-    if current is None and not params.get("production_branch"):
+    production_branch = params.get("production_branch")
+    if current is None and (
+        not isinstance(production_branch, str) or not production_branch.strip()
+    ):
         module.fail_json(
             msg="production_branch is required when creating a Pages project"
         )
 
     payload = payload_from_params(params, FIELDS)
     changed = False
+    created = False
     domains_changed = False
     managed_domains = []
 
@@ -223,8 +278,11 @@ def ensure_present(module, client):
             module.exit_json(changed=True, message="Pages project would be created")
 
         current = post_result(client, endpoint(params["account_id"]), payload)
+        resource_field(module, current, "name", "Pages project")
         changed = True
+        created = True
     else:
+        resource_field(module, current, "name", "Pages project")
         payload = payload_with_removed_env_vars(payload, current)
 
         if (
@@ -248,6 +306,7 @@ def ensure_present(module, client):
                 item_endpoint(params["account_id"], params["name"]),
                 payload,
             )
+            resource_field(module, current, "name", "Pages project")
             changed = True
 
     if domain_names:
@@ -256,11 +315,12 @@ def ensure_present(module, client):
             domains_endpoint(params["account_id"], params["name"]),
             paginate=False,
         )
-        existing_names = current_domain_names(current, existing_domains)
-        missing_domains = []
-        for domain_name in domain_names:
-            if domain_name not in existing_names:
-                missing_domains.append(domain_name)
+        existing_names = current_domain_names(module, current, existing_domains)
+        missing_domains = [
+            domain_name
+            for domain_name in domain_names
+            if domain_name not in existing_names
+        ]
 
         domains_changed = bool(missing_domains)
 
@@ -272,13 +332,13 @@ def ensure_present(module, client):
             )
 
         for domain_name in missing_domains:
-            managed_domains.append(
-                post_result(
-                    client,
-                    domains_endpoint(params["account_id"], params["name"]),
-                    {"name": domain_name},
-                )
+            domain = post_result(
+                client,
+                domains_endpoint(params["account_id"], params["name"]),
+                {"name": domain_name},
             )
+            resource_field(module, domain, "name", "Pages domain")
+            managed_domains.append(domain)
 
     if not changed and not domains_changed:
         module.exit_json(
@@ -289,7 +349,7 @@ def ensure_present(module, client):
 
     module.exit_json(
         changed=True,
-        message="Pages project updated",
+        message="Pages project created" if created else "Pages project updated",
         pages_project=current,
         domains=managed_domains,
     )
@@ -304,16 +364,12 @@ def ensure_absent(module, client):
         ok_statuses=[404],
     )
 
-    domain_names = []
-    for domain in params.get("domains") or []:
-        domain_name = domain.get("name") if isinstance(domain, dict) else None
-        if not domain_name:
-            module.fail_json(msg="Each Pages project domain requires a name")
-        if domain_name not in domain_names:
-            domain_names.append(domain_name)
+    domain_names = desired_domain_names(module)
 
     if current is None:
         module.exit_json(changed=False, message="Pages project already absent")
+
+    resource_field(module, current, "name", "Pages project")
 
     if module.check_mode:
         module.exit_json(
@@ -322,22 +378,28 @@ def ensure_absent(module, client):
             pages_project=current,
         )
 
-    existing_domains = list_all(
-        client,
-        domains_endpoint(params["account_id"], params["name"]),
-        paginate=False,
-    )
-    existing_names = current_domain_names(current, existing_domains)
+    if domain_names:
+        existing_domains = list_all(
+            client,
+            domains_endpoint(params["account_id"], params["name"]),
+            paginate=False,
+        )
+        existing_names = current_domain_names(module, current, existing_domains)
 
-    for domain_name in domain_names:
-        if domain_name in existing_names:
-            delete_result(
-                client,
-                "{}/{}".format(
-                    domains_endpoint(params["account_id"], params["name"]),
-                    domain_name,
-                ),
-            )
+        for domain_name in domain_names:
+            if domain_name in existing_names:
+                delete_result(
+                    client,
+                    cloudflare_path(
+                        "accounts",
+                        params["account_id"],
+                        "pages",
+                        "projects",
+                        params["name"],
+                        "domains",
+                        domain_name,
+                    ),
+                )
 
     delete_result(client, item_endpoint(params["account_id"], params["name"]))
     module.exit_json(
@@ -358,7 +420,11 @@ def main():
             "deployment_configs": {"type": "dict"},
             "rotate_secrets": {"type": "bool", "default": False},
             "source": {"type": "dict"},
-            "domains": {"type": "list", "elements": "dict"},
+            "domains": {
+                "type": "list",
+                "elements": "dict",
+                "options": {"name": {"required": True, "type": "str"}},
+            },
             "state": {
                 "type": "str",
                 "choices": ["present", "absent"],

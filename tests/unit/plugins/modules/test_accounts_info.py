@@ -8,6 +8,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.modules import accounts_info
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
 )
 
 
@@ -25,14 +26,20 @@ class AccountsInfoTests(TestCase):
             patch.object(
                 accounts_info,
                 "serialize_resource",
-                return_value={"name": "wanted"},
+                side_effect=(
+                    {"id": "other", "name": "other"},
+                    {"id": "account", "name": "wanted"},
+                ),
             ),
             self.assertRaises(ModuleExit) as raised,
         ):
             accounts_info.info(module, client)
 
         client.accounts.list.assert_called_once_with(name="wanted")
-        self.assertEqual(raised.exception.values["account"], {"name": "wanted"})
+        self.assertEqual(
+            raised.exception.values["account"],
+            {"id": "account", "name": "wanted"},
+        )
         self.assertFalse(raised.exception.values["changed"])
 
     def test_missing_account_returns_none(self):
@@ -44,3 +51,16 @@ class AccountsInfoTests(TestCase):
             accounts_info.info(module, client)
 
         self.assertIsNone(raised.exception.values["account"])
+
+    def test_rejects_malformed_accounts(self):
+        module = FakeModule({"name": "wanted"})
+        client = Mock()
+        client.accounts.list.return_value = [SimpleNamespace(name=None)]
+
+        with self.assertRaises(ModuleFail) as raised:
+            accounts_info.info(module, client)
+
+        self.assertEqual(
+            raised.exception.values["msg"],
+            "Cloudflare API returned malformed account data",
+        )

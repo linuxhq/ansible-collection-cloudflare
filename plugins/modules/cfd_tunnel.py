@@ -1,15 +1,18 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: cfd_tunnel
-short_description: Manage cloudflare cfd tunnels
+short_description: Manage Cloudflare cloudflared tunnels
 description:
   - Create and delete Cloudflare cloudflared tunnels by name.
-  - Tunnel secrets are sent when creating a tunnel, or when C(rotate_secrets) is
+  - Tunnel secrets are sent when creating a tunnel, or when O(rotate_secrets) is
     enabled, because Cloudflare does not return the current secret for idempotent
     comparison.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -27,27 +30,27 @@ options:
     required: true
     type: str
     description:
-      - Resource name.
+      - Cloudflared tunnel name.
   config_src:
     type: str
     choices:
       - local
       - cloudflare
     description:
-      - Config src.
+      - Location from which the tunnel receives its configuration.
       - Required when creating a cloudflared tunnel.
   tunnel_secret:
     type: str
     description:
       - Tunnel secret for locally-managed tunnels.
       - Applied when creating a tunnel. Cloudflare does not return the current
-        secret, so changes are not detected; use C(rotate_secrets) to apply the
+        secret, so changes are not detected; use O(rotate_secrets) to apply the
         secret to an existing tunnel.
   rotate_secrets:
     type: bool
     default: false
     description:
-      - Apply C(tunnel_secret) to an existing tunnel, rotating its secret.
+      - Apply O(tunnel_secret) to an existing tunnel, rotating its secret.
       - The module always reports C(changed) when enabled and a secret is given.
   state:
     type: str
@@ -60,6 +63,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -78,6 +88,19 @@ cfd_tunnel:
   description: Cloudflare tunnel.
   returned: when available
   type: dict
+  contains:
+    id:
+      description: Cloudflared tunnel identifier.
+      returned: always
+      type: str
+    name:
+      description: Cloudflared tunnel name.
+      returned: always
+      type: str
+    config_src:
+      description: Tunnel configuration source.
+      returned: when available
+      type: str
 message:
   returned: always
   type: str
@@ -89,18 +112,20 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     delete_result,
     find_by_name,
     patch_result,
     payload_from_params,
     post_result,
+    resource_id,
 )
 
 FIELDS = ("config_src", "name", "tunnel_secret")
 
 
 def endpoint(account_id):
-    return f"/accounts/{account_id}/cfd_tunnel"
+    return cloudflare_path("accounts", account_id, "cfd_tunnel")
 
 
 def ensure_present(module, client):
@@ -114,6 +139,7 @@ def ensure_present(module, client):
     )
 
     if current is not None:
+        current_id = resource_id(module, current, "cloudflared tunnel")
         if params["rotate_secrets"] and params.get("tunnel_secret") is not None:
             if module.check_mode:
                 module.exit_json(
@@ -124,9 +150,12 @@ def ensure_present(module, client):
 
             cfd_tunnel = patch_result(
                 client,
-                "{}/{}".format(endpoint(params["account_id"]), current["id"]),
+                cloudflare_path(
+                    "accounts", params["account_id"], "cfd_tunnel", current_id
+                ),
                 {"tunnel_secret": params["tunnel_secret"]},
             )
+            resource_id(module, cfd_tunnel, "cloudflared tunnel")
             module.exit_json(
                 changed=True,
                 message="Cloudflared tunnel updated",
@@ -152,6 +181,7 @@ def ensure_present(module, client):
         endpoint(params["account_id"]),
         payload_from_params(params, FIELDS),
     )
+    resource_id(module, cfd_tunnel, "cloudflared tunnel")
     module.exit_json(
         changed=True,
         message="Cloudflared tunnel created",
@@ -172,6 +202,8 @@ def ensure_absent(module, client):
     if current is None:
         module.exit_json(changed=False, message="Cloudflared tunnel already absent")
 
+    current_id = resource_id(module, current, "cloudflared tunnel")
+
     if module.check_mode:
         module.exit_json(
             changed=True,
@@ -179,7 +211,10 @@ def ensure_absent(module, client):
             cfd_tunnel=current,
         )
 
-    delete_result(client, "{}/{}".format(endpoint(params["account_id"]), current["id"]))
+    delete_result(
+        client,
+        cloudflare_path("accounts", params["account_id"], "cfd_tunnel", current_id),
+    )
     module.exit_json(
         changed=True,
         message="Cloudflared tunnel deleted",

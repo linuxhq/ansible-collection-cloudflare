@@ -23,7 +23,7 @@ class PagesProjectsInfoTests(TestCase):
             ) as listed,
             self.assertRaises(ModuleExit) as raised,
         ):
-            pages_projects_info.list(module, {})
+            pages_projects_info.list_resources(module, {})
 
         listed.assert_called_once_with(
             {},

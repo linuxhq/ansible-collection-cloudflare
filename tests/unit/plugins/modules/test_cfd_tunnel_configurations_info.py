@@ -18,7 +18,6 @@ class CfdTunnelConfigurationsInfoTests(TestCase):
         tunnels = [
             {"id": "remote", "name": "one", "remote_config": True},
             {"id": "local", "name": "two", "remote_config": False},
-            {"name": "missing-id", "remote_config": True},
         ]
 
         with (
@@ -34,7 +33,7 @@ class CfdTunnelConfigurationsInfoTests(TestCase):
             ) as get,
             self.assertRaises(ModuleExit) as raised,
         ):
-            cfd_tunnel_configurations_info.list(module, {})
+            cfd_tunnel_configurations_info.list_resources(module, {})
 
         listed.assert_called_once_with(
             {},

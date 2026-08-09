@@ -24,12 +24,11 @@ class DnssecInfoTests(TestCase):
         client = Mock()
         client.zones.list.return_value = [
             Model({"id": "zone", "name": "example.com"}),
-            Model({"name": "missing-id"}),
         ]
         client.dns.dnssec.get.return_value = Model({"status": "active"})
 
         with self.assertRaises(ModuleExit) as raised:
-            dnssec_info.list(module, client)
+            dnssec_info.list_resources(module, client)
 
         client.dns.dnssec.get.assert_called_once_with(zone_id="zone")
         self.assertEqual(

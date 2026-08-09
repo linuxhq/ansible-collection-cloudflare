@@ -36,7 +36,7 @@ class ZonesTests(TestCase):
         module = FakeModule(params(account_id=None))
 
         with (
-            patch.object(zones, "get_result", return_value=[]),
+            patch.object(zones, "find_by_name", return_value=None),
             patch.object(zones, "post_result") as post,
             self.assertRaises(ModuleFail) as raised,
         ):
@@ -48,12 +48,27 @@ class ZonesTests(TestCase):
             "account_id is required when creating a zone",
         )
 
+    def test_rejects_invalid_setting_before_lookup(self):
+        module = FakeModule(params(settings=[{"id": " ", "value": "on"}]))
+
+        with (
+            patch.object(zones, "find_by_name") as find,
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            zones.ensure_present(module, {})
+
+        find.assert_not_called()
+        self.assertEqual(
+            raised.exception.values["msg"],
+            "Each zone setting requires a valid id and value",
+        )
+
     def test_creates_zone_with_default_type(self):
         module = FakeModule(params())
         created = {"id": "zone", "name": "example.com", "type": "full"}
 
         with (
-            patch.object(zones, "get_result", return_value=[]),
+            patch.object(zones, "find_by_name", return_value=None),
             patch.object(zones, "post_result", return_value=created) as post,
             self.assertRaises(ModuleExit) as raised,
         ):
@@ -70,6 +85,34 @@ class ZonesTests(TestCase):
         )
         self.assertTrue(raised.exception.values["changed"])
 
+    def test_updates_zone_fields_in_one_request(self):
+        module = FakeModule(
+            params(type="partial", vanity_name_servers=["ns1.example.com"])
+        )
+        current = {"id": "zone", "name": "example.com", "type": "full"}
+        updated = {
+            **current,
+            "type": "partial",
+            "vanity_name_servers": ["ns1.example.com"],
+        }
+
+        with (
+            patch.object(zones, "find_by_name", return_value=current),
+            patch.object(zones, "patch_result", return_value=updated) as patch_result,
+            self.assertRaises(ModuleExit) as raised,
+        ):
+            zones.ensure_present(module, {})
+
+        patch_result.assert_called_once_with(
+            {},
+            "/zones/zone",
+            {
+                "type": "partial",
+                "vanity_name_servers": ["ns1.example.com"],
+            },
+        )
+        self.assertEqual(raised.exception.values["zone"], updated)
+
     def test_equivalent_setting_is_unchanged(self):
         module = FakeModule(params(settings=[{"id": "min_tls_version", "value": 1.2}]))
         current = {"id": "zone", "name": "example.com"}
@@ -78,8 +121,9 @@ class ZonesTests(TestCase):
             patch.object(
                 zones,
                 "get_result",
-                side_effect=[[current], {"value": "1.2"}],
+                return_value={"value": "1.2"},
             ),
+            patch.object(zones, "find_by_name", return_value=current),
             patch.object(zones, "patch_result") as patch_result,
             self.assertRaises(ModuleExit) as raised,
         ):
@@ -93,7 +137,7 @@ class ZonesTests(TestCase):
         module = FakeModule(params(), check_mode=True)
 
         with (
-            patch.object(zones, "get_result", return_value=[current]),
+            patch.object(zones, "find_by_name", return_value=current),
             patch.object(zones, "delete_result") as delete,
             self.assertRaises(ModuleExit) as raised,
         ):

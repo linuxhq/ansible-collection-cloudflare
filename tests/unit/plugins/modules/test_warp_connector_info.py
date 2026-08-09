@@ -24,7 +24,7 @@ class WarpConnectorInfoTests(TestCase):
             ) as get,
             self.assertRaises(ModuleExit) as raised,
         ):
-            warp_connector_info.list(module, {})
+            warp_connector_info.list_resources(module, {})
 
         get.assert_called_once_with(
             {},
@@ -43,6 +43,6 @@ class WarpConnectorInfoTests(TestCase):
             patch.object(warp_connector_info, "get_result") as get,
             self.assertRaises(ModuleExit),
         ):
-            warp_connector_info.list(module, {})
+            warp_connector_info.list_resources(module, {})
 
         get.assert_not_called()

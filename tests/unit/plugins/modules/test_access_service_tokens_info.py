@@ -25,7 +25,7 @@ class AccessServiceTokensInfoTests(TestCase):
             ) as listed,
             self.assertRaises(ModuleExit) as raised,
         ):
-            access_service_tokens_info.list(module, {})
+            access_service_tokens_info.list_resources(module, {})
 
         listed.assert_called_once_with(
             {},

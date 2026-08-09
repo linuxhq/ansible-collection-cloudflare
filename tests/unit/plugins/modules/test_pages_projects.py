@@ -24,6 +24,12 @@ def params(**updates):
 
 
 class PagesProjectsTests(TestCase):
+    def test_encodes_project_path_segments(self):
+        self.assertEqual(
+            pages_projects.item_endpoint("account/id", "docs/site"),
+            "/accounts/account%2Fid/pages/projects/docs%2Fsite",
+        )
+
     def test_secret_values_are_ignored_without_mutating_payload(self):
         payload = {
             "deployment_configs": {

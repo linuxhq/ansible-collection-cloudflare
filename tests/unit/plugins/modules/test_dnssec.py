@@ -1,6 +1,5 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import Mock
 
@@ -23,11 +22,19 @@ def params(**updates):
     return values
 
 
+class Model:
+    def __init__(self, value):
+        self.value = value
+
+    def to_dict(self):
+        return self.value
+
+
 class DnssecTests(TestCase):
     def test_pending_status_is_equivalent_to_active(self):
         module = FakeModule(params())
         client = Mock()
-        client.dns.dnssec.get.return_value = SimpleNamespace(status="pending")
+        client.dns.dnssec.get.return_value = Model({"status": "pending"})
 
         with self.assertRaises(ModuleExit) as raised:
             dnssec.ensure_present(module, client)
@@ -38,13 +45,15 @@ class DnssecTests(TestCase):
     def test_updates_only_explicit_fields(self):
         module = FakeModule(params(dnssec_presigned=True))
         client = Mock()
-        client.dns.dnssec.get.return_value = SimpleNamespace(
-            status="disabled",
-            dnssec_multi_signer=False,
-            dnssec_presigned=False,
-            dnssec_use_nsec3=False,
+        client.dns.dnssec.get.return_value = Model(
+            {
+                "status": "disabled",
+                "dnssec_multi_signer": False,
+                "dnssec_presigned": False,
+                "dnssec_use_nsec3": False,
+            }
         )
-        client.dns.dnssec.edit.return_value = SimpleNamespace(status="active")
+        client.dns.dnssec.edit.return_value = Model({"status": "active"})
 
         with self.assertRaises(ModuleExit) as raised:
             dnssec.ensure_present(module, client)

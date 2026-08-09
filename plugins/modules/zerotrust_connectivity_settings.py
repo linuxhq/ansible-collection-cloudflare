@@ -1,12 +1,15 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: zerotrust_connectivity_settings
-short_description: Manage cloudflare zerotrust connectivity settings
+short_description: Manage Cloudflare Zero Trust connectivity settings
 description:
   - Manage Cloudflare Zero Trust connectivity settings for an account.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -24,15 +27,22 @@ options:
     type: bool
     default: false
     description:
-      - Icmp proxy enabled.
+      - Whether Cloudflare proxies ICMP traffic for the account.
   offramp_warp_enabled:
     type: bool
     default: false
     description:
-      - Offramp warp enabled.
+      - Whether WARP traffic may use configured off-ramps.
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -50,6 +60,15 @@ connectivity_settings:
   description: Cloudflare Zero Trust connectivity settings.
   returned: always
   type: dict
+  contains:
+    icmp_proxy_enabled:
+      description: Whether Cloudflare proxies ICMP traffic.
+      returned: when available
+      type: bool
+    offramp_warp_enabled:
+      description: Whether WARP traffic may use configured off-ramps.
+      returned: when available
+      type: bool
 message:
   returned: always
   type: str
@@ -61,9 +80,11 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     get_result,
     patch_result,
     payload_from_params,
+    require_mapping,
     select_fields,
     values_differ,
 )
@@ -72,7 +93,7 @@ FIELDS = ("icmp_proxy_enabled", "offramp_warp_enabled")
 
 
 def endpoint(account_id):
-    return f"/accounts/{account_id}/zerotrust/connectivity_settings"
+    return cloudflare_path("accounts", account_id, "zerotrust", "connectivity_settings")
 
 
 def ensure_present(module, client):
@@ -81,6 +102,7 @@ def ensure_present(module, client):
     payload = payload_from_params(params, FIELDS)
 
     current = get_result(client, endpoint(params["account_id"]), default={})
+    require_mapping(module, current, "connectivity settings")
 
     if not values_differ(select_fields(current, payload.keys()), payload):
         module.exit_json(
@@ -97,6 +119,7 @@ def ensure_present(module, client):
         )
 
     settings = patch_result(client, endpoint(params["account_id"]), payload)
+    require_mapping(module, settings, "connectivity settings")
     module.exit_json(
         changed=True,
         message="Connectivity settings updated",

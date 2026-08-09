@@ -1,12 +1,15 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: access_groups_info
-short_description: Gather information about cloudflare access groups
+short_description: Gather information about Cloudflare Access groups
 description:
   - Gather Cloudflare Access groups for an account.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -23,6 +26,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -40,21 +50,33 @@ access_groups:
   returned: always
   type: list
   elements: dict
+  contains:
+    id:
+      description: Access group identifier.
+      returned: always
+      type: str
+    name:
+      description: Access group name.
+      returned: always
+      type: str
 
 """
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     list_all,
+    validate_resource_fields,
 )
 
 
-def list(module, client):
+def list_resources(module, client):
     access_groups = list_all(
         client,
-        "/accounts/{}/access/groups".format(module.params["account_id"]),
+        cloudflare_path("accounts", module.params["account_id"], "access", "groups"),
     )
+    validate_resource_fields(module, access_groups, "id", "Access group")
 
     module.exit_json(changed=False, access_groups=access_groups)
 
@@ -69,7 +91,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list(module, client)
+        list_resources(module, client)
 
 
 if __name__ == "__main__":

@@ -23,7 +23,7 @@ class AccessPoliciesInfoTests(TestCase):
             ) as listed,
             self.assertRaises(ModuleExit) as raised,
         ):
-            access_policies_info.list(module, {})
+            access_policies_info.list_resources(module, {})
 
         listed.assert_called_once_with({}, "/accounts/account/access/policies")
         self.assertEqual(raised.exception.values["access_policies"], policies)

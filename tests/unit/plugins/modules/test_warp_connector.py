@@ -11,15 +11,20 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 )
 
 
-class ApiConnectionError(Exception):
+class ApiError(Exception):
     pass
 
 
-class ApiStatusError(Exception):
+class ApiConnectionError(ApiError):
+    pass
+
+
+class ApiStatusError(ApiError):
     pass
 
 
 ERRORS = SimpleNamespace(
+    APIError=ApiError,
     APIConnectionError=ApiConnectionError,
     APIStatusError=ApiStatusError,
 )

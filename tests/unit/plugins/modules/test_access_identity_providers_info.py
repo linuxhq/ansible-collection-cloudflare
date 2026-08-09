@@ -17,6 +17,7 @@ class AccessIdentityProvidersInfoTests(TestCase):
         module = FakeModule({"account_id": "account"})
         providers = [
             {
+                "id": "provider",
                 "config": {"client_id": "id", "client_secret": "secret"},
                 "scim_config": {"secret": "secret"},
             }
@@ -30,7 +31,7 @@ class AccessIdentityProvidersInfoTests(TestCase):
             ) as listed,
             self.assertRaises(ModuleExit) as raised,
         ):
-            access_identity_providers_info.list(module, {})
+            access_identity_providers_info.list_resources(module, {})
 
         listed.assert_called_once_with(
             {},
@@ -38,5 +39,5 @@ class AccessIdentityProvidersInfoTests(TestCase):
         )
         self.assertEqual(
             raised.exception.values["access_identity_providers"],
-            [{"config": {"client_id": "id"}, "scim_config": {}}],
+            [{"id": "provider", "config": {"client_id": "id"}, "scim_config": {}}],
         )

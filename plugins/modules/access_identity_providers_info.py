@@ -1,14 +1,17 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: access_identity_providers_info
-short_description: Gather information about cloudflare access identity providers
+short_description: Gather information about Cloudflare Access identity providers
 description:
   - Gather Cloudflare Access identity providers for an account.
   - Secret fields such as C(config.client_secret) and C(scim_config.secret) are
     redacted from the results.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -25,6 +28,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -42,25 +52,44 @@ access_identity_providers:
   returned: always
   type: list
   elements: dict
+  contains:
+    id:
+      description: Identity provider identifier.
+      returned: always
+      type: str
+    name:
+      description: Identity provider name.
+      returned: always
+      type: str
+    type:
+      description: Identity provider type.
+      returned: always
+      type: str
 
 """
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     list_all,
+    validate_resource_fields,
 )
 
 
-def list(module, client):
+def list_resources(module, client):
     providers = list_all(
         client,
-        "/accounts/{}/access/identity_providers".format(module.params["account_id"]),
+        cloudflare_path(
+            "accounts",
+            module.params["account_id"],
+            "access",
+            "identity_providers",
+        ),
     )
+    validate_resource_fields(module, providers, "id", "Access identity provider")
 
     for provider in providers:
-        if not isinstance(provider, dict):
-            continue
         for section, field in (("config", "client_secret"), ("scim_config", "secret")):
             if isinstance(provider.get(section), dict):
                 provider[section].pop(field, None)
@@ -78,7 +107,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list(module, client)
+        list_resources(module, client)
 
 
 if __name__ == "__main__":

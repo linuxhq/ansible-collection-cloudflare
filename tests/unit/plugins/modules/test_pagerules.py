@@ -30,7 +30,7 @@ class PageRulesTests(TestCase):
         created = {"id": "rule", "targets": TARGETS}
 
         with (
-            patch.object(pagerules, "get_result", return_value=[]),
+            patch.object(pagerules, "list_all", return_value=[]),
             patch.object(pagerules, "post_result", return_value=created) as post,
             self.assertRaises(ModuleExit) as raised,
         ):
@@ -58,7 +58,7 @@ class PageRulesTests(TestCase):
         module = FakeModule(params())
 
         with (
-            patch.object(pagerules, "get_result", return_value=[current]),
+            patch.object(pagerules, "list_all", return_value=[current]),
             patch.object(pagerules, "put_result") as put,
             self.assertRaises(ModuleExit) as raised,
         ):
@@ -72,7 +72,7 @@ class PageRulesTests(TestCase):
         module = FakeModule(params(), check_mode=True)
 
         with (
-            patch.object(pagerules, "get_result", return_value=[current]),
+            patch.object(pagerules, "list_all", return_value=[current]),
             patch.object(pagerules, "delete_result") as delete,
             self.assertRaises(ModuleExit) as raised,
         ):

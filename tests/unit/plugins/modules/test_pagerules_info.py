@@ -13,27 +13,29 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 class PageRulesInfoTests(TestCase):
     def test_lists_rules_for_zones_with_ids(self):
         module = FakeModule({})
-        zones = [{"id": "zone", "name": "example.com"}, {"name": "missing-id"}]
+        zones = [{"id": "zone", "name": "example.com"}]
+        rules = [{"id": "rule"}]
 
         with (
-            patch.object(pagerules_info, "list_all", return_value=zones),
             patch.object(
                 pagerules_info,
-                "get_result",
-                return_value=[{"id": "rule"}],
-            ) as get,
+                "list_all",
+                side_effect=[zones, rules],
+            ) as listed,
             self.assertRaises(ModuleExit) as raised,
         ):
-            pagerules_info.list(module, {})
+            pagerules_info.list_resources(module, {})
 
-        get.assert_called_once_with({}, "/zones/zone/pagerules", default=[])
+        self.assertEqual(listed.call_count, 2)
+        listed.assert_any_call({}, "/zones")
+        listed.assert_any_call({}, "/zones/zone/pagerules")
         self.assertEqual(
             raised.exception.values["pagerules"],
             [
                 {
                     "id": "zone",
                     "name": "example.com",
-                    "pagerules": [{"id": "rule"}],
+                    "pagerules": rules,
                 }
             ],
         )

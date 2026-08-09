@@ -1,0 +1,24 @@
+---
+bugfixes:
+  - all modules - encode dynamic API path segments and query values before
+    sending raw SDK requests
+    (https://github.com/linuxhq/ansible-collection-cloudflare/pull/47).
+  - access groups and policies - ignore provider-only nested response fields
+    during idempotence comparisons
+    (https://github.com/linuxhq/ansible-collection-cloudflare/pull/47).
+  - pagerules - follow API pagination when locating existing rules
+    (https://github.com/linuxhq/ansible-collection-cloudflare/pull/47).
+  - rules_lists - consume the SDK item iterator, validate bulk operations, and
+    enforce the operation deadline
+    (https://github.com/linuxhq/ansible-collection-cloudflare/pull/47).
+  - zones - update zone properties in one request and validate settings before
+    creating or changing a zone
+    (https://github.com/linuxhq/ansible-collection-cloudflare/pull/47).
+minor_changes:
+  - all modules - validate required Cloudflare response fields before reporting
+    successful operations
+    (https://github.com/linuxhq/ansible-collection-cloudflare/pull/47).
+  - all modules - expand Ansible documentation for nested return values,
+    check-mode support, requirements, and stable response fields
+    (https://github.com/linuxhq/ansible-collection-cloudflare/pull/47).
+...

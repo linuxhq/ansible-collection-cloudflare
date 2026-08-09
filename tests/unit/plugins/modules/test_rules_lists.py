@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import rules_lists
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
@@ -26,6 +26,14 @@ ERRORS = SimpleNamespace(
     APIConnectionError=ApiConnectionError,
     APIStatusError=ApiStatusError,
 )
+
+
+class Model:
+    def __init__(self, value):
+        self.value = value
+
+    def to_dict(self):
+        return self.value
 
 
 def params(**updates):
@@ -125,6 +133,31 @@ class RulesListsTests(TestCase):
         )
         self.assertEqual(result, completed)
 
+    def test_wait_rejects_unknown_operation_status(self):
+        module = FakeModule({})
+
+        with (
+            patch.object(rules_lists.time, "monotonic", return_value=1),
+            patch.object(
+                rules_lists,
+                "get_result",
+                return_value={"id": "operation", "status": "unknown"},
+            ),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            rules_lists.wait_for_operation(
+                module,
+                {},
+                "account",
+                {"operation_id": "operation"},
+                30,
+            )
+
+        self.assertEqual(
+            raised.exception.values["msg"],
+            "Cloudflare API returned an unknown Rules list operation status",
+        )
+
     def test_check_mode_does_not_create(self):
         module = FakeModule(params(), check_mode=True)
 
@@ -154,4 +187,28 @@ class RulesListsTests(TestCase):
             rules_lists.ensure_present(module, {})
 
         put.assert_not_called()
+        self.assertFalse(raised.exception.values["changed"])
+
+    def test_generated_sdk_iterator_reads_all_current_items(self):
+        module = FakeModule(params(elements=[{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}]))
+        current = {"id": "list", "name": "addresses", "num_items": 2}
+        client = Mock()
+        client.rules.lists.items.list.return_value = [
+            Model({"ip": "192.0.2.1"}),
+            Model({"ip": "192.0.2.2"}),
+        ]
+
+        with (
+            patch.object(rules_lists, "find_by_field", return_value=current),
+            patch.object(rules_lists, "submit_items") as submit,
+            self.assertRaises(ModuleExit) as raised,
+        ):
+            rules_lists.ensure_present(module, client)
+
+        client.rules.lists.items.list.assert_called_once_with(
+            "list",
+            account_id="account",
+            per_page=rules_lists.ITEMS_PER_PAGE,
+        )
+        submit.assert_not_called()
         self.assertFalse(raised.exception.values["changed"])

@@ -1,14 +1,17 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: rules_lists
-short_description: Manage cloudflare rules lists
+short_description: Manage Cloudflare Rules Lists
 description:
   - Create, update, populate, and delete Cloudflare Rules lists by name.
   - Item updates wait for the resulting bulk operation to complete and fail when
     Cloudflare reports the operation failed.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -26,7 +29,7 @@ options:
     required: true
     type: str
     description:
-      - Resource name.
+      - Rules list name.
   kind:
     type: str
     choices:
@@ -35,17 +38,18 @@ options:
       - hostname
       - asn
     description:
-      - Resource kind.
+      - Data type stored by the Rules list.
       - Required when creating a Rules list.
+      - Existing list kinds cannot be changed.
   description:
     type: str
     description:
-      - Description.
+      - Human-readable purpose of the Rules list.
   elements:
     type: list
     elements: dict
     description:
-      - Elements.
+      - Complete set of entries that the Rules list must contain.
   operation_timeout:
     type: int
     default: 240
@@ -68,6 +72,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -88,10 +99,40 @@ rules_list:
   description: Cloudflare Rules list.
   returned: when available
   type: dict
+  contains:
+    id:
+      description: Rules list identifier.
+      returned: always
+      type: str
+    name:
+      description: Rules list name.
+      returned: always
+      type: str
+    kind:
+      description: Data type stored by the Rules list.
+      returned: always
+      type: str
+    num_items:
+      description: Number of entries in the Rules list.
+      returned: when available
+      type: float
 items_operation:
   description: Bulk operation returned when list items were updated.
   returned: when list items changed
   type: dict
+  contains:
+    id:
+      description: Bulk operation identifier.
+      returned: when provided by Cloudflare
+      type: str
+    operation_id:
+      description: Bulk operation identifier.
+      returned: when provided by Cloudflare
+      type: str
+    status:
+      description: Final bulk operation status.
+      returned: always
+      type: str
 message:
   returned: always
   type: str
@@ -102,19 +143,20 @@ message:
 
 import json
 import time
-from urllib.parse import urlencode
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare,
     cloudflare_client,
+    cloudflare_path,
     delete_result,
     fail_from_cloudflare_error,
     find_by_field,
     get_result,
-    parse_list_response,
     post_result,
     put_result,
+    require_mapping,
+    resource_id,
     serialize_resource,
     values_differ,
 )
@@ -142,19 +184,26 @@ def canonical_item(item):
 
 
 def endpoint(account_id):
-    return f"/accounts/{account_id}/rules/lists"
+    return cloudflare_path("accounts", account_id, "rules", "lists")
 
 
 def item_endpoint(account_id, list_id):
-    return f"{endpoint(account_id)}/{list_id}"
+    return cloudflare_path("accounts", account_id, "rules", "lists", list_id)
 
 
 def items_endpoint(account_id, list_id):
-    return f"{item_endpoint(account_id, list_id)}/items"
+    return cloudflare_path("accounts", account_id, "rules", "lists", list_id, "items")
 
 
 def operation_endpoint(account_id, operation_id):
-    return f"/accounts/{account_id}/rules/lists/bulk_operations/{operation_id}"
+    return cloudflare_path(
+        "accounts",
+        account_id,
+        "rules",
+        "lists",
+        "bulk_operations",
+        operation_id,
+    )
 
 
 def pending_operation_error(exc):
@@ -194,7 +243,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
     operation_id = None
     if isinstance(operation, dict):
         operation_id = operation.get("operation_id") or operation.get("id")
-    if operation_id is None:
+    if not isinstance(operation_id, str) or not operation_id.strip():
         module.fail_json(
             msg="Rules list items submission did not return an operation id",
             operation=operation,
@@ -228,13 +277,36 @@ def wait_for_operation(module, client, account_id, operation, deadline):
                     operation=status,
                 )
             status = {}
+            time.sleep(min(OPERATION_POLL_SECONDS, max(deadline - time.monotonic(), 0)))
+            continue
 
-        if status.get("status") == "completed":
+        if not isinstance(status, dict) or not isinstance(status.get("status"), str):
+            module.fail_json(
+                msg="Cloudflare API returned malformed Rules list operation data",
+                operation_id=operation_id,
+            )
+
+        status_id = resource_id(module, status, "Rules list operation")
+        if status_id != operation_id:
+            module.fail_json(
+                msg="Cloudflare API returned the wrong Rules list operation",
+                operation_id=operation_id,
+            )
+
+        operation_status = status["status"]
+        if operation_status == "completed":
             return status
 
-        if status.get("status") == "failed":
+        if operation_status == "failed":
             module.fail_json(
                 msg="Rules list items operation failed",
+                operation_id=operation_id,
+                operation=status,
+            )
+
+        if operation_status not in ("pending", "running"):
+            module.fail_json(
+                msg="Cloudflare API returned an unknown Rules list operation status",
                 operation_id=operation_id,
                 operation=status,
             )
@@ -253,34 +325,28 @@ def normalize_items(items):
             if key == "comment" and value == "":
                 continue
 
-            if key == "hostname" and isinstance(value, dict):
-                hostname = {}
-                for hostname_key, hostname_value in value.items():
-                    if hostname_value is not None:
-                        hostname[hostname_key] = hostname_value
+            normalized_value = value
+            if key == "hostname" and isinstance(normalized_value, dict):
+                hostname = {
+                    hostname_key: hostname_value
+                    for hostname_key, hostname_value in normalized_value.items()
+                    if hostname_value is not None
+                }
 
                 if hostname.get("exclude_exact_hostname") is True:
                     hostname.pop("exclude_exact_hostname")
 
-                value = hostname
+                normalized_value = hostname
 
-            if key == "redirect" and isinstance(value, dict):
-                redirect = {}
-                for redirect_key, redirect_value in value.items():
-                    if redirect_value is None:
-                        continue
+            if key == "redirect" and isinstance(normalized_value, dict):
+                normalized_value = {
+                    redirect_key: redirect_value
+                    for redirect_key, redirect_value in normalized_value.items()
+                    if redirect_value is not None
+                    and redirect_value != REDIRECT_DEFAULTS.get(redirect_key)
+                }
 
-                    if (
-                        redirect_key in REDIRECT_DEFAULTS
-                        and redirect_value == REDIRECT_DEFAULTS[redirect_key]
-                    ):
-                        continue
-
-                    redirect[redirect_key] = redirect_value
-
-                value = redirect
-
-            normalized[key] = value
+            normalized[key] = normalized_value
 
         normalized_items[canonical_item(normalized)] = normalized
 
@@ -302,6 +368,7 @@ def ensure_present(module, client):
         module.fail_json(msg="kind is required when creating a Rules list")
 
     changed = False
+    created = False
     items_changed = False
     items_operation = None
 
@@ -322,8 +389,11 @@ def ensure_present(module, client):
                 "name": params["name"],
             },
         )
+        resource_id(module, current, "Rules list")
         changed = True
+        created = True
     else:
+        current_id = resource_id(module, current, "Rules list")
         desired_description = params.get("description")
         if (
             desired_description is not None
@@ -338,39 +408,39 @@ def ensure_present(module, client):
 
             current = put_result(
                 client,
-                item_endpoint(params["account_id"], current["id"]),
+                item_endpoint(params["account_id"], current_id),
                 {"description": desired_description},
             )
+            resource_id(module, current, "Rules list")
             changed = True
+
+    current_id = resource_id(module, current, "Rules list")
 
     if params.get("elements") is not None:
         desired_items = normalize_items(params["elements"])
         current_count = current.get("num_items")
 
+        if current_count is not None and (
+            isinstance(current_count, bool)
+            or not isinstance(current_count, (int, float))
+            or current_count < 0
+            or int(current_count) != current_count
+        ):
+            module.fail_json(msg="Cloudflare API returned malformed Rules list data")
+
         if current_count is not None and current_count != len(desired_items):
             items_changed = True
         else:
-            current_items = []
-            cursor = None
-
-            while True:
-                query = {"cursor": cursor, "per_page": ITEMS_PER_PAGE}
-                query = {
-                    key: value for key, value in query.items() if value is not None
-                }
-                path = items_endpoint(params["account_id"], current["id"])
-                if query:
-                    path = f"{path}?{urlencode(query)}"
-
-                result, result_info = parse_list_response(
-                    serialize_resource(client.get(path, cast_to=object))
+            current_items = [
+                serialize_resource(item)
+                for item in client.rules.lists.items.list(
+                    current_id,
+                    account_id=params["account_id"],
+                    per_page=ITEMS_PER_PAGE,
                 )
-
-                current_items.extend(result)
-
-                cursor = (result_info.get("cursors") or {}).get("after")
-                if not cursor:
-                    break
+            ]
+            for item in current_items:
+                require_mapping(module, item, "Rules list item")
 
             items_changed = values_differ(
                 normalize_items(current_items),
@@ -393,7 +463,7 @@ def ensure_present(module, client):
                 submit_items(
                     client,
                     params["account_id"],
-                    current["id"],
+                    current_id,
                     params["elements"],
                     deadline,
                 ),
@@ -401,9 +471,10 @@ def ensure_present(module, client):
             )
             current = get_result(
                 client,
-                item_endpoint(params["account_id"], current["id"]),
+                item_endpoint(params["account_id"], current_id),
                 default=current,
             )
+            current_id = resource_id(module, current, "Rules list")
 
     if not changed and not items_changed:
         module.exit_json(
@@ -414,7 +485,7 @@ def ensure_present(module, client):
 
     module.exit_json(
         changed=True,
-        message="Rules list updated",
+        message="Rules list created" if created else "Rules list updated",
         rules_list=current,
         items_operation=items_operation,
     )
@@ -441,7 +512,8 @@ def ensure_absent(module, client):
             rules_list=current,
         )
 
-    delete_result(client, item_endpoint(params["account_id"], current["id"]))
+    current_id = resource_id(module, current, "Rules list")
+    delete_result(client, item_endpoint(params["account_id"], current_id))
     module.exit_json(
         changed=True,
         message="Rules list deleted",

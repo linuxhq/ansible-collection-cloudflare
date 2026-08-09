@@ -15,6 +15,7 @@ class AccessAppsInfoTests(TestCase):
         module = FakeModule({"account_id": "account"})
         apps = [
             {
+                "id": "app-id",
                 "name": "app",
                 "scim_config": {
                     "authentication": {"client_secret": "secret", "method": "oauth"}
@@ -26,7 +27,7 @@ class AccessAppsInfoTests(TestCase):
             patch.object(access_apps_info, "list_all", return_value=apps) as listed,
             self.assertRaises(ModuleExit) as raised,
         ):
-            access_apps_info.list(module, {})
+            access_apps_info.list_resources(module, {})
 
         listed.assert_called_once_with({}, "/accounts/account/access/apps")
         self.assertFalse(raised.exception.values["changed"])

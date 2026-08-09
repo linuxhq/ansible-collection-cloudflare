@@ -1,12 +1,15 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: zones_info
-short_description: Gather information about cloudflare zones
+short_description: Gather information about Cloudflare zones
 description:
   - Gather Cloudflare zones visible to the supplied API token.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -22,10 +25,17 @@ options:
       - all
     default: all
     description:
-      - Match.
+      - Whether all or any supplied filters must match.
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -42,18 +52,38 @@ zones:
   returned: always
   type: list
   elements: dict
+  contains:
+    id:
+      description: Cloudflare zone identifier.
+      returned: always
+      type: str
+    name:
+      description: Fully qualified domain name of the zone.
+      returned: always
+      type: str
+    status:
+      description: Current zone activation status.
+      returned: when available
+      type: str
 
 """
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
+    cloudflare_query,
     list_all,
+    validate_resource_fields,
 )
 
 
-def list(module, client):
-    zones = list_all(client, "/zones?match={}".format(module.params["match"]))
+def list_resources(module, client):
+    zones = list_all(
+        client,
+        cloudflare_query(cloudflare_path("zones"), {"match": module.params["match"]}),
+    )
+    validate_resource_fields(module, zones, "id", "zone")
 
     module.exit_json(changed=False, zones=zones)
 
@@ -68,7 +98,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list(module, client)
+        list_resources(module, client)
 
 
 if __name__ == "__main__":

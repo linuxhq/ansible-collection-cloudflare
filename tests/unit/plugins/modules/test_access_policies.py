@@ -27,6 +27,14 @@ def params(**updates):
 class AccessPoliciesTests(TestCase):
     def test_equivalent_policy_is_unchanged(self):
         current = {"id": "policy", **params()}
+        current["include"] = [
+            {
+                "email_domain": {
+                    "domain": "example.com",
+                    "provider_field": "ignored",
+                }
+            }
+        ]
         module = FakeModule(params())
 
         with (
