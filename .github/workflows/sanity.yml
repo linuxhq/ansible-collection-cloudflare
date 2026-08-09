@@ -33,3 +33,4 @@ jobs:
           python-version: "${{ matrix.python }}"
       - run: pip install '${{ matrix.ansible }}'
       - run: ansible-test sanity --requirements --color -v
+      - run: ansible-test units --requirements --color -v
