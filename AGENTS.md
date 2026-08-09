@@ -16,11 +16,12 @@ An Ansible collection of Cloudflare modules and roles, published to Galaxy on ta
 
 Always-on agent rules.  Append new rules to imports section below.
 
-| Rule                      | Covers                               |
-| ------------------------- | ------------------------------------ |
-| `ansible-module-utils.md` | Reusable Ansible module utilities    |
-| `ansible-plugins.md`      | Standards for Ansible Python plugins |
-| `ansible-roles.md`        | Standards for Ansible roles          |
+| Rule                       | Covers                                  |
+| -------------------------- | --------------------------------------- |
+| `ansible-module-utils.md`  | Reusable Ansible module utilities       |
+| `ansible-plugins.md`       | Standards for Ansible Python plugins    |
+| `ansible-plugins-sdk.md`   | Cloudflare SDK standards for plugins    |
+| `ansible-roles.md`         | Standards for Ansible roles             |
 
 ## Tooling
 
@@ -47,4 +48,5 @@ Enable the review gate once: `/codex:setup --enable-review-gate`
 
 - @.agents/rules/ansible-module-utils.md
 - @.agents/rules/ansible-plugins.md
+- @.agents/rules/ansible-plugins-sdk.md
 - @.agents/rules/ansible-roles.md
