@@ -15,6 +15,16 @@ filter plugins under `plugins/`. Apply these with `ansible-plugins.md`.
   versioned interfaces that can change between SDK minor releases.
 - Add or widen the dependency range only after tests pass at both boundaries.
 
+## SDK behavior
+
+- SDK responses are Pydantic models that provide `to_dict()`.
+- Iterating a list response automatically fetches subsequent pages.
+- The SDK retries eligible failures twice by default.
+- Default retries cover connection errors and HTTP 408, 409, 429, and 5xx
+  responses.
+- Requests time out after one minute by default.
+- `APITimeoutError` is a subclass of `APIConnectionError`.
+
 ## Clients and authentication
 
 - Use `cloudflare_client(module)` instead of constructing clients in individual
@@ -84,8 +94,7 @@ filter plugins under `plugins/`. Apply these with `ansible-plugins.md`.
   response in actionable failures.
 - Never expose request headers, authentication values, or secret response
   fields.
-- Account for the SDK's default retries on connection errors and HTTP 408,
-  409, 429, and 5xx responses.
+- Account for automatic SDK retries when enforcing an operation deadline.
 - Do not stack an unbounded plugin retry loop on the SDK retry policy.
 - Disable SDK retries when a module owns a bounded retry loop or a strict
   operation deadline.
