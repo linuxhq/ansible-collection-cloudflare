@@ -1,7 +1,7 @@
-# Role authoring
+# Ansible Roles
 
-Conventions for the roles in `roles/` that `ansible-lint` and `yamllint` don't enforce on their
-own. As with modules, match the nearest existing role.
+Standards for designing, implementing, documenting, and testing content under
+`roles/`. Provider-specific requirements are defined separately.
 
 Roles come in two kinds:
 

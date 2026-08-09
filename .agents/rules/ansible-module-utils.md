@@ -1,7 +1,7 @@
-# Helpers
+# Ansible Module Utilities
 
-Prefer these `module_utils` helpers over hand-rolled logic — reimplementing one fails review and
-sanity. They cover:
+Reference for reusable Ansible `module_utils`. Check these helpers before
+writing equivalent local logic. They cover:
 
 - case conversion
 - filters
