@@ -49,3 +49,26 @@ class CfdTunnelConfigurationsInfoTests(TestCase):
             raised.exception.values["cfd_tunnel_configurations"],
             [{"id": "remote", "name": "one", "config": {"ingress": []}}],
         )
+
+    def test_returns_empty_config_for_unconfigured_remote_tunnel(self):
+        module = FakeModule({"account_id": "account"})
+
+        with (
+            patch.object(
+                cfd_tunnel_configurations_info,
+                "list_all",
+                return_value=[{"id": "remote", "name": "one"}],
+            ),
+            patch.object(
+                cfd_tunnel_configurations_info,
+                "get_result",
+                return_value={"config": None},
+            ),
+            self.assertRaises(ModuleExit) as raised,
+        ):
+            cfd_tunnel_configurations_info.list_resources(module, {})
+
+        self.assertEqual(
+            raised.exception.values["cfd_tunnel_configurations"],
+            [{"id": "remote", "name": "one", "config": {}}],
+        )

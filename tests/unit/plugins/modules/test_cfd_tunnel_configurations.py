@@ -57,3 +57,23 @@ class CfdTunnelConfigurationsTests(TestCase):
 
         put.assert_not_called()
         self.assertTrue(raised.exception.values["changed"])
+
+    def test_unconfigured_tunnel_is_updated(self):
+        module = FakeModule(
+            {"account_id": "account", "tunnel_id": "tunnel", "config": {"warp": True}},
+            check_mode=True,
+        )
+
+        with (
+            patch.object(
+                cfd_tunnel_configurations,
+                "get_result",
+                return_value={"config": None},
+            ),
+            patch.object(cfd_tunnel_configurations, "put_result") as put,
+            self.assertRaises(ModuleExit) as raised,
+        ):
+            cfd_tunnel_configurations.ensure_present(module, {})
+
+        put.assert_not_called()
+        self.assertTrue(raised.exception.values["changed"])

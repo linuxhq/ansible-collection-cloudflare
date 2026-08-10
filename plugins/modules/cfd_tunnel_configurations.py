@@ -103,8 +103,11 @@ def ensure_present(module, client):
         default={},
     )
     require_mapping(module, current, "tunnel configuration")
-    current_config = current.get("config", {})
-    require_mapping(module, current_config, "tunnel configuration")
+    current_config = current.get("config")
+    if current_config is None:
+        current_config = {}
+    else:
+        require_mapping(module, current_config, "tunnel configuration")
 
     if not values_differ(
         normalize_current_by_desired_fields(current_config, params["config"]),

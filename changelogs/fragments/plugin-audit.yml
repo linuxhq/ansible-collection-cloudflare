@@ -4,6 +4,8 @@ bugfixes:
     sending raw SDK requests.
   - access groups and policies - ignore provider-only nested response fields
     during idempotence comparisons.
+  - cfd_tunnel_configurations - accept an unconfigured remote tunnel as an empty
+    configuration instead of reporting malformed API data.
   - pagerules - follow API pagination when locating existing rules.
   - rules_lists - consume the SDK item iterator, validate bulk operations, and
     enforce the operation deadline.

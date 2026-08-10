@@ -110,13 +110,17 @@ def list_resources(module, client):
             default={},
         )
         require_mapping(module, configuration, "tunnel configuration")
-        require_mapping(module, configuration.get("config"), "tunnel configuration")
+        config = configuration.get("config")
+        if config is None:
+            config = {}
+        else:
+            require_mapping(module, config, "tunnel configuration")
 
         configurations.append(
             {
                 "id": tunnel_id,
                 "name": tunnel.get("name"),
-                "config": configuration["config"],
+                "config": config,
             }
         )
 
