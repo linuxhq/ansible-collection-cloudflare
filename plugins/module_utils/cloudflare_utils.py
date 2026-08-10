@@ -3,7 +3,7 @@
 
 
 from contextlib import contextmanager
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from ansible.module_utils.basic import missing_required_lib
 from ansible.module_utils.common.dict_transformations import recursive_diff
@@ -14,6 +14,19 @@ try:
 except ImportError:
     cloudflare = None
     Cloudflare = None
+
+SENSITIVE_KEY_PARTS = (
+    "api_key",
+    "api_token",
+    "authorization",
+    "password",
+    "secret",
+    "token",
+)
+
+
+class CloudflareResponseError(Exception):
+    pass
 
 
 def api_request(client, method, path, body=None, ok_statuses=None, timeout=None):
@@ -39,8 +52,25 @@ def cloudflare_client(module):
             missing_python_package="cloudflare",
         )
 
+    api_token = module.params.get("api_token")
+    if not isinstance(api_token, str) or not api_token.strip():
+        module.fail_json(msg="api_token must not be empty")
+    if any(ord(character) < 32 or ord(character) == 127 for character in api_token):
+        module.fail_json(msg="api_token must not contain control characters")
+
+    for name, value in module.params.items():
+        if (name in {"name", "phase"} or name.endswith("_id")) and isinstance(
+            value, str
+        ):
+            if not value.strip():
+                module.fail_json(msg=f"{name} must not be empty")
+            if value != value.strip():
+                module.fail_json(
+                    msg=f"{name} must not contain leading or trailing whitespace"
+                )
+
     try:
-        with Cloudflare(api_token=module.params["api_token"]) as client:
+        with Cloudflare(api_token=api_token.strip()) as client:
             yield client
     except cloudflare.APIConnectionError as exc:
         fail_from_cloudflare_error(
@@ -63,6 +93,8 @@ def cloudflare_client(module):
             exc,
             **getattr(exc, "_cloudflare_context", {}),
         )
+    except CloudflareResponseError as exc:
+        module.fail_json(msg=str(exc))
 
 
 def delete_result(client, path):
@@ -74,43 +106,60 @@ def fail_from_cloudflare_error(module, message, exc, **context):
     status_code = getattr(exc, "status_code", None)
     response_body = None
 
-    if response is not None:
-        if hasattr(response, "json"):
-            try:
-                response_body = response.json()
-            except ValueError:
-                response_body = None
-        if response_body is None and hasattr(response, "text"):
-            response_body = response.text
+    if response is not None and hasattr(response, "json"):
+        try:
+            response_body = response.json()
+        except ValueError:
+            response_body = None
 
-    module.fail_json(
-        msg=message,
-        error=str(exc),
-        status_code=status_code,
-        response=response_body,
-        **context,
+    failure = {"msg": message, **redact_sensitive_values(context)}
+    if response is None:
+        failure["error"] = str(exc)
+    if status_code is not None:
+        failure["status_code"] = status_code
+    if response_body is not None:
+        failure["response"] = redact_sensitive_values(response_body)
+
+    module.fail_json(**failure)
+
+
+def cloudflare_path(*segments):
+    return "/" + "/".join(quote(str(segment), safe="") for segment in segments)
+
+
+def cloudflare_query(path, values):
+    query = urlencode(
+        [(key, value) for key, value in values.items() if value is not None]
     )
+    if not query:
+        return path
+    return f"{path}{'&' if '?' in path else '?'}{query}"
 
 
 def find_by_field(client, path, field, value, paginate=True):
     for item in iter_items(client, path, paginate=paginate):
-        if isinstance(item, dict) and item.get(field) == value:
+        if not isinstance(item, dict):
+            raise CloudflareResponseError(
+                "Cloudflare API returned malformed resource data"
+            )
+        item_value = item.get(field)
+        if item_value is None or (
+            isinstance(item_value, str)
+            and (not item_value.strip() or item_value != item_value.strip())
+        ):
+            raise CloudflareResponseError(
+                "Cloudflare API returned malformed resource data"
+            )
+        if item_value == value:
             return item
 
     return None
 
 
 def find_by_name(client, path, name, extra_query=None, paginate=True):
-    query = list((extra_query or {}).items())
-    query.append(("name", name))
-    query_string = "&".join(
-        "{}={}".format(key, quote(str(value), safe="")) for key, value in query
-    )
-    separator = "&" if "?" in path else "?"
-
     return find_by_field(
         client,
-        f"{path}{separator}{query_string}",
+        cloudflare_query(path, {**(extra_query or {}), "name": name}),
         "name",
         name,
         paginate=paginate,
@@ -132,7 +181,6 @@ def iter_items(client, path, per_page=50, paginate=True):
 
     fetched = 0
     page = 1
-    separator = "&" if "?" in path else "?"
 
     while True:
         result, result_info = parse_list_response(
@@ -140,7 +188,7 @@ def iter_items(client, path, per_page=50, paginate=True):
                 api_request(
                     client,
                     "get",
-                    f"{path}{separator}page={page}&per_page={per_page}",
+                    cloudflare_query(path, {"page": page, "per_page": per_page}),
                 )
             )
         )
@@ -155,9 +203,17 @@ def iter_items(client, path, per_page=50, paginate=True):
         total_pages = result_info.get("total_pages")
         total_count = result_info.get("total_count")
         if total_pages is not None:
+            if isinstance(total_pages, bool) or not isinstance(total_pages, int):
+                raise CloudflareResponseError(
+                    "Cloudflare API returned malformed pagination data"
+                )
             if page >= total_pages:
                 return
         elif total_count is not None:
+            if isinstance(total_count, bool) or not isinstance(total_count, int):
+                raise CloudflareResponseError(
+                    "Cloudflare API returned malformed pagination data"
+                )
             if fetched >= total_count:
                 return
         elif len(result) < per_page:
@@ -192,14 +248,22 @@ def normalize_current_by_desired_fields(current, desired):
 
 def parse_list_response(response):
     if isinstance(response, dict) and ("result" in response or "success" in response):
-        result = response.get("result") or []
-        result_info = response.get("result_info") or {}
+        if response.get("success") is False:
+            raise CloudflareResponseError(
+                "Cloudflare API returned an unsuccessful response"
+            )
+        result = response.get("result")
+        result_info = response.get("result_info")
+        if result is None:
+            result = []
+        if result_info is None:
+            result_info = {}
     else:
-        result = response or []
+        result = [] if response is None else response
         result_info = {}
 
-    if not isinstance(result, list):
-        result = [result]
+    if not isinstance(result, list) or not isinstance(result_info, dict):
+        raise CloudflareResponseError("Cloudflare API returned malformed list data")
 
     return result, result_info
 
@@ -246,10 +310,56 @@ def redact_scim_secrets(resource):
     return resource
 
 
+def redact_sensitive_values(value):
+    if isinstance(value, dict):
+        return {
+            key: (
+                "********"
+                if any(part in str(key).lower() for part in SENSITIVE_KEY_PARTS)
+                else redact_sensitive_values(item)
+            )
+            for key, item in value.items()
+        }
+
+    if isinstance(value, (list, tuple)):
+        return [redact_sensitive_values(item) for item in value]
+
+    return value
+
+
+def resource_field(module, resource, field, resource_name):
+    value = resource.get(field) if isinstance(resource, dict) else None
+    if not isinstance(value, str) or not value.strip() or value != value.strip():
+        module.fail_json(
+            msg=f"Cloudflare API returned malformed {resource_name} data",
+        )
+    return value
+
+
+def resource_id(module, resource, resource_name):
+    return resource_field(module, resource, "id", resource_name)
+
+
+def require_mapping(module, value, resource_name):
+    if not isinstance(value, dict):
+        module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data")
+    return value
+
+
+def validate_resource_fields(module, resources, field, resource_name):
+    for resource in resources:
+        resource_field(module, resource, field, resource_name)
+    return resources
+
+
 def response_result(response, default=None):
     response = serialize_resource(response)
 
     if isinstance(response, dict) and ("result" in response or "success" in response):
+        if response.get("success") is False:
+            raise CloudflareResponseError(
+                "Cloudflare API returned an unsuccessful response"
+            )
         result = response.get("result")
         if result is None:
             return default

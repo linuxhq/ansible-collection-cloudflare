@@ -1,15 +1,18 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: warp_connector
-short_description: Manage cloudflare warp connectors
+short_description: Manage Cloudflare WARP Connectors
 description:
   - Create and delete Cloudflare WARP Connector tunnels by name.
-  - Tunnel secrets are sent when creating a connector, or when C(rotate_secrets) is
+  - Tunnel secrets are sent when creating a connector, or when O(rotate_secrets) is
     enabled, because Cloudflare does not return the current secret for idempotent
     comparison.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -27,19 +30,19 @@ options:
     required: true
     type: str
     description:
-      - Resource name.
+      - WARP Connector name.
   tunnel_secret:
     type: str
     description:
-      - Tunnel secret.
+      - Secret used to authenticate the WARP Connector tunnel.
       - Applied when creating a connector. Cloudflare does not return the current
-        secret, so changes are not detected; use C(rotate_secrets) to apply the
+        secret, so changes are not detected; use O(rotate_secrets) to apply the
         secret to an existing connector.
   rotate_secrets:
     type: bool
     default: false
     description:
-      - Apply C(tunnel_secret) to an existing connector, rotating its secret.
+      - Apply O(tunnel_secret) to an existing connector, rotating its secret.
       - The module always reports C(changed) when enabled and a secret is given.
   state:
     type: str
@@ -52,6 +55,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -69,6 +79,15 @@ warp_connector:
   description: Cloudflare WARP Connector tunnel.
   returned: when available
   type: dict
+  contains:
+    id:
+      description: WARP Connector identifier.
+      returned: always
+      type: str
+    name:
+      description: WARP Connector name.
+      returned: always
+      type: str
 message:
   returned: always
   type: str
@@ -81,15 +100,17 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare,
     cloudflare_client,
+    cloudflare_path,
     delete_result,
     find_by_name,
     patch_result,
     post_result,
+    resource_id,
 )
 
 
 def endpoint(account_id):
-    return f"/accounts/{account_id}/warp_connector"
+    return cloudflare_path("accounts", account_id, "warp_connector")
 
 
 def ensure_present(module, client):
@@ -103,6 +124,7 @@ def ensure_present(module, client):
     )
 
     if current is not None:
+        current_id = resource_id(module, current, "WARP Connector")
         if params["rotate_secrets"] and params.get("tunnel_secret") is not None:
             if module.check_mode:
                 module.exit_json(
@@ -113,9 +135,12 @@ def ensure_present(module, client):
 
             warp_connector = patch_result(
                 client,
-                "{}/{}".format(endpoint(params["account_id"]), current["id"]),
+                cloudflare_path(
+                    "accounts", params["account_id"], "warp_connector", current_id
+                ),
                 {"tunnel_secret": params["tunnel_secret"]},
             )
+            resource_id(module, warp_connector, "WARP Connector")
             module.exit_json(
                 changed=True,
                 message="WARP Connector updated",
@@ -136,11 +161,14 @@ def ensure_present(module, client):
         endpoint(params["account_id"]),
         {"name": params["name"]},
     )
+    connector_id = resource_id(module, warp_connector, "WARP Connector")
 
     if params.get("tunnel_secret") is not None:
-        connector_path = "{}/{}".format(
-            endpoint(params["account_id"]),
-            warp_connector["id"],
+        connector_path = cloudflare_path(
+            "accounts",
+            params["account_id"],
+            "warp_connector",
+            connector_id,
         )
         try:
             warp_connector = patch_result(
@@ -148,17 +176,18 @@ def ensure_present(module, client):
                 connector_path,
                 {"tunnel_secret": params["tunnel_secret"]},
             )
-        except (cloudflare.APIConnectionError, cloudflare.APIStatusError):
+            resource_id(module, warp_connector, "WARP Connector")
+        except cloudflare.APIError:
             try:
                 delete_result(client, connector_path)
-            except (cloudflare.APIConnectionError, cloudflare.APIStatusError):
+            except cloudflare.APIError:
                 module.fail_json(
                     msg=(
                         "Failed to apply tunnel_secret and to roll back "
                         "the created WARP Connector; delete it manually "
                         "and retry"
                     ),
-                    warp_connector_id=warp_connector["id"],
+                    warp_connector_id=connector_id,
                 )
             raise
 
@@ -182,6 +211,8 @@ def ensure_absent(module, client):
     if current is None:
         module.exit_json(changed=False, message="WARP Connector already absent")
 
+    current_id = resource_id(module, current, "WARP Connector")
+
     if module.check_mode:
         module.exit_json(
             changed=True,
@@ -189,7 +220,10 @@ def ensure_absent(module, client):
             warp_connector=current,
         )
 
-    delete_result(client, "{}/{}".format(endpoint(params["account_id"]), current["id"]))
+    delete_result(
+        client,
+        cloudflare_path("accounts", params["account_id"], "warp_connector", current_id),
+    )
     module.exit_json(
         changed=True,
         message="WARP Connector deleted",

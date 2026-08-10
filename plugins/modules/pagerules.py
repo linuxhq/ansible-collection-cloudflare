@@ -1,12 +1,15 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: pagerules
-short_description: Manage cloudflare pagerules
+short_description: Manage Cloudflare Page Rules
 description:
   - Create, update, and delete Cloudflare page rules identified by their targets.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -24,18 +27,18 @@ options:
     type: list
     elements: dict
     description:
-      - Actions.
-      - Required when state is C(present).
+      - Actions applied when the page rule matches.
+      - Required when O(state=present).
   targets:
     required: true
     type: list
     elements: dict
     description:
-      - Targets.
+      - URL matching conditions that identify the page rule.
   priority:
     type: int
     description:
-      - Priority.
+      - Evaluation priority of the page rule.
       - An existing rule's priority is preserved when omitted.
   status:
     type: str
@@ -43,7 +46,7 @@ options:
       - active
       - disabled
     description:
-      - Status.
+      - Whether the page rule is active or disabled.
       - Defaults to C(active) when creating a page rule; an existing rule's
         status is preserved when omitted.
   state:
@@ -57,6 +60,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -83,6 +93,19 @@ pagerule:
   description: Cloudflare page rule.
   returned: when available
   type: dict
+  contains:
+    id:
+      description: Page rule identifier.
+      returned: always
+      type: str
+    priority:
+      description: Evaluation priority of the page rule.
+      returned: when available
+      type: int
+    status:
+      description: Current page rule status.
+      returned: when available
+      type: str
 message:
   returned: always
   type: str
@@ -94,11 +117,14 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     delete_result,
-    get_result,
+    list_all,
     payload_from_params,
     post_result,
     put_result,
+    require_mapping,
+    resource_id,
     select_fields,
     values_differ,
 )
@@ -107,23 +133,24 @@ FIELDS = ("actions", "priority", "status", "targets")
 
 
 def endpoint(zone_id):
-    return f"/zones/{zone_id}/pagerules"
+    return cloudflare_path("zones", zone_id, "pagerules")
 
 
 def item_endpoint(zone_id, pagerule_id):
-    return f"{endpoint(zone_id)}/{pagerule_id}"
+    return cloudflare_path("zones", zone_id, "pagerules", pagerule_id)
+
+
+def find_pagerule(module, client):
+    for pagerule in list_all(client, endpoint(module.params["zone_id"])):
+        require_mapping(module, pagerule, "page rule")
+        if not values_differ(pagerule.get("targets"), module.params["targets"]):
+            return pagerule
+    return None
 
 
 def ensure_present(module, client):
     params = module.params
-
-    pagerules = get_result(client, endpoint(params["zone_id"]), default=[])
-    current = None
-
-    for pagerule in pagerules:
-        if not values_differ(pagerule.get("targets"), params["targets"]):
-            current = pagerule
-            break
+    current = find_pagerule(module, client)
 
     payload = payload_from_params(params, FIELDS)
 
@@ -134,6 +161,7 @@ def ensure_present(module, client):
             module.exit_json(changed=True, message="Page rule would be created")
 
         pagerule = post_result(client, endpoint(params["zone_id"]), payload)
+        resource_id(module, pagerule, "page rule")
         module.exit_json(
             changed=True,
             message="Page rule created",
@@ -158,11 +186,13 @@ def ensure_present(module, client):
             pagerule=current,
         )
 
+    current_id = resource_id(module, current, "page rule")
     pagerule = put_result(
         client,
-        item_endpoint(params["zone_id"], current["id"]),
+        item_endpoint(params["zone_id"], current_id),
         payload,
     )
+    resource_id(module, pagerule, "page rule")
     module.exit_json(
         changed=True,
         message="Page rule updated",
@@ -172,14 +202,7 @@ def ensure_present(module, client):
 
 def ensure_absent(module, client):
     params = module.params
-
-    pagerules = get_result(client, endpoint(params["zone_id"]), default=[])
-    current = None
-
-    for pagerule in pagerules:
-        if not values_differ(pagerule.get("targets"), params["targets"]):
-            current = pagerule
-            break
+    current = find_pagerule(module, client)
 
     if current is None:
         module.exit_json(changed=False, message="Page rule already absent")
@@ -191,7 +214,8 @@ def ensure_absent(module, client):
             pagerule=current,
         )
 
-    delete_result(client, item_endpoint(params["zone_id"], current["id"]))
+    current_id = resource_id(module, current, "page rule")
+    delete_result(client, item_endpoint(params["zone_id"], current_id))
     module.exit_json(
         changed=True,
         message="Page rule deleted",

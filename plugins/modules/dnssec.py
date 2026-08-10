@@ -1,12 +1,15 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: dnssec
-short_description: Manage cloudflare dnssec settings
+short_description: Manage Cloudflare DNSSEC settings
 description:
   - Manage Cloudflare DNSSEC settings for a zone.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -43,6 +46,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -66,6 +76,15 @@ dnssec:
   description: Cloudflare DNSSEC settings after the requested operation.
   returned: always
   type: dict
+  contains:
+    status:
+      description: Current DNSSEC activation status.
+      returned: always
+      type: str
+    ds:
+      description: Delegation signer record content.
+      returned: when provided by Cloudflare
+      type: str
 message:
   description: Summary of the action taken.
   returned: always
@@ -76,16 +95,18 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    require_mapping,
+    resource_field,
     serialize_resource,
 )
 
 
 def ensure_present(module, client):
-    current = client.dns.dnssec.get(zone_id=module.params["zone_id"])
-
-    current_dict = serialize_resource(current)
-
-    current_status = getattr(current, "status", None)
+    current = serialize_resource(
+        client.dns.dnssec.get(zone_id=module.params["zone_id"])
+    )
+    require_mapping(module, current, "DNSSEC settings")
+    current_status = resource_field(module, current, "status", "DNSSEC settings")
     if current_status == "pending":
         current_status = "active"
     elif current_status == "pending-disabled":
@@ -94,15 +115,15 @@ def ensure_present(module, client):
     comparisons = (
         (current_status, module.params["status"]),
         (
-            getattr(current, "dnssec_multi_signer", None),
+            current.get("dnssec_multi_signer"),
             module.params.get("dnssec_multi_signer"),
         ),
         (
-            getattr(current, "dnssec_presigned", None),
+            current.get("dnssec_presigned"),
             module.params.get("dnssec_presigned"),
         ),
         (
-            getattr(current, "dnssec_use_nsec3", None),
+            current.get("dnssec_use_nsec3"),
             module.params.get("dnssec_use_nsec3"),
         ),
     )
@@ -116,14 +137,14 @@ def ensure_present(module, client):
         module.exit_json(
             changed=False,
             message="DNSSEC settings already present",
-            dnssec=current_dict,
+            dnssec=current,
         )
 
     if module.check_mode:
         module.exit_json(
             changed=True,
             message="DNSSEC settings would be updated",
-            dnssec=current_dict,
+            dnssec=current,
         )
 
     payload = {"zone_id": module.params["zone_id"]}
@@ -136,11 +157,13 @@ def ensure_present(module, client):
         if module.params.get(field) is not None:
             payload[field] = module.params[field]
 
-    dnssec = client.dns.dnssec.edit(**payload)
+    dnssec = serialize_resource(client.dns.dnssec.edit(**payload))
+    require_mapping(module, dnssec, "DNSSEC settings")
+    resource_field(module, dnssec, "status", "DNSSEC settings")
     module.exit_json(
         changed=True,
         message="DNSSEC settings updated",
-        dnssec=serialize_resource(dnssec),
+        dnssec=dnssec,
     )
 
 

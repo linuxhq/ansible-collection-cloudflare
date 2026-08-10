@@ -1,12 +1,15 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: zones
-short_description: Manage cloudflare zones
+short_description: Manage Cloudflare zones
 description:
   - Create, update, delete Cloudflare zones, and manage zone settings.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -19,7 +22,7 @@ options:
     required: true
     type: str
     description:
-      - Resource name.
+      - Fully qualified domain name of the zone.
   account_id:
     description:
       - Account identifier used when creating a zone.
@@ -31,19 +34,30 @@ options:
       - partial
       - secondary
     description:
-      - Resource type.
+      - DNS setup type used by the zone.
       - Defaults to C(full) when creating a zone.
       - An existing zone's type is only changed when explicitly provided.
   vanity_name_servers:
     type: list
     elements: str
     description:
-      - Vanity name servers.
+      - Custom authoritative name servers assigned to the zone.
   settings:
     type: list
     elements: dict
     description:
       - Zone settings to manage.
+    suboptions:
+      id:
+        description:
+          - Cloudflare zone setting identifier.
+        required: true
+        type: str
+      value:
+        description:
+          - Desired zone setting value.
+        required: true
+        type: raw
   state:
     type: str
     choices:
@@ -55,6 +69,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -73,11 +94,37 @@ zone:
   description: Cloudflare zone.
   returned: when available
   type: dict
+  contains:
+    id:
+      description: Cloudflare zone identifier.
+      returned: always
+      type: str
+    name:
+      description: Fully qualified domain name of the zone.
+      returned: always
+      type: str
+    status:
+      description: Current zone activation status.
+      returned: when available
+      type: str
+    type:
+      description: DNS setup type used by the zone.
+      returned: when available
+      type: str
 settings:
   description: Updated zone settings.
   returned: when settings changed
   type: list
   elements: dict
+  contains:
+    id:
+      description: Zone setting identifier.
+      returned: always
+      type: str
+    value:
+      description: Updated zone setting value.
+      returned: always
+      type: raw
 message:
   returned: always
   type: str
@@ -89,17 +136,20 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     delete_result,
+    find_by_name,
     get_result,
     patch_result,
     post_result,
+    resource_id,
     select_fields,
     values_differ,
 )
 
 
 def settings_endpoint(zone_id, setting_id):
-    return f"/zones/{zone_id}/settings/{setting_id}"
+    return cloudflare_path("zones", zone_id, "settings", setting_id)
 
 
 def normalize_setting_value(value):
@@ -120,22 +170,28 @@ def normalize_setting_value(value):
 
 def zone_endpoint(zone_id=None):
     if zone_id is None:
-        return "/zones"
-    return f"/zones/{zone_id}"
+        return cloudflare_path("zones")
+    return cloudflare_path("zones", zone_id)
 
 
 def ensure_present(module, client):
     params = module.params
 
-    current = None
-    zones = get_result(
-        client, "/zones?name={}&per_page=50".format(params["name"]), default=[]
-    )
+    for setting in params.get("settings") or []:
+        if (
+            not isinstance(setting.get("id"), str)
+            or not setting["id"].strip()
+            or setting["id"] != setting["id"].strip()
+            or "value" not in setting
+        ):
+            module.fail_json(msg="Each zone setting requires a valid id and value")
 
-    for zone in zones:
-        if zone.get("name") == params["name"]:
-            current = zone
-            break
+    current = find_by_name(
+        client,
+        zone_endpoint(),
+        params["name"],
+        paginate=False,
+    )
 
     if current is None:
         if params.get("account_id") is None:
@@ -153,27 +209,27 @@ def ensure_present(module, client):
                 "type": params.get("type") or "full",
             },
         )
+        current_id = resource_id(module, current, "zone")
 
         if params.get("vanity_name_servers") is not None:
             current = patch_result(
                 client,
-                zone_endpoint(current["id"]),
+                zone_endpoint(current_id),
                 {"vanity_name_servers": params["vanity_name_servers"]},
             )
+            current_id = resource_id(module, current, "zone")
 
         changed = True
+        created = True
     else:
-        payloads = []
-        if params.get("type") is not None:
-            payloads.append({"type": params["type"]})
-        if params.get("vanity_name_servers") is not None:
-            payloads.append({"vanity_name_servers": params["vanity_name_servers"]})
-
+        current_id = resource_id(module, current, "zone")
+        payload = {
+            field: params[field]
+            for field in ("type", "vanity_name_servers")
+            if params.get(field) is not None
+        }
         changed = False
-        for payload in payloads:
-            if not values_differ(select_fields(current, payload.keys()), payload):
-                continue
-
+        if payload and values_differ(select_fields(current, payload.keys()), payload):
             if module.check_mode:
                 module.exit_json(
                     changed=True,
@@ -181,18 +237,20 @@ def ensure_present(module, client):
                     zone=current,
                 )
 
-            current = patch_result(client, zone_endpoint(current["id"]), payload)
+            current = patch_result(client, zone_endpoint(current_id), payload)
+            current_id = resource_id(module, current, "zone")
             changed = True
+        created = False
 
     updated_settings = []
     for setting in params.get("settings") or []:
-        if setting.get("id") is None or "value" not in setting:
-            module.fail_json(msg="Each zone setting requires id and value")
         existing = get_result(
             client,
-            settings_endpoint(current["id"], setting["id"]),
+            settings_endpoint(current_id, setting["id"]),
             default={},
         )
+        if not isinstance(existing, dict) or "value" not in existing:
+            module.fail_json(msg="Cloudflare API returned malformed zone setting data")
 
         if normalize_setting_value(existing.get("value")) == normalize_setting_value(
             setting["value"]
@@ -206,20 +264,20 @@ def ensure_present(module, client):
                 zone=current,
             )
 
-        updated_settings.append(
-            patch_result(
-                client,
-                settings_endpoint(current["id"], setting["id"]),
-                {"value": setting["value"]},
-            )
+        updated_setting = patch_result(
+            client,
+            settings_endpoint(current_id, setting["id"]),
+            {"value": setting["value"]},
         )
+        resource_id(module, updated_setting, "zone setting")
+        updated_settings.append(updated_setting)
 
     if not changed and not updated_settings:
         module.exit_json(changed=False, message="Zone already present", zone=current)
 
     module.exit_json(
         changed=True,
-        message="Zone updated",
+        message="Zone created" if created else "Zone updated",
         zone=current,
         settings=updated_settings,
     )
@@ -228,18 +286,17 @@ def ensure_present(module, client):
 def ensure_absent(module, client):
     params = module.params
 
-    current = None
-    zones = get_result(
-        client, "/zones?name={}&per_page=50".format(params["name"]), default=[]
+    current = find_by_name(
+        client,
+        zone_endpoint(),
+        params["name"],
+        paginate=False,
     )
-
-    for zone in zones:
-        if zone.get("name") == params["name"]:
-            current = zone
-            break
 
     if current is None:
         module.exit_json(changed=False, message="Zone already absent")
+
+    current_id = resource_id(module, current, "zone")
 
     if module.check_mode:
         module.exit_json(
@@ -248,7 +305,7 @@ def ensure_absent(module, client):
             zone=current,
         )
 
-    delete_result(client, zone_endpoint(current["id"]))
+    delete_result(client, zone_endpoint(current_id))
     module.exit_json(changed=True, message="Zone deleted", zone=current)
 
 
@@ -263,7 +320,14 @@ def main():
                 "choices": ["full", "partial", "secondary"],
             },
             "vanity_name_servers": {"type": "list", "elements": "str"},
-            "settings": {"type": "list", "elements": "dict"},
+            "settings": {
+                "type": "list",
+                "elements": "dict",
+                "options": {
+                    "id": {"required": True, "type": "str"},
+                    "value": {"required": True, "type": "raw"},
+                },
+            },
             "state": {
                 "type": "str",
                 "choices": ["present", "absent"],

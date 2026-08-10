@@ -1,12 +1,15 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: access_policies
-short_description: Manage cloudflare access policies
+short_description: Manage Cloudflare Access policies
 description:
   - Create, update, and delete Cloudflare Access policies by name.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -24,7 +27,7 @@ options:
     required: true
     type: str
     description:
-      - Resource name.
+      - Access policy name.
   decision:
     type: str
     choices:
@@ -33,48 +36,48 @@ options:
       - non_identity
       - bypass
     description:
-      - Decision.
-      - Required when state is C(present).
+      - Action applied when the policy matches.
+      - Required when O(state=present).
   include:
     type: list
     elements: dict
     description:
-      - Include.
-      - Required when state is C(present).
+      - Access selectors that identify candidate users.
+      - Required when O(state=present).
   exclude:
     type: list
     elements: dict
     description:
-      - Exclude.
+      - Access selectors that remove users from the policy.
   require:
     type: list
     elements: dict
     description:
-      - Require.
+      - Additional Access selectors every included user must satisfy.
   approval_groups:
     type: list
     elements: dict
     description:
-      - Approval groups.
+      - Approval groups authorized to approve access requests.
   approval_required:
     type: bool
     default: false
     description:
-      - Approval required.
+      - Whether users must obtain approval before access is granted.
   isolation_required:
     type: bool
     default: false
     description:
-      - Isolation required.
+      - Whether matching sessions require browser isolation.
   purpose_justification_prompt:
     type: str
     description:
-      - Purpose justification prompt.
+      - Prompt shown when requesting an access justification.
   purpose_justification_required:
     type: bool
     default: false
     description:
-      - Purpose justification required.
+      - Whether users must provide a justification for access.
   state:
     type: str
     choices:
@@ -86,6 +89,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -107,6 +117,15 @@ access_policy:
   description: Cloudflare Access policy.
   returned: when available
   type: dict
+  contains:
+    id:
+      description: Access policy identifier.
+      returned: always
+      type: str
+    name:
+      description: Access policy name.
+      returned: always
+      type: str
 message:
   returned: always
   type: str
@@ -118,11 +137,14 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     delete_result,
     find_by_field,
+    normalize_current_by_desired_fields,
     payload_from_params,
     post_result,
     put_result,
+    resource_id,
     select_fields,
     values_differ,
 )
@@ -148,7 +170,7 @@ FALSE_FIELDS = (
 
 
 def endpoint(account_id):
-    return f"/accounts/{account_id}/access/policies"
+    return cloudflare_path("accounts", account_id, "access", "policies")
 
 
 def ensure_present(module, client):
@@ -165,18 +187,23 @@ def ensure_present(module, client):
             module.exit_json(changed=True, message="Access policy would be created")
 
         access_policy = post_result(client, endpoint(params["account_id"]), payload)
+        resource_id(module, access_policy, "Access policy")
         module.exit_json(
             changed=True,
             message="Access policy created",
             access_policy=access_policy,
         )
 
+    current_id = resource_id(module, current, "Access policy")
     comparable_current = current.copy()
     for field in FALSE_FIELDS:
         comparable_current.setdefault(field, False)
 
     if not values_differ(
-        select_fields(comparable_current, payload.keys()),
+        normalize_current_by_desired_fields(
+            select_fields(comparable_current, payload.keys()),
+            payload,
+        ),
         payload,
     ):
         module.exit_json(
@@ -194,9 +221,12 @@ def ensure_present(module, client):
 
     access_policy = put_result(
         client,
-        "{}/{}".format(endpoint(params["account_id"]), current["id"]),
+        cloudflare_path(
+            "accounts", params["account_id"], "access", "policies", current_id
+        ),
         payload,
     )
+    resource_id(module, access_policy, "Access policy")
     module.exit_json(
         changed=True,
         message="Access policy updated",
@@ -214,6 +244,8 @@ def ensure_absent(module, client):
     if current is None:
         module.exit_json(changed=False, message="Access policy already absent")
 
+    current_id = resource_id(module, current, "Access policy")
+
     if module.check_mode:
         module.exit_json(
             changed=True,
@@ -221,7 +253,12 @@ def ensure_absent(module, client):
             access_policy=current,
         )
 
-    delete_result(client, "{}/{}".format(endpoint(params["account_id"]), current["id"]))
+    delete_result(
+        client,
+        cloudflare_path(
+            "accounts", params["account_id"], "access", "policies", current_id
+        ),
+    )
     module.exit_json(
         changed=True,
         message="Access policy deleted",

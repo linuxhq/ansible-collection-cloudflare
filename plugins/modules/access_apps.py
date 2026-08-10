@@ -1,14 +1,17 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: access_apps
-short_description: Manage cloudflare access apps
+short_description: Manage Cloudflare Access applications
 description:
   - Create, update, and delete Cloudflare Access applications by name.
   - Secret fields under C(scim_config.authentication) are redacted from returned
     applications.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -30,81 +33,81 @@ options:
   domain:
     description:
       - Application domain.
-      - Required when state is C(present).
+      - Required when O(state=present).
     type: str
   type:
     description:
       - Access application type.
-      - Required when state is C(present).
+      - Required when O(state=present).
     type: str
   allowed_idps:
     type: list
     elements: str
     description:
-      - Allowed idps.
+      - Identity provider identifiers allowed for the application.
   app_launcher_visible:
     type: bool
     default: true
     description:
-      - App launcher visible.
+      - Whether to show the application in the Access application launcher.
   auto_redirect_to_identity:
     type: bool
     default: false
     description:
-      - Auto redirect to identity.
+      - Whether to redirect users to the identity provider automatically.
   cors_headers:
     type: dict
     description:
-      - Cors headers.
+      - Cross-origin resource sharing headers for the application.
   custom_deny_message:
     type: str
     description:
-      - Custom deny message.
+      - Message displayed when Access denies a request.
   custom_deny_url:
     type: str
     description:
-      - Custom deny url.
+      - URL used when Access denies a request.
   destinations:
     type: list
     elements: dict
     description:
-      - Destinations.
+      - Public destinations protected by the application.
   enable_binding_cookie:
     type: bool
     default: false
     description:
-      - Enable binding cookie.
+      - Whether to bind the Access cookie to the user session.
   http_only_cookie_attribute:
     type: bool
     default: true
     description:
-      - Http only cookie attribute.
+      - Whether the Access cookie uses the HTTP-only attribute.
   logo_url:
     type: str
     description:
-      - Logo url.
+      - URL of the application logo.
   policies:
     type: list
     elements: dict
     description:
-      - Policies.
+      - Access policies attached to the application.
   same_site_cookie_attribute:
     type: str
     description:
-      - Same site cookie attribute.
+      - SameSite attribute for the Access cookie.
   service_auth_401_redirect:
     type: bool
     description:
-      - Service auth 401 redirect.
+      - Whether service authentication failures redirect with HTTP 401.
   session_duration:
     type: str
     default: 24h
     description:
-      - Session duration.
+      - Maximum duration of an authenticated Access session.
   skip_interstitial:
     type: bool
     description:
-      - Skip interstitial.
+      - Whether to skip the Access interstitial page.
   state:
     type: str
     choices:
@@ -116,6 +119,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -135,6 +145,15 @@ access_app:
   description: Cloudflare Access application.
   returned: when available
   type: dict
+  contains:
+    id:
+      description: Access application identifier.
+      returned: always
+      type: str
+    name:
+      description: Access application name.
+      returned: always
+      type: str
 message:
   description: Operation summary.
   returned: always
@@ -145,6 +164,7 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     delete_result,
     find_by_name,
     normalize_current_by_desired_fields,
@@ -152,6 +172,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     post_result,
     put_result,
     redact_scim_secrets,
+    resource_id,
     select_fields,
     values_differ,
 )
@@ -187,11 +208,11 @@ DEFAULT_FIELDS = {
 
 
 def endpoint(account_id):
-    return f"/accounts/{account_id}/access/apps"
+    return cloudflare_path("accounts", account_id, "access", "apps")
 
 
 def item_endpoint(account_id, app_id):
-    return f"{endpoint(account_id)}/{app_id}"
+    return cloudflare_path("accounts", account_id, "access", "apps", app_id)
 
 
 def ensure_present(module, client):
@@ -216,12 +237,14 @@ def ensure_present(module, client):
             )
 
         access_app = post_result(client, endpoint(params["account_id"]), payload)
+        resource_id(module, access_app, "Access application")
         module.exit_json(
             changed=True,
             message="Access application created",
             access_app=redact_scim_secrets(access_app),
         )
 
+    current_id = resource_id(module, current, "Access application")
     comparable_current = current.copy()
     for field, value in DEFAULT_FIELDS.items():
         comparable_current.setdefault(field, value)
@@ -248,9 +271,10 @@ def ensure_present(module, client):
 
     access_app = put_result(
         client,
-        item_endpoint(params["account_id"], current["id"]),
+        item_endpoint(params["account_id"], current_id),
         payload,
     )
+    resource_id(module, access_app, "Access application")
     module.exit_json(
         changed=True,
         message="Access application updated",
@@ -274,6 +298,8 @@ def ensure_absent(module, client):
     if current is None:
         module.exit_json(changed=False, message="Access application already absent")
 
+    current_id = resource_id(module, current, "Access application")
+
     if module.check_mode:
         module.exit_json(
             changed=True,
@@ -281,7 +307,7 @@ def ensure_absent(module, client):
             access_app=current,
         )
 
-    delete_result(client, item_endpoint(params["account_id"], current["id"]))
+    delete_result(client, item_endpoint(params["account_id"], current_id))
     module.exit_json(
         changed=True,
         message="Access application deleted",

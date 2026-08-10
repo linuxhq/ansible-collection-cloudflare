@@ -1,1 +1,4 @@
 target-version = "py39"
+
+[lint.per-file-ignores]
+"plugins/modules/*.py" = ["EXE001"]

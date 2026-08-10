@@ -1,12 +1,15 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: pagerules_info
-short_description: Gather information about cloudflare pagerules
+short_description: Gather information about Cloudflare Page Rules
 description:
   - Gather page rules for all accessible zones.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -18,6 +21,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -34,34 +44,54 @@ pagerules:
   returned: always
   type: list
   elements: dict
+  contains:
+    id:
+      description: Cloudflare zone identifier.
+      returned: always
+      type: str
+    name:
+      description: Cloudflare zone name.
+      returned: when available
+      type: str
+    pagerules:
+      description: Page rules configured for the zone.
+      returned: always
+      type: list
+      elements: dict
+      contains:
+        id:
+          description: Page rule identifier.
+          returned: always
+          type: str
 
 """
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    get_result,
+    cloudflare_path,
     list_all,
+    resource_id,
+    validate_resource_fields,
 )
 
 
-def list(module, client):
+def list_resources(module, client):
     pagerules = []
     zones = list_all(client, "/zones")
 
     for zone in zones:
-        if zone.get("id") is None:
-            continue
+        zone_id = resource_id(module, zone, "zone")
 
-        rules = get_result(
+        rules = list_all(
             client,
-            "/zones/{}/pagerules".format(zone["id"]),
-            default=[],
+            cloudflare_path("zones", zone_id, "pagerules"),
         )
+        validate_resource_fields(module, rules, "id", "page rule")
 
         pagerules.append(
             {
-                "id": zone["id"],
+                "id": zone_id,
                 "name": zone.get("name"),
                 "pagerules": rules,
             }
@@ -79,7 +109,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list(module, client)
+        list_resources(module, client)
 
 
 if __name__ == "__main__":

@@ -1,12 +1,15 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: access_groups
-short_description: Manage cloudflare access groups
+short_description: Manage Cloudflare Access groups
 description:
   - Create, update, and delete Cloudflare Access groups by name.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -24,28 +27,28 @@ options:
     required: true
     type: str
     description:
-      - Resource name.
+      - Access group name.
   include:
     type: list
     elements: dict
     description:
-      - Include.
-      - Required when state is C(present).
+      - Access selectors that include users in the group.
+      - Required when O(state=present).
   exclude:
     type: list
     elements: dict
     description:
-      - Exclude.
+      - Access selectors that exclude users from the group.
   require:
     type: list
     elements: dict
     description:
-      - Require.
+      - Additional Access selectors every included user must satisfy.
   is_default:
     type: bool
     default: false
     description:
-      - Is default.
+      - Whether this is the account's default Access group.
   state:
     type: str
     choices:
@@ -57,6 +60,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -77,6 +87,15 @@ access_group:
   description: Cloudflare Access group.
   returned: when available
   type: dict
+  contains:
+    id:
+      description: Access group identifier.
+      returned: always
+      type: str
+    name:
+      description: Access group name.
+      returned: always
+      type: str
 message:
   returned: always
   type: str
@@ -88,11 +107,14 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     delete_result,
     find_by_name,
+    normalize_current_by_desired_fields,
     payload_from_params,
     post_result,
     put_result,
+    resource_id,
     select_fields,
     values_differ,
 )
@@ -101,7 +123,7 @@ FIELDS = ("exclude", "include", "is_default", "name", "require")
 
 
 def endpoint(account_id):
-    return f"/accounts/{account_id}/access/groups"
+    return cloudflare_path("accounts", account_id, "access", "groups")
 
 
 def ensure_present(module, client):
@@ -120,17 +142,22 @@ def ensure_present(module, client):
             module.exit_json(changed=True, message="Access group would be created")
 
         access_group = post_result(client, endpoint(params["account_id"]), payload)
+        resource_id(module, access_group, "Access group")
         module.exit_json(
             changed=True,
             message="Access group created",
             access_group=access_group,
         )
 
+    current_id = resource_id(module, current, "Access group")
     comparable_current = current.copy()
     comparable_current.setdefault("is_default", False)
 
     if not values_differ(
-        select_fields(comparable_current, payload.keys()),
+        normalize_current_by_desired_fields(
+            select_fields(comparable_current, payload.keys()),
+            payload,
+        ),
         payload,
     ):
         module.exit_json(
@@ -148,9 +175,12 @@ def ensure_present(module, client):
 
     access_group = put_result(
         client,
-        "{}/{}".format(endpoint(params["account_id"]), current["id"]),
+        cloudflare_path(
+            "accounts", params["account_id"], "access", "groups", current_id
+        ),
         payload,
     )
+    resource_id(module, access_group, "Access group")
     module.exit_json(
         changed=True,
         message="Access group updated",
@@ -170,6 +200,8 @@ def ensure_absent(module, client):
     if current is None:
         module.exit_json(changed=False, message="Access group already absent")
 
+    current_id = resource_id(module, current, "Access group")
+
     if module.check_mode:
         module.exit_json(
             changed=True,
@@ -177,7 +209,12 @@ def ensure_absent(module, client):
             access_group=current,
         )
 
-    delete_result(client, "{}/{}".format(endpoint(params["account_id"]), current["id"]))
+    delete_result(
+        client,
+        cloudflare_path(
+            "accounts", params["account_id"], "access", "groups", current_id
+        ),
+    )
     module.exit_json(
         changed=True,
         message="Access group deleted",

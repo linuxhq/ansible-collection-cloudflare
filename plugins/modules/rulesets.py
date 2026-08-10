@@ -1,12 +1,15 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: rulesets
-short_description: Manage cloudflare rulesets
+short_description: Manage Cloudflare rulesets
 description:
   - Create, update, and delete a Cloudflare zone ruleset entrypoint for a phase.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -23,25 +26,26 @@ options:
   name:
     type: str
     description:
-      - Resource name.
+      - Ruleset name.
       - Required when creating the ruleset; an existing ruleset cannot be renamed.
   rules:
     type: list
     elements: dict
     description:
-      - Ruleset rules.
+      - Ordered rules evaluated by the ruleset.
       - When omitted, the existing rules are preserved.
       - An explicit empty list clears the ruleset.
   phase:
     type: str
     default: http_request_firewall_custom
     description:
-      - Ruleset phase.
+      - Cloudflare request phase controlled by the entrypoint ruleset.
   kind:
     type: str
     default: zone
     description:
-      - Resource kind.
+      - Scope of the ruleset.
+      - Used only when creating a ruleset.
   state:
     type: str
     choices:
@@ -53,6 +57,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -73,6 +84,24 @@ ruleset:
   description: Cloudflare ruleset.
   returned: when available
   type: dict
+  contains:
+    id:
+      description: Ruleset identifier.
+      returned: always
+      type: str
+    name:
+      description: Ruleset name.
+      returned: always
+      type: str
+    phase:
+      description: Cloudflare request phase controlled by the ruleset.
+      returned: when available
+      type: str
+    rules:
+      description: Ordered rules in the ruleset.
+      returned: when available
+      type: list
+      elements: dict
 message:
   returned: always
   type: str
@@ -84,21 +113,24 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     delete_result,
     get_result,
     normalize_current_by_desired_fields,
     post_result,
     put_result,
+    resource_field,
+    resource_id,
     values_differ,
 )
 
 
 def entrypoint_endpoint(zone_id, phase):
-    return f"/zones/{zone_id}/rulesets/phases/{phase}/entrypoint"
+    return cloudflare_path("zones", zone_id, "rulesets", "phases", phase, "entrypoint")
 
 
 def rulesets_endpoint(zone_id):
-    return f"/zones/{zone_id}/rulesets"
+    return cloudflare_path("zones", zone_id, "rulesets")
 
 
 def ensure_present(module, client):
@@ -128,13 +160,13 @@ def ensure_present(module, client):
                 "rules": params.get("rules") or [],
             },
         )
+        resource_id(module, ruleset, "ruleset")
         module.exit_json(changed=True, message="Ruleset created", ruleset=ruleset)
 
-    if (
-        params.get("name") is not None
-        and current.get("name") is not None
-        and params["name"] != current["name"]
-    ):
+    resource_id(module, current, "ruleset")
+    current_name = resource_field(module, current, "name", "ruleset")
+
+    if params.get("name") is not None and params["name"] != current_name:
         module.fail_json(
             msg="An existing ruleset cannot be renamed",
             ruleset=current,
@@ -173,6 +205,7 @@ def ensure_present(module, client):
         entrypoint_endpoint(params["zone_id"], params["phase"]),
         payload,
     )
+    resource_id(module, ruleset, "ruleset")
     module.exit_json(changed=True, message="Ruleset updated", ruleset=ruleset)
 
 
@@ -186,8 +219,10 @@ def ensure_absent(module, client):
         ok_statuses=[404],
     )
 
-    if not current or current.get("id") is None:
+    if current is None:
         module.exit_json(changed=False, message="Ruleset already absent")
+
+    current_id = resource_id(module, current, "ruleset")
 
     if module.check_mode:
         module.exit_json(
@@ -197,7 +232,8 @@ def ensure_absent(module, client):
         )
 
     delete_result(
-        client, "{}/{}".format(rulesets_endpoint(params["zone_id"]), current["id"])
+        client,
+        cloudflare_path("zones", params["zone_id"], "rulesets", current_id),
     )
     module.exit_json(
         changed=True,

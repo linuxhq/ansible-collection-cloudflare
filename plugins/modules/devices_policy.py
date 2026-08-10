@@ -1,12 +1,15 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: devices_policy
-short_description: Manage cloudflare devices policy
+short_description: Manage the Cloudflare device policy
 description:
   - Patch the Cloudflare Zero Trust default device policy for an account.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -93,6 +96,13 @@ options:
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -115,6 +125,15 @@ devices_policy:
   description: Cloudflare device policy.
   returned: when available
   type: dict
+  contains:
+    allow_updates:
+      description: Whether users may update the WARP client.
+      returned: when available
+      type: bool
+    service_mode_v2:
+      description: WARP client service mode configuration.
+      returned: when available
+      type: dict
 message:
   returned: always
   type: str
@@ -126,10 +145,12 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     get_result,
     normalize_current_by_desired_fields,
     patch_result,
     payload_from_params,
+    require_mapping,
     values_differ,
 )
 
@@ -155,7 +176,7 @@ FIELDS = (
 
 
 def endpoint(account_id):
-    return f"/accounts/{account_id}/devices/policy"
+    return cloudflare_path("accounts", account_id, "devices", "policy")
 
 
 def ensure_present(module, client):
@@ -166,6 +187,7 @@ def ensure_present(module, client):
         module.exit_json(changed=False, message="No device policy fields provided")
 
     current = get_result(client, endpoint(params["account_id"]), default={})
+    require_mapping(module, current, "device policy")
 
     if not values_differ(
         normalize_current_by_desired_fields(current, payload),
@@ -185,6 +207,7 @@ def ensure_present(module, client):
         )
 
     policy = patch_result(client, endpoint(params["account_id"]), payload)
+    require_mapping(module, policy, "device policy")
     module.exit_json(
         changed=True,
         message="Device policy updated",

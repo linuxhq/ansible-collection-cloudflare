@@ -1,12 +1,15 @@
+#!/usr/bin/python
+# Copyright: Contributors to the Ansible project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 DOCUMENTATION = r"""
 ---
 module: devices_settings
-short_description: Manage cloudflare devices settings
+short_description: Manage Cloudflare device settings
 description:
   - Manage account-wide Cloudflare Zero Trust device settings.
+version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
 options:
@@ -24,30 +27,37 @@ options:
     type: float
     default: 0
     description:
-      - Disable for time.
+      - Number of minutes users may temporarily disable the WARP client.
   gateway_proxy_enabled:
     type: bool
     default: false
     description:
-      - Gateway proxy enabled.
+      - Whether the WARP client proxies TCP traffic through Gateway.
   gateway_udp_proxy_enabled:
     type: bool
     default: false
     description:
-      - Gateway udp proxy enabled.
+      - Whether the WARP client proxies UDP traffic through Gateway.
   root_certificate_installation_enabled:
     type: bool
     default: false
     description:
-      - Root certificate installation enabled.
+      - Whether users may install the Cloudflare root certificate.
   use_zt_virtual_ip:
     type: bool
     default: false
     description:
-      - Use zt virtual ip.
+      - Whether devices receive a Zero Trust virtual IP address.
 requirements:
   - python >= 3.9
   - cloudflare >= 5.6.0, < 6
+attributes:
+  check_mode:
+    description: Supports predicting changes without applying them.
+    support: full
+  diff_mode:
+    description: Determines whether the module returns change details in diff format.
+    support: none
 
 """
 
@@ -65,6 +75,15 @@ devices_settings:
   description: Cloudflare device settings.
   returned: always
   type: dict
+  contains:
+    gateway_proxy_enabled:
+      description: Whether the WARP client proxies TCP traffic through Gateway.
+      returned: when available
+      type: bool
+    gateway_udp_proxy_enabled:
+      description: Whether the WARP client proxies UDP traffic through Gateway.
+      returned: when available
+      type: bool
 message:
   returned: always
   type: str
@@ -76,9 +95,11 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_path,
     get_result,
     patch_result,
     payload_from_params,
+    require_mapping,
     select_fields,
     values_differ,
 )
@@ -93,7 +114,7 @@ FIELDS = (
 
 
 def endpoint(account_id):
-    return f"/accounts/{account_id}/devices/settings"
+    return cloudflare_path("accounts", account_id, "devices", "settings")
 
 
 def ensure_present(module, client):
@@ -102,6 +123,7 @@ def ensure_present(module, client):
     payload = payload_from_params(params, FIELDS)
 
     current = get_result(client, endpoint(params["account_id"]), default={})
+    require_mapping(module, current, "device settings")
 
     if not values_differ(select_fields(current, payload.keys()), payload):
         module.exit_json(
@@ -118,6 +140,7 @@ def ensure_present(module, client):
         )
 
     settings = patch_result(client, endpoint(params["account_id"]), payload)
+    require_mapping(module, settings, "device settings")
     module.exit_json(
         changed=True,
         message="Device settings updated",
