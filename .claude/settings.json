@@ -5,7 +5,7 @@
     "sessionUrl": false
   },
   "autoMemoryEnabled": false,
-  "effortLevel": "high",
+  "effortLevel": "medium",
   "enabledPlugins": {
     "codex@openai-codex": true
   },
