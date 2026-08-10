@@ -4,6 +4,30 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.1.7
+======
+
+Release Summary
+---------------
+
+Plugin hardening release that improves API response validation, pagination, idempotence, secret handling, and Ansible documentation across the collection.
+
+Minor Changes
+-------------
+
+- all modules - expand Ansible documentation for nested return values, check-mode support, requirements, and stable response fields.
+- all modules - validate required Cloudflare response fields before reporting successful operations.
+
+Bugfixes
+--------
+
+- access groups and policies - ignore provider-only nested response fields during idempotence comparisons.
+- all modules - encode dynamic API path segments and query values before sending raw SDK requests.
+- cfd_tunnel_configurations - accept an unconfigured remote tunnel as an empty configuration instead of reporting malformed API data.
+- pagerules - follow API pagination when locating existing rules.
+- rules_lists - consume the SDK item iterator, validate bulk operations, and enforce the operation deadline.
+- zones - update zone properties in one request and validate settings before creating or changing a zone.
+
 v2.1.6
 ======
 
