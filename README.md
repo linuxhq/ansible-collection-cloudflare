@@ -5,38 +5,53 @@
 [![Lint](https://github.com/linuxhq/ansible-collection-cloudflare/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/linuxhq/ansible-collection-cloudflare/actions/workflows/pre-commit.yml)
 [![Release](https://github.com/linuxhq/ansible-collection-cloudflare/actions/workflows/release.yml/badge.svg)](https://github.com/linuxhq/ansible-collection-cloudflare/actions/workflows/release.yml)
 
-A collection of cloudflare roles
-
-# Collection
-
-## Build
-
-    ansible-galaxy collection build
-
-## Install
-
-    ansible-galaxy collection install linuxhq.cloudflare
+An Ansible collection of Cloudflare modules, plugins, and roles.
 
 ## Requirements
 
-* Python `>= 3.11`
-* `ansible-core >= 2.18.0`
-* `community.general >= 12.0.0, < 14.0.0`
-* `cloudflare >= 5.6.0, < 6`
+- Python `>= 3.13`
+- `ansible-core >= 2.18.0`
+- `community.general >= 12.0.0, < 14.0.0`
+- `cloudflare >= 5.6.0, < 6`
 
-# Examples
+## Installation
 
-Example playbooks and inventory can be found [here](examples/)
+    ansible-galaxy collection install linuxhq.cloudflare
 
-# Tokens
+## Development
 
-The use of these roles will require an api token which can be generated using the link below
+    make
+    source venv/bin/activate
 
-* https://dash.cloudflare.com/profile/api-tokens
+### Build
 
-## Permissions
+    ansible-galaxy collection build
 
-If you plan to utilize all the roles in this collection you'll need the following permissions
+### Changelog
+
+    antsibull-changelog generate
+
+### Lint
+
+    ansible-lint
+    yamllint -s .
+
+### Test
+
+Every role includes a Molecule scenario with an example playbook.
+
+## Examples
+
+Example playbooks and inventory are available in [`examples/`](examples/).
+
+## Tokens
+
+These roles require an API token created from the
+[Cloudflare dashboard](https://dash.cloudflare.com/profile/api-tokens).
+
+### Permissions
+
+Using every role in the collection requires the following permissions:
 
 | Type    | Permission                                            | Value |
 | ------- | ----------------------------------------------------- | ----- |
