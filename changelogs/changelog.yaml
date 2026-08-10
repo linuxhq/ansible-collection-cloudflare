@@ -243,3 +243,28 @@ releases:
     fragments:
     - cloudflare-sdk-5.6.yml
     release_date: '2026-07-24'
+  2.1.7:
+    changes:
+      bugfixes:
+      - access groups and policies - ignore provider-only nested response fields during
+        idempotence comparisons.
+      - all modules - encode dynamic API path segments and query values before sending
+        raw SDK requests.
+      - cfd_tunnel_configurations - accept an unconfigured remote tunnel as an empty
+        configuration instead of reporting malformed API data.
+      - pagerules - follow API pagination when locating existing rules.
+      - rules_lists - consume the SDK item iterator, validate bulk operations, and
+        enforce the operation deadline.
+      - zones - update zone properties in one request and validate settings before
+        creating or changing a zone.
+      minor_changes:
+      - all modules - expand Ansible documentation for nested return values, check-mode
+        support, requirements, and stable response fields.
+      - all modules - validate required Cloudflare response fields before reporting
+        successful operations.
+      release_summary: Plugin hardening release that improves API response validation,
+        pagination, idempotence, secret handling, and Ansible documentation across
+        the collection.
+    fragments:
+    - plugin-audit.yml
+    release_date: '2026-08-09'
