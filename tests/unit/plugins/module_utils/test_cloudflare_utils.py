@@ -70,6 +70,14 @@ class Model:
 
 
 class CloudflareUtilsTests(TestCase):
+    def test_error_context_preserves_non_sdk_errors_without_sdk(self):
+        with (
+            patch.object(cloudflare_utils, "cloudflare", None),
+            self.assertRaisesRegex(RuntimeError, "validation failed"),
+            cloudflare_error_context("Request failed"),
+        ):
+            raise RuntimeError("validation failed")
+
     def test_delete_result_verifies_expected_resource(self):
         with patch.object(
             cloudflare_utils,

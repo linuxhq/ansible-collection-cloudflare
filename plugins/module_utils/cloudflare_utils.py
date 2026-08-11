@@ -34,9 +34,10 @@ class CloudflareResponseError(Exception):
 
 @contextmanager
 def cloudflare_error_context(message, **context):
+    api_error = getattr(cloudflare, "APIError", ())
     try:
         yield
-    except cloudflare.APIError as exc:
+    except api_error as exc:
         exc._cloudflare_message = message
         exc._cloudflare_context = context
         raise
