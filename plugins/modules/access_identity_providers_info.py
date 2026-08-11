@@ -73,6 +73,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     cloudflare_path,
     list_all,
+    remove_fields,
     validate_resource_fields,
 )
 
@@ -87,12 +88,18 @@ def list_resources(module, client):
             "identity_providers",
         ),
     )
-    validate_resource_fields(module, providers, "id", "Access identity provider")
+    validate_resource_fields(
+        module, providers, ("id", "type"), "Access identity provider"
+    )
 
     for provider in providers:
+        name = provider.get("name")
+        if not isinstance(name, str) or name != name.strip():
+            module.fail_json(
+                msg="Cloudflare API returned malformed Access identity provider data"
+            )
         for section, field in (("config", "client_secret"), ("scim_config", "secret")):
-            if isinstance(provider.get(section), dict):
-                provider[section].pop(field, None)
+            remove_fields(provider.get(section), (field,))
 
     module.exit_json(changed=False, access_identity_providers=providers)
 

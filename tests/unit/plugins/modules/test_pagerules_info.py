@@ -7,6 +7,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.modules import pagerules_inf
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
 )
 
 
@@ -14,7 +15,7 @@ class PageRulesInfoTests(TestCase):
     def test_lists_rules_for_zones_with_ids(self):
         module = FakeModule({})
         zones = [{"id": "zone", "name": "example.com"}]
-        rules = [{"id": "rule"}]
+        rules = [{"id": "rule", "actions": [], "targets": []}]
 
         with (
             patch.object(
@@ -39,3 +40,21 @@ class PageRulesInfoTests(TestCase):
                 }
             ],
         )
+
+    def test_rejects_malformed_rule_collections(self):
+        for rule in (
+            {"id": "rule", "actions": {}, "targets": []},
+            {"id": "rule", "actions": [], "targets": ["invalid"]},
+        ):
+            with (
+                self.subTest(rule=rule),
+                patch.object(
+                    pagerules_info,
+                    "list_all",
+                    side_effect=[[{"id": "zone", "name": "example.com"}], [rule]],
+                ),
+                self.assertRaises(ModuleFail) as raised,
+            ):
+                pagerules_info.list_resources(FakeModule({}), {})
+
+            self.assertIn("malformed page rule", raised.exception.values["msg"])

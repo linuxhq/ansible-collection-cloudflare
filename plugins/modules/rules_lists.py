@@ -146,8 +146,10 @@ import time
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    CloudflareResponseError,
     cloudflare,
     cloudflare_client,
+    cloudflare_error_context,
     cloudflare_path,
     delete_result,
     fail_from_cloudflare_error,
@@ -156,8 +158,10 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     post_result,
     put_result,
     require_mapping,
+    resource_field,
     resource_id,
     serialize_resource,
+    validate_requested_values,
     values_differ,
 )
 
@@ -195,6 +199,25 @@ def items_endpoint(account_id, list_id):
     return cloudflare_path("accounts", account_id, "rules", "lists", list_id, "items")
 
 
+def list_items(module, client, account_id, list_id):
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering Rules list items",
+        account_id=account_id,
+        rules_list_id=list_id,
+    ):
+        items = [
+            serialize_resource(item)
+            for item in client.rules.lists.items.list(
+                list_id,
+                account_id=account_id,
+                per_page=ITEMS_PER_PAGE,
+            )
+        ]
+    for item in items:
+        require_mapping(module, item, "Rules list item")
+    return items
+
+
 def operation_endpoint(account_id, operation_id):
     return cloudflare_path(
         "accounts",
@@ -222,12 +245,18 @@ def transient_error(exc):
 
 def submit_items(client, account_id, list_id, elements, deadline):
     while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise CloudflareResponseError(
+                "Timed out submitting the Rules list items operation"
+            )
+
         try:
             return put_result(
                 client,
                 items_endpoint(account_id, list_id),
                 elements,
-                timeout=max(deadline - time.monotonic(), 1),
+                timeout=remaining,
             )
         except (cloudflare.APIConnectionError, cloudflare.APIStatusError) as exc:
             if (
@@ -243,7 +272,11 @@ def wait_for_operation(module, client, account_id, operation, deadline):
     operation_id = None
     if isinstance(operation, dict):
         operation_id = operation.get("operation_id") or operation.get("id")
-    if not isinstance(operation_id, str) or not operation_id.strip():
+    if (
+        not isinstance(operation_id, str)
+        or not operation_id.strip()
+        or operation_id != operation_id.strip()
+    ):
         module.fail_json(
             msg="Rules list items submission did not return an operation id",
             operation=operation,
@@ -252,7 +285,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
     status = {}
     while True:
         remaining = deadline - time.monotonic()
-        if remaining < 1:
+        if remaining <= 0:
             module.fail_json(
                 msg="Timed out waiting for the rules list items operation to complete",
                 operation_id=operation_id,
@@ -267,7 +300,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
                 timeout=remaining,
             )
         except (cloudflare.APIConnectionError, cloudflare.APIStatusError) as exc:
-            if not transient_error(exc) or deadline - time.monotonic() < 1:
+            if not transient_error(exc) or deadline - time.monotonic() <= 0:
                 fail_from_cloudflare_error(
                     module,
                     "Cloudflare API request failed while waiting for the rules "
@@ -376,24 +409,36 @@ def ensure_present(module, client):
         if module.check_mode:
             module.exit_json(changed=True, message="Rules list would be created")
 
+        payload = {
+            "description": (
+                params["name"]
+                if params.get("description") is None
+                else params["description"]
+            ),
+            "kind": params["kind"],
+            "name": params["name"],
+        }
         current = post_result(
             client,
             endpoint(params["account_id"]),
-            {
-                "description": (
-                    params["name"]
-                    if params.get("description") is None
-                    else params["description"]
-                ),
-                "kind": params["kind"],
-                "name": params["name"],
-            },
+            payload,
         )
         resource_id(module, current, "Rules list")
+        resource_field(module, current, "name", "Rules list", expected=params["name"])
+        resource_field(module, current, "kind", "Rules list", expected=params["kind"])
+        validate_requested_values(module, current, payload, "Rules list")
+        current_kind = params["kind"]
         changed = True
         created = True
     else:
         current_id = resource_id(module, current, "Rules list")
+        current_kind = resource_field(module, current, "kind", "Rules list")
+        if params.get("kind") is not None and params["kind"] != current_kind:
+            module.fail_json(
+                msg="An existing Rules list kind cannot be changed",
+                rules_list=current,
+            )
+
         desired_description = params.get("description")
         if (
             desired_description is not None
@@ -411,7 +456,17 @@ def ensure_present(module, client):
                 item_endpoint(params["account_id"], current_id),
                 {"description": desired_description},
             )
-            resource_id(module, current, "Rules list")
+            resource_id(module, current, "Rules list", expected=current_id)
+            resource_field(
+                module, current, "name", "Rules list", expected=params["name"]
+            )
+            resource_field(module, current, "kind", "Rules list", expected=current_kind)
+            validate_requested_values(
+                module,
+                current,
+                {"description": desired_description},
+                "Rules list",
+            )
             changed = True
 
     current_id = resource_id(module, current, "Rules list")
@@ -431,19 +486,10 @@ def ensure_present(module, client):
         if current_count is not None and current_count != len(desired_items):
             items_changed = True
         else:
-            current_items = [
-                serialize_resource(item)
-                for item in client.rules.lists.items.list(
-                    current_id,
-                    account_id=params["account_id"],
-                    per_page=ITEMS_PER_PAGE,
-                )
-            ]
-            for item in current_items:
-                require_mapping(module, item, "Rules list item")
-
             items_changed = values_differ(
-                normalize_items(current_items),
+                normalize_items(
+                    list_items(module, client, params["account_id"], current_id)
+                ),
                 desired_items,
             )
 
@@ -464,7 +510,7 @@ def ensure_present(module, client):
                     client,
                     params["account_id"],
                     current_id,
-                    params["elements"],
+                    desired_items,
                     deadline,
                 ),
                 deadline,
@@ -474,7 +520,20 @@ def ensure_present(module, client):
                 item_endpoint(params["account_id"], current_id),
                 default=current,
             )
-            current_id = resource_id(module, current, "Rules list")
+            resource_id(module, current, "Rules list", expected=current_id)
+            resource_field(
+                module, current, "name", "Rules list", expected=params["name"]
+            )
+            resource_field(module, current, "kind", "Rules list", expected=current_kind)
+            if values_differ(
+                normalize_items(
+                    list_items(module, client, params["account_id"], current_id)
+                ),
+                desired_items,
+            ):
+                module.fail_json(
+                    msg="Cloudflare did not apply the requested Rules list items"
+                )
 
     if not changed and not items_changed:
         module.exit_json(
@@ -483,12 +542,14 @@ def ensure_present(module, client):
             rules_list=current,
         )
 
-    module.exit_json(
-        changed=True,
-        message="Rules list created" if created else "Rules list updated",
-        rules_list=current,
-        items_operation=items_operation,
-    )
+    result = {
+        "changed": True,
+        "message": "Rules list created" if created else "Rules list updated",
+        "rules_list": current,
+    }
+    if items_operation is not None:
+        result["items_operation"] = items_operation
+    module.exit_json(**result)
 
 
 def ensure_absent(module, client):
@@ -513,7 +574,9 @@ def ensure_absent(module, client):
         )
 
     current_id = resource_id(module, current, "Rules list")
-    delete_result(client, item_endpoint(params["account_id"], current_id))
+    delete_result(
+        client, item_endpoint(params["account_id"], current_id), expected_id=current_id
+    )
     module.exit_json(
         changed=True,
         message="Rules list deleted",

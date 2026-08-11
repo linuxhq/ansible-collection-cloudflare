@@ -7,6 +7,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.modules import devices_setti
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
 )
 
 
@@ -39,7 +40,7 @@ class DevicesSettingsTests(TestCase):
 
     def test_updates_changed_settings(self):
         module = FakeModule(params(gateway_proxy_enabled=True))
-        updated = {"gateway_proxy_enabled": True}
+        updated = params(gateway_proxy_enabled=True)
 
         with (
             patch.object(devices_settings, "get_result", return_value=params()),
@@ -64,3 +65,15 @@ class DevicesSettingsTests(TestCase):
             },
         )
         self.assertEqual(raised.exception.values["devices_settings"], updated)
+
+    def test_rejects_update_response_with_wrong_settings(self):
+        module = FakeModule(params(gateway_proxy_enabled=True))
+
+        with (
+            patch.object(devices_settings, "get_result", return_value=params()),
+            patch.object(devices_settings, "patch_result", return_value=params()),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            devices_settings.ensure_present(module, {})
+
+        self.assertIn("did not apply", raised.exception.values["msg"])

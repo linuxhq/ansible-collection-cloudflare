@@ -17,7 +17,7 @@ class CfdTunnelConfigurationsInfoTests(TestCase):
         module = FakeModule({"account_id": "account"})
         tunnels = [
             {"id": "remote", "name": "one", "remote_config": True},
-            {"id": "local", "name": "two", "remote_config": False},
+            {"id": "local", "name": "two", "config_src": "local"},
         ]
 
         with (

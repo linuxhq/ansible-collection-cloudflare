@@ -12,6 +12,7 @@ Gather information about cloudflare warp connectors
 
     warp_connector_info_account_id: null
     warp_connector_info_api_token: null
+    warp_connector_info_include_token: false
 
 ## Dependencies
 
@@ -30,3 +31,4 @@ Gather information about cloudflare warp connectors
         - role: linuxhq.cloudflare.warp_connector_info
           warp_connector_info_account_id: '{{ _accounts_info_id }}'
           warp_connector_info_api_token: '{{ accounts_info_api_token }}'
+          warp_connector_info_include_token: false

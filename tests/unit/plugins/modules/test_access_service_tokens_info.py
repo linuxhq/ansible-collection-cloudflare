@@ -15,7 +15,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 class AccessServiceTokensInfoTests(TestCase):
     def test_lists_service_tokens(self):
         module = FakeModule({"account_id": "account"})
-        tokens = [{"id": "one"}]
+        tokens = [{"id": "one", "name": "automation"}]
 
         with (
             patch.object(

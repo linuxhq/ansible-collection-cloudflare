@@ -56,7 +56,7 @@ rulesets:
       type: str
     name:
       description: Cloudflare zone name.
-      returned: when available
+      returned: always
       type: str
     phase:
       description: Cloudflare request phase controlled by the ruleset.
@@ -80,6 +80,8 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_path,
     get_result,
     list_all,
+    require_mapping,
+    resource_field,
     resource_id,
 )
 
@@ -90,6 +92,7 @@ def list_resources(module, client):
 
     for zone in zones:
         zone_id = resource_id(module, zone, "zone")
+        zone_name = resource_field(module, zone, "name", "zone")
 
         ruleset = get_result(
             client,
@@ -104,19 +107,24 @@ def list_resources(module, client):
             default=None,
             ok_statuses=[404],
         )
-        ruleset_id = None
+        rules = []
         if ruleset is not None:
             ruleset_id = resource_id(module, ruleset, "ruleset")
+            resource_field(
+                module, ruleset, "phase", "ruleset", expected=module.params["phase"]
+            )
+            rules = ruleset.get("rules")
+            if rules is None:
+                rules = []
+            elif not isinstance(rules, list):
+                module.fail_json(msg="Cloudflare API returned malformed ruleset data")
+            for rule in rules:
+                require_mapping(module, rule, "ruleset rule")
 
-        rulesets.append(
-            {
-                "id": ruleset_id,
-                "name": zone.get("name"),
-                "phase": ruleset.get("phase") if ruleset else None,
-                "rules": ruleset.get("rules") or [] if ruleset else [],
-                "zone_id": zone_id,
-            }
-        )
+        entry = {"name": zone_name, "rules": rules, "zone_id": zone_id}
+        if ruleset is not None:
+            entry.update(id=ruleset_id, phase=ruleset["phase"])
+        rulesets.append(entry)
 
     module.exit_json(changed=False, rulesets=rulesets)
 

@@ -113,7 +113,7 @@ zone:
       type: str
 settings:
   description: Updated zone settings.
-  returned: when settings changed
+  returned: when the zone or its settings changed
   type: list
   elements: dict
   contains:
@@ -142,8 +142,10 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     get_result,
     patch_result,
     post_result,
+    resource_field,
     resource_id,
     select_fields,
+    validate_requested_values,
     values_differ,
 )
 
@@ -177,14 +179,19 @@ def zone_endpoint(zone_id=None):
 def ensure_present(module, client):
     params = module.params
 
+    setting_ids = set()
     for setting in params.get("settings") or []:
         if (
             not isinstance(setting.get("id"), str)
             or not setting["id"].strip()
             or setting["id"] != setting["id"].strip()
             or "value" not in setting
+            or setting["id"] in setting_ids
         ):
-            module.fail_json(msg="Each zone setting requires a valid id and value")
+            module.fail_json(
+                msg="Each zone setting requires a unique valid id and value"
+            )
+        setting_ids.add(setting["id"])
 
     current = find_by_name(
         client,
@@ -200,16 +207,15 @@ def ensure_present(module, client):
         if module.check_mode:
             module.exit_json(changed=True, message="Zone would be created")
 
-        current = post_result(
-            client,
-            zone_endpoint(),
-            {
-                "account": {"id": params["account_id"]},
-                "name": params["name"],
-                "type": params.get("type") or "full",
-            },
-        )
+        payload = {
+            "account": {"id": params["account_id"]},
+            "name": params["name"],
+            "type": params.get("type") or "full",
+        }
+        current = post_result(client, zone_endpoint(), payload)
         current_id = resource_id(module, current, "zone")
+        resource_field(module, current, "name", "zone", expected=params["name"])
+        validate_requested_values(module, current, payload, "zone")
 
         if params.get("vanity_name_servers") is not None:
             current = patch_result(
@@ -217,7 +223,14 @@ def ensure_present(module, client):
                 zone_endpoint(current_id),
                 {"vanity_name_servers": params["vanity_name_servers"]},
             )
-            current_id = resource_id(module, current, "zone")
+            current_id = resource_id(module, current, "zone", expected=current_id)
+            resource_field(module, current, "name", "zone", expected=params["name"])
+            validate_requested_values(
+                module,
+                current,
+                {"vanity_name_servers": params["vanity_name_servers"]},
+                "zone",
+            )
 
         changed = True
         created = True
@@ -238,7 +251,9 @@ def ensure_present(module, client):
                 )
 
             current = patch_result(client, zone_endpoint(current_id), payload)
-            current_id = resource_id(module, current, "zone")
+            current_id = resource_id(module, current, "zone", expected=current_id)
+            resource_field(module, current, "name", "zone", expected=params["name"])
+            validate_requested_values(module, current, payload, "zone")
             changed = True
         created = False
 
@@ -269,7 +284,13 @@ def ensure_present(module, client):
             settings_endpoint(current_id, setting["id"]),
             {"value": setting["value"]},
         )
-        resource_id(module, updated_setting, "zone setting")
+        resource_id(module, updated_setting, "zone setting", expected=setting["id"])
+        if "value" not in updated_setting:
+            module.fail_json(msg="Cloudflare API returned malformed zone setting data")
+        if normalize_setting_value(updated_setting["value"]) != normalize_setting_value(
+            setting["value"]
+        ):
+            module.fail_json(msg="Cloudflare did not apply the requested zone setting")
         updated_settings.append(updated_setting)
 
     if not changed and not updated_settings:
@@ -305,7 +326,7 @@ def ensure_absent(module, client):
             zone=current,
         )
 
-    delete_result(client, zone_endpoint(current_id))
+    delete_result(client, zone_endpoint(current_id), expected_id=current_id)
     module.exit_json(changed=True, message="Zone deleted", zone=current)
 
 

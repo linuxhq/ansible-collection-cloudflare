@@ -4,10 +4,14 @@ from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
 
+from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    CloudflareResponseError,
+)
 from ansible_collections.linuxhq.cloudflare.plugins.modules import warp_connector
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
 )
 
 
@@ -61,7 +65,9 @@ class WarpConnectorTests(TestCase):
         self.assertEqual(raised.exception.values["warp_connector"], created)
 
     def test_secret_failure_rolls_back_created_connector(self):
-        module = FakeModule(params(tunnel_secret="secret"))
+        module = FakeModule(
+            params(tunnel_secret="eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=")
+        )
         error = ApiStatusError("rejected")
 
         with (
@@ -70,7 +76,7 @@ class WarpConnectorTests(TestCase):
             patch.object(
                 warp_connector,
                 "post_result",
-                return_value={"id": "connector-id"},
+                return_value={"id": "connector-id", "name": "connector"},
             ),
             patch.object(warp_connector, "patch_result", side_effect=error),
             patch.object(warp_connector, "delete_result") as delete,
@@ -82,6 +88,65 @@ class WarpConnectorTests(TestCase):
         delete.assert_called_once_with(
             {},
             "/accounts/account/warp_connector/connector-id",
+            expected_id="connector-id",
+        )
+
+    def test_reports_connector_id_when_rollback_response_is_malformed(self):
+        module = FakeModule(
+            params(tunnel_secret="eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=")
+        )
+
+        with (
+            patch.object(warp_connector, "cloudflare", ERRORS),
+            patch.object(warp_connector, "find_by_name", return_value=None),
+            patch.object(
+                warp_connector,
+                "post_result",
+                return_value={"id": "connector-id", "name": "connector"},
+            ),
+            patch.object(
+                warp_connector,
+                "patch_result",
+                side_effect=ApiStatusError("rejected"),
+            ),
+            patch.object(
+                warp_connector,
+                "delete_result",
+                side_effect=CloudflareResponseError("malformed response"),
+            ),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            warp_connector.ensure_present(module, {})
+
+        self.assertEqual(raised.exception.values["warp_connector_id"], "connector-id")
+
+    def test_wrong_secret_response_rolls_back_created_connector(self):
+        module = FakeModule(
+            params(tunnel_secret="eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=")
+        )
+
+        with (
+            patch.object(warp_connector, "cloudflare", ERRORS),
+            patch.object(warp_connector, "find_by_name", return_value=None),
+            patch.object(
+                warp_connector,
+                "post_result",
+                return_value={"id": "connector-id", "name": "connector"},
+            ),
+            patch.object(
+                warp_connector,
+                "patch_result",
+                return_value={"id": "wrong", "name": "connector"},
+            ),
+            patch.object(warp_connector, "delete_result") as delete,
+            self.assertRaises(CloudflareResponseError),
+        ):
+            warp_connector.ensure_present(module, {})
+
+        delete.assert_called_once_with(
+            {},
+            "/accounts/account/warp_connector/connector-id",
+            expected_id="connector-id",
         )
 
     def test_missing_connector_is_already_absent(self):

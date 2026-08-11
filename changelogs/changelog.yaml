@@ -268,3 +268,149 @@ releases:
     fragments:
     - plugin-audit.yml
     release_date: '2026-08-09'
+  2.1.8:
+    changes:
+      bugfixes:
+      - Access application, group, and policy managers - verify that mutation responses
+        contain the requested configuration before reporting success.
+      - SDK-backed modules - preserve operation and resource context in sanitized
+        failures from generated client calls.
+      - access_apps and pages_projects - reject blank or padded application domains
+        and production branch names before making Cloudflare API calls.
+      - access_identity_providers_info - accept Cloudflare's empty display name for
+        the built-in one-time PIN provider.
+      - access_service_tokens - verify that create and update responses reflect the
+        requested token duration.
+      - accounts_info - return an empty mapping rather than null when no account matches
+        the requested name.
+      - cfd_tunnel - require an unambiguous local-management signal before sending
+        a tunnel secret during rotation.
+      - cfd_tunnel - verify that creation returns the requested immutable configuration
+        source.
+      - cfd_tunnel_configurations - verify that update responses contain the requested
+        tunnel configuration before reporting success.
+      - cfd_tunnel_configurations_info - skip locally managed tunnels identified by
+        either documented configuration-source field.
+      - cfd_tunnel_info role - expose token retrieval through the secure-by-default
+        C(cfd_tunnel_info_include_token) variable.
+      - devices_settings - document C(disable_for_time) in the seconds expected by
+        Cloudflare instead of incorrectly describing it as minutes.
+      - dnssec - verify that update responses contain every requested setting before
+        reporting success.
+      - dnssec and dnssec_info - document the complete public DNSSEC response schema.
+      - dnssec_info - keep skipped-zone error and message list elements as mappings
+        when Cloudflare returns malformed structured details.
+      - dnssec_info - keep skipped-zone error and message result fields as lists when
+        Cloudflare returns malformed structured error data.
+      - dnssec_info - preserve zone context in generic SDK failures.
+      - info modules - reject malformed resources missing documented identity fields.
+      - manager modules - reject malformed mutation responses missing documented identity
+        and setting fields.
+      - manager modules - verify create, update, and documented delete responses identify
+        the requested resource.
+      - module utilities - continue pagination for full bare-list response pages.
+      - module utilities - preserve explicit null result fields in successful API
+        envelopes, including valid delete responses.
+      - module utilities - preserve the raw API operation and encoded path in sanitized
+        failures.
+      - module utilities - reject contradictory pagination metadata instead of silently
+        returning an incomplete resource list.
+      - module utilities - reject malformed pagination metadata, including empty pages
+        with invalid counts.
+      - module utilities - reject mismatched provider page and item-count metadata
+        instead of returning duplicated or incomplete resource lists.
+      - module utilities - reject non-string provider names during resource lookup
+        instead of treating malformed resources as absent.
+      - module utilities - reject successful API envelopes missing their required
+        result field instead of treating them as empty data.
+      - module utilities - serialize Cloudflare SDK models in JSON mode so datetime
+        response fields are safe for Ansible results.
+      - module utilities - validate pagination metadata before yielding items so early-exit
+        resource lookups cannot bypass malformed-page detection.
+      - modules with secret rotation - reject rotation requests that omit the credential
+        input instead of silently reporting no change.
+      - pagerules - fail on ambiguous duplicate target matches instead of mutating
+        an arbitrary page rule.
+      - pagerules - ignore provider-added nested response fields when matching and
+        comparing managed page rule configuration.
+      - pagerules - reject malformed target elements before matching page rules.
+      - pagerules - verify that create and update responses contain the requested
+        target constraints before reporting success.
+      - pagerules and rulesets - reject malformed provider collection fields instead
+        of treating them as missing or empty state.
+      - pagerules and rulesets - verify that mutation responses contain the complete
+        requested rule configuration before reporting success.
+      - pagerules_info - validate documented action and target collections before
+        returning provider data.
+      - pages_projects - do not let an unobservable write-only analytics token force
+        repeated updates unless secret rotation is requested.
+      - pages_projects - reject malformed project domain collections instead of treating
+        strings or mappings as domain lists.
+      - pages_projects - reject whitespace-padded domain names returned by Cloudflare.
+      - pages_projects - require an actual write-only credential before forced secret
+        rotation instead of repeatedly updating plain-text deployment configuration.
+      - pages_projects - validate requested domain names before making Cloudflare
+        API calls.
+      - pages_projects - verify observable project fields in mutation responses before
+        reporting success.
+      - pages_projects and zones - document conditional collection results according
+        to when the modules actually return them.
+      - purge_cache - enforce shared token and identifier validation in check mode
+        without opening an SDK client.
+      - rules_lists - allow operation polling to use the documented one-second timeout
+        instead of failing early when less than one second remains.
+      - rules_lists - keep bulk-item submission requests within the remaining operation
+        timeout instead of rounding subsecond budgets up to one second.
+      - rules_lists - omit the conditional bulk-operation result for metadata-only
+        changes instead of returning null for a documented dictionary.
+      - rules_lists - re-read list items after a completed bulk operation and fail
+        if the requested contents were not applied.
+      - rules_lists - reject attempts to change an existing list's immutable kind.
+      - rules_lists - reject malformed bulk-operation identifiers before using them
+        in API paths.
+      - rules_lists - submit the same normalized, deduplicated items used for idempotence
+        comparisons.
+      - rules_lists - verify that create and update responses contain the requested
+        list metadata before reporting success.
+      - rulesets - reject malformed rule elements instead of returning or comparing
+        non-mapping values.
+      - rulesets - verify that fetched and mutated entrypoints belong to the requested
+        phase, and that created rulesets have the requested kind.
+      - rulesets_info - omit conditional ruleset identifiers and phases when a zone
+        has no entrypoint instead of returning null string fields.
+      - settings managers - verify that update responses contain every requested setting
+        before reporting success.
+      - tunnel modules - validate the documented base64 encoding and minimum decoded
+        length of tunnel secrets before calling Cloudflare, and reject secrets for
+        remotely managed cloudflared tunnels.
+      - warp_connector - retain manual cleanup guidance and the created connector
+        ID when a secret rollback returns malformed response data.
+      - warp_connector - roll back a newly created connector when the secret update
+        returns malformed or mismatched resource data.
+      - warp_connector - verify secret-application rollback deletes the connector
+        that was just created.
+      - warp_connector_info role - expose token retrieval through the secure-by-default
+        C(warp_connector_info_include_token) variable.
+      - zones - reject duplicate setting identifiers before issuing contradictory
+        updates.
+      - zones - verify that create and update responses contain the requested account
+        and zone configuration before reporting success.
+      - zones - verify that setting update responses contain the requested normalized
+        value before reporting success.
+      security_fixes:
+      - Access and Pages modules - recursively remove credential fields from malformed
+        or unexpectedly nested provider response structures.
+      - Access application modules - remove SaaS client secrets as well as SCIM credentials
+        from returned applications.
+      - Pages project modules - redact C(secret_text) values and web analytics tokens
+        from manager and info results, and mark their inputs as sensitive so Ansible
+        masks project credentials.
+      - Pages project modules - redact secret values nested in canonical and latest
+        deployment summaries.
+      - connector info modules - retrieve sensitive connector tokens only when explicitly
+        requested.
+      - dnssec_info - redact sensitive values from structured errors returned for
+        skipped zones.
+    fragments:
+    - plugin-pagination-items.yml
+    release_date: '2026-08-11'

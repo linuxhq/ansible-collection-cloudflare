@@ -18,8 +18,13 @@ class AccessIdentityProvidersInfoTests(TestCase):
         providers = [
             {
                 "id": "provider",
-                "config": {"client_id": "id", "client_secret": "secret"},
-                "scim_config": {"secret": "secret"},
+                "name": "",
+                "type": "onetimepin",
+                "config": {
+                    "client_id": "id",
+                    "nested": [{"client_secret": "secret"}],
+                },
+                "scim_config": [{"secret": "secret"}],
             }
         ]
 
@@ -39,5 +44,13 @@ class AccessIdentityProvidersInfoTests(TestCase):
         )
         self.assertEqual(
             raised.exception.values["access_identity_providers"],
-            [{"id": "provider", "config": {"client_id": "id"}, "scim_config": {}}],
+            [
+                {
+                    "id": "provider",
+                    "name": "",
+                    "type": "onetimepin",
+                    "config": {"client_id": "id", "nested": [{}]},
+                    "scim_config": [{}],
+                }
+            ],
         )

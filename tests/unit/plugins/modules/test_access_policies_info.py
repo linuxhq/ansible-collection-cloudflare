@@ -13,7 +13,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 class AccessPoliciesInfoTests(TestCase):
     def test_lists_policies(self):
         module = FakeModule({"account_id": "account"})
-        policies = [{"id": "one"}]
+        policies = [{"id": "one", "name": "admins"}]
 
         with (
             patch.object(

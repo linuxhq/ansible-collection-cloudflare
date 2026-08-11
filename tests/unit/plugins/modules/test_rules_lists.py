@@ -98,16 +98,44 @@ class RulesListsTests(TestCase):
         self.assertEqual(put.call_count, 2)
         sleep.assert_called_once_with(rules_lists.OPERATION_POLL_SECONDS)
 
-    def test_wait_rejects_missing_operation_identifier(self):
-        module = FakeModule({})
+    def test_submit_honors_subsecond_and_expired_deadlines(self):
+        with (
+            patch.object(rules_lists.time, "monotonic", return_value=0.5),
+            patch.object(
+                rules_lists, "put_result", return_value={"id": "operation"}
+            ) as put,
+        ):
+            rules_lists.submit_items({}, "account", "list", [], 1)
 
-        with self.assertRaises(ModuleFail) as raised:
-            rules_lists.wait_for_operation(module, {}, "account", {}, 30)
-
-        self.assertEqual(
-            raised.exception.values["msg"],
-            "Rules list items submission did not return an operation id",
+        put.assert_called_once_with(
+            {},
+            "/accounts/account/rules/lists/list/items",
+            [],
+            timeout=0.5,
         )
+
+        with (
+            patch.object(rules_lists.time, "monotonic", return_value=1),
+            self.assertRaisesRegex(
+                rules_lists.CloudflareResponseError, "Timed out submitting"
+            ),
+        ):
+            rules_lists.submit_items({}, "account", "list", [], 1)
+
+    def test_wait_rejects_missing_operation_identifier(self):
+        for operation in ({}, {"operation_id": " operation "}):
+            with (
+                self.subTest(operation=operation),
+                self.assertRaises(ModuleFail) as raised,
+            ):
+                rules_lists.wait_for_operation(
+                    FakeModule({}), {}, "account", operation, 30
+                )
+
+            self.assertEqual(
+                raised.exception.values["msg"],
+                "Rules list items submission did not return an operation id",
+            )
 
     def test_wait_returns_completed_operation(self):
         module = FakeModule({})
@@ -130,6 +158,26 @@ class RulesListsTests(TestCase):
             "/accounts/account/rules/lists/bulk_operations/operation",
             default={},
             timeout=29,
+        )
+        self.assertEqual(result, completed)
+
+    def test_wait_uses_remaining_subsecond_budget(self):
+        module = FakeModule({})
+        completed = {"id": "operation", "status": "completed"}
+
+        with (
+            patch.object(rules_lists.time, "monotonic", return_value=0.5),
+            patch.object(rules_lists, "get_result", return_value=completed) as get,
+        ):
+            result = rules_lists.wait_for_operation(
+                module, {}, "account", {"id": "operation"}, 1
+            )
+
+        get.assert_called_once_with(
+            {},
+            "/accounts/account/rules/lists/bulk_operations/operation",
+            default={},
+            timeout=0.5,
         )
         self.assertEqual(result, completed)
 
@@ -176,6 +224,7 @@ class RulesListsTests(TestCase):
         current = {
             "id": "list",
             "name": "addresses",
+            "kind": "ip",
             "description": "current",
         }
 
@@ -189,9 +238,66 @@ class RulesListsTests(TestCase):
         put.assert_not_called()
         self.assertFalse(raised.exception.values["changed"])
 
+    def test_rejects_update_response_with_wrong_description(self):
+        module = FakeModule(params(description="desired"))
+        current = {
+            "id": "list",
+            "name": "addresses",
+            "kind": "ip",
+            "description": "current",
+        }
+
+        with (
+            patch.object(rules_lists, "find_by_field", return_value=current),
+            patch.object(rules_lists, "put_result", return_value=current),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            rules_lists.ensure_present(module, {})
+
+        self.assertIn("did not apply", raised.exception.values["msg"])
+
+    def test_metadata_update_omits_items_operation(self):
+        module = FakeModule(params(description="desired"))
+        current = {
+            "id": "list",
+            "name": "addresses",
+            "kind": "ip",
+            "description": "current",
+        }
+        updated = {**current, "description": "desired"}
+
+        with (
+            patch.object(rules_lists, "find_by_field", return_value=current),
+            patch.object(rules_lists, "put_result", return_value=updated),
+            self.assertRaises(ModuleExit) as raised,
+        ):
+            rules_lists.ensure_present(module, {})
+
+        self.assertNotIn("items_operation", raised.exception.values)
+
+    def test_rejects_kind_change(self):
+        module = FakeModule(params(kind="hostname", elements=[]))
+        current = {"id": "list", "name": "addresses", "kind": "ip"}
+
+        with (
+            patch.object(rules_lists, "find_by_field", return_value=current),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            rules_lists.ensure_present(module, Mock())
+
+        self.assertEqual(
+            raised.exception.values["msg"],
+            "An existing Rules list kind cannot be changed",
+        )
+
     def test_generated_sdk_iterator_reads_all_current_items(self):
         module = FakeModule(params(elements=[{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}]))
-        current = {"id": "list", "name": "addresses", "num_items": 2}
+        current = {
+            "id": "list",
+            "name": "addresses",
+            "kind": "ip",
+            "num_items": 2,
+        }
         client = Mock()
         client.rules.lists.items.list.return_value = [
             Model({"ip": "192.0.2.1"}),
@@ -212,3 +318,62 @@ class RulesListsTests(TestCase):
         )
         submit.assert_not_called()
         self.assertFalse(raised.exception.values["changed"])
+
+    def test_submits_normalized_items(self):
+        elements = [{"ip": "192.0.2.1", "comment": ""}, {"ip": "192.0.2.1"}]
+        module = FakeModule(params(elements=elements))
+        current = {
+            "id": "list",
+            "name": "addresses",
+            "kind": "ip",
+            "num_items": 0,
+        }
+        client = Mock()
+        client.rules.lists.items.list.return_value = [Model({"ip": "192.0.2.1"})]
+
+        with (
+            patch.object(rules_lists, "find_by_field", return_value=current),
+            patch.object(
+                rules_lists, "submit_items", return_value={"id": "operation"}
+            ) as submit,
+            patch.object(
+                rules_lists,
+                "wait_for_operation",
+                return_value={"id": "operation", "status": "completed"},
+            ),
+            patch.object(rules_lists, "get_result", return_value=current),
+            patch.object(rules_lists.time, "monotonic", return_value=1),
+            self.assertRaises(ModuleExit),
+        ):
+            rules_lists.ensure_present(module, client)
+
+        submit.assert_called_once_with(
+            client, "account", "list", [{"ip": "192.0.2.1"}], 31
+        )
+
+    def test_rejects_completed_update_with_wrong_items(self):
+        module = FakeModule(params(elements=[{"ip": "192.0.2.1"}]))
+        current = {
+            "id": "list",
+            "name": "addresses",
+            "kind": "ip",
+            "num_items": 0,
+        }
+        client = Mock()
+        client.rules.lists.items.list.return_value = []
+
+        with (
+            patch.object(rules_lists, "find_by_field", return_value=current),
+            patch.object(rules_lists, "submit_items", return_value={"id": "operation"}),
+            patch.object(
+                rules_lists,
+                "wait_for_operation",
+                return_value={"id": "operation", "status": "completed"},
+            ),
+            patch.object(rules_lists, "get_result", return_value=current),
+            patch.object(rules_lists.time, "monotonic", return_value=1),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            rules_lists.ensure_present(module, client)
+
+        self.assertIn("did not apply", raised.exception.values["msg"])

@@ -64,6 +64,7 @@ account:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_error_context,
     resource_field,
     resource_id,
     serialize_resource,
@@ -71,15 +72,19 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 
 
 def info(module, client):
-    account = None
+    account = {}
 
-    for account_info in client.accounts.list(name=module.params["name"]):
-        account_info = serialize_resource(account_info)
-        account_name = resource_field(module, account_info, "name", "account")
-        resource_id(module, account_info, "account")
-        if account_name == module.params["name"]:
-            account = account_info
-            break
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering accounts",
+        name=module.params["name"],
+    ):
+        for account_info in client.accounts.list(name=module.params["name"]):
+            account_info = serialize_resource(account_info)
+            account_name = resource_field(module, account_info, "name", "account")
+            resource_id(module, account_info, "account")
+            if account_name == module.params["name"]:
+                account = account_info
+                break
 
     module.exit_json(
         changed=False,

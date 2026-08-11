@@ -13,7 +13,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 class WarpConnectorInfoTests(TestCase):
     def test_includes_tokens_when_requested(self):
         module = FakeModule({"account_id": "account", "include_token": True})
-        connectors = [{"id": "connector"}]
+        connectors = [{"id": "connector", "name": "example"}]
 
         with (
             patch.object(warp_connector_info, "list_all", return_value=connectors),
@@ -32,7 +32,7 @@ class WarpConnectorInfoTests(TestCase):
         )
         self.assertEqual(
             raised.exception.values["warp_connectors"],
-            [{"id": "connector", "token": "token"}],
+            [{"id": "connector", "name": "example", "token": "token"}],
         )
 
     def test_omits_tokens_when_not_requested(self):

@@ -13,7 +13,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 class AccessGroupsInfoTests(TestCase):
     def test_lists_groups(self):
         module = FakeModule({"account_id": "account"})
-        groups = [{"id": "one"}]
+        groups = [{"id": "one", "name": "admins"}]
 
         with (
             patch.object(access_groups_info, "list_all", return_value=groups) as listed,

@@ -151,6 +151,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     patch_result,
     payload_from_params,
     require_mapping,
+    validate_requested_values,
     values_differ,
 )
 
@@ -207,7 +208,7 @@ def ensure_present(module, client):
         )
 
     policy = patch_result(client, endpoint(params["account_id"]), payload)
-    require_mapping(module, policy, "device policy")
+    validate_requested_values(module, policy, payload, "device policy")
     module.exit_json(
         changed=True,
         message="Device policy updated",

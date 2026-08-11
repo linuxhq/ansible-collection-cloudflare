@@ -13,7 +13,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 class RulesListsInfoTests(TestCase):
     def test_lists_rules_lists_without_client_pagination(self):
         module = FakeModule({"account_id": "account"})
-        rules_lists = [{"id": "list", "name": "addresses"}]
+        rules_lists = [{"id": "list", "name": "addresses", "kind": "ip"}]
 
         with (
             patch.object(

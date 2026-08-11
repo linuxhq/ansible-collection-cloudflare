@@ -81,7 +81,7 @@ def list_resources(module, client):
             "policies",
         ),
     )
-    validate_resource_fields(module, access_policies, "id", "Access policy")
+    validate_resource_fields(module, access_policies, ("id", "name"), "Access policy")
 
     module.exit_json(changed=False, access_policies=access_policies)
 

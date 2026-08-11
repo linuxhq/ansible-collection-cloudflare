@@ -13,7 +13,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 class ZonesInfoTests(TestCase):
     def test_lists_zones_with_match_mode(self):
         module = FakeModule({"match": "all"})
-        zones = [{"id": "zone"}]
+        zones = [{"id": "zone", "name": "example.com"}]
 
         with (
             patch.object(zones_info, "list_all", return_value=zones) as listed,

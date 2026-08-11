@@ -114,8 +114,10 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     post_result,
     put_result,
+    resource_field,
     resource_id,
     select_fields,
+    validate_requested_values,
     values_differ,
 )
 
@@ -143,6 +145,15 @@ def ensure_present(module, client):
 
         access_group = post_result(client, endpoint(params["account_id"]), payload)
         resource_id(module, access_group, "Access group")
+        resource_field(
+            module, access_group, "name", "Access group", expected=params["name"]
+        )
+        validate_requested_values(
+            module,
+            {"is_default": False, **access_group},
+            payload,
+            "Access group",
+        )
         module.exit_json(
             changed=True,
             message="Access group created",
@@ -150,8 +161,7 @@ def ensure_present(module, client):
         )
 
     current_id = resource_id(module, current, "Access group")
-    comparable_current = current.copy()
-    comparable_current.setdefault("is_default", False)
+    comparable_current = {"is_default": False, **current}
 
     if not values_differ(
         normalize_current_by_desired_fields(
@@ -180,7 +190,16 @@ def ensure_present(module, client):
         ),
         payload,
     )
-    resource_id(module, access_group, "Access group")
+    resource_id(module, access_group, "Access group", expected=current_id)
+    resource_field(
+        module, access_group, "name", "Access group", expected=params["name"]
+    )
+    validate_requested_values(
+        module,
+        {"is_default": False, **access_group},
+        payload,
+        "Access group",
+    )
     module.exit_json(
         changed=True,
         message="Access group updated",
@@ -214,6 +233,7 @@ def ensure_absent(module, client):
         cloudflare_path(
             "accounts", params["account_id"], "access", "groups", current_id
         ),
+        expected_id=current_id,
     )
     module.exit_json(
         changed=True,

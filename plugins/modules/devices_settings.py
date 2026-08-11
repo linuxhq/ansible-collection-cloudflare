@@ -27,7 +27,7 @@ options:
     type: float
     default: 0
     description:
-      - Number of minutes users may temporarily disable the WARP client.
+      - Number of seconds users may temporarily disable the WARP client.
   gateway_proxy_enabled:
     type: bool
     default: false
@@ -101,6 +101,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     require_mapping,
     select_fields,
+    validate_requested_values,
     values_differ,
 )
 
@@ -140,7 +141,7 @@ def ensure_present(module, client):
         )
 
     settings = patch_result(client, endpoint(params["account_id"]), payload)
-    require_mapping(module, settings, "device settings")
+    validate_requested_values(module, settings, payload, "device settings")
     module.exit_json(
         changed=True,
         message="Device settings updated",

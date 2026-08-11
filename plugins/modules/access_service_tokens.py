@@ -112,8 +112,10 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_error_context,
     cloudflare_path,
     find_by_name,
+    resource_field,
     resource_id,
     serialize_resource,
 )
@@ -129,6 +131,15 @@ def service_token_payload(module):
     return payload
 
 
+def duration_matches(service_token, duration):
+    if duration is None:
+        return True
+    current_duration = service_token.get("duration")
+    if current_duration is not None:
+        return current_duration == duration
+    return duration == "forever" and service_token.get("expires_at") in (None, "")
+
+
 def ensure_present(module, client):
     params = module.params
 
@@ -142,12 +153,24 @@ def ensure_present(module, client):
         if module.check_mode:
             module.exit_json(changed=True, message="Service token would be created")
 
-        service_token = serialize_resource(
-            client.zero_trust.access.service_tokens.create(
-                **service_token_payload(module)
+        with cloudflare_error_context(
+            "Cloudflare API request failed while creating a service token",
+            account_id=params["account_id"],
+            name=params["name"],
+        ):
+            service_token = serialize_resource(
+                client.zero_trust.access.service_tokens.create(
+                    **service_token_payload(module)
+                )
             )
-        )
         resource_id(module, service_token, "service token")
+        resource_field(
+            module, service_token, "name", "service token", expected=params["name"]
+        )
+        if not duration_matches(service_token, params["duration"]):
+            module.fail_json(
+                msg="Cloudflare did not apply the requested service token duration"
+            )
         module.exit_json(
             changed=True,
             message="Service token created",
@@ -155,15 +178,7 @@ def ensure_present(module, client):
         )
 
     current_id = resource_id(module, current, "service token")
-    duration = params["duration"]
-    duration_matches = duration is None
-    current_duration = current.get("duration")
-    if duration is not None and current_duration is not None:
-        duration_matches = current_duration == duration
-    elif duration == "forever" and current.get("expires_at") in (None, ""):
-        duration_matches = True
-
-    if duration_matches:
+    if duration_matches(current, params["duration"]):
         module.exit_json(
             changed=False,
             message="Service token already present",
@@ -177,12 +192,24 @@ def ensure_present(module, client):
             service_token=current,
         )
 
-    service_token = client.zero_trust.access.service_tokens.update(
-        current_id,
-        **service_token_payload(module),
-    )
+    with cloudflare_error_context(
+        "Cloudflare API request failed while updating a service token",
+        account_id=params["account_id"],
+        service_token_id=current_id,
+    ):
+        service_token = client.zero_trust.access.service_tokens.update(
+            current_id,
+            **service_token_payload(module),
+        )
     service_token = serialize_resource(service_token)
-    resource_id(module, service_token, "service token")
+    resource_id(module, service_token, "service token", expected=current_id)
+    resource_field(
+        module, service_token, "name", "service token", expected=params["name"]
+    )
+    if not duration_matches(service_token, params["duration"]):
+        module.fail_json(
+            msg="Cloudflare did not apply the requested service token duration"
+        )
     module.exit_json(
         changed=True,
         message="Service token updated",
@@ -211,10 +238,18 @@ def ensure_absent(module, client):
             service_token=current,
         )
 
-    client.zero_trust.access.service_tokens.delete(
-        current_id,
+    with cloudflare_error_context(
+        "Cloudflare API request failed while deleting a service token",
         account_id=params["account_id"],
-    )
+        service_token_id=current_id,
+    ):
+        deleted_token = serialize_resource(
+            client.zero_trust.access.service_tokens.delete(
+                current_id,
+                account_id=params["account_id"],
+            )
+        )
+    resource_id(module, deleted_token, "service token", expected=current_id)
     module.exit_json(
         changed=True,
         message="Service token deleted",

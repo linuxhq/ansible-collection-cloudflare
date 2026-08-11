@@ -7,6 +7,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.modules import access_groups
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
 )
 
 
@@ -46,7 +47,7 @@ class AccessGroupsTests(TestCase):
 
     def test_creates_group(self):
         module = FakeModule(params())
-        created = {"id": "group", "name": "admins"}
+        created = {"id": "group", **params()}
 
         with (
             patch.object(access_groups, "find_by_name", return_value=None),
@@ -65,6 +66,22 @@ class AccessGroupsTests(TestCase):
             },
         )
         self.assertEqual(raised.exception.values["access_group"], created)
+
+    def test_rejects_create_response_with_wrong_rules(self):
+        module = FakeModule(params())
+
+        with (
+            patch.object(access_groups, "find_by_name", return_value=None),
+            patch.object(
+                access_groups,
+                "post_result",
+                return_value={"id": "group", "name": "admins", "include": []},
+            ),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            access_groups.ensure_present(module, {})
+
+        self.assertIn("did not apply", raised.exception.values["msg"])
 
     def test_check_mode_does_not_delete(self):
         current = {"id": "group", "name": "admins"}

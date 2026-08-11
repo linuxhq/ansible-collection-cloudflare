@@ -7,6 +7,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.modules import dnssec
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
 )
 
 
@@ -53,7 +54,9 @@ class DnssecTests(TestCase):
                 "dnssec_use_nsec3": False,
             }
         )
-        client.dns.dnssec.edit.return_value = Model({"status": "active"})
+        client.dns.dnssec.edit.return_value = Model(
+            {"status": "pending", "dnssec_presigned": True}
+        )
 
         with self.assertRaises(ModuleExit) as raised:
             dnssec.ensure_present(module, client)
@@ -64,3 +67,21 @@ class DnssecTests(TestCase):
             status="active",
         )
         self.assertTrue(raised.exception.values["changed"])
+
+    def test_rejects_an_unmet_update_postcondition(self):
+        module = FakeModule(params(dnssec_presigned=True))
+        client = Mock()
+        client.dns.dnssec.get.return_value = Model(
+            {"status": "active", "dnssec_presigned": False}
+        )
+        client.dns.dnssec.edit.return_value = Model(
+            {"status": "active", "dnssec_presigned": False}
+        )
+
+        with self.assertRaises(ModuleFail) as raised:
+            dnssec.ensure_present(module, client)
+
+        self.assertEqual(
+            raised.exception.values["msg"],
+            "Cloudflare did not apply the requested DNSSEC settings",
+        )

@@ -76,7 +76,7 @@ def list_resources(module, client):
         client,
         cloudflare_path("accounts", module.params["account_id"], "access", "groups"),
     )
-    validate_resource_fields(module, access_groups, "id", "Access group")
+    validate_resource_fields(module, access_groups, ("id", "name"), "Access group")
 
     module.exit_json(changed=False, access_groups=access_groups)
 

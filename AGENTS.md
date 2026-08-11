@@ -36,6 +36,7 @@ Invoke skills rather than running commands ad hoc.
 | `black`            | Format Python                 |
 | `ruff`             | Lint Python                   |
 | `ansible-test`     | Module sanity                 |
+| `plugins-audit`    | Exhaustive plugins audit      |
 | `molecule`         | Role tests                    |
 | `changelog`        | Changelog fragments & release |
 | `collection-build` | Build the collection tarball  |

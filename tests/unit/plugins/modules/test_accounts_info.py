@@ -42,7 +42,7 @@ class AccountsInfoTests(TestCase):
         )
         self.assertFalse(raised.exception.values["changed"])
 
-    def test_missing_account_returns_none(self):
+    def test_missing_account_returns_empty_mapping(self):
         module = FakeModule({"name": "missing"})
         client = Mock()
         client.accounts.list.return_value = []
@@ -50,7 +50,7 @@ class AccountsInfoTests(TestCase):
         with self.assertRaises(ModuleExit) as raised:
             accounts_info.info(module, client)
 
-        self.assertIsNone(raised.exception.values["account"])
+        self.assertEqual(raised.exception.values["account"], {})
 
     def test_rejects_malformed_accounts(self):
         module = FakeModule({"name": "wanted"})

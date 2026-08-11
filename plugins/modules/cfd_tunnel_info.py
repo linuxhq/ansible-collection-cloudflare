@@ -27,7 +27,7 @@ options:
       - Cloudflare API token.
   include_token:
     type: bool
-    default: true
+    default: false
     description:
       - Whether to retrieve and return each sensitive tunnel token.
 requirements:
@@ -98,6 +98,7 @@ def list_resources(module, client):
 
     for tunnel in cfd_tunnels:
         tunnel_id = resource_id(module, tunnel, "cloudflared tunnel")
+        resource_field(module, tunnel, "name", "cloudflared tunnel")
         if module.params["include_token"]:
             token = get_result(
                 client,
@@ -120,7 +121,7 @@ def main():
         argument_spec={
             "account_id": {"required": True, "type": "str"},
             "api_token": {"required": True, "type": "str", "no_log": True},
-            "include_token": {"type": "bool", "default": True},
+            "include_token": {"type": "bool", "default": False},
         },
         supports_check_mode=True,
     )

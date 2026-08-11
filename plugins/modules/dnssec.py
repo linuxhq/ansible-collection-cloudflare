@@ -81,8 +81,56 @@ dnssec:
       description: Current DNSSEC activation status.
       returned: always
       type: str
+    algorithm:
+      description: DNSSEC signing algorithm identifier.
+      returned: when provided by Cloudflare
+      type: str
+    digest:
+      description: Delegation signer digest.
+      returned: when provided by Cloudflare
+      type: str
+    digest_algorithm:
+      description: Delegation signer digest algorithm.
+      returned: when provided by Cloudflare
+      type: str
+    digest_type:
+      description: Delegation signer digest type.
+      returned: when provided by Cloudflare
+      type: str
     ds:
       description: Delegation signer record content.
+      returned: when provided by Cloudflare
+      type: str
+    dnssec_multi_signer:
+      description: Whether multi-signer DNSSEC is enabled.
+      returned: when provided by Cloudflare
+      type: bool
+    dnssec_presigned:
+      description: Whether presigned DNSSEC is enabled.
+      returned: when provided by Cloudflare
+      type: bool
+    dnssec_use_nsec3:
+      description: Whether NSEC3 is enabled.
+      returned: when provided by Cloudflare
+      type: bool
+    flags:
+      description: DNSKEY flags value.
+      returned: when provided by Cloudflare
+      type: float
+    key_tag:
+      description: DNSKEY key tag.
+      returned: when provided by Cloudflare
+      type: float
+    key_type:
+      description: DNSKEY type.
+      returned: when provided by Cloudflare
+      type: str
+    modified_on:
+      description: Time the DNSSEC settings were last modified.
+      returned: when provided by Cloudflare
+      type: str
+    public_key:
+      description: Public DNSSEC key.
       returned: when provided by Cloudflare
       type: str
 message:
@@ -95,22 +143,29 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
+    cloudflare_error_context,
     require_mapping,
     resource_field,
     serialize_resource,
 )
 
 
+def normalized_status(status):
+    return {"pending": "active", "pending-disabled": "disabled"}.get(status, status)
+
+
 def ensure_present(module, client):
-    current = serialize_resource(
-        client.dns.dnssec.get(zone_id=module.params["zone_id"])
-    )
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering DNSSEC settings",
+        zone_id=module.params["zone_id"],
+    ):
+        current = serialize_resource(
+            client.dns.dnssec.get(zone_id=module.params["zone_id"])
+        )
     require_mapping(module, current, "DNSSEC settings")
-    current_status = resource_field(module, current, "status", "DNSSEC settings")
-    if current_status == "pending":
-        current_status = "active"
-    elif current_status == "pending-disabled":
-        current_status = "disabled"
+    current_status = normalized_status(
+        resource_field(module, current, "status", "DNSSEC settings")
+    )
 
     comparisons = (
         (current_status, module.params["status"]),
@@ -157,9 +212,25 @@ def ensure_present(module, client):
         if module.params.get(field) is not None:
             payload[field] = module.params[field]
 
-    dnssec = serialize_resource(client.dns.dnssec.edit(**payload))
+    with cloudflare_error_context(
+        "Cloudflare API request failed while updating DNSSEC settings",
+        zone_id=module.params["zone_id"],
+    ):
+        dnssec = serialize_resource(client.dns.dnssec.edit(**payload))
     require_mapping(module, dnssec, "DNSSEC settings")
-    resource_field(module, dnssec, "status", "DNSSEC settings")
+    response_status = normalized_status(
+        resource_field(module, dnssec, "status", "DNSSEC settings")
+    )
+    if any(
+        desired is not None and actual != desired
+        for actual, desired in (
+            (response_status, module.params["status"]),
+            (dnssec.get("dnssec_multi_signer"), module.params["dnssec_multi_signer"]),
+            (dnssec.get("dnssec_presigned"), module.params["dnssec_presigned"]),
+            (dnssec.get("dnssec_use_nsec3"), module.params["dnssec_use_nsec3"]),
+        )
+    ):
+        module.fail_json(msg="Cloudflare did not apply the requested DNSSEC settings")
     module.exit_json(
         changed=True,
         message="DNSSEC settings updated",

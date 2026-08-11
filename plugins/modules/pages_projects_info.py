@@ -9,6 +9,8 @@ module: pages_projects_info
 short_description: Gather information about Cloudflare Pages projects
 description:
   - Gather Cloudflare Pages projects for an account.
+  - Secret environment variable values and the web analytics token are redacted
+    from returned projects.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
@@ -46,7 +48,7 @@ EXAMPLES = r"""
 RETURN = r"""
 ---
 pages_projects:
-  description: Cloudflare Pages projects.
+  description: Cloudflare Pages projects with credential values redacted.
   returned: always
   type: list
   elements: dict
@@ -67,6 +69,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     cloudflare_path,
     list_all,
+    redact_pages_secrets,
     validate_resource_fields,
 )
 
@@ -79,7 +82,10 @@ def list_resources(module, client):
     )
     validate_resource_fields(module, projects, "name", "Pages project")
 
-    module.exit_json(changed=False, pages_projects=projects)
+    module.exit_json(
+        changed=False,
+        pages_projects=[redact_pages_secrets(project) for project in projects],
+    )
 
 
 def main():

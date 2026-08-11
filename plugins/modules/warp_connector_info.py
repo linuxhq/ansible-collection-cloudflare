@@ -27,7 +27,7 @@ options:
       - Cloudflare API token.
   include_token:
     type: bool
-    default: true
+    default: false
     description:
       - Whether to retrieve and return each sensitive connector token.
 requirements:
@@ -98,6 +98,7 @@ def list_resources(module, client):
 
     for connector in warp_connectors:
         connector_id = resource_id(module, connector, "WARP Connector")
+        resource_field(module, connector, "name", "WARP Connector")
         if module.params["include_token"]:
             token = get_result(
                 client,
@@ -124,7 +125,7 @@ def main():
         argument_spec={
             "account_id": {"required": True, "type": "str"},
             "api_token": {"required": True, "type": "str", "no_log": True},
-            "include_token": {"type": "bool", "default": True},
+            "include_token": {"type": "bool", "default": False},
         },
         supports_check_mode=True,
     )

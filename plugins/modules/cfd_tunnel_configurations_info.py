@@ -59,7 +59,7 @@ cfd_tunnel_configurations:
       type: str
     name:
       description: Cloudflared tunnel name.
-      returned: when available
+      returned: always
       type: str
     config:
       description: Remotely managed tunnel configuration.
@@ -76,6 +76,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     get_result,
     list_all,
     require_mapping,
+    resource_field,
     resource_id,
 )
 
@@ -95,9 +96,10 @@ def list_resources(module, client):
     for tunnel in tunnels:
         tunnel_id = resource_id(module, tunnel, "cloudflared tunnel")
 
-        if tunnel.get("remote_config") is False:
+        if tunnel.get("remote_config") is False or tunnel.get("config_src") == "local":
             continue
 
+        tunnel_name = resource_field(module, tunnel, "name", "cloudflared tunnel")
         configuration = get_result(
             client,
             cloudflare_path(
@@ -119,7 +121,7 @@ def list_resources(module, client):
         configurations.append(
             {
                 "id": tunnel_id,
-                "name": tunnel.get("name"),
+                "name": tunnel_name,
                 "config": config,
             }
         )

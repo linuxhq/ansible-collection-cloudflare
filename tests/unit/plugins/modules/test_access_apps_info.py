@@ -11,12 +11,13 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 
 
 class AccessAppsInfoTests(TestCase):
-    def test_lists_apps_and_redacts_scim_secrets(self):
+    def test_lists_apps_and_redacts_secrets(self):
         module = FakeModule({"account_id": "account"})
         apps = [
             {
                 "id": "app-id",
                 "name": "app",
+                "saas_app": {"client_secret": "secret", "name": "example"},
                 "scim_config": {
                     "authentication": {"client_secret": "secret", "method": "oauth"}
                 },
@@ -34,4 +35,8 @@ class AccessAppsInfoTests(TestCase):
         self.assertEqual(
             raised.exception.values["access_apps"][0]["scim_config"]["authentication"],
             {"method": "oauth"},
+        )
+        self.assertEqual(
+            raised.exception.values["access_apps"][0]["saas_app"],
+            {"name": "example"},
         )

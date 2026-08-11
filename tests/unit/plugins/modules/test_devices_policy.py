@@ -7,6 +7,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.modules import devices_polic
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
 )
 
 
@@ -39,3 +40,25 @@ class DevicesPolicyTests(TestCase):
 
         patch_result.assert_not_called()
         self.assertTrue(raised.exception.values["changed"])
+
+    def test_rejects_update_response_with_wrong_policy(self):
+        module = FakeModule(
+            {"account_id": "account", "service_mode_v2": {"mode": "warp"}}
+        )
+
+        with (
+            patch.object(
+                devices_policy,
+                "get_result",
+                return_value={"service_mode_v2": {"mode": "proxy"}},
+            ),
+            patch.object(
+                devices_policy,
+                "patch_result",
+                return_value={"service_mode_v2": {"mode": "proxy"}},
+            ),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            devices_policy.ensure_present(module, {})
+
+        self.assertIn("did not apply", raised.exception.values["msg"])
