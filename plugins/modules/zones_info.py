@@ -83,7 +83,7 @@ def list_resources(module, client):
         client,
         cloudflare_query(cloudflare_path("zones"), {"match": module.params["match"]}),
     )
-    validate_resource_fields(module, zones, "id", "zone")
+    validate_resource_fields(module, zones, ("id", "name"), "zone")
 
     module.exit_json(changed=False, zones=zones)
 

@@ -132,11 +132,13 @@ def ensure_present(module, client):
         {"config": params["config"]},
     )
     require_mapping(module, configuration, "tunnel configuration")
-    require_mapping(
-        module,
-        configuration.get("config"),
-        "tunnel configuration",
-    )
+    returned_config = configuration.get("config")
+    require_mapping(module, returned_config, "tunnel configuration")
+    if values_differ(
+        normalize_current_by_desired_fields(returned_config, params["config"]),
+        params["config"],
+    ):
+        module.fail_json(msg="Cloudflare did not apply the tunnel configuration")
     module.exit_json(
         changed=True,
         message="Tunnel configuration updated",

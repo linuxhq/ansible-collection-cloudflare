@@ -5,13 +5,15 @@ dependency:
     requirements-file: ../../requirements.yml
 
 driver:
-  name: vagrant
+  name: default
+  options:
+    managed: false
+    ansible_connection_options:
+      ansible_connection: local
+      ansible_python_interpreter: "{{ ansible_playbook_python }}"
 
 platforms:
-  - name: almalinux9
-    box: bento/almalinux-9.6
-    cpus: 4
-    memory: 4096
+  - name: localhost
 
 provisioner:
   name: ansible
@@ -35,6 +37,7 @@ provisioner:
 
         warp_connector_info_account_id: "{{ _accounts_info_id }}"
         warp_connector_info_api_token: "{{ accounts_info_api_token }}"
+        warp_connector_info_include_token: true
 
 scenario:
   test_sequence:

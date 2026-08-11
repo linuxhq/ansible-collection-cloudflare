@@ -9,6 +9,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.modules import (
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
 )
 
 
@@ -77,3 +78,28 @@ class CfdTunnelConfigurationsTests(TestCase):
 
         put.assert_not_called()
         self.assertTrue(raised.exception.values["changed"])
+
+    def test_rejects_an_unmet_update_postcondition(self):
+        module = FakeModule(
+            {"account_id": "account", "tunnel_id": "tunnel", "config": {"warp": True}}
+        )
+
+        with (
+            patch.object(
+                cfd_tunnel_configurations,
+                "get_result",
+                return_value={"config": {"warp": False}},
+            ),
+            patch.object(
+                cfd_tunnel_configurations,
+                "put_result",
+                return_value={"config": {"warp": False}},
+            ),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            cfd_tunnel_configurations.ensure_present(module, {})
+
+        self.assertEqual(
+            raised.exception.values["msg"],
+            "Cloudflare did not apply the tunnel configuration",
+        )

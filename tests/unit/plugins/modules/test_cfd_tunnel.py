@@ -54,10 +54,34 @@ class CfdTunnelTests(TestCase):
             "config_src is required when creating a cloudflared tunnel",
         )
 
+    def test_rejects_create_response_with_wrong_config_source(self):
+        module = FakeModule(params())
+
+        with (
+            patch.object(cfd_tunnel, "find_by_name", return_value=None),
+            patch.object(
+                cfd_tunnel,
+                "post_result",
+                return_value={
+                    "id": "tunnel-id",
+                    "name": "tunnel",
+                    "config_src": "local",
+                },
+            ),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            cfd_tunnel.ensure_present(module, {})
+
+        self.assertIn("wrong cloudflared tunnel", raised.exception.values["msg"])
+
     def test_check_mode_does_not_rotate_secret(self):
-        current = {"id": "tunnel-id", "name": "tunnel"}
+        current = {"id": "tunnel-id", "name": "tunnel", "config_src": "local"}
         module = FakeModule(
-            params(rotate_secrets=True, tunnel_secret="secret"),
+            params(
+                config_src="local",
+                rotate_secrets=True,
+                tunnel_secret="eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=",
+            ),
             check_mode=True,
         )
 
@@ -70,3 +94,35 @@ class CfdTunnelTests(TestCase):
 
         patch_result.assert_not_called()
         self.assertTrue(raised.exception.values["changed"])
+
+    def test_rejects_secret_for_remote_tunnel(self):
+        module = FakeModule(
+            params(
+                rotate_secrets=True,
+                tunnel_secret="eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=",
+            )
+        )
+
+        for current in (
+            {"id": "tunnel-id", "name": "tunnel", "remote_config": True},
+            {"id": "tunnel-id", "name": "tunnel"},
+            {
+                "id": "tunnel-id",
+                "name": "tunnel",
+                "config_src": "local",
+                "remote_config": True,
+            },
+        ):
+            with (
+                self.subTest(current=current),
+                patch.object(cfd_tunnel, "find_by_name", return_value=current),
+                patch.object(cfd_tunnel, "patch_result") as patch_result,
+                self.assertRaises(ModuleFail) as raised,
+            ):
+                cfd_tunnel.ensure_present(module, {})
+
+            patch_result.assert_not_called()
+            self.assertEqual(
+                raised.exception.values["msg"],
+                "tunnel_secret is only valid for locally-managed tunnels",
+            )

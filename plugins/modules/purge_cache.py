@@ -78,6 +78,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_path,
     post_result,
     resource_id,
+    validate_cloudflare_params,
 )
 
 
@@ -95,6 +96,7 @@ def main():
         module.fail_json(msg="cache must not be empty")
 
     if module.check_mode:
+        validate_cloudflare_params(module)
         module.exit_json(changed=True, message="Cache would be purged")
 
     with cloudflare_client(module) as client:
@@ -103,7 +105,7 @@ def main():
             cloudflare_path("zones", module.params["zone_id"], "purge_cache"),
             module.params["cache"],
         )
-        resource_id(module, result, "cache purge")
+        resource_id(module, result, "cache purge", expected=module.params["zone_id"])
 
     module.exit_json(changed=True, message="Cache purged", purge_cache=result)
 

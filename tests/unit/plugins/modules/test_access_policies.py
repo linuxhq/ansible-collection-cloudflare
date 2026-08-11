@@ -7,6 +7,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.modules import access_polici
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
 )
 
 
@@ -66,6 +67,19 @@ class AccessPoliciesTests(TestCase):
         put.assert_called_once()
         self.assertTrue(raised.exception.values["changed"])
         self.assertEqual(raised.exception.values["access_policy"], updated)
+
+    def test_rejects_update_response_with_wrong_policy(self):
+        current = {"id": "policy", **params(decision="deny")}
+        module = FakeModule(params())
+
+        with (
+            patch.object(access_policies, "find_by_field", return_value=current),
+            patch.object(access_policies, "put_result", return_value=current),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            access_policies.ensure_present(module, {})
+
+        self.assertIn("did not apply", raised.exception.values["msg"])
 
     def test_missing_policy_is_already_absent(self):
         module = FakeModule(params())

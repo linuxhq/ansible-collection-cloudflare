@@ -9,8 +9,7 @@ module: access_apps
 short_description: Manage Cloudflare Access applications
 description:
   - Create, update, and delete Cloudflare Access applications by name.
-  - Secret fields under C(scim_config.authentication) are redacted from returned
-    applications.
+  - Secret fields are redacted from returned applications.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
@@ -171,9 +170,11 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     post_result,
     put_result,
-    redact_scim_secrets,
+    redact_access_app_secrets,
+    resource_field,
     resource_id,
     select_fields,
+    validate_requested_values,
     values_differ,
 )
 
@@ -218,7 +219,7 @@ def item_endpoint(account_id, app_id):
 def ensure_present(module, client):
     params = module.params
 
-    current = redact_scim_secrets(
+    current = redact_access_app_secrets(
         find_by_name(
             client,
             endpoint(params["account_id"]),
@@ -238,16 +239,23 @@ def ensure_present(module, client):
 
         access_app = post_result(client, endpoint(params["account_id"]), payload)
         resource_id(module, access_app, "Access application")
+        resource_field(
+            module, access_app, "name", "Access application", expected=params["name"]
+        )
+        validate_requested_values(
+            module,
+            {**DEFAULT_FIELDS, **access_app},
+            payload,
+            "Access application",
+        )
         module.exit_json(
             changed=True,
             message="Access application created",
-            access_app=redact_scim_secrets(access_app),
+            access_app=redact_access_app_secrets(access_app),
         )
 
     current_id = resource_id(module, current, "Access application")
-    comparable_current = current.copy()
-    for field, value in DEFAULT_FIELDS.items():
-        comparable_current.setdefault(field, value)
+    comparable_current = {**DEFAULT_FIELDS, **current}
 
     if not values_differ(
         normalize_current_by_desired_fields(
@@ -274,18 +282,27 @@ def ensure_present(module, client):
         item_endpoint(params["account_id"], current_id),
         payload,
     )
-    resource_id(module, access_app, "Access application")
+    resource_id(module, access_app, "Access application", expected=current_id)
+    resource_field(
+        module, access_app, "name", "Access application", expected=params["name"]
+    )
+    validate_requested_values(
+        module,
+        {**DEFAULT_FIELDS, **access_app},
+        payload,
+        "Access application",
+    )
     module.exit_json(
         changed=True,
         message="Access application updated",
-        access_app=redact_scim_secrets(access_app),
+        access_app=redact_access_app_secrets(access_app),
     )
 
 
 def ensure_absent(module, client):
     params = module.params
 
-    current = redact_scim_secrets(
+    current = redact_access_app_secrets(
         find_by_name(
             client,
             endpoint(params["account_id"]),
@@ -307,7 +324,9 @@ def ensure_absent(module, client):
             access_app=current,
         )
 
-    delete_result(client, item_endpoint(params["account_id"], current_id))
+    delete_result(
+        client, item_endpoint(params["account_id"], current_id), expected_id=current_id
+    )
     module.exit_json(
         changed=True,
         message="Access application deleted",

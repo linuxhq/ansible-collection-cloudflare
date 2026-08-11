@@ -7,6 +7,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.modules import access_servic
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
 )
 
 
@@ -25,7 +26,7 @@ class AccessServiceTokensTests(TestCase):
         )
         client = Mock()
         client.zero_trust.access.service_tokens.create.return_value = Model(
-            {"id": "token", "name": "automation"}
+            {"id": "token", "name": "automation", "duration": "1y"}
         )
 
         with (
@@ -41,8 +42,29 @@ class AccessServiceTokensTests(TestCase):
         )
         self.assertEqual(
             raised.exception.values["service_token"],
-            {"id": "token", "name": "automation"},
+            {"id": "token", "name": "automation", "duration": "1y"},
         )
+
+    def test_rejects_update_response_with_wrong_duration(self):
+        module = FakeModule(
+            {"account_id": "account", "name": "automation", "duration": "1y"}
+        )
+        client = Mock()
+        client.zero_trust.access.service_tokens.update.return_value = Model(
+            {"id": "token", "name": "automation", "duration": "1h"}
+        )
+
+        with (
+            patch.object(
+                access_service_tokens,
+                "find_by_name",
+                return_value={"id": "token", "name": "automation", "duration": "1h"},
+            ),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            access_service_tokens.ensure_present(module, client)
+
+        self.assertIn("did not apply", raised.exception.values["msg"])
 
     def test_forever_token_without_expiry_is_unchanged(self):
         module = FakeModule(
@@ -68,6 +90,9 @@ class AccessServiceTokensTests(TestCase):
             {"account_id": "account", "name": "automation", "duration": None}
         )
         client = Mock()
+        client.zero_trust.access.service_tokens.delete.return_value = Model(
+            {"id": "token"}
+        )
         current = {"id": "token", "name": "automation"}
 
         with (

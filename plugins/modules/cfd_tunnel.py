@@ -43,6 +43,7 @@ options:
     type: str
     description:
       - Tunnel secret for locally-managed tunnels.
+      - Must be base64-encoded and decode to at least 32 bytes.
       - Applied when creating a tunnel. Cloudflare does not return the current
         secret, so changes are not detected; use O(rotate_secrets) to apply the
         secret to an existing tunnel.
@@ -52,6 +53,7 @@ options:
     description:
       - Apply O(tunnel_secret) to an existing tunnel, rotating its secret.
       - The module always reports C(changed) when enabled and a secret is given.
+      - Requires O(tunnel_secret).
   state:
     type: str
     choices:
@@ -118,7 +120,9 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     patch_result,
     payload_from_params,
     post_result,
+    resource_field,
     resource_id,
+    validate_tunnel_secret,
 )
 
 FIELDS = ("config_src", "name", "tunnel_secret")
@@ -130,6 +134,7 @@ def endpoint(account_id):
 
 def ensure_present(module, client):
     params = module.params
+    validate_tunnel_secret(module, params.get("tunnel_secret"))
 
     current = find_by_name(
         client,
@@ -141,6 +146,18 @@ def ensure_present(module, client):
     if current is not None:
         current_id = resource_id(module, current, "cloudflared tunnel")
         if params["rotate_secrets"] and params.get("tunnel_secret") is not None:
+            local = (
+                current.get("config_src") == "local"
+                or current.get("remote_config") is False
+            )
+            remote = (
+                current.get("config_src") == "cloudflare"
+                or current.get("remote_config") is True
+            )
+            if not local or remote:
+                module.fail_json(
+                    msg="tunnel_secret is only valid for locally-managed tunnels"
+                )
             if module.check_mode:
                 module.exit_json(
                     changed=True,
@@ -155,7 +172,14 @@ def ensure_present(module, client):
                 ),
                 {"tunnel_secret": params["tunnel_secret"]},
             )
-            resource_id(module, cfd_tunnel, "cloudflared tunnel")
+            resource_id(module, cfd_tunnel, "cloudflared tunnel", expected=current_id)
+            resource_field(
+                module,
+                cfd_tunnel,
+                "name",
+                "cloudflared tunnel",
+                expected=params["name"],
+            )
             module.exit_json(
                 changed=True,
                 message="Cloudflared tunnel updated",
@@ -172,6 +196,8 @@ def ensure_present(module, client):
         module.fail_json(
             msg="config_src is required when creating a cloudflared tunnel"
         )
+    if params["config_src"] != "local" and params.get("tunnel_secret") is not None:
+        module.fail_json(msg="tunnel_secret is only valid for locally-managed tunnels")
 
     if module.check_mode:
         module.exit_json(changed=True, message="Cloudflared tunnel would be created")
@@ -182,6 +208,16 @@ def ensure_present(module, client):
         payload_from_params(params, FIELDS),
     )
     resource_id(module, cfd_tunnel, "cloudflared tunnel")
+    resource_field(
+        module, cfd_tunnel, "name", "cloudflared tunnel", expected=params["name"]
+    )
+    resource_field(
+        module,
+        cfd_tunnel,
+        "config_src",
+        "cloudflared tunnel",
+        expected=params["config_src"],
+    )
     module.exit_json(
         changed=True,
         message="Cloudflared tunnel created",
@@ -214,6 +250,7 @@ def ensure_absent(module, client):
     delete_result(
         client,
         cloudflare_path("accounts", params["account_id"], "cfd_tunnel", current_id),
+        expected_id=current_id,
     )
     module.exit_json(
         changed=True,
@@ -237,6 +274,7 @@ def main():
                 "default": "present",
             },
         },
+        required_if=[("rotate_secrets", True, ["tunnel_secret"])],
         supports_check_mode=True,
     )
 

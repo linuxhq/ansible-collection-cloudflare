@@ -7,6 +7,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.modules import access_apps
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
 )
 
 
@@ -60,6 +61,22 @@ class AccessAppsTests(TestCase):
         post.assert_not_called()
         self.assertTrue(raised.exception.values["changed"])
 
+    def test_rejects_create_response_with_wrong_configuration(self):
+        module = FakeModule(params())
+
+        with (
+            patch.object(access_apps, "find_by_name", return_value=None),
+            patch.object(
+                access_apps,
+                "post_result",
+                return_value={"id": "app-id", "name": "app"},
+            ),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            access_apps.ensure_present(module, {})
+
+        self.assertIn("did not apply", raised.exception.values["msg"])
+
     def test_deletes_app_and_returns_redacted_state(self):
         current = {
             "id": "app-id",
@@ -75,7 +92,9 @@ class AccessAppsTests(TestCase):
         ):
             access_apps.ensure_absent(module, {})
 
-        delete.assert_called_once_with({}, "/accounts/account/access/apps/app-id")
+        delete.assert_called_once_with(
+            {}, "/accounts/account/access/apps/app-id", expected_id="app-id"
+        )
         self.assertEqual(
             raised.exception.values["access_app"]["scim_config"]["authentication"],
             {},

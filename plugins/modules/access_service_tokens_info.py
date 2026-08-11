@@ -85,7 +85,9 @@ def list_resources(module, client):
             "service_tokens",
         ),
     )
-    validate_resource_fields(module, service_tokens, "id", "Access service token")
+    validate_resource_fields(
+        module, service_tokens, ("id", "name"), "Access service token"
+    )
 
     module.exit_json(
         changed=False,

@@ -81,7 +81,7 @@ def list_resources(module, client):
         cloudflare_path("accounts", module.params["account_id"], "rules", "lists"),
         paginate=False,
     )
-    validate_resource_fields(module, rules_lists, "id", "Rules list")
+    validate_resource_fields(module, rules_lists, ("id", "name", "kind"), "Rules list")
 
     module.exit_json(changed=False, rules_lists=rules_lists)
 

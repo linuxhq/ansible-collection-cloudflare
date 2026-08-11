@@ -144,8 +144,10 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     post_result,
     put_result,
+    resource_field,
     resource_id,
     select_fields,
+    validate_requested_values,
     values_differ,
 )
 
@@ -188,6 +190,15 @@ def ensure_present(module, client):
 
         access_policy = post_result(client, endpoint(params["account_id"]), payload)
         resource_id(module, access_policy, "Access policy")
+        resource_field(
+            module, access_policy, "name", "Access policy", expected=params["name"]
+        )
+        validate_requested_values(
+            module,
+            {**dict.fromkeys(FALSE_FIELDS, False), **access_policy},
+            payload,
+            "Access policy",
+        )
         module.exit_json(
             changed=True,
             message="Access policy created",
@@ -195,9 +206,7 @@ def ensure_present(module, client):
         )
 
     current_id = resource_id(module, current, "Access policy")
-    comparable_current = current.copy()
-    for field in FALSE_FIELDS:
-        comparable_current.setdefault(field, False)
+    comparable_current = {**dict.fromkeys(FALSE_FIELDS, False), **current}
 
     if not values_differ(
         normalize_current_by_desired_fields(
@@ -226,7 +235,16 @@ def ensure_present(module, client):
         ),
         payload,
     )
-    resource_id(module, access_policy, "Access policy")
+    resource_id(module, access_policy, "Access policy", expected=current_id)
+    resource_field(
+        module, access_policy, "name", "Access policy", expected=params["name"]
+    )
+    validate_requested_values(
+        module,
+        {**dict.fromkeys(FALSE_FIELDS, False), **access_policy},
+        payload,
+        "Access policy",
+    )
     module.exit_json(
         changed=True,
         message="Access policy updated",
@@ -258,6 +276,7 @@ def ensure_absent(module, client):
         cloudflare_path(
             "accounts", params["account_id"], "access", "policies", current_id
         ),
+        expected_id=current_id,
     )
     module.exit_json(
         changed=True,

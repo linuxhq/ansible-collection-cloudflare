@@ -14,7 +14,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 
 class PurgeCacheTests(TestCase):
     def test_rejects_empty_cache(self):
-        module = FakeModule({"cache": {}, "zone_id": "zone"})
+        module = FakeModule({"api_token": "token", "cache": {}, "zone_id": "zone"})
 
         with (
             patch.object(purge_cache, "AnsibleModule", return_value=module),
@@ -28,7 +28,11 @@ class PurgeCacheTests(TestCase):
 
     def test_check_mode_does_not_purge(self):
         module = FakeModule(
-            {"cache": {"purge_everything": True}, "zone_id": "zone"},
+            {
+                "api_token": "token",
+                "cache": {"purge_everything": True},
+                "zone_id": "zone",
+            },
             check_mode=True,
         )
 
@@ -42,8 +46,34 @@ class PurgeCacheTests(TestCase):
         post.assert_not_called()
         self.assertTrue(raised.exception.values["changed"])
 
+    def test_check_mode_validates_identifiers_without_opening_a_client(self):
+        module = FakeModule(
+            {
+                "api_token": "token",
+                "cache": {"purge_everything": True},
+                "zone_id": " ",
+            },
+            check_mode=True,
+        )
+
+        with (
+            patch.object(purge_cache, "AnsibleModule", return_value=module),
+            patch.object(purge_cache, "cloudflare_client") as client,
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            purge_cache.main()
+
+        client.assert_not_called()
+        self.assertEqual(raised.exception.values["msg"], "zone_id must not be empty")
+
     def test_purges_cache(self):
-        module = FakeModule({"cache": {"purge_everything": True}, "zone_id": "zone"})
+        module = FakeModule(
+            {
+                "api_token": "token",
+                "cache": {"purge_everything": True},
+                "zone_id": "zone",
+            }
+        )
         result = {"id": "zone"}
 
         with (

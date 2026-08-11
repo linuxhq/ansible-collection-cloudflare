@@ -60,12 +60,35 @@ class ZonesTests(TestCase):
         find.assert_not_called()
         self.assertEqual(
             raised.exception.values["msg"],
-            "Each zone setting requires a valid id and value",
+            "Each zone setting requires a unique valid id and value",
         )
+
+    def test_rejects_duplicate_settings_before_lookup(self):
+        module = FakeModule(
+            params(
+                settings=[
+                    {"id": "ssl", "value": "full"},
+                    {"id": "ssl", "value": "strict"},
+                ]
+            )
+        )
+
+        with (
+            patch.object(zones, "find_by_name") as find,
+            self.assertRaises(ModuleFail),
+        ):
+            zones.ensure_present(module, {})
+
+        find.assert_not_called()
 
     def test_creates_zone_with_default_type(self):
         module = FakeModule(params())
-        created = {"id": "zone", "name": "example.com", "type": "full"}
+        created = {
+            "id": "zone",
+            "account": {"id": "account"},
+            "name": "example.com",
+            "type": "full",
+        }
 
         with (
             patch.object(zones, "find_by_name", return_value=None),
@@ -84,6 +107,27 @@ class ZonesTests(TestCase):
             },
         )
         self.assertTrue(raised.exception.values["changed"])
+
+    def test_rejects_create_response_for_wrong_account(self):
+        module = FakeModule(params())
+
+        with (
+            patch.object(zones, "find_by_name", return_value=None),
+            patch.object(
+                zones,
+                "post_result",
+                return_value={
+                    "id": "zone",
+                    "account": {"id": "other"},
+                    "name": "example.com",
+                    "type": "full",
+                },
+            ),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            zones.ensure_present(module, {})
+
+        self.assertIn("did not apply", raised.exception.values["msg"])
 
     def test_updates_zone_fields_in_one_request(self):
         module = FakeModule(
@@ -131,6 +175,27 @@ class ZonesTests(TestCase):
 
         patch_result.assert_not_called()
         self.assertFalse(raised.exception.values["changed"])
+
+    def test_rejects_an_unmet_setting_postcondition(self):
+        module = FakeModule(params(settings=[{"id": "min_tls_version", "value": 1.3}]))
+        current = {"id": "zone", "name": "example.com"}
+
+        with (
+            patch.object(zones, "find_by_name", return_value=current),
+            patch.object(zones, "get_result", return_value={"value": "1.2"}),
+            patch.object(
+                zones,
+                "patch_result",
+                return_value={"id": "min_tls_version", "value": "1.2"},
+            ),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            zones.ensure_present(module, {})
+
+        self.assertEqual(
+            raised.exception.values["msg"],
+            "Cloudflare did not apply the requested zone setting",
+        )
 
     def test_check_mode_does_not_delete(self):
         current = {"id": "zone", "name": "example.com"}

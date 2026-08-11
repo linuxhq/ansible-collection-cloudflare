@@ -51,7 +51,7 @@ pagerules:
       type: str
     name:
       description: Cloudflare zone name.
-      returned: when available
+      returned: always
       type: str
     pagerules:
       description: Page rules configured for the zone.
@@ -63,6 +63,16 @@ pagerules:
           description: Page rule identifier.
           returned: always
           type: str
+        actions:
+          description: Actions applied by the page rule.
+          returned: always
+          type: list
+          elements: dict
+        targets:
+          description: Target constraints identifying the page rule.
+          returned: always
+          type: list
+          elements: dict
 
 """
 
@@ -71,6 +81,8 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     cloudflare_path,
     list_all,
+    require_mapping,
+    resource_field,
     resource_id,
     validate_resource_fields,
 )
@@ -82,17 +94,27 @@ def list_resources(module, client):
 
     for zone in zones:
         zone_id = resource_id(module, zone, "zone")
+        zone_name = resource_field(module, zone, "name", "zone")
 
         rules = list_all(
             client,
             cloudflare_path("zones", zone_id, "pagerules"),
         )
         validate_resource_fields(module, rules, "id", "page rule")
+        for rule in rules:
+            for field in ("actions", "targets"):
+                values = rule.get(field)
+                if not isinstance(values, list):
+                    module.fail_json(
+                        msg="Cloudflare API returned malformed page rule data"
+                    )
+                for value in values:
+                    require_mapping(module, value, f"page rule {field[:-1]}")
 
         pagerules.append(
             {
                 "id": zone_id,
-                "name": zone.get("name"),
+                "name": zone_name,
                 "pagerules": rules,
             }
         )

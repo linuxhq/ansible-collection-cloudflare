@@ -93,6 +93,10 @@ ruleset:
       description: Ruleset name.
       returned: always
       type: str
+    kind:
+      description: Scope of the ruleset.
+      returned: when available
+      type: str
     phase:
       description: Cloudflare request phase controlled by the ruleset.
       returned: when available
@@ -119,8 +123,10 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     normalize_current_by_desired_fields,
     post_result,
     put_result,
+    require_mapping,
     resource_field,
     resource_id,
+    validate_requested_values,
     values_differ,
 )
 
@@ -131,6 +137,17 @@ def entrypoint_endpoint(zone_id, phase):
 
 def rulesets_endpoint(zone_id):
     return cloudflare_path("zones", zone_id, "rulesets")
+
+
+def rules_from_resource(module, ruleset):
+    rules = ruleset.get("rules")
+    if rules is None:
+        return []
+    if not isinstance(rules, list):
+        module.fail_json(msg="Cloudflare API returned malformed ruleset data")
+    for rule in rules:
+        require_mapping(module, rule, "ruleset rule")
+    return rules
 
 
 def ensure_present(module, client):
@@ -150,21 +167,29 @@ def ensure_present(module, client):
         if module.check_mode:
             module.exit_json(changed=True, message="Ruleset would be created")
 
+        payload = {
+            "kind": params["kind"],
+            "name": params["name"],
+            "phase": params["phase"],
+            "rules": params.get("rules") or [],
+        }
         ruleset = post_result(
             client,
             rulesets_endpoint(params["zone_id"]),
-            {
-                "kind": params["kind"],
-                "name": params["name"],
-                "phase": params["phase"],
-                "rules": params.get("rules") or [],
-            },
+            payload,
         )
         resource_id(module, ruleset, "ruleset")
+        resource_field(module, ruleset, "name", "ruleset", expected=params["name"])
+        resource_field(module, ruleset, "phase", "ruleset", expected=params["phase"])
+        resource_field(module, ruleset, "kind", "ruleset", expected=params["kind"])
+        rules_from_resource(module, ruleset)
+        validate_requested_values(module, ruleset, payload, "ruleset")
         module.exit_json(changed=True, message="Ruleset created", ruleset=ruleset)
 
-    resource_id(module, current, "ruleset")
+    current_id = resource_id(module, current, "ruleset")
     current_name = resource_field(module, current, "name", "ruleset")
+    resource_field(module, current, "phase", "ruleset", expected=params["phase"])
+    current_rules = rules_from_resource(module, current)
 
     if params.get("name") is not None and params["name"] != current_name:
         module.fail_json(
@@ -174,15 +199,13 @@ def ensure_present(module, client):
 
     payload = {
         "rules": (
-            current.get("rules") or []
-            if params.get("rules") is None
-            else params["rules"]
+            current_rules or [] if params.get("rules") is None else params["rules"]
         ),
     }
 
     if not values_differ(
         normalize_current_by_desired_fields(
-            {"rules": current.get("rules") or []},
+            {"rules": current_rules or []},
             payload,
         ),
         payload,
@@ -205,7 +228,11 @@ def ensure_present(module, client):
         entrypoint_endpoint(params["zone_id"], params["phase"]),
         payload,
     )
-    resource_id(module, ruleset, "ruleset")
+    resource_id(module, ruleset, "ruleset", expected=current_id)
+    resource_field(module, ruleset, "name", "ruleset", expected=current_name)
+    resource_field(module, ruleset, "phase", "ruleset", expected=params["phase"])
+    rules_from_resource(module, ruleset)
+    validate_requested_values(module, ruleset, payload, "ruleset")
     module.exit_json(changed=True, message="Ruleset updated", ruleset=ruleset)
 
 
@@ -223,6 +250,7 @@ def ensure_absent(module, client):
         module.exit_json(changed=False, message="Ruleset already absent")
 
     current_id = resource_id(module, current, "ruleset")
+    resource_field(module, current, "phase", "ruleset", expected=params["phase"])
 
     if module.check_mode:
         module.exit_json(

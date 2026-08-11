@@ -40,6 +40,10 @@ An Ansible collection of Cloudflare modules, plugins, and roles.
 
 Every role includes a Molecule scenario with an example playbook.
 
+### Plugin audit
+
+Use `$plugins-audit` for an exhaustive review of the `plugins/` tree.
+
 ## Examples
 
 Example playbooks and inventory are available in [`examples/`](examples/).

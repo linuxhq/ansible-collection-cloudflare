@@ -7,6 +7,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.modules import rulesets_info
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
 )
 
 
@@ -44,4 +45,50 @@ class RulesetsInfoTests(TestCase):
                     "zone_id": "zone",
                 }
             ],
+        )
+
+    def test_omits_conditional_fields_without_an_entrypoint(self):
+        module = FakeModule({"phase": "http_request_firewall_custom"})
+
+        with (
+            patch.object(
+                rulesets_info,
+                "list_all",
+                return_value=[{"id": "zone", "name": "example.com"}],
+            ),
+            patch.object(rulesets_info, "get_result", return_value=None),
+            self.assertRaises(ModuleExit) as raised,
+        ):
+            rulesets_info.list_resources(module, {})
+
+        self.assertEqual(
+            raised.exception.values["rulesets"],
+            [{"name": "example.com", "rules": [], "zone_id": "zone"}],
+        )
+
+    def test_rejects_non_mapping_rules(self):
+        module = FakeModule({"phase": "http_request_firewall_custom"})
+
+        with (
+            patch.object(
+                rulesets_info,
+                "list_all",
+                return_value=[{"id": "zone", "name": "example.com"}],
+            ),
+            patch.object(
+                rulesets_info,
+                "get_result",
+                return_value={
+                    "id": "ruleset",
+                    "phase": module.params["phase"],
+                    "rules": ["invalid"],
+                },
+            ),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            rulesets_info.list_resources(module, {})
+
+        self.assertEqual(
+            raised.exception.values["msg"],
+            "Cloudflare API returned malformed ruleset rule data",
         )

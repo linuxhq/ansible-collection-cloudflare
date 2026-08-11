@@ -24,6 +24,26 @@ def params(**updates):
 
 
 class RulesetsTests(TestCase):
+    def test_rejects_malformed_rules(self):
+        for rules in ({}, ["invalid"]):
+            with (
+                self.subTest(rules=rules),
+                patch.object(
+                    rulesets,
+                    "get_result",
+                    return_value={
+                        "id": "ruleset",
+                        "name": "default",
+                        "phase": "http_request_firewall_custom",
+                        "rules": rules,
+                    },
+                ),
+                self.assertRaises(ModuleFail) as raised,
+            ):
+                rulesets.ensure_present(FakeModule(params()), {})
+
+            self.assertIn("malformed ruleset", raised.exception.values["msg"])
+
     def test_create_requires_name(self):
         module = FakeModule(params(name=None))
 
@@ -44,6 +64,7 @@ class RulesetsTests(TestCase):
         current = {
             "id": "ruleset",
             "name": "default",
+            "phase": "http_request_firewall_custom",
             "rules": [{"action": "block", "expression": "true"}],
         }
         module = FakeModule(params())
@@ -59,7 +80,12 @@ class RulesetsTests(TestCase):
         self.assertFalse(raised.exception.values["changed"])
 
     def test_rejects_rename_before_update(self):
-        current = {"id": "ruleset", "name": "existing", "rules": []}
+        current = {
+            "id": "ruleset",
+            "name": "existing",
+            "phase": "http_request_firewall_custom",
+            "rules": [],
+        }
         module = FakeModule(params(name="renamed", rules=[]))
 
         with (
@@ -76,7 +102,11 @@ class RulesetsTests(TestCase):
         )
 
     def test_deletes_entrypoint_ruleset_by_id(self):
-        current = {"id": "ruleset", "name": "default"}
+        current = {
+            "id": "ruleset",
+            "name": "default",
+            "phase": "http_request_firewall_custom",
+        }
         module = FakeModule(params())
 
         with (
@@ -88,3 +118,46 @@ class RulesetsTests(TestCase):
 
         delete.assert_called_once_with({}, "/zones/zone/rulesets/ruleset")
         self.assertTrue(raised.exception.values["changed"])
+
+    def test_rejects_a_response_for_the_wrong_phase(self):
+        module = FakeModule(params())
+
+        with (
+            patch.object(rulesets, "get_result", return_value=None),
+            patch.object(
+                rulesets,
+                "post_result",
+                return_value={
+                    "id": "ruleset",
+                    "name": "default",
+                    "phase": "http_request_transform",
+                    "kind": "zone",
+                    "rules": [],
+                },
+            ),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            rulesets.ensure_present(module, {})
+
+        self.assertEqual(
+            raised.exception.values["msg"],
+            "Cloudflare API returned the wrong ruleset",
+        )
+
+    def test_rejects_update_response_with_wrong_rules(self):
+        current = {
+            "id": "ruleset",
+            "name": "default",
+            "phase": "http_request_firewall_custom",
+            "rules": [],
+        }
+        module = FakeModule(params(rules=[{"action": "block", "expression": "true"}]))
+
+        with (
+            patch.object(rulesets, "get_result", return_value=current),
+            patch.object(rulesets, "put_result", return_value=current),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            rulesets.ensure_present(module, {})
+
+        self.assertIn("did not apply", raised.exception.values["msg"])

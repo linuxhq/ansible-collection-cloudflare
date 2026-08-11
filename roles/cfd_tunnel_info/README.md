@@ -12,6 +12,7 @@ Gather information about cloudflare cfd tunnels
 
     cfd_tunnel_info_account_id: null
     cfd_tunnel_info_api_token: null
+    cfd_tunnel_info_include_token: false
 
 ## Dependencies
 
@@ -30,3 +31,4 @@ Gather information about cloudflare cfd tunnels
         - role: linuxhq.cloudflare.cfd_tunnel_info
           cfd_tunnel_info_account_id: '{{ _accounts_info_id }}'
           cfd_tunnel_info_api_token: '{{ accounts_info_api_token }}'
+          cfd_tunnel_info_include_token: false

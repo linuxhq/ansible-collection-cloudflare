@@ -98,6 +98,11 @@ pagerule:
       description: Page rule identifier.
       returned: always
       type: str
+    actions:
+      description: Actions applied by the page rule.
+      returned: always
+      type: list
+      elements: dict
     priority:
       description: Evaluation priority of the page rule.
       returned: when available
@@ -106,6 +111,11 @@ pagerule:
       description: Current page rule status.
       returned: when available
       type: str
+    targets:
+      description: Target constraints identifying the page rule.
+      returned: always
+      type: list
+      elements: dict
 message:
   returned: always
   type: str
@@ -120,12 +130,14 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_path,
     delete_result,
     list_all,
+    normalize_current_by_desired_fields,
     payload_from_params,
     post_result,
     put_result,
     require_mapping,
     resource_id,
     select_fields,
+    validate_requested_values,
     values_differ,
 )
 
@@ -140,12 +152,31 @@ def item_endpoint(zone_id, pagerule_id):
     return cloudflare_path("zones", zone_id, "pagerules", pagerule_id)
 
 
+def pagerule_targets(module, pagerule):
+    require_mapping(module, pagerule, "page rule")
+    targets = pagerule.get("targets")
+    if not isinstance(targets, list):
+        module.fail_json(msg="Cloudflare API returned malformed page rule data")
+    for target in targets:
+        require_mapping(module, target, "page rule target")
+    return targets
+
+
 def find_pagerule(module, client):
+    found = None
     for pagerule in list_all(client, endpoint(module.params["zone_id"])):
-        require_mapping(module, pagerule, "page rule")
-        if not values_differ(pagerule.get("targets"), module.params["targets"]):
-            return pagerule
-    return None
+        if not values_differ(
+            normalize_current_by_desired_fields(
+                pagerule_targets(module, pagerule), module.params["targets"]
+            ),
+            module.params["targets"],
+        ):
+            if found is not None:
+                module.fail_json(
+                    msg="Multiple page rules match the requested target constraints"
+                )
+            found = pagerule
+    return found
 
 
 def ensure_present(module, client):
@@ -162,6 +193,7 @@ def ensure_present(module, client):
 
         pagerule = post_result(client, endpoint(params["zone_id"]), payload)
         resource_id(module, pagerule, "page rule")
+        validate_requested_values(module, pagerule, payload, "page rule")
         module.exit_json(
             changed=True,
             message="Page rule created",
@@ -172,7 +204,12 @@ def ensure_present(module, client):
         if field not in payload and current.get(field) is not None:
             payload[field] = current[field]
 
-    if not values_differ(select_fields(current, payload.keys()), payload):
+    if not values_differ(
+        normalize_current_by_desired_fields(
+            select_fields(current, payload.keys()), payload
+        ),
+        payload,
+    ):
         module.exit_json(
             changed=False,
             message="Page rule already present",
@@ -192,7 +229,8 @@ def ensure_present(module, client):
         item_endpoint(params["zone_id"], current_id),
         payload,
     )
-    resource_id(module, pagerule, "page rule")
+    resource_id(module, pagerule, "page rule", expected=current_id)
+    validate_requested_values(module, pagerule, payload, "page rule")
     module.exit_json(
         changed=True,
         message="Page rule updated",
@@ -215,7 +253,9 @@ def ensure_absent(module, client):
         )
 
     current_id = resource_id(module, current, "page rule")
-    delete_result(client, item_endpoint(params["zone_id"], current_id))
+    delete_result(
+        client, item_endpoint(params["zone_id"], current_id), expected_id=current_id
+    )
     module.exit_json(
         changed=True,
         message="Page rule deleted",
