@@ -36,7 +36,6 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleFail,
 )
-from cloudflare.types.zero_trust.access.service_token import ServiceToken
 
 
 class ApiConnectionError(Exception):
@@ -67,6 +66,20 @@ class Model:
 
     def to_dict(self):
         return self.value
+
+
+class SdkModel:
+    def __init__(self, resource_id, expires_at):
+        self.resource_id = resource_id
+        self.expires_at = expires_at
+
+    def to_dict(self, mode=None):
+        if mode != "json":
+            raise ValueError("expected JSON serialization")
+        return {
+            "id": self.resource_id,
+            "expires_at": self.expires_at.isoformat().replace("+00:00", "Z"),
+        }
 
 
 class CloudflareUtilsTests(TestCase):
@@ -459,10 +472,11 @@ class CloudflareUtilsTests(TestCase):
     def test_serializes_sdk_models_to_json_values(self):
         expires_at = datetime(2026, 8, 11, 12, 30, tzinfo=timezone.utc)
 
-        self.assertEqual(
-            serialize_resource(ServiceToken(id="token", expires_at=expires_at)),
-            {"id": "token", "expires_at": "2026-08-11T12:30:00Z"},
-        )
+        with patch.object(cloudflare_utils, "BaseModel", SdkModel):
+            self.assertEqual(
+                serialize_resource(SdkModel("token", expires_at)),
+                {"id": "token", "expires_at": "2026-08-11T12:30:00Z"},
+            )
 
     def test_payload_and_comparison_helpers_manage_only_desired_fields(self):
         desired = {"nested": {"enabled": True}, "items": [{"id": "one"}]}
