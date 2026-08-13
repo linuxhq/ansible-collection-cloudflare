@@ -32,6 +32,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           path: ansible_collections/linuxhq/cloudflare
+          sparse-checkout: |
+            /*
+            !/.agents/
+            !/.claude/
+            !/.codex/
+          sparse-checkout-cone-mode: false
+      - run: git rm --cached --quiet -r --sparse .agents .claude .codex
       - uses: actions/setup-python@v7
         with:
           python-version: "${{ matrix.python }}"
