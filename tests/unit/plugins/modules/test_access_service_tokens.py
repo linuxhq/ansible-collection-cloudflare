@@ -21,9 +21,7 @@ class Model:
 
 class AccessServiceTokensTests(TestCase):
     def test_creates_token_with_explicit_duration(self):
-        module = FakeModule(
-            {"account_id": "account", "name": "automation", "duration": "1y"}
-        )
+        module = FakeModule({"account_id": "account", "name": "automation", "duration": "1y"})
         client = Mock()
         client.zero_trust.access.service_tokens.create.return_value = Model(
             {"id": "token", "name": "automation", "duration": "1y"}
@@ -46,9 +44,7 @@ class AccessServiceTokensTests(TestCase):
         )
 
     def test_rejects_update_response_with_wrong_duration(self):
-        module = FakeModule(
-            {"account_id": "account", "name": "automation", "duration": "1y"}
-        )
+        module = FakeModule({"account_id": "account", "name": "automation", "duration": "1y"})
         client = Mock()
         client.zero_trust.access.service_tokens.update.return_value = Model(
             {"id": "token", "name": "automation", "duration": "1h"}
@@ -67,9 +63,7 @@ class AccessServiceTokensTests(TestCase):
         self.assertIn("did not apply", raised.exception.values["msg"])
 
     def test_forever_token_without_expiry_is_unchanged(self):
-        module = FakeModule(
-            {"account_id": "account", "name": "automation", "duration": "forever"}
-        )
+        module = FakeModule({"account_id": "account", "name": "automation", "duration": "forever"})
         client = Mock()
 
         with (
@@ -86,13 +80,9 @@ class AccessServiceTokensTests(TestCase):
         self.assertFalse(raised.exception.values["changed"])
 
     def test_deletes_token_by_sdk_identifier(self):
-        module = FakeModule(
-            {"account_id": "account", "name": "automation", "duration": None}
-        )
+        module = FakeModule({"account_id": "account", "name": "automation", "duration": None})
         client = Mock()
-        client.zero_trust.access.service_tokens.delete.return_value = Model(
-            {"id": "token"}
-        )
+        client.zero_trust.access.service_tokens.delete.return_value = Model({"id": "token"})
         current = {"id": "token", "name": "automation"}
 
         with (

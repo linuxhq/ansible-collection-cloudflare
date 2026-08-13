@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -77,6 +77,7 @@ pagerules:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_path,
@@ -105,9 +106,7 @@ def list_resources(module, client):
             for field in ("actions", "targets"):
                 values = rule.get(field)
                 if not isinstance(values, list):
-                    module.fail_json(
-                        msg="Cloudflare API returned malformed page rule data"
-                    )
+                    module.fail_json(msg="Cloudflare API returned malformed page rule data")
                 for value in values:
                     require_mapping(module, value, f"page rule {field[:-1]}")
 

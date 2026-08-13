@@ -29,17 +29,19 @@ Invoke skills rather than running commands ad hoc.
 
 | Skill              | Purpose                       |
 | ------------------ | ----------------------------- |
-| `pyenv`            | Install pyenv + pinned Python |
-| `virtualenv`       | Set up the venv               |
 | `ansible-lint`     | Lint roles & playbooks        |
-| `yamllint`         | Lint YAML                     |
 | `black`            | Format Python                 |
-| `ruff`             | Lint Python                   |
 | `ansible-test`     | Module sanity                 |
-| `plugins-audit`    | Exhaustive plugins audit      |
-| `molecule`         | Role tests                    |
 | `changelog`        | Changelog fragments & release |
 | `collection-build` | Build the collection tarball  |
+| `isort`            | Sort Python imports           |
+| `molecule`         | Role tests                    |
+| `plugins-audit`    | Exhaustive plugins audit      |
+| `pyenv`            | Install pyenv + pinned Python |
+| `ruff`             | Lint Python                   |
+| `tox`              | Set up isolated environments  |
+| `unit`             | Run Python unit tests         |
+| `yamllint`         | Lint YAML                     |
 
 ## Setup
 

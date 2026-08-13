@@ -101,9 +101,7 @@ class RulesListsTests(TestCase):
     def test_submit_honors_subsecond_and_expired_deadlines(self):
         with (
             patch.object(rules_lists.time, "monotonic", return_value=0.5),
-            patch.object(
-                rules_lists, "put_result", return_value={"id": "operation"}
-            ) as put,
+            patch.object(rules_lists, "put_result", return_value={"id": "operation"}) as put,
         ):
             rules_lists.submit_items({}, "account", "list", [], 1)
 
@@ -116,9 +114,7 @@ class RulesListsTests(TestCase):
 
         with (
             patch.object(rules_lists.time, "monotonic", return_value=1),
-            self.assertRaisesRegex(
-                rules_lists.CloudflareResponseError, "Timed out submitting"
-            ),
+            self.assertRaisesRegex(rules_lists.CloudflareResponseError, "Timed out submitting"),
         ):
             rules_lists.submit_items({}, "account", "list", [], 1)
 
@@ -128,9 +124,7 @@ class RulesListsTests(TestCase):
                 self.subTest(operation=operation),
                 self.assertRaises(ModuleFail) as raised,
             ):
-                rules_lists.wait_for_operation(
-                    FakeModule({}), {}, "account", operation, 30
-                )
+                rules_lists.wait_for_operation(FakeModule({}), {}, "account", operation, 30)
 
             self.assertEqual(
                 raised.exception.values["msg"],
@@ -169,9 +163,7 @@ class RulesListsTests(TestCase):
             patch.object(rules_lists.time, "monotonic", return_value=0.5),
             patch.object(rules_lists, "get_result", return_value=completed) as get,
         ):
-            result = rules_lists.wait_for_operation(
-                module, {}, "account", {"id": "operation"}, 1
-            )
+            result = rules_lists.wait_for_operation(module, {}, "account", {"id": "operation"}, 1)
 
         get.assert_called_once_with(
             {},
@@ -333,9 +325,7 @@ class RulesListsTests(TestCase):
 
         with (
             patch.object(rules_lists, "find_by_field", return_value=current),
-            patch.object(
-                rules_lists, "submit_items", return_value={"id": "operation"}
-            ) as submit,
+            patch.object(rules_lists, "submit_items", return_value={"id": "operation"}) as submit,
             patch.object(
                 rules_lists,
                 "wait_for_operation",
@@ -347,9 +337,7 @@ class RulesListsTests(TestCase):
         ):
             rules_lists.ensure_present(module, client)
 
-        submit.assert_called_once_with(
-            client, "account", "list", [{"ip": "192.0.2.1"}], 31
-        )
+        submit.assert_called_once_with(client, "account", "list", [{"ip": "192.0.2.1"}], 31)
 
     def test_rejects_completed_update_with_wrong_items(self):
         module = FakeModule(params(elements=[{"ip": "192.0.2.1"}]))

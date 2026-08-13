@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -161,6 +161,7 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_path,
@@ -233,15 +234,11 @@ def ensure_present(module, client):
 
     if current is None:
         if module.check_mode:
-            module.exit_json(
-                changed=True, message="Access application would be created"
-            )
+            module.exit_json(changed=True, message="Access application would be created")
 
         access_app = post_result(client, endpoint(params["account_id"]), payload)
         resource_id(module, access_app, "Access application")
-        resource_field(
-            module, access_app, "name", "Access application", expected=params["name"]
-        )
+        resource_field(module, access_app, "name", "Access application", expected=params["name"])
         validate_requested_values(
             module,
             {**DEFAULT_FIELDS, **access_app},
@@ -283,9 +280,7 @@ def ensure_present(module, client):
         payload,
     )
     resource_id(module, access_app, "Access application", expected=current_id)
-    resource_field(
-        module, access_app, "name", "Access application", expected=params["name"]
-    )
+    resource_field(module, access_app, "name", "Access application", expected=params["name"])
     validate_requested_values(
         module,
         {**DEFAULT_FIELDS, **access_app},
@@ -324,9 +319,7 @@ def ensure_absent(module, client):
             access_app=current,
         )
 
-    delete_result(
-        client, item_endpoint(params["account_id"], current_id), expected_id=current_id
-    )
+    delete_result(client, item_endpoint(params["account_id"], current_id), expected_id=current_id)
     module.exit_json(
         changed=True,
         message="Access application deleted",

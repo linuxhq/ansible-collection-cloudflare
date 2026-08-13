@@ -54,9 +54,7 @@ class DnssecTests(TestCase):
                 "dnssec_use_nsec3": False,
             }
         )
-        client.dns.dnssec.edit.return_value = Model(
-            {"status": "pending", "dnssec_presigned": True}
-        )
+        client.dns.dnssec.edit.return_value = Model({"status": "pending", "dnssec_presigned": True})
 
         with self.assertRaises(ModuleExit) as raised:
             dnssec.ensure_present(module, client)
@@ -71,12 +69,8 @@ class DnssecTests(TestCase):
     def test_rejects_an_unmet_update_postcondition(self):
         module = FakeModule(params(dnssec_presigned=True))
         client = Mock()
-        client.dns.dnssec.get.return_value = Model(
-            {"status": "active", "dnssec_presigned": False}
-        )
-        client.dns.dnssec.edit.return_value = Model(
-            {"status": "active", "dnssec_presigned": False}
-        )
+        client.dns.dnssec.get.return_value = Model({"status": "active", "dnssec_presigned": False})
+        client.dns.dnssec.edit.return_value = Model({"status": "active", "dnssec_presigned": False})
 
         with self.assertRaises(ModuleFail) as raised:
             dnssec.ensure_present(module, client)

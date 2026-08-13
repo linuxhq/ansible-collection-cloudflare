@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -145,6 +145,7 @@ import json
 import time
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     CloudflareResponseError,
     cloudflare,
@@ -247,9 +248,7 @@ def submit_items(client, account_id, list_id, elements, deadline):
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise CloudflareResponseError(
-                "Timed out submitting the Rules list items operation"
-            )
+            raise CloudflareResponseError("Timed out submitting the Rules list items operation")
 
         try:
             return put_result(
@@ -272,11 +271,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
     operation_id = None
     if isinstance(operation, dict):
         operation_id = operation.get("operation_id") or operation.get("id")
-    if (
-        not isinstance(operation_id, str)
-        or not operation_id.strip()
-        or operation_id != operation_id.strip()
-    ):
+    if not isinstance(operation_id, str) or not operation_id.strip() or operation_id != operation_id.strip():
         module.fail_json(
             msg="Rules list items submission did not return an operation id",
             operation=operation,
@@ -303,8 +298,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
             if not transient_error(exc) or deadline - time.monotonic() <= 0:
                 fail_from_cloudflare_error(
                     module,
-                    "Cloudflare API request failed while waiting for the rules "
-                    "list items operation",
+                    "Cloudflare API request failed while waiting for the rules list items operation",
                     exc,
                     operation_id=operation_id,
                     operation=status,
@@ -375,8 +369,7 @@ def normalize_items(items):
                 normalized_value = {
                     redirect_key: redirect_value
                     for redirect_key, redirect_value in normalized_value.items()
-                    if redirect_value is not None
-                    and redirect_value != REDIRECT_DEFAULTS.get(redirect_key)
+                    if redirect_value is not None and redirect_value != REDIRECT_DEFAULTS.get(redirect_key)
                 }
 
             normalized[key] = normalized_value
@@ -410,11 +403,7 @@ def ensure_present(module, client):
             module.exit_json(changed=True, message="Rules list would be created")
 
         payload = {
-            "description": (
-                params["name"]
-                if params.get("description") is None
-                else params["description"]
-            ),
+            "description": (params["name"] if params.get("description") is None else params["description"]),
             "kind": params["kind"],
             "name": params["name"],
         }
@@ -440,10 +429,7 @@ def ensure_present(module, client):
             )
 
         desired_description = params.get("description")
-        if (
-            desired_description is not None
-            and current.get("description") != desired_description
-        ):
+        if desired_description is not None and current.get("description") != desired_description:
             if module.check_mode:
                 module.exit_json(
                     changed=True,
@@ -457,9 +443,7 @@ def ensure_present(module, client):
                 {"description": desired_description},
             )
             resource_id(module, current, "Rules list", expected=current_id)
-            resource_field(
-                module, current, "name", "Rules list", expected=params["name"]
-            )
+            resource_field(module, current, "name", "Rules list", expected=params["name"])
             resource_field(module, current, "kind", "Rules list", expected=current_kind)
             validate_requested_values(
                 module,
@@ -487,9 +471,7 @@ def ensure_present(module, client):
             items_changed = True
         else:
             items_changed = values_differ(
-                normalize_items(
-                    list_items(module, client, params["account_id"], current_id)
-                ),
+                normalize_items(list_items(module, client, params["account_id"], current_id)),
                 desired_items,
             )
 
@@ -521,19 +503,13 @@ def ensure_present(module, client):
                 default=current,
             )
             resource_id(module, current, "Rules list", expected=current_id)
-            resource_field(
-                module, current, "name", "Rules list", expected=params["name"]
-            )
+            resource_field(module, current, "name", "Rules list", expected=params["name"])
             resource_field(module, current, "kind", "Rules list", expected=current_kind)
             if values_differ(
-                normalize_items(
-                    list_items(module, client, params["account_id"], current_id)
-                ),
+                normalize_items(list_items(module, client, params["account_id"], current_id)),
                 desired_items,
             ):
-                module.fail_json(
-                    msg="Cloudflare did not apply the requested Rules list items"
-                )
+                module.fail_json(msg="Cloudflare did not apply the requested Rules list items")
 
     if not changed and not items_changed:
         module.exit_json(
@@ -574,9 +550,7 @@ def ensure_absent(module, client):
         )
 
     current_id = resource_id(module, current, "Rules list")
-    delete_result(
-        client, item_endpoint(params["account_id"], current_id), expected_id=current_id
-    )
+    delete_result(client, item_endpoint(params["account_id"], current_id), expected_id=current_id)
     module.exit_json(
         changed=True,
         message="Rules list deleted",

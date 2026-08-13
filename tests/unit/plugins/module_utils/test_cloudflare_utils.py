@@ -113,9 +113,7 @@ class CloudflareUtilsTests(TestCase):
             delete_result(Mock(), "/resources/one", expected_id="one")
 
     def test_validates_tunnel_secrets(self):
-        validate_tunnel_secret(
-            FakeModule({}), "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg="
-        )
+        validate_tunnel_secret(FakeModule({}), "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=")
 
         for secret in ("not-base64", "c2hvcnQ="):
             with self.subTest(secret=secret), self.assertRaises(ModuleFail):
@@ -245,16 +243,12 @@ class CloudflareUtilsTests(TestCase):
             ):
                 pass
 
-            self.assertEqual(
-                raised.exception.values["msg"], f"{name} must not be empty"
-            )
+            self.assertEqual(raised.exception.values["msg"], f"{name} must not be empty")
 
         with (
             patch.object(cloudflare_utils, "Cloudflare", constructor),
             self.assertRaises(ModuleFail) as raised,
-            cloudflare_client(
-                FakeModule({"api_token": "secret", "account_id": " account"})
-            ),
+            cloudflare_client(FakeModule({"api_token": "secret", "account_id": " account"})),
         ):
             pass
 
@@ -431,9 +425,7 @@ class CloudflareUtilsTests(TestCase):
             {"id": "one"},
         )
         self.assertIsNone(response_result({"result": None, "success": True}))
-        self.assertEqual(
-            parse_list_response({"result": [{"id": "one"}]})[0], [{"id": "one"}]
-        )
+        self.assertEqual(parse_list_response({"result": [{"id": "one"}]})[0], [{"id": "one"}])
         self.assertEqual(
             serialize_resource({"items": [Model({"id": "one", "empty": None})]}),
             {"items": [{"id": "one"}]},

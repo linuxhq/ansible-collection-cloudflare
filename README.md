@@ -9,7 +9,7 @@ An Ansible collection of Cloudflare modules, plugins, and roles.
 
 ## Requirements
 
-- Python `>= 3.13`
+- Python `>= 3.11`
 - `ansible-core >= 2.18.0`
 - `community.general >= 12.0.0, < 14.0.0`
 - `cloudflare >= 5.6.0, < 6`
@@ -20,25 +20,53 @@ An Ansible collection of Cloudflare modules, plugins, and roles.
 
 ## Development
 
-    make
-    source venv/bin/activate
+With Tox installed, install the pre-commit hook:
 
-### Build
+```sh
+tox run -e pre-commit
+```
 
-    ansible-galaxy collection build
+Tox manages isolated environments under `.tox/`; no environment activation is required.
 
-### Changelog
+### Checks
 
-    antsibull-changelog generate
+Run the default checks:
 
-### Lint
+```sh
+tox
+```
 
-    ansible-lint
-    yamllint -s .
+Run grouped checks:
 
-### Test
+```sh
+tox run -m format
+tox run -m lint
+tox run -m unit
+```
 
-Every role includes a Molecule scenario with an example playbook.
+Run Ansible sanity tests for a module:
+
+```sh
+tox run -e ansible-test -- sanity --python "$(cat .python-version)" plugins/modules/access_apps.py
+```
+
+### Molecule
+
+Each role has a Molecule scenario that also serves as an example playbook. Set `MOLECULE_ROLE`
+to select a role:
+
+```sh
+MOLECULE_ROLE=accounts_info tox run -e molecule -- test -s default
+```
+
+Molecule scenarios may create real Cloudflare resources.
+
+### Changelog and build
+
+```sh
+tox run -e changelog -- generate
+tox run -e build
+```
 
 ### Plugin audit
 

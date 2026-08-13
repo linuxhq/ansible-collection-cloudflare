@@ -11,25 +11,35 @@ build_ignore:
   - .claude/**
   - .codex
   - .codex/**
+  - .config
+  - .config/**
+  - .DS_Store
+  - '**/.DS_Store'
   - .github
   - .github/**
   - .gitignore
   - .pre-commit-config.yaml
   - .python-version
+  - .pytest_cache
+  - .pytest_cache/**
   - .ruff.toml
   - .ruff_cache
   - .ruff_cache/**
   - .yamllint
   - AGENTS.md
   - ansible.cfg
+  - changelogs/.plugin-cache.yaml
   - CLAUDE.md
-  - Makefile
   - requirements.txt
   - requirements.yml
+  - pyproject.toml
   - roles/*/molecule
   - roles/*/molecule/**
   - venv
   - venv/**
+  - .tox
+  - .tox/**
+  - tox.ini
   - '**/__pycache__'
   - '**/__pycache__/**'
   - '**/*.pyc'

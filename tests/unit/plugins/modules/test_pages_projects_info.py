@@ -18,11 +18,7 @@ class PagesProjectsInfoTests(TestCase):
                 "name": "docs",
                 "build_config": {"web_analytics_token": "analytics-secret"},
                 "deployment_configs": {
-                    "production": {
-                        "env_vars": {
-                            "TOKEN": {"type": "secret_text", "value": "secret"}
-                        }
-                    }
+                    "production": {"env_vars": {"TOKEN": {"type": "secret_text", "value": "secret"}}}
                 },
                 "canonical_deployment": {
                     "build_config": {"web_analytics_token": "canonical-analytics"},
@@ -70,9 +66,7 @@ class PagesProjectsInfoTests(TestCase):
             per_page=10,
         )
         self.assertEqual(
-            raised.exception.values["pages_projects"][0]["deployment_configs"][
-                "production"
-            ]["env_vars"]["TOKEN"],
+            raised.exception.values["pages_projects"][0]["deployment_configs"]["production"]["env_vars"]["TOKEN"],
             {"type": "secret_text"},
         )
         self.assertNotIn(
@@ -84,9 +78,7 @@ class PagesProjectsInfoTests(TestCase):
             ("latest_deployment", "LATEST_TOKEN"),
         ):
             self.assertEqual(
-                raised.exception.values["pages_projects"][0][field]["env_vars"][
-                    variable
-                ],
+                raised.exception.values["pages_projects"][0][field]["env_vars"][variable],
                 {"type": "secret_text"},
             )
             self.assertNotIn(
@@ -94,14 +86,10 @@ class PagesProjectsInfoTests(TestCase):
                 raised.exception.values["pages_projects"][0][field]["build_config"],
             )
         self.assertEqual(
-            projects[0]["deployment_configs"]["production"]["env_vars"]["TOKEN"][
-                "value"
-            ],
+            projects[0]["deployment_configs"]["production"]["env_vars"]["TOKEN"]["value"],
             "secret",
         )
-        self.assertEqual(
-            projects[0]["build_config"]["web_analytics_token"], "analytics-secret"
-        )
+        self.assertEqual(projects[0]["build_config"]["web_analytics_token"], "analytics-secret")
         self.assertEqual(
             projects[0]["latest_deployment"]["env_vars"]["LATEST_TOKEN"]["value"],
             "latest-secret",

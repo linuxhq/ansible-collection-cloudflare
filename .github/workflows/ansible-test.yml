@@ -1,0 +1,80 @@
+---
+'on':
+  push:
+    branches: main
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  ANSIBLE_COLLECTIONS_SCAN_SYS_PATH: 'false'
+
+jobs:
+  sanity:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ansible: '>=11,<12'
+            python: '3.11'
+          - ansible: '>=12,<13'
+            python: '3.12'
+          - ansible: '>=13,<14'
+            python: '3.13'
+          - ansible: '>=14.2,<15'
+            python: '3.13'
+    defaults:
+      run:
+        working-directory: ansible_collections/linuxhq/cloudflare
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ansible_collections/linuxhq/cloudflare
+          sparse-checkout: |
+            /*
+            !/.agents/
+            !/.claude/
+            !/.codex/
+          sparse-checkout-cone-mode: false
+      - run: git rm --cached --quiet -r --sparse .agents .claude .codex
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "${{ matrix.python }}"
+      - run: pip install 'ansible${{ matrix.ansible }}'
+      - run: pip install --constraint requirements.txt cloudflare jmespath netaddr
+      - run: ansible-galaxy collection install -r requirements.yml -p ../..
+      - run: >-
+          ansible-test sanity --requirements --venv-system-site-packages --python "${{ matrix.python }}" --color -v
+
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ansible: '>=11,<12'
+            python: '3.11'
+          - ansible: '>=12,<13'
+            python: '3.12'
+          - ansible: '>=13,<14'
+            python: '3.13'
+          - ansible: '>=14.2,<15'
+            python: '3.13'
+    defaults:
+      run:
+        working-directory: ansible_collections/linuxhq/cloudflare
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ansible_collections/linuxhq/cloudflare
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "${{ matrix.python }}"
+      - run: pip install 'ansible${{ matrix.ansible }}'
+      - run: pip install --constraint requirements.txt cloudflare jmespath netaddr
+      - run: ansible-galaxy collection install -r requirements.yml -p ../..
+      - run: >-
+          ansible-test units --requirements --venv-system-site-packages --python "${{ matrix.python }}" --color -v
+...

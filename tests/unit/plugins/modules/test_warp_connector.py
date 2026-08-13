@@ -65,9 +65,7 @@ class WarpConnectorTests(TestCase):
         self.assertEqual(raised.exception.values["warp_connector"], created)
 
     def test_secret_failure_rolls_back_created_connector(self):
-        module = FakeModule(
-            params(tunnel_secret="eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=")
-        )
+        module = FakeModule(params(tunnel_secret="eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg="))
         error = ApiStatusError("rejected")
 
         with (
@@ -92,9 +90,7 @@ class WarpConnectorTests(TestCase):
         )
 
     def test_reports_connector_id_when_rollback_response_is_malformed(self):
-        module = FakeModule(
-            params(tunnel_secret="eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=")
-        )
+        module = FakeModule(params(tunnel_secret="eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg="))
 
         with (
             patch.object(warp_connector, "cloudflare", ERRORS),
@@ -121,9 +117,7 @@ class WarpConnectorTests(TestCase):
         self.assertEqual(raised.exception.values["warp_connector_id"], "connector-id")
 
     def test_wrong_secret_response_rolls_back_created_connector(self):
-        module = FakeModule(
-            params(tunnel_secret="eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=")
-        )
+        module = FakeModule(params(tunnel_secret="eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg="))
 
         with (
             patch.object(warp_connector, "cloudflare", ERRORS),

@@ -1,16 +1,15 @@
 ---
 name: ruff
-description: Lint Python plugin code with ruff from the project virtualenv. Run after every edit to a file under plugins/.
+description: Lint Python plugin code with ruff through Tox. Run after every edit under plugins/.
 ---
 
 # ruff
 
-Lint Python with the venv's `ruff`, after every edit to a `plugins/**/*.py` file.
-
 ```sh
-venv/bin/ruff check plugins/modules/{{ file }}.py
-venv/bin/ruff check plugins
-venv/bin/ruff check --fix plugins/modules/{{ file }}.py
+tox run -e ruff-lint -- plugins/modules/{{ file }}.py
+tox run -e ruff -- plugins/modules/{{ file }}.py
+tox run -m lint
+tox run -m format
 ```
 
 - Clean run: `All checks passed!`.
@@ -19,4 +18,4 @@ venv/bin/ruff check --fix plugins/modules/{{ file }}.py
 
 ## Dependencies
 
-- `virtualenv` skill
+- `tox` skill

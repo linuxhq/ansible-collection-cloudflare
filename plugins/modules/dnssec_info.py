@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -150,6 +150,7 @@ skipped_zones:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare,
     cloudflare_client,
@@ -170,9 +171,7 @@ def list_resources(module, client):
     skipped_zones = []
     zones = []
 
-    with cloudflare_error_context(
-        "Cloudflare API request failed while gathering zones for DNSSEC information"
-    ):
+    with cloudflare_error_context("Cloudflare API request failed while gathering zones for DNSSEC information"):
         for zone in client.zones.list():
             zone_dict = serialize_resource(zone)
             zones.append(
@@ -214,28 +213,19 @@ def list_resources(module, client):
                 for field in ("errors", "messages"):
                     value = response_body.get(field, [])
                     skipped_zone[field] = (
-                        value
-                        if isinstance(value, list)
-                        and all(isinstance(item, dict) for item in value)
-                        else []
+                        value if isinstance(value, list) and all(isinstance(item, dict) for item in value) else []
                     )
             else:
-                skipped_zone["error"] = (
-                    "Cloudflare API did not return structured error details"
-                )
+                skipped_zone["error"] = "Cloudflare API did not return structured error details"
 
             skipped_zones.append(skipped_zone)
             continue
         except cloudflare.APIConnectionError as exc:
-            exc._cloudflare_message = (
-                "Cloudflare API connection failed while gathering DNSSEC information"
-            )
+            exc._cloudflare_message = "Cloudflare API connection failed while gathering DNSSEC information"
             exc._cloudflare_context = {"zone": zone}
             raise
         except cloudflare.APIError as exc:
-            exc._cloudflare_message = (
-                "Cloudflare API error while gathering DNSSEC information"
-            )
+            exc._cloudflare_message = "Cloudflare API error while gathering DNSSEC information"
             exc._cloudflare_context = {"zone": zone}
             raise
 

@@ -32,9 +32,7 @@ class PageRulesTests(TestCase):
 
             with (
                 self.subTest(targets=targets),
-                patch.object(
-                    pagerules, "list_all", return_value=[{"targets": targets}]
-                ),
+                patch.object(pagerules, "list_all", return_value=[{"targets": targets}]),
                 self.assertRaises(ModuleFail) as raised,
             ):
                 pagerules.find_pagerule(module, {})

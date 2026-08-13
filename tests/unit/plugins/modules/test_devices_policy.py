@@ -42,9 +42,7 @@ class DevicesPolicyTests(TestCase):
         self.assertTrue(raised.exception.values["changed"])
 
     def test_rejects_update_response_with_wrong_policy(self):
-        module = FakeModule(
-            {"account_id": "account", "service_mode_v2": {"mode": "warp"}}
-        )
+        module = FakeModule({"account_id": "account", "service_mode_v2": {"mode": "warp"}})
 
         with (
             patch.object(

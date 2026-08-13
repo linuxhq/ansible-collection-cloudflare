@@ -18,9 +18,7 @@ class AccessAppsInfoTests(TestCase):
                 "id": "app-id",
                 "name": "app",
                 "saas_app": {"client_secret": "secret", "name": "example"},
-                "scim_config": {
-                    "authentication": {"client_secret": "secret", "method": "oauth"}
-                },
+                "scim_config": {"authentication": {"client_secret": "secret", "method": "oauth"}},
             }
         ]
 

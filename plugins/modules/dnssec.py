@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -141,6 +141,7 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_error_context,
@@ -159,13 +160,9 @@ def ensure_present(module, client):
         "Cloudflare API request failed while gathering DNSSEC settings",
         zone_id=module.params["zone_id"],
     ):
-        current = serialize_resource(
-            client.dns.dnssec.get(zone_id=module.params["zone_id"])
-        )
+        current = serialize_resource(client.dns.dnssec.get(zone_id=module.params["zone_id"]))
     require_mapping(module, current, "DNSSEC settings")
-    current_status = normalized_status(
-        resource_field(module, current, "status", "DNSSEC settings")
-    )
+    current_status = normalized_status(resource_field(module, current, "status", "DNSSEC settings"))
 
     comparisons = (
         (current_status, module.params["status"]),
@@ -183,10 +180,7 @@ def ensure_present(module, client):
         ),
     )
 
-    needs_update = any(
-        desired is not None and current_value != desired
-        for current_value, desired in comparisons
-    )
+    needs_update = any(desired is not None and current_value != desired for current_value, desired in comparisons)
 
     if not needs_update:
         module.exit_json(
@@ -218,9 +212,7 @@ def ensure_present(module, client):
     ):
         dnssec = serialize_resource(client.dns.dnssec.edit(**payload))
     require_mapping(module, dnssec, "DNSSEC settings")
-    response_status = normalized_status(
-        resource_field(module, dnssec, "status", "DNSSEC settings")
-    )
+    response_status = normalized_status(resource_field(module, dnssec, "status", "DNSSEC settings"))
     if any(
         desired is not None and actual != desired
         for actual, desired in (
