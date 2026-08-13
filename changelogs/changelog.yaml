@@ -414,3 +414,11 @@ releases:
     fragments:
     - plugin-pagination-items.yml
     release_date: '2026-08-11'
+  2.1.9:
+    changes:
+      minor_changes:
+      - Development and CI tooling - migrate collection checks from Make to Tox and
+        expand unit and sanity testing across supported Ansible versions.
+    fragments:
+    - tox-tooling.yml
+    release_date: '2026-08-13'
