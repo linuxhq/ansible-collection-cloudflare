@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -146,6 +146,7 @@ message:
 from copy import deepcopy
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_path,
@@ -177,9 +178,7 @@ def comparable_pages_payload(payload):
 def payload_with_removed_env_vars(payload, current):
     merged = deepcopy(payload)
     configs = merged.get("deployment_configs")
-    current_configs = (
-        current.get("deployment_configs") if isinstance(current, dict) else None
-    )
+    current_configs = current.get("deployment_configs") if isinstance(current, dict) else None
     if not isinstance(configs, dict) or not isinstance(current_configs, dict):
         return merged
 
@@ -189,9 +188,7 @@ def payload_with_removed_env_vars(payload, current):
 
         desired_vars = desired_env.get("env_vars")
         current_env = current_configs.get(environment)
-        current_vars = (
-            current_env.get("env_vars") if isinstance(current_env, dict) else None
-        )
+        current_vars = current_env.get("env_vars") if isinstance(current_env, dict) else None
         if not isinstance(desired_vars, dict) or not isinstance(current_vars, dict):
             continue
 
@@ -224,11 +221,7 @@ def desired_domain_names(module):
     names = []
     for domain in module.params.get("domains") or []:
         domain_name = domain.get("name") if isinstance(domain, dict) else None
-        if (
-            not isinstance(domain_name, str)
-            or not domain_name.strip()
-            or domain_name != domain_name.strip()
-        ):
+        if not isinstance(domain_name, str) or not domain_name.strip() or domain_name != domain_name.strip():
             module.fail_json(msg="Each Pages project domain requires a valid name")
         if domain_name not in names:
             names.append(domain_name)
@@ -236,9 +229,7 @@ def desired_domain_names(module):
 
 
 def domains_endpoint(account_id, project_name):
-    return cloudflare_path(
-        "accounts", account_id, "pages", "projects", project_name, "domains"
-    )
+    return cloudflare_path("accounts", account_id, "pages", "projects", project_name, "domains")
 
 
 def endpoint(account_id):
@@ -254,19 +245,12 @@ def ensure_present(module, client):
     domain_names = desired_domain_names(module)
     production_branch = params.get("production_branch")
     payload = payload_from_params(params, FIELDS)
-    credential_payload = payload_from_params(
-        params, ("build_config", "deployment_configs")
-    )
+    credential_payload = payload_from_params(params, ("build_config", "deployment_configs"))
     secrets_requested = params["rotate_secrets"] and values_differ(
         redact_pages_secrets(credential_payload), credential_payload
     )
     if params["rotate_secrets"] and not secrets_requested:
-        module.fail_json(
-            msg=(
-                "rotate_secrets requires a secret_text value or "
-                "build_config.web_analytics_token"
-            )
-        )
+        module.fail_json(msg=("rotate_secrets requires a secret_text value or " "build_config.web_analytics_token"))
 
     current = get_result(
         client,
@@ -275,9 +259,7 @@ def ensure_present(module, client):
     )
 
     if current is None and production_branch is None:
-        module.fail_json(
-            msg="production_branch is required when creating a Pages project"
-        )
+        module.fail_json(msg="production_branch is required when creating a Pages project")
 
     changed = False
     created = False
@@ -289,9 +271,7 @@ def ensure_present(module, client):
             module.exit_json(changed=True, message="Pages project would be created")
 
         current = post_result(client, endpoint(params["account_id"]), payload)
-        resource_field(
-            module, current, "name", "Pages project", expected=params["name"]
-        )
+        resource_field(module, current, "name", "Pages project", expected=params["name"])
         validate_requested_values(
             module,
             redact_pages_secrets(current),
@@ -301,9 +281,7 @@ def ensure_present(module, client):
         changed = True
         created = True
     else:
-        resource_field(
-            module, current, "name", "Pages project", expected=params["name"]
-        )
+        resource_field(module, current, "name", "Pages project", expected=params["name"])
         payload = payload_with_removed_env_vars(payload, current)
 
         comparable_payload = comparable_pages_payload(payload)
@@ -326,9 +304,7 @@ def ensure_present(module, client):
                 item_endpoint(params["account_id"], params["name"]),
                 payload,
             )
-            resource_field(
-                module, current, "name", "Pages project", expected=params["name"]
-            )
+            resource_field(module, current, "name", "Pages project", expected=params["name"])
             validate_requested_values(
                 module,
                 redact_pages_secrets(current),
@@ -344,11 +320,7 @@ def ensure_present(module, client):
             paginate=False,
         )
         existing_names = current_domain_names(module, current, existing_domains)
-        missing_domains = [
-            domain_name
-            for domain_name in domain_names
-            if domain_name not in existing_names
-        ]
+        missing_domains = [domain_name for domain_name in domain_names if domain_name not in existing_names]
 
         domains_changed = bool(missing_domains)
 

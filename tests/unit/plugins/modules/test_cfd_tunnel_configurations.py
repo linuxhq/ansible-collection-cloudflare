@@ -16,14 +16,8 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 class CfdTunnelConfigurationsTests(TestCase):
     def test_nested_provider_fields_do_not_cause_change(self):
         config = {"ingress": [{"service": "http_status:404"}]}
-        current = {
-            "config": {
-                "ingress": [{"service": "http_status:404", "provider_field": "ignored"}]
-            }
-        }
-        module = FakeModule(
-            {"account_id": "account", "tunnel_id": "tunnel", "config": config}
-        )
+        current = {"config": {"ingress": [{"service": "http_status:404", "provider_field": "ignored"}]}}
+        module = FakeModule({"account_id": "account", "tunnel_id": "tunnel", "config": config})
 
         with (
             patch.object(
@@ -80,9 +74,7 @@ class CfdTunnelConfigurationsTests(TestCase):
         self.assertTrue(raised.exception.values["changed"])
 
     def test_rejects_an_unmet_update_postcondition(self):
-        module = FakeModule(
-            {"account_id": "account", "tunnel_id": "tunnel", "config": {"warp": True}}
-        )
+        module = FakeModule({"account_id": "account", "tunnel_id": "tunnel", "config": {"warp": True}})
 
         with (
             patch.object(

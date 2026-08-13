@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -112,6 +112,7 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_path,
@@ -146,18 +147,10 @@ def ensure_present(module, client):
     if current is not None:
         current_id = resource_id(module, current, "cloudflared tunnel")
         if params["rotate_secrets"] and params.get("tunnel_secret") is not None:
-            local = (
-                current.get("config_src") == "local"
-                or current.get("remote_config") is False
-            )
-            remote = (
-                current.get("config_src") == "cloudflare"
-                or current.get("remote_config") is True
-            )
+            local = current.get("config_src") == "local" or current.get("remote_config") is False
+            remote = current.get("config_src") == "cloudflare" or current.get("remote_config") is True
             if not local or remote:
-                module.fail_json(
-                    msg="tunnel_secret is only valid for locally-managed tunnels"
-                )
+                module.fail_json(msg="tunnel_secret is only valid for locally-managed tunnels")
             if module.check_mode:
                 module.exit_json(
                     changed=True,
@@ -167,9 +160,7 @@ def ensure_present(module, client):
 
             cfd_tunnel = patch_result(
                 client,
-                cloudflare_path(
-                    "accounts", params["account_id"], "cfd_tunnel", current_id
-                ),
+                cloudflare_path("accounts", params["account_id"], "cfd_tunnel", current_id),
                 {"tunnel_secret": params["tunnel_secret"]},
             )
             resource_id(module, cfd_tunnel, "cloudflared tunnel", expected=current_id)
@@ -193,9 +184,7 @@ def ensure_present(module, client):
         )
 
     if not params.get("config_src"):
-        module.fail_json(
-            msg="config_src is required when creating a cloudflared tunnel"
-        )
+        module.fail_json(msg="config_src is required when creating a cloudflared tunnel")
     if params["config_src"] != "local" and params.get("tunnel_secret") is not None:
         module.fail_json(msg="tunnel_secret is only valid for locally-managed tunnels")
 
@@ -208,9 +197,7 @@ def ensure_present(module, client):
         payload_from_params(params, FIELDS),
     )
     resource_id(module, cfd_tunnel, "cloudflared tunnel")
-    resource_field(
-        module, cfd_tunnel, "name", "cloudflared tunnel", expected=params["name"]
-    )
+    resource_field(module, cfd_tunnel, "name", "cloudflared tunnel", expected=params["name"])
     resource_field(
         module,
         cfd_tunnel,

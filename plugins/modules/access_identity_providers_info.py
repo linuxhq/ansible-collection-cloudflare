@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -69,6 +69,7 @@ access_identity_providers:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_path,
@@ -88,16 +89,12 @@ def list_resources(module, client):
             "identity_providers",
         ),
     )
-    validate_resource_fields(
-        module, providers, ("id", "type"), "Access identity provider"
-    )
+    validate_resource_fields(module, providers, ("id", "type"), "Access identity provider")
 
     for provider in providers:
         name = provider.get("name")
         if not isinstance(name, str) or name != name.strip():
-            module.fail_json(
-                msg="Cloudflare API returned malformed Access identity provider data"
-            )
+            module.fail_json(msg="Cloudflare API returned malformed Access identity provider data")
         for section, field in (("config", "client_secret"), ("scim_config", "secret")):
             remove_fields(provider.get(section), (field,))
 

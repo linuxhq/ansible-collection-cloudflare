@@ -35,6 +35,13 @@ repos:
         files: \.(py)$
         verbose: true
 
+  - repo: https://github.com/PyCQA/isort
+    rev: 8.0.1
+    hooks:
+      - id: isort
+        files: \.(py)$
+        verbose: true
+
   - repo: https://github.com/psf/black-pre-commit-mirror
     rev: 26.5.1
     hooks:

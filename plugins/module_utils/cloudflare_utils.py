@@ -110,27 +110,20 @@ def validate_cloudflare_params(module):
         module.fail_json(msg="api_token must not contain control characters")
 
     for name, value in module.params.items():
-        if (
-            name in {"domain", "name", "phase", "production_branch"}
-            or name.endswith("_id")
-        ) and isinstance(value, str):
+        if (name in {"domain", "name", "phase", "production_branch"} or name.endswith("_id")) and isinstance(
+            value, str
+        ):
             if not value.strip():
                 module.fail_json(msg=f"{name} must not be empty")
             if value != value.strip():
-                module.fail_json(
-                    msg=f"{name} must not contain leading or trailing whitespace"
-                )
+                module.fail_json(msg=f"{name} must not contain leading or trailing whitespace")
     return api_token.strip()
 
 
 def delete_result(client, path, expected_id=None):
     result = response_result(api_request(client, "delete", path))
-    if expected_id is not None and (
-        not isinstance(result, dict) or result.get("id") != expected_id
-    ):
-        raise CloudflareResponseError(
-            "Cloudflare API returned the wrong deleted resource"
-        )
+    if expected_id is not None and (not isinstance(result, dict) or result.get("id") != expected_id):
+        raise CloudflareResponseError("Cloudflare API returned the wrong deleted resource")
     return result
 
 
@@ -161,9 +154,7 @@ def cloudflare_path(*segments):
 
 
 def cloudflare_query(path, values):
-    query = urlencode(
-        [(key, value) for key, value in values.items() if value is not None]
-    )
+    query = urlencode([(key, value) for key, value in values.items() if value is not None])
     if not query:
         return path
     return f"{path}{'&' if '?' in path else '?'}{query}"
@@ -172,22 +163,14 @@ def cloudflare_query(path, values):
 def find_by_field(client, path, field, value, paginate=True):
     for item in iter_items(client, path, paginate=paginate):
         if not isinstance(item, dict):
-            raise CloudflareResponseError(
-                "Cloudflare API returned malformed resource data"
-            )
+            raise CloudflareResponseError("Cloudflare API returned malformed resource data")
         item_value = item.get(field)
         if (
             item_value is None
             or isinstance(value, str)
-            and (
-                not isinstance(item_value, str)
-                or not item_value.strip()
-                or item_value != item_value.strip()
-            )
+            and (not isinstance(item_value, str) or not item_value.strip() or item_value != item_value.strip())
         ):
-            raise CloudflareResponseError(
-                "Cloudflare API returned malformed resource data"
-            )
+            raise CloudflareResponseError("Cloudflare API returned malformed resource data")
         if item_value == value:
             return item
 
@@ -234,42 +217,22 @@ def iter_items(client, path, per_page=50, paginate=True):
         fetched += len(result)
         for field in ("page", "count", "total_pages", "total_count"):
             value = result_info.get(field)
-            if value is not None and (
-                isinstance(value, bool) or not isinstance(value, int) or value < 0
-            ):
-                raise CloudflareResponseError(
-                    "Cloudflare API returned malformed pagination data"
-                )
+            if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 0):
+                raise CloudflareResponseError("Cloudflare API returned malformed pagination data")
 
         total_pages = result_info.get("total_pages")
         total_count = result_info.get("total_count")
-        if result_info.get("page", page) != page or result_info.get(
-            "count", len(result)
-        ) != len(result):
-            raise CloudflareResponseError(
-                "Cloudflare API returned malformed pagination data"
-            )
+        if result_info.get("page", page) != page or result_info.get("count", len(result)) != len(result):
+            raise CloudflareResponseError("Cloudflare API returned malformed pagination data")
 
         if (
             result
-            and (
-                total_pages is not None
-                and page > total_pages
-                or total_count is not None
-                and fetched > total_count
-            )
+            and (total_pages is not None and page > total_pages or total_count is not None and fetched > total_count)
         ) or (
             not result
-            and (
-                total_pages is not None
-                and page < total_pages
-                or total_count is not None
-                and fetched < total_count
-            )
+            and (total_pages is not None and page < total_pages or total_count is not None and fetched < total_count)
         ):
-            raise CloudflareResponseError(
-                "Cloudflare API returned malformed pagination data"
-            )
+            raise CloudflareResponseError("Cloudflare API returned malformed pagination data")
 
         yield from result
 
@@ -278,9 +241,7 @@ def iter_items(client, path, per_page=50, paginate=True):
 
         if total_pages is not None and page >= total_pages:
             if total_count is not None and fetched < total_count:
-                raise CloudflareResponseError(
-                    "Cloudflare API returned malformed pagination data"
-                )
+                raise CloudflareResponseError("Cloudflare API returned malformed pagination data")
             return
         if total_pages is None and total_count is not None and fetched >= total_count:
             return
@@ -298,10 +259,7 @@ def normalize_current_by_desired_fields(current, desired):
     if isinstance(current, dict) and isinstance(desired, dict):
         if not desired:
             return current
-        return {
-            key: normalize_current_by_desired_fields(current.get(key), value)
-            for key, value in desired.items()
-        }
+        return {key: normalize_current_by_desired_fields(current.get(key), value) for key, value in desired.items()}
 
     if isinstance(current, list) and isinstance(desired, list):
         if len(current) != len(desired):
@@ -319,9 +277,7 @@ def parse_list_response(response):
         if "success" in response and not isinstance(response["success"], bool):
             raise CloudflareResponseError("Cloudflare API returned malformed list data")
         if response.get("success") is False:
-            raise CloudflareResponseError(
-                "Cloudflare API returned an unsuccessful response"
-            )
+            raise CloudflareResponseError("Cloudflare API returned an unsuccessful response")
         if "result" not in response:
             raise CloudflareResponseError("Cloudflare API returned malformed list data")
         result = response.get("result")
@@ -465,11 +421,7 @@ def validate_tunnel_secret(module, secret):
 
 
 def response_result(response, default=None):
-    null_result = (
-        isinstance(response, dict)
-        and "result" in response
-        and response["result"] is None
-    )
+    null_result = isinstance(response, dict) and "result" in response and response["result"] is None
     response = serialize_resource(response)
     if null_result:
         response["result"] = None
@@ -478,9 +430,7 @@ def response_result(response, default=None):
         if "success" in response and not isinstance(response["success"], bool):
             raise CloudflareResponseError("Cloudflare API returned malformed data")
         if response.get("success") is False:
-            raise CloudflareResponseError(
-                "Cloudflare API returned an unsuccessful response"
-            )
+            raise CloudflareResponseError("Cloudflare API returned an unsuccessful response")
         if "result" not in response:
             raise CloudflareResponseError("Cloudflare API returned malformed data")
         result = response.get("result")
@@ -510,11 +460,7 @@ def serialize_resource(resource):
         return serialize_resource(resource.to_dict())
 
     if isinstance(resource, dict):
-        return {
-            key: serialize_resource(value)
-            for key, value in resource.items()
-            if value is not None
-        }
+        return {key: serialize_resource(value) for key, value in resource.items() if value is not None}
 
     if isinstance(resource, (list, tuple)):
         return [serialize_resource(value) for value in resource]

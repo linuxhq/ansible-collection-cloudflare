@@ -92,9 +92,7 @@ class AccessAppsTests(TestCase):
         ):
             access_apps.ensure_absent(module, {})
 
-        delete.assert_called_once_with(
-            {}, "/accounts/account/access/apps/app-id", expected_id="app-id"
-        )
+        delete.assert_called_once_with({}, "/accounts/account/access/apps/app-id", expected_id="app-id")
         self.assertEqual(
             raised.exception.values["access_app"]["scim_config"]["authentication"],
             {},

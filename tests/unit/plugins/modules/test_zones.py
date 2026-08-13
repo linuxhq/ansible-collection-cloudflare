@@ -26,9 +26,7 @@ def params(**updates):
 class ZonesTests(TestCase):
     def test_normalizes_setting_scalar_values_recursively(self):
         self.assertEqual(
-            zones.normalize_setting_value(
-                {"enabled": True, "ports": [80, 443], "ratio": 1.5}
-            ),
+            zones.normalize_setting_value({"enabled": True, "ports": [80, 443], "ratio": 1.5}),
             {"enabled": "true", "ports": ["80", "443"], "ratio": "1.5"},
         )
 
@@ -130,9 +128,7 @@ class ZonesTests(TestCase):
         self.assertIn("did not apply", raised.exception.values["msg"])
 
     def test_updates_zone_fields_in_one_request(self):
-        module = FakeModule(
-            params(type="partial", vanity_name_servers=["ns1.example.com"])
-        )
+        module = FakeModule(params(type="partial", vanity_name_servers=["ns1.example.com"]))
         current = {"id": "zone", "name": "example.com", "type": "full"}
         updated = {
             **current,

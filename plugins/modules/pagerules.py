@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -125,6 +125,7 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_path,
@@ -166,15 +167,11 @@ def find_pagerule(module, client):
     found = None
     for pagerule in list_all(client, endpoint(module.params["zone_id"])):
         if not values_differ(
-            normalize_current_by_desired_fields(
-                pagerule_targets(module, pagerule), module.params["targets"]
-            ),
+            normalize_current_by_desired_fields(pagerule_targets(module, pagerule), module.params["targets"]),
             module.params["targets"],
         ):
             if found is not None:
-                module.fail_json(
-                    msg="Multiple page rules match the requested target constraints"
-                )
+                module.fail_json(msg="Multiple page rules match the requested target constraints")
             found = pagerule
     return found
 
@@ -205,9 +202,7 @@ def ensure_present(module, client):
             payload[field] = current[field]
 
     if not values_differ(
-        normalize_current_by_desired_fields(
-            select_fields(current, payload.keys()), payload
-        ),
+        normalize_current_by_desired_fields(select_fields(current, payload.keys()), payload),
         payload,
     ):
         module.exit_json(
@@ -253,9 +248,7 @@ def ensure_absent(module, client):
         )
 
     current_id = resource_id(module, current, "page rule")
-    delete_result(
-        client, item_endpoint(params["zone_id"], current_id), expected_id=current_id
-    )
+    delete_result(client, item_endpoint(params["zone_id"], current_id), expected_id=current_id)
     module.exit_json(
         changed=True,
         message="Page rule deleted",

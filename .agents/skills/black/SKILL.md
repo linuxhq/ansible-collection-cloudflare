@@ -1,17 +1,16 @@
 ---
 name: black
-description: Format Python plugin code with black from the project virtualenv. Run after every edit to a file under plugins/ so it matches the black version CI enforces.
+description: Format Python plugin code with black through Tox. Run after every edit under plugins/.
 ---
 
 # black
 
-Format Python with the venv's `black` (matches CI's pre-commit hook), after every edit to a
-`plugins/**/*.py` file.
+Match CI's pre-commit hook.
 
 ```sh
-venv/bin/black plugins/modules/{{ file }}.py
-venv/bin/black plugins
-venv/bin/black --check plugins
+tox run -e black -- plugins/modules/{{ file }}.py
+tox run -m format
+tox run -m lint
 ```
 
 - Re-read a file if black rewrote it.
@@ -19,4 +18,4 @@ venv/bin/black --check plugins
 
 ## Dependencies
 
-- `virtualenv` skill
+- `tox` skill

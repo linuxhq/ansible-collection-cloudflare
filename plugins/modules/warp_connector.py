@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -99,6 +99,7 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     CloudflareResponseError,
     cloudflare,
@@ -141,9 +142,7 @@ def ensure_present(module, client):
 
             warp_connector = patch_result(
                 client,
-                cloudflare_path(
-                    "accounts", params["account_id"], "warp_connector", current_id
-                ),
+                cloudflare_path("accounts", params["account_id"], "warp_connector", current_id),
                 {"tunnel_secret": params["tunnel_secret"]},
             )
             resource_id(module, warp_connector, "WARP Connector", expected=current_id)
@@ -175,9 +174,7 @@ def ensure_present(module, client):
         {"name": params["name"]},
     )
     connector_id = resource_id(module, warp_connector, "WARP Connector")
-    resource_field(
-        module, warp_connector, "name", "WARP Connector", expected=params["name"]
-    )
+    resource_field(module, warp_connector, "name", "WARP Connector", expected=params["name"])
 
     if params.get("tunnel_secret") is not None:
         connector_path = cloudflare_path(
@@ -197,9 +194,7 @@ def ensure_present(module, client):
                 or warp_connector.get("id") != connector_id
                 or warp_connector.get("name") != params["name"]
             ):
-                raise CloudflareResponseError(
-                    "Cloudflare API returned the wrong WARP Connector"
-                )
+                raise CloudflareResponseError("Cloudflare API returned the wrong WARP Connector")
         except (cloudflare.APIError, CloudflareResponseError):
             try:
                 delete_result(client, connector_path, expected_id=connector_id)

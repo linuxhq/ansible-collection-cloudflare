@@ -2,6 +2,7 @@
 extends: default
 ignore:
   - .ansible
+  - .tox
   - changelogs/.plugin-cache.yaml
   - changelogs/changelog.yaml
   - venv

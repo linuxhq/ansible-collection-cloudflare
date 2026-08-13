@@ -1,17 +1,17 @@
 ---
 name: pyenv
-description: Install pyenv and the project's pinned Python. Use before the virtualenv skill when the .python-version interpreter is missing.
+description: Install pyenv and the project's pinned Python. Use before the tox skill when the .python-version interpreter is missing.
 ---
 
 # pyenv
 
 Install `pyenv` via Homebrew, install the Python pinned in `.python-version`, and activate it so
-the `virtualenv` skill builds `venv/` against the right interpreter.
+Tox builds disposable environments against the right interpreter.
 
 ```sh
 brew install pyenv
-pyenv install "$(cat .python-version)"
 eval "$(pyenv init -)"
+pyenv install -s "$(cat .python-version)"
 ```
 
 `.python-version` already pins the version, so pyenv selects it automatically once the shims are
@@ -22,10 +22,11 @@ pyenv version
 python --version
 ```
 
-- Run once, before the `virtualenv` skill, if the pinned Python isn't installed.
-- To persist activation across sessions, add `eval "$(pyenv init -)"` to your shell profile
-  (e.g. `~/.zshrc`).
+- Run once, before the `tox` skill, if the pinned Python isn't installed.
+- Do not modify a shell profile unless the user explicitly requests a persistent setup.
+- On other platforms, use the platform's supported pyenv installation method rather than
+  Homebrew.
 
 ## Dependencies
 
-- Homebrew (`brew`)
+- `pyenv`; Homebrew is required only for the macOS installation command above.

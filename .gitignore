@@ -2,8 +2,10 @@
 
 .ansible/
 .DS_Store
+.pytest_cache/
 .ruff_cache/
+.tox/
+changelogs/.plugin-cache.yaml
 __pycache__/
 *.py[co]
-venv
-changelogs/.plugin-cache.yaml
+venv/

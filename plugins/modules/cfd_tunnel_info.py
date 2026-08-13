@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -74,6 +74,7 @@ cfd_tunnels:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_path,
@@ -102,9 +103,7 @@ def list_resources(module, client):
         if module.params["include_token"]:
             token = get_result(
                 client,
-                cloudflare_path(
-                    "accounts", account_id, "cfd_tunnel", tunnel_id, "token"
-                ),
+                cloudflare_path("accounts", account_id, "cfd_tunnel", tunnel_id, "token"),
             )
             tunnel["token"] = resource_field(
                 module,

@@ -54,16 +54,10 @@ class PagesProjectsTests(TestCase):
             "secret",
         )
         self.assertNotIn("web_analytics_token", comparable["build_config"])
-        self.assertEqual(
-            payload["build_config"]["web_analytics_token"], "analytics-secret"
-        )
+        self.assertEqual(payload["build_config"]["web_analytics_token"], "analytics-secret")
 
     def test_removed_environment_variables_are_sent_as_null(self):
-        payload = {
-            "deployment_configs": {
-                "production": {"env_vars": {"KEEP": {"value": "yes"}}}
-            }
-        }
+        payload = {"deployment_configs": {"production": {"env_vars": {"KEEP": {"value": "yes"}}}}}
         current = {
             "deployment_configs": {
                 "production": {
@@ -77,9 +71,7 @@ class PagesProjectsTests(TestCase):
 
         merged = pages_projects.payload_with_removed_env_vars(payload, current)
 
-        self.assertIsNone(
-            merged["deployment_configs"]["production"]["env_vars"]["REMOVE"]
-        )
+        self.assertIsNone(merged["deployment_configs"]["production"]["env_vars"]["REMOVE"])
         self.assertNotIn(
             "REMOVE",
             payload["deployment_configs"]["production"]["env_vars"],
@@ -104,13 +96,7 @@ class PagesProjectsTests(TestCase):
     def test_rotation_requires_credentials(self):
         for updates in (
             {},
-            {
-                "deployment_configs": {
-                    "production": {
-                        "env_vars": {"MODE": {"type": "plain_text", "value": "prod"}}
-                    }
-                }
-            },
+            {"deployment_configs": {"production": {"env_vars": {"MODE": {"type": "plain_text", "value": "prod"}}}}},
         ):
             module = FakeModule(params(rotate_secrets=True, **updates))
 
@@ -124,8 +110,7 @@ class PagesProjectsTests(TestCase):
             get.assert_not_called()
             self.assertEqual(
                 raised.exception.values["msg"],
-                "rotate_secrets requires a secret_text value or "
-                "build_config.web_analytics_token",
+                "rotate_secrets requires a secret_text value or build_config.web_analytics_token",
             )
 
     def test_rejects_invalid_requested_domains_before_api_calls(self):
@@ -154,13 +139,7 @@ class PagesProjectsTests(TestCase):
     def test_redacts_secret_values_from_result(self):
         module = FakeModule(
             params(
-                deployment_configs={
-                    "production": {
-                        "env_vars": {
-                            "TOKEN": {"type": "secret_text", "value": "secret"}
-                        }
-                    }
-                }
+                deployment_configs={"production": {"env_vars": {"TOKEN": {"type": "secret_text", "value": "secret"}}}}
             )
         )
         project = {"name": "docs", **module.params}
@@ -172,9 +151,7 @@ class PagesProjectsTests(TestCase):
         ):
             pages_projects.ensure_present(module, {})
 
-        secret = raised.exception.values["pages_project"]["deployment_configs"][
-            "production"
-        ]["env_vars"]["TOKEN"]
+        secret = raised.exception.values["pages_project"]["deployment_configs"]["production"]["env_vars"]["TOKEN"]
         self.assertEqual(secret, {"type": "secret_text"})
 
     def test_rotates_web_analytics_token(self):

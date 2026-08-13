@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -134,6 +134,7 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_path,
@@ -188,9 +189,7 @@ def ensure_present(module, client):
             or "value" not in setting
             or setting["id"] in setting_ids
         ):
-            module.fail_json(
-                msg="Each zone setting requires a unique valid id and value"
-            )
+            module.fail_json(msg="Each zone setting requires a unique valid id and value")
         setting_ids.add(setting["id"])
 
     current = find_by_name(
@@ -236,11 +235,7 @@ def ensure_present(module, client):
         created = True
     else:
         current_id = resource_id(module, current, "zone")
-        payload = {
-            field: params[field]
-            for field in ("type", "vanity_name_servers")
-            if params.get(field) is not None
-        }
+        payload = {field: params[field] for field in ("type", "vanity_name_servers") if params.get(field) is not None}
         changed = False
         if payload and values_differ(select_fields(current, payload.keys()), payload):
             if module.check_mode:
@@ -267,9 +262,7 @@ def ensure_present(module, client):
         if not isinstance(existing, dict) or "value" not in existing:
             module.fail_json(msg="Cloudflare API returned malformed zone setting data")
 
-        if normalize_setting_value(existing.get("value")) == normalize_setting_value(
-            setting["value"]
-        ):
+        if normalize_setting_value(existing.get("value")) == normalize_setting_value(setting["value"]):
             continue
 
         if module.check_mode:
@@ -287,9 +280,7 @@ def ensure_present(module, client):
         resource_id(module, updated_setting, "zone setting", expected=setting["id"])
         if "value" not in updated_setting:
             module.fail_json(msg="Cloudflare API returned malformed zone setting data")
-        if normalize_setting_value(updated_setting["value"]) != normalize_setting_value(
-            setting["value"]
-        ):
+        if normalize_setting_value(updated_setting["value"]) != normalize_setting_value(setting["value"]):
             module.fail_json(msg="Cloudflare did not apply the requested zone setting")
         updated_settings.append(updated_setting)
 

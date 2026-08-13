@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -105,6 +105,7 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_path,
@@ -145,9 +146,7 @@ def ensure_present(module, client):
 
         access_group = post_result(client, endpoint(params["account_id"]), payload)
         resource_id(module, access_group, "Access group")
-        resource_field(
-            module, access_group, "name", "Access group", expected=params["name"]
-        )
+        resource_field(module, access_group, "name", "Access group", expected=params["name"])
         validate_requested_values(
             module,
             {"is_default": False, **access_group},
@@ -185,15 +184,11 @@ def ensure_present(module, client):
 
     access_group = put_result(
         client,
-        cloudflare_path(
-            "accounts", params["account_id"], "access", "groups", current_id
-        ),
+        cloudflare_path("accounts", params["account_id"], "access", "groups", current_id),
         payload,
     )
     resource_id(module, access_group, "Access group", expected=current_id)
-    resource_field(
-        module, access_group, "name", "Access group", expected=params["name"]
-    )
+    resource_field(module, access_group, "name", "Access group", expected=params["name"])
     validate_requested_values(
         module,
         {"is_default": False, **access_group},
@@ -230,9 +225,7 @@ def ensure_absent(module, client):
 
     delete_result(
         client,
-        cloudflare_path(
-            "accounts", params["account_id"], "access", "groups", current_id
-        ),
+        cloudflare_path("accounts", params["account_id"], "access", "groups", current_id),
         expected_id=current_id,
     )
     module.exit_json(

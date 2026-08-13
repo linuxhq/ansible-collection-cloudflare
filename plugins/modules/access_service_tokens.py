@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright: Contributors to the Ansible project
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
@@ -110,6 +110,7 @@ message:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_error_context,
@@ -159,18 +160,12 @@ def ensure_present(module, client):
             name=params["name"],
         ):
             service_token = serialize_resource(
-                client.zero_trust.access.service_tokens.create(
-                    **service_token_payload(module)
-                )
+                client.zero_trust.access.service_tokens.create(**service_token_payload(module))
             )
         resource_id(module, service_token, "service token")
-        resource_field(
-            module, service_token, "name", "service token", expected=params["name"]
-        )
+        resource_field(module, service_token, "name", "service token", expected=params["name"])
         if not duration_matches(service_token, params["duration"]):
-            module.fail_json(
-                msg="Cloudflare did not apply the requested service token duration"
-            )
+            module.fail_json(msg="Cloudflare did not apply the requested service token duration")
         module.exit_json(
             changed=True,
             message="Service token created",
@@ -203,13 +198,9 @@ def ensure_present(module, client):
         )
     service_token = serialize_resource(service_token)
     resource_id(module, service_token, "service token", expected=current_id)
-    resource_field(
-        module, service_token, "name", "service token", expected=params["name"]
-    )
+    resource_field(module, service_token, "name", "service token", expected=params["name"])
     if not duration_matches(service_token, params["duration"]):
-        module.fail_json(
-            msg="Cloudflare did not apply the requested service token duration"
-        )
+        module.fail_json(msg="Cloudflare did not apply the requested service token duration")
     module.exit_json(
         changed=True,
         message="Service token updated",
