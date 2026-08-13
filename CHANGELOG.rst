@@ -4,6 +4,14 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.1.9
+======
+
+Minor Changes
+-------------
+
+- Development and CI tooling - migrate collection checks from Make to Tox and expand unit and sanity testing across supported Ansible versions.
+
 v2.1.8
 ======
 

@@ -28,4 +28,5 @@ sections:
     - Known Issues
 title: linuxhq.cloudflare
 trivial_section_name: trivial
+vcs: git
 ...
