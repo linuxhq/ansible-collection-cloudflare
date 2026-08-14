@@ -68,10 +68,6 @@ tox run -e changelog -- generate
 tox run -e build
 ```
 
-### Plugin audit
-
-Use `$plugins-audit` for an exhaustive review of the `plugins/` tree.
-
 ## Examples
 
 Example playbooks and inventory are available in [`examples/`](examples/).
