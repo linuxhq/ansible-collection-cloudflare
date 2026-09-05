@@ -36,7 +36,7 @@ repos:
         verbose: true
 
   - repo: https://github.com/PyCQA/isort
-    rev: 8.0.1
+    rev: 9.0.1
     hooks:
       - id: isort
         files: \.(py)$
