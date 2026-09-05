@@ -27,6 +27,13 @@ repos:
         files: \.(yaml|yml)$
         verbose: true
 
+  - repo: https://github.com/jsh9/blank-line-after-blocks
+    rev: 0.1.4
+    hooks:
+      - id: blank-line-after-blocks
+        files: ^(plugins|tests)/.*\.py$
+        verbose: true
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.16.5
     hooks:

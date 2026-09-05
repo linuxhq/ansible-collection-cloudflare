@@ -138,6 +138,7 @@ def ensure_present(module, client):
         params["config"],
     ):
         module.fail_json(msg="Cloudflare did not apply the tunnel configuration")
+
     module.exit_json(
         changed=True,
         message="Tunnel configuration updated",

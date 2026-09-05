@@ -158,8 +158,10 @@ def pagerule_targets(module, pagerule):
     targets = pagerule.get("targets")
     if not isinstance(targets, list):
         module.fail_json(msg="Cloudflare API returned malformed page rule data")
+
     for target in targets:
         require_mapping(module, target, "page rule target")
+
     return targets
 
 
@@ -172,7 +174,9 @@ def find_pagerule(module, client):
         ):
             if found is not None:
                 module.fail_json(msg="Multiple page rules match the requested target constraints")
+
             found = pagerule
+
     return found
 
 

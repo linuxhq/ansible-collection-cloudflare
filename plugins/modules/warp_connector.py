@@ -207,6 +207,7 @@ def ensure_present(module, client):
                     ),
                     warp_connector_id=connector_id,
                 )
+
             raise
 
     module.exit_json(

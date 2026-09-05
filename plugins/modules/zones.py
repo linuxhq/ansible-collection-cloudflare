@@ -174,6 +174,7 @@ def normalize_setting_value(value):
 def zone_endpoint(zone_id=None):
     if zone_id is None:
         return cloudflare_path("zones")
+
     return cloudflare_path("zones", zone_id)
 
 
@@ -190,6 +191,7 @@ def ensure_present(module, client):
             or setting["id"] in setting_ids
         ):
             module.fail_json(msg="Each zone setting requires a unique valid id and value")
+
         setting_ids.add(setting["id"])
 
     current = find_by_name(
@@ -250,6 +252,7 @@ def ensure_present(module, client):
             resource_field(module, current, "name", "zone", expected=params["name"])
             validate_requested_values(module, current, payload, "zone")
             changed = True
+
         created = False
 
     updated_settings = []
@@ -280,8 +283,10 @@ def ensure_present(module, client):
         resource_id(module, updated_setting, "zone setting", expected=setting["id"])
         if "value" not in updated_setting:
             module.fail_json(msg="Cloudflare API returned malformed zone setting data")
+
         if normalize_setting_value(updated_setting["value"]) != normalize_setting_value(setting["value"]):
             module.fail_json(msg="Cloudflare did not apply the requested zone setting")
+
         updated_settings.append(updated_setting)
 
     if not changed and not updated_settings:

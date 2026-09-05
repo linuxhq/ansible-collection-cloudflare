@@ -107,6 +107,7 @@ def list_resources(module, client):
                 values = rule.get(field)
                 if not isinstance(values, list):
                     module.fail_json(msg="Cloudflare API returned malformed page rule data")
+
                 for value in values:
                     require_mapping(module, value, f"page rule {field[:-1]}")
 

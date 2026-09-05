@@ -117,12 +117,14 @@ def list_resources(module, client):
                 rules = []
             elif not isinstance(rules, list):
                 module.fail_json(msg="Cloudflare API returned malformed ruleset data")
+
             for rule in rules:
                 require_mapping(module, rule, "ruleset rule")
 
         entry = {"name": zone_name, "rules": rules, "zone_id": zone_id}
         if ruleset is not None:
             entry.update(id=ruleset_id, phase=ruleset["phase"])
+
         rulesets.append(entry)
 
     module.exit_json(changed=False, rulesets=rulesets)
