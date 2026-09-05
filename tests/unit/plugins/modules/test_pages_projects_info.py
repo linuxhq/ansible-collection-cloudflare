@@ -85,6 +85,7 @@ class PagesProjectsInfoTests(TestCase):
                 "web_analytics_token",
                 raised.exception.values["pages_projects"][0][field]["build_config"],
             )
+
         self.assertEqual(
             projects[0]["deployment_configs"]["production"]["env_vars"]["TOKEN"]["value"],
             "secret",

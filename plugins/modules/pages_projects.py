@@ -172,6 +172,7 @@ def comparable_pages_payload(payload):
     build_config = payload.get("build_config")
     if isinstance(build_config, dict) and set(build_config) == {"web_analytics_token"}:
         comparable.pop("build_config")
+
     return comparable
 
 
@@ -210,10 +211,12 @@ def current_domain_names(module, project, domains):
     for name in project_domains:
         if not isinstance(name, str) or not name.strip() or name != name.strip():
             module.fail_json(msg="Cloudflare API returned malformed Pages domain data")
+
         names.add(name)
 
     for domain in domains:
         names.add(resource_field(module, domain, "name", "Pages domain"))
+
     return names
 
 
@@ -223,8 +226,10 @@ def desired_domain_names(module):
         domain_name = domain.get("name") if isinstance(domain, dict) else None
         if not isinstance(domain_name, str) or not domain_name.strip() or domain_name != domain_name.strip():
             module.fail_json(msg="Each Pages project domain requires a valid name")
+
         if domain_name not in names:
             names.append(domain_name)
+
     return names
 
 

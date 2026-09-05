@@ -214,8 +214,10 @@ def list_items(module, client, account_id, list_id):
                 per_page=ITEMS_PER_PAGE,
             )
         ]
+
     for item in items:
         require_mapping(module, item, "Rules list item")
+
     return items
 
 
@@ -233,6 +235,7 @@ def operation_endpoint(account_id, operation_id):
 def pending_operation_error(exc):
     if getattr(exc, "status_code", None) not in (400, 409, 429):
         return False
+
     return "operation" in str(exc).lower()
 
 
@@ -271,6 +274,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
     operation_id = None
     if isinstance(operation, dict):
         operation_id = operation.get("operation_id") or operation.get("id")
+
     if not isinstance(operation_id, str) or not operation_id.strip() or operation_id != operation_id.strip():
         module.fail_json(
             msg="Rules list items submission did not return an operation id",
@@ -303,6 +307,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
                     operation_id=operation_id,
                     operation=status,
                 )
+
             status = {}
             time.sleep(min(OPERATION_POLL_SECONDS, max(deadline - time.monotonic(), 0)))
             continue
@@ -525,6 +530,7 @@ def ensure_present(module, client):
     }
     if items_operation is not None:
         result["items_operation"] = items_operation
+
     module.exit_json(**result)
 
 

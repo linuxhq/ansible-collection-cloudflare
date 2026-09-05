@@ -76,6 +76,7 @@ class SdkModel:
     def to_dict(self, mode=None):
         if mode != "json":
             raise ValueError("expected JSON serialization")
+
         return {
             "id": self.resource_id,
             "expires_at": self.expires_at.isoformat().replace("+00:00", "Z"),

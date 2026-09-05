@@ -144,10 +144,13 @@ def rules_from_resource(module, ruleset):
     rules = ruleset.get("rules")
     if rules is None:
         return []
+
     if not isinstance(rules, list):
         module.fail_json(msg="Cloudflare API returned malformed ruleset data")
+
     for rule in rules:
         require_mapping(module, rule, "ruleset rule")
+
     return rules
 
 

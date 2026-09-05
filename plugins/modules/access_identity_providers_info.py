@@ -95,6 +95,7 @@ def list_resources(module, client):
         name = provider.get("name")
         if not isinstance(name, str) or name != name.strip():
             module.fail_json(msg="Cloudflare API returned malformed Access identity provider data")
+
         for section, field in (("config", "client_secret"), ("scim_config", "secret")):
             remove_fields(provider.get(section), (field,))
 

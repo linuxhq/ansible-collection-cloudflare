@@ -151,6 +151,7 @@ def ensure_present(module, client):
             remote = current.get("config_src") == "cloudflare" or current.get("remote_config") is True
             if not local or remote:
                 module.fail_json(msg="tunnel_secret is only valid for locally-managed tunnels")
+
             if module.check_mode:
                 module.exit_json(
                     changed=True,
@@ -185,6 +186,7 @@ def ensure_present(module, client):
 
     if not params.get("config_src"):
         module.fail_json(msg="config_src is required when creating a cloudflared tunnel")
+
     if params["config_src"] != "local" and params.get("tunnel_secret") is not None:
         module.fail_json(msg="tunnel_secret is only valid for locally-managed tunnels")
 

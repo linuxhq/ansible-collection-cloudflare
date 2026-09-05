@@ -2,6 +2,7 @@ ansible>=14.3.1,<15
 ansible-lint==26.8.0
 antsibull-changelog==0.35.1
 black==26.5.1
+blank-line-after-blocks==0.1.4
 cloudflare>=5.6.0,<6
 isort==9.0.1
 jmespath==1.1.0

@@ -161,6 +161,7 @@ def ensure_present(module, client):
         zone_id=module.params["zone_id"],
     ):
         current = serialize_resource(client.dns.dnssec.get(zone_id=module.params["zone_id"]))
+
     require_mapping(module, current, "DNSSEC settings")
     current_status = normalized_status(resource_field(module, current, "status", "DNSSEC settings"))
 
@@ -211,6 +212,7 @@ def ensure_present(module, client):
         zone_id=module.params["zone_id"],
     ):
         dnssec = serialize_resource(client.dns.dnssec.edit(**payload))
+
     require_mapping(module, dnssec, "DNSSEC settings")
     response_status = normalized_status(resource_field(module, dnssec, "status", "DNSSEC settings"))
     if any(
@@ -223,6 +225,7 @@ def ensure_present(module, client):
         )
     ):
         module.fail_json(msg="Cloudflare did not apply the requested DNSSEC settings")
+
     module.exit_json(
         changed=True,
         message="DNSSEC settings updated",
