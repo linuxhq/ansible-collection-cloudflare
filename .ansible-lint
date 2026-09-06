@@ -1,5 +1,6 @@
 ---
 exclude_paths:
+  - .tox
   - molecule
   - venv
 offline: false

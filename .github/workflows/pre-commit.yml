@@ -1,8 +1,12 @@
 ---
 'on':
   push:
-    branches: '*'
+    branches: '**'
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   pre-commit:
