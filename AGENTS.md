@@ -46,7 +46,7 @@ Invoke skills rather than running commands ad hoc.
 
 ## Setup
 
-Enable the review gate once: `/codex:setup --enable-review-gate`
+Enable the review gate once: `$cc:setup --enable-review-gate`
 
 ## Imports
 
