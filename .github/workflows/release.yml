@@ -2,17 +2,36 @@
 'on':
   push:
     tags:
-      - '*'
+      - 'v*'
+
+permissions:
+  contents: read
 
 jobs:
+  pre-commit:
+    uses: ./.github/workflows/pre-commit.yml
+
+  sanity:
+    uses: ./.github/workflows/ansible-test.yml
+
   release:
+    needs:
+      - pre-commit
+      - sanity
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version-file: .python-version
-      - run: pip install --constraint requirements.txt ansible
+          python-version: '3.12'
+      - run: pip install ansible-core==2.18.0
+      - name: Verify tag matches galaxy.yml version
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          galaxy_version="$(awk '/^version:/ {print $2}' galaxy.yml)"
+          if [ "${tag_version}" != "${galaxy_version}" ]; then
+            echo "Tag v${tag_version} does not match galaxy.yml version ${galaxy_version}" >&2
+            exit 1
+          fi
       - run: ansible-galaxy collection build
       - run: ansible-galaxy collection publish --api-key ${{ secrets.GALAXY_API_KEY }} linuxhq-cloudflare-*.tar.gz
-...
