@@ -30,9 +30,9 @@ Invoke skills rather than running commands ad hoc.
 | Skill                     | Purpose                       |
 | ------------------------- | ----------------------------- |
 | `ansible-lint`            | Lint roles & playbooks        |
+| `ansible-test`            | Module sanity                 |
 | `black`                   | Format Python                 |
 | `blank-line-after-blocks` | Space Python blocks           |
-| `ansible-test`            | Module sanity                 |
 | `changelog`               | Changelog fragments & release |
 | `collection-build`        | Build the collection tarball  |
 | `isort`                   | Sort Python imports           |
@@ -41,7 +41,7 @@ Invoke skills rather than running commands ad hoc.
 | `pyenv`                   | Install pyenv + pinned Python |
 | `ruff`                    | Lint Python                   |
 | `tox`                     | Set up isolated environments  |
-| `unit`                    | Run Python unit tests         |
+| `unit`                    | Run unit tests                |
 | `yamllint`                | Lint YAML                     |
 
 ## Setup
