@@ -20,9 +20,6 @@ updates:
       - dependency-name: molecule
         versions:
           - '>=25.2.0'
-      - dependency-name: molecule-plugins
-        versions:
-          - '>=25.0.0'
 
   - package-ecosystem: pre-commit
     directory: /
