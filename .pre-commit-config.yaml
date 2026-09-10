@@ -24,12 +24,6 @@ repos:
     hooks:
       - id: ansible-lint
         language_version: python3
-        entry: >-
-          bash -c '
-          export ANSIBLE_HOME="$PWD/.ansible";
-          export ANSIBLE_COLLECTIONS_PATH="$PWD/.ansible/collections";
-          export ANSIBLE_COLLECTIONS_SCAN_SYS_PATH=false;
-          exec python3 -m ansiblelint -v --force-color'
         files: \.(yaml|yml)$
         verbose: true
 
