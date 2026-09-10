@@ -58,8 +58,8 @@ Standards for Python modules, lookup plugins, and filter plugins under
 
 - Give each module one concise, well-defined task.
 - Use state modules for declarative resource management.
-- Isolate imperative operations in purpose-specific action modules.
-- Document when an action module is inherently non-idempotent.
+- Use purpose-specific modules for imperative operations.
+- Document when a module for imperative operations is inherently non-idempotent.
 - Use `name` for the primary resource identifier when practical.
 - Use Ansible types, such as `type="bool"`, instead of parsing values.
 - Do not add `get`, `list`, or `info` states to manager modules.

@@ -98,7 +98,7 @@ Standards for designing, implementing, documenting, and testing content under
 
 - Give every task a concise, outcome-oriented name.
 - Use the fully qualified collection name for every module and action plugin.
-- Tag every task and handler with the role name.
+- Tag every ordinary task with the role name.
 - Use `apply.tags` when an included task file must inherit the role tag.
 - Declare the intended module state instead of relying on a module default.
 - Keep conditions explicit and based on documented inputs or Ansible facts.
@@ -117,7 +117,8 @@ Standards for designing, implementing, documenting, and testing content under
 - Support check mode throughout the role when the called modules support it.
 - Guard unavoidable side effects and non-check-mode operations explicitly.
 - Do not disable check mode merely to make a scenario pass.
-- Ensure a second converge reports no changes.
+- Ensure a second converge reports no changes for roles with an idempotent contract.
+- For documented non-idempotent action roles, verify the expected action and change reporting.
 
 ### Commands and failures
 
@@ -219,8 +220,8 @@ Standards for designing, implementing, documenting, and testing content under
 - Name handlers with the action and affected service.
 - Notify handlers by their exact, stable name.
 - Prefer reload over restart when reload fully applies the change.
-- Apply the role tag, privilege requirements, and safety conditions to
-  handlers as well as ordinary tasks.
+- Apply privilege requirements and safety conditions to handlers as well as
+  ordinary tasks.
 - Guard handlers that cannot run safely in check mode.
 - Keep service enablement and runtime state explicit.
 

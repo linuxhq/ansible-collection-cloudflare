@@ -18,13 +18,9 @@ from ansible.module_utils.{{ module }} import {{ name }}
 
 | Module                         | Symbol                     | Use                           |
 | ------------------------------ | -------------------------- | ----------------------------- |
-| `.basic`                       | `get_all_subclasses`       | All subclasses.               |
 | `.basic`                       | `get_module_path`          | Module file path.             |
-| `.basic`                       | `get_platform`             | Platform name.                |
 | `.basic`                       | `heuristic_log_sanitize`   | Scrub secrets before logging. |
-| `.basic`                       | `load_platform_subclass`   | Load platform subclass.       |
 | `.basic`                       | `missing_required_lib`     | "install X" message.          |
-| `.common.collections`          | `count`                    | Count occurrences.            |
 | `.common.collections`          | `is_iterable`              | Is it iterable?               |
 | `.common.collections`          | `is_sequence`              | Is it a sequence?             |
 | `.common.collections`          | `is_string`                | Is it a string?               |
@@ -32,10 +28,6 @@ from ansible.module_utils.{{ module }} import {{ name }}
 | `.common.dict_transformations` | `dict_merge`               | Deep-merge dicts.             |
 | `.common.dict_transformations` | `recursive_diff`           | Structural diff.              |
 | `.common.dict_transformations` | `snake_dict_to_camel_dict` | snake_case → camel_case.      |
-| `.common.json`                 | `get_decoder`              | JSON decoder.                 |
-| `.common.json`                 | `get_encoder`              | JSON encoder.                 |
-| `.common.json`                 | `get_module_decoder`       | Module JSON decoder.          |
-| `.common.json`                 | `get_module_encoder`       | Module JSON encoder.          |
 | `.common.parameters`           | `env_fallback`             | Default from env var.         |
 | `.common.parameters`           | `remove_values`            | Strip `no_log` values.        |
 | `.common.parameters`           | `sanitize_keys`            | Strip `no_log` keys.          |
