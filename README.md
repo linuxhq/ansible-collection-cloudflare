@@ -9,16 +9,17 @@ An Ansible collection of Cloudflare modules, plugins, and roles.
 
 ## Requirements
 
-- Python `>= 3.11`
-- `ansible-core >= 2.18.0`
-- `community.general >= 12.0.0, < 14.0.0`
-- `cloudflare >= 5.6.0, < 6`
+See [requirements.yml](requirements.yml).
 
 ## Installation
 
-    ansible-galaxy collection install linuxhq.cloudflare
+```sh
+ansible-galaxy collection install linuxhq.cloudflare
+```
 
 ## Development
+
+Local Tox environments use the Python version selected by `.python-version`.
 
 With Tox installed, install the pre-commit hook:
 
@@ -47,7 +48,7 @@ tox run -m unit
 Run Ansible sanity tests for a module:
 
 ```sh
-tox run -e ansible-test -- sanity --python "$(cat .python-version)" plugins/modules/access_apps.py
+tox run -e ansible-test -- sanity plugins/modules/access_apps.py
 ```
 
 ### Molecule

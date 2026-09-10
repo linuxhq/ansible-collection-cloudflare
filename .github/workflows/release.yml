@@ -23,8 +23,8 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
-      - run: pip install ansible-core==2.18.0
+          python-version-file: .python-version
+      - run: python -m pip install 'tox>=4.51'
       - name: Verify tag matches galaxy.yml version
         run: |
           tag_version="${GITHUB_REF_NAME#v}"
@@ -33,5 +33,5 @@ jobs:
             echo "Tag v${tag_version} does not match galaxy.yml version ${galaxy_version}" >&2
             exit 1
           fi
-      - run: ansible-galaxy collection build
-      - run: ansible-galaxy collection publish --api-key ${{ secrets.GALAXY_API_KEY }} linuxhq-cloudflare-*.tar.gz
+      - run: tox run -e build
+      - run: tox exec -e build -- ansible-galaxy collection publish --api-key ${{ secrets.GALAXY_API_KEY }} linuxhq-cloudflare-*.tar.gz
