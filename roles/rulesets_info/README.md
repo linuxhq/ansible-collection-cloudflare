@@ -13,6 +13,10 @@ Gather information about cloudflare rulesets
     rulesets_info_api_token: null
     rulesets_info_phase: http_request_firewall_custom
 
+## Dependencies
+
+None
+
 ## Return Values
 
     _rulesets_info_dict

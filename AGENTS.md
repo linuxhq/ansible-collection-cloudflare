@@ -46,7 +46,12 @@ Invoke skills rather than running commands ad hoc.
 
 ## Setup
 
-Enable the review gate once: `$cc:setup --enable-review-gate`
+Enable the review gate once for the agent you are using:
+
+| Agent  | Command                              |
+| ------ | ------------------------------------ |
+| Codex  | `$claude:setup --enable-review-gate` |
+| Claude | `/codex:setup --enable-review-gate`  |
 
 ## Imports
 

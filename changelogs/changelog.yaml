@@ -170,6 +170,14 @@ releases:
       release_summary: Bugfix release that restores support for all Cloudflare Access
         application types.
     release_date: '2026-07-14'
+  2.1.10:
+    changes:
+      release_summary: Maintenance release aligning agent setup guidance, completing
+        role dependency documentation and metadata, standardizing Molecule warning
+        settings, and removing unused Vagrant development dependencies.
+    fragments:
+    - final-collection-cleanup.yml
+    release_date: '2026-09-10'
   2.1.2:
     changes:
       breaking_changes:

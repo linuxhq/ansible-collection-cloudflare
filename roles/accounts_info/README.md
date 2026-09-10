@@ -13,6 +13,10 @@ Gather information about cloudflare accounts
     accounts_info_api_token: null
     accounts_info_name: null
 
+## Dependencies
+
+None
+
 ## Return Values
 
     _accounts_info_id

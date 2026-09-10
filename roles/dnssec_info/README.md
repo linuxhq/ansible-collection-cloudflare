@@ -13,6 +13,10 @@ Gather information about cloudflare dnssec settings
 
     dnssec_info_api_token: null
 
+## Dependencies
+
+None
+
 ## Return Values
 
     _dnssec_info_dict

@@ -13,6 +13,10 @@ Gather information about cloudflare zones
     zones_info_api_token: null
     zones_info_match: all
 
+## Dependencies
+
+None
+
 ## Return Values
 
     _zones_info_dict

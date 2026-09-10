@@ -4,6 +4,14 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.1.10
+=======
+
+Release Summary
+---------------
+
+Maintenance release aligning agent setup guidance, completing role dependency documentation and metadata, standardizing Molecule warning settings, and removing unused Vagrant development dependencies.
+
 v2.1.9
 ======
 

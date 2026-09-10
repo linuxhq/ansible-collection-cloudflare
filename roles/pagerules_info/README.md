@@ -12,6 +12,10 @@ Gather information about cloudflare pagerules
 
     pagerules_info_api_token: null
 
+## Dependencies
+
+None
+
 ## Return Values
 
     _pagerules_info_dict
