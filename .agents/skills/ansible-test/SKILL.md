@@ -1,24 +1,21 @@
 ---
 name: ansible-test
-description: Run ansible-test sanity on modules and plugins.
+description: Run ansible-test sanity checks on modules and plugins through Tox.
 ---
 
 # ansible-test
 
-Catch `DOCUMENTATION`/`RETURN`/`EXAMPLES` drift, argspec mismatches, and import errors. Treat it as
-a required local and CI check.
-
-## Pre-checks
+- Use the `tox` skill for environment setup and run from the collection root.
+- Run sanity checks locally and in CI to catch documentation drift, argspec mismatches,
+  and import errors.
+- Replace the example path with the module or plugin to check.
+- Tox supplies the pinned Python version and copies the repository into the required
+  `ansible_collections/{{ namespace }}/{{ name }}/` layout before each run.
 
 ```sh
 git diff --check
-tox run -e ansible-test -- sanity --python "$(cat .python-version)" plugins/modules/{{ file }}.py
+tox run -e ansible-test -- sanity plugins/modules/{{ file }}.py
 ```
 
-Tox copies the repository into the required
-`ansible_collections/{{ namespace }}/{{ name }}/` layout before every run. Drop the path argument
-for the full local suite; add `--test validate-modules` for only doc/argspec checks.
-
-## Dependencies
-
-- `tox` skill
+- Omit the path to run the full sanity suite.
+- Add `--test validate-modules` to limit the run to documentation and argspec checks.

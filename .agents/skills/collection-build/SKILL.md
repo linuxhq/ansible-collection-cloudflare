@@ -1,25 +1,20 @@
 ---
 name: collection-build
-description: Build the collection tarball with ansible-galaxy through Tox. Local builds verify only; the tag-driven release workflow builds and publishes.
+description: Build and inspect the collection tarball through Tox.
 ---
 
 # collection-build
 
-Build the collection tarball from the collection root (where `galaxy.yml` lives).
+- Use the `tox` skill for environment setup and run from the collection root.
+- Build settings, including version and `build_ignore`, come from `galaxy.yml`.
+- Build into a temporary directory for local verification.
 
 ```sh
 collection_artifact_dir="$(mktemp -d)"
 tox run -e build -- --force --output-path "${collection_artifact_dir}"
 ```
 
-- Reads `galaxy.yml` (version, `build_ignore`).
-- Local builds only **verify** the artifact — they don't publish.
-- Release is tag-driven: `.github/workflows/release.yml` builds then publishes. Don't `publish`
-  by hand.
-- Before tagging: bump `version` in `galaxy.yml`, and record changes with the `changelog` skill.
-- Inspect the file list with `tar tzf` and `MANIFEST.json` with `tar xOf`; verify the artifact's
-  version and collection dependencies. Don't commit the tarball.
-
-## Dependencies
-
-- `tox` skill
+- Inspect the file list with `tar tzf` and `MANIFEST.json` with `tar xOf`.
+- Verify the artifact's version and collection dependencies; do not commit the tarball.
+- Before tagging a release, bump `version` in `galaxy.yml` and use the `changelog` skill.
+- `.github/workflows/release.yml` builds and publishes on tag push; do not publish manually.
