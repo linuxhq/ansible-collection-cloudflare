@@ -35,7 +35,7 @@ options:
       - Whether WARP traffic may use configured off-ramps.
 requirements:
   - python >= 3.9
-  - cloudflare >= 5.6.0, < 6
+  - cloudflare >= 5.7.0, < 6
 attributes:
   check_mode:
     description: Supports predicting changes without applying them.

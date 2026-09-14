@@ -28,7 +28,7 @@ options:
       - Whether all or any supplied filters must match.
 requirements:
   - python >= 3.9
-  - cloudflare >= 5.6.0, < 6
+  - cloudflare >= 5.7.0, < 6
 attributes:
   check_mode:
     description: Supports predicting changes without applying them.
