@@ -142,7 +142,9 @@ message:
 """
 
 import json
+import signal
 import time
+from contextlib import contextmanager
 
 from ansible.module_utils.basic import AnsibleModule
 
@@ -169,6 +171,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 ITEMS_PER_PAGE = 500
 OPERATION_POLL_SECONDS = 2
 
+
 ITEM_META_FIELDS = (
     "created_on",
     "id",
@@ -182,6 +185,38 @@ REDIRECT_DEFAULTS = {
     "status_code": 301,
     "subpath_matching": False,
 }
+
+
+class OperationDeadlineExpired(BaseException):
+    # Bypass the SDK's broad Exception handler so an expired request cannot retry.
+    pass
+
+
+@contextmanager
+def operation_deadline(seconds):
+    def expire(signum, frame):
+        raise OperationDeadlineExpired()
+
+    started = time.monotonic()
+    previous_handler = signal.signal(signal.SIGALRM, expire)
+    previous_timer = signal.getitimer(signal.ITIMER_REAL)
+    try:
+        try:
+            signal.setitimer(signal.ITIMER_REAL, seconds)
+            yield started + seconds
+        finally:
+            try:
+                signal.setitimer(signal.ITIMER_REAL, 0)
+            finally:
+                signal.signal(signal.SIGALRM, previous_handler)
+                if previous_timer[0] > 0:
+                    signal.setitimer(
+                        signal.ITIMER_REAL,
+                        max(previous_timer[0] - (time.monotonic() - started), 0.000001),
+                        previous_timer[1],
+                    )
+    except OperationDeadlineExpired:
+        raise CloudflareResponseError("Timed out completing the Rules list items operation") from None
 
 
 def canonical_item(item):
@@ -254,12 +289,16 @@ def submit_items(client, account_id, list_id, elements, deadline):
             raise CloudflareResponseError("Timed out submitting the Rules list items operation")
 
         try:
-            return put_result(
+            operation = put_result(
                 client,
                 items_endpoint(account_id, list_id),
                 elements,
                 timeout=remaining,
             )
+            if time.monotonic() >= deadline:
+                raise CloudflareResponseError("Timed out submitting the Rules list items operation")
+
+            return operation
         except (cloudflare.APIConnectionError, cloudflare.APIStatusError) as exc:
             if (
                 not (pending_operation_error(exc) or transient_error(exc))
@@ -311,6 +350,12 @@ def wait_for_operation(module, client, account_id, operation, deadline):
             status = {}
             time.sleep(min(OPERATION_POLL_SECONDS, max(deadline - time.monotonic(), 0)))
             continue
+
+        if time.monotonic() >= deadline:
+            module.fail_json(
+                msg="Timed out waiting for the rules list items operation to complete",
+                operation_id=operation_id,
+            )
 
         if not isinstance(status, dict) or not isinstance(status.get("status"), str):
             module.fail_json(
@@ -488,20 +533,21 @@ def ensure_present(module, client):
             )
 
         if items_changed:
-            deadline = time.monotonic() + params["operation_timeout"]
-            items_operation = wait_for_operation(
-                module,
-                client,
-                params["account_id"],
-                submit_items(
+            with operation_deadline(params["operation_timeout"]) as deadline:
+                items_operation = wait_for_operation(
+                    module,
                     client,
                     params["account_id"],
-                    current_id,
-                    desired_items,
+                    submit_items(
+                        client,
+                        params["account_id"],
+                        current_id,
+                        desired_items,
+                        deadline,
+                    ),
                     deadline,
-                ),
-                deadline,
-            )
+                )
+
             current = get_result(
                 client,
                 item_endpoint(params["account_id"], current_id),

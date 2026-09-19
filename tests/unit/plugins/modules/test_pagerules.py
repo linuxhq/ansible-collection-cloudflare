@@ -1,7 +1,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import pagerules
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
@@ -26,6 +26,15 @@ def params(**updates):
 
 
 class PageRulesTests(TestCase):
+    def test_finds_rule_in_large_unpaginated_response(self):
+        rules = [{"id": str(index), "targets": []} for index in range(124)]
+        rules.append({"id": "match", "targets": TARGETS})
+        client = MagicMock()
+        client.get.side_effect = [{"success": True, "result": rules}]
+
+        self.assertEqual(pagerules.find_pagerule(FakeModule(params()), client), rules[-1])
+        client.get.assert_called_once_with("/zones/zone/pagerules", cast_to=object, options={})
+
     def test_rejects_malformed_targets(self):
         for targets in ({}, ["invalid"]):
             module = FakeModule(params())

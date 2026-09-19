@@ -1,9 +1,13 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
+import os
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import Mock, patch
+
+import cloudflare
+import httpx
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudflare_utils
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
@@ -84,6 +88,69 @@ class SdkModel:
 
 
 class CloudflareUtilsTests(TestCase):
+    def test_client_uses_only_explicit_token_with_environment_credentials(self):
+        environments = (
+            {},
+            {"CLOUDFLARE_EMAIL": "EXAMPLE@example.com"},
+            {"CLOUDFLARE_API_KEY": "EXAMPLE-key"},
+            {"CLOUDFLARE_API_USER_SERVICE_KEY": "EXAMPLE-service-key"},
+            {
+                "CLOUDFLARE_EMAIL": "EXAMPLE@example.com",
+                "CLOUDFLARE_API_KEY": "EXAMPLE-key",
+                "CLOUDFLARE_API_USER_SERVICE_KEY": "EXAMPLE-service-key",
+                "CLOUDFLARE_API_TOKEN": "EXAMPLE-environment-token",
+            },
+            {"CLOUDFLARE_CUSTOM_HEADERS": "Authorization: Bearer EXAMPLE-ambient"},
+            {"CLOUDFLARE_CUSTOM_HEADERS": "authorization: Bearer EXAMPLE-ambient"},
+            {
+                "CLOUDFLARE_EMAIL": "EXAMPLE@example.com",
+                "CLOUDFLARE_API_KEY": "EXAMPLE-key",
+                "CLOUDFLARE_API_USER_SERVICE_KEY": "EXAMPLE-service-key",
+                "CLOUDFLARE_CUSTOM_HEADERS": (
+                    " Authorization : Bearer EXAMPLE-ambient\n"
+                    "aUtHoRiZaTiOn: Bearer EXAMPLE-other\n"
+                    "X-Auth-Email: EXAMPLE@example.com\n"
+                    "x-auth-email: EXAMPLE-other@example.com\n"
+                    "X-Auth-Key: EXAMPLE-key\n"
+                    "x-AUTH-key: EXAMPLE-other-key\n"
+                    "X-Auth-User-Service-Key: EXAMPLE-service-key\n"
+                    "x-auth-user-service-key: EXAMPLE-other-service-key\n"
+                    "X-Example-Trace: preserve-me"
+                ),
+            },
+        )
+        for environment in environments:
+            with self.subTest(environment=environment):
+                requests = []
+
+                def respond(request, record=requests.append):
+                    record(request)
+                    return httpx.Response(200, json={"success": True, "result": {"id": "zone"}})
+
+                def make_client(**kwargs):
+                    return cloudflare.Cloudflare(
+                        **kwargs,
+                        http_client=httpx.Client(transport=httpx.MockTransport(respond)),
+                    )
+
+                with (
+                    patch.dict(os.environ, environment, clear=True),
+                    patch.object(cloudflare_utils, "Cloudflare", side_effect=make_client),
+                    cloudflare_client(FakeModule({"api_token": "  EXAMPLE-explicit-token  "})) as client,
+                ):
+                    api_request(client, "get", "/zones/zone")
+                    client.zones.get(zone_id="zone")
+                    self.assertEqual(dict(os.environ), environment)
+
+                self.assertEqual(len(requests), 2)
+                for request in requests:
+                    self.assertEqual(request.headers["Authorization"], "Bearer EXAMPLE-explicit-token")
+                    if "X-Example-Trace" in environment.get("CLOUDFLARE_CUSTOM_HEADERS", ""):
+                        self.assertEqual(request.headers["X-Example-Trace"], "preserve-me")
+
+                    for header in ("X-Auth-Email", "X-Auth-Key", "X-Auth-User-Service-Key"):
+                        self.assertNotIn(header, request.headers)
+
     def test_error_context_preserves_non_sdk_errors_without_sdk(self):
         with (
             patch.object(cloudflare_utils, "cloudflare", None),
@@ -209,7 +276,7 @@ class CloudflareUtilsTests(TestCase):
         ):
             self.assertIs(result, client)
 
-        constructor.assert_called_once_with(api_token="secret")
+        constructor.assert_called_once_with(api_token="secret", default_headers={"Authorization": "Bearer secret"})
         context.__exit__.assert_called_once()
 
     def test_client_normalizes_token_and_rejects_empty_identifiers(self):
@@ -225,7 +292,7 @@ class CloudflareUtilsTests(TestCase):
         ):
             pass
 
-        constructor.assert_called_once_with(api_token="secret")
+        constructor.assert_called_once_with(api_token="secret", default_headers={"Authorization": "Bearer secret"})
 
         for name in (
             "account_id",

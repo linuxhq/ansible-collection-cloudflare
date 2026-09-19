@@ -43,9 +43,11 @@ options:
   kind:
     type: str
     default: zone
+    choices:
+      - zone
     description:
-      - Scope of the ruleset.
-      - Used only when creating a ruleset.
+      - Scope of the ruleset. This module manages only zone phase entrypoints.
+      - Custom, managed, and account-level rulesets are not supported.
   state:
     type: str
     choices:
@@ -280,7 +282,7 @@ def main():
             "name": {"type": "str"},
             "rules": {"type": "list", "elements": "dict"},
             "phase": {"type": "str", "default": "http_request_firewall_custom"},
-            "kind": {"type": "str", "default": "zone"},
+            "kind": {"type": "str", "default": "zone", "choices": ["zone"]},
             "state": {
                 "type": "str",
                 "choices": ["present", "absent"],

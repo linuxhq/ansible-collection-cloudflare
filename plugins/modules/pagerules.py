@@ -167,7 +167,7 @@ def pagerule_targets(module, pagerule):
 
 def find_pagerule(module, client):
     found = None
-    for pagerule in list_all(client, endpoint(module.params["zone_id"])):
+    for pagerule in list_all(client, endpoint(module.params["zone_id"]), paginate=False):
         if not values_differ(
             normalize_current_by_desired_fields(pagerule_targets(module, pagerule), module.params["targets"]),
             module.params["targets"],

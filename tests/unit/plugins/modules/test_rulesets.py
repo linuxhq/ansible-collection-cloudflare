@@ -3,6 +3,8 @@
 from unittest import TestCase
 from unittest.mock import patch
 
+from ansible.module_utils import basic
+
 from ansible_collections.linuxhq.cloudflare.plugins.modules import rulesets
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
@@ -24,6 +26,28 @@ def params(**updates):
 
 
 class RulesetsTests(TestCase):
+    def test_unsupported_kinds_fail_before_opening_client(self):
+        for kind in ("custom", "managed", "root"):
+            for state in ("present", "absent"):
+                for check_mode in (False, True):
+                    arguments = {
+                        **params(kind=kind),
+                        "api_token": "test-token",
+                        "state": state,
+                        "_ansible_check_mode": check_mode,
+                    }
+                    with (
+                        self.subTest(kind=kind, state=state, check_mode=check_mode),
+                        patch.object(basic, "_load_params", return_value=arguments),
+                        patch.object(basic.AnsibleModule, "fail_json", side_effect=FakeModule({}).fail_json),
+                        patch.object(rulesets, "cloudflare_client") as client,
+                        self.assertRaises(ModuleFail) as raised,
+                    ):
+                        rulesets.main()
+
+                    self.assertIn("value of kind must be one of", raised.exception.values["msg"])
+                    client.assert_not_called()
+
     def test_rejects_malformed_rules(self):
         for rules in ({}, ["invalid"]):
             with (

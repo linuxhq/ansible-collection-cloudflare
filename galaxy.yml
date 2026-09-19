@@ -57,5 +57,5 @@ repository: https://github.com/linuxhq/ansible-collection-cloudflare
 tags:
   - cloudflare
   - infrastructure
-version: 2.1.10
+version: 2.1.11
 ...

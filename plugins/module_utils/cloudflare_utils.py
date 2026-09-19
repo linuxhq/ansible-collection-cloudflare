@@ -2,6 +2,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
+import os
 from base64 import b64decode
 from contextlib import contextmanager
 from copy import deepcopy
@@ -75,9 +76,31 @@ def cloudflare_client(module):
         )
 
     api_token = validate_cloudflare_params(module)
+    # Override each original spelling: SDK header dictionaries are case-sensitive
+    # until HTTPX builds the request. Preserve unrelated custom headers.
+    headers = {"Authorization": f"Bearer {api_token}"}
+    for line in os.environ.get("CLOUDFLARE_CUSTOM_HEADERS", "").split("\n"):
+        header = line.split(":", 1)[0].strip()
+        if (
+            ":" in line
+            and header.lower()
+            in (
+                "authorization",
+                "x-auth-email",
+                "x-auth-key",
+                "x-auth-user-service-key",
+            )
+            and header != "Authorization"
+        ):
+            headers[header] = cloudflare.omit
 
     try:
-        with Cloudflare(api_token=api_token) as client:
+        with Cloudflare(api_token=api_token, default_headers=headers) as client:
+            # Constructor values of None load ambient credentials, which take
+            # precedence over api_token. Clear them before issuing requests.
+            client.api_email = None
+            client.api_key = None
+            client.user_service_key = None
             yield client
     except cloudflare.APIConnectionError as exc:
         fail_from_cloudflare_error(

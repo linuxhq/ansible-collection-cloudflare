@@ -9,6 +9,7 @@ module: cfd_tunnel
 short_description: Manage Cloudflare cloudflared tunnels
 description:
   - Create and delete Cloudflare cloudflared tunnels by name.
+  - Connector tokens and tunnel credentials are redacted from returned tunnels.
   - Tunnel secrets are sent when creating a tunnel, or when O(rotate_secrets) is
     enabled, because Cloudflare does not return the current secret for idempotent
     comparison.
@@ -121,12 +122,14 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     patch_result,
     payload_from_params,
     post_result,
+    remove_fields,
     resource_field,
     resource_id,
     validate_tunnel_secret,
 )
 
 FIELDS = ("config_src", "name", "tunnel_secret")
+SECRET_FIELDS = ("token", "credentials_file", "tunnel_secret", "TunnelSecret")
 
 
 def endpoint(account_id):
@@ -145,6 +148,7 @@ def ensure_present(module, client):
     )
 
     if current is not None:
+        remove_fields(current, SECRET_FIELDS)
         current_id = resource_id(module, current, "cloudflared tunnel")
         if params["rotate_secrets"] and params.get("tunnel_secret") is not None:
             local = current.get("config_src") == "local" or current.get("remote_config") is False
@@ -164,6 +168,7 @@ def ensure_present(module, client):
                 cloudflare_path("accounts", params["account_id"], "cfd_tunnel", current_id),
                 {"tunnel_secret": params["tunnel_secret"]},
             )
+            remove_fields(cfd_tunnel, SECRET_FIELDS)
             resource_id(module, cfd_tunnel, "cloudflared tunnel", expected=current_id)
             resource_field(
                 module,
@@ -198,6 +203,7 @@ def ensure_present(module, client):
         endpoint(params["account_id"]),
         payload_from_params(params, FIELDS),
     )
+    remove_fields(cfd_tunnel, SECRET_FIELDS)
     resource_id(module, cfd_tunnel, "cloudflared tunnel")
     resource_field(module, cfd_tunnel, "name", "cloudflared tunnel", expected=params["name"])
     resource_field(
@@ -227,6 +233,7 @@ def ensure_absent(module, client):
     if current is None:
         module.exit_json(changed=False, message="Cloudflared tunnel already absent")
 
+    remove_fields(current, SECRET_FIELDS)
     current_id = resource_id(module, current, "cloudflared tunnel")
 
     if module.check_mode:

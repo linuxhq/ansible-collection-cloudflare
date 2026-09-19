@@ -24,6 +24,55 @@ def params(**updates):
 
 
 class CfdTunnelTests(TestCase):
+    def test_redacts_generated_credentials_on_create_and_rotation(self):
+        for rotate in (False, True):
+            with self.subTest(rotate=rotate):
+                config_src = "local" if rotate else "cloudflare"
+                safe_result = {"id": "tunnel-id", "name": "tunnel", "config_src": config_src}
+                response = {
+                    **safe_result,
+                    "token": "EXAMPLE-generated-token",
+                    "credentials_file": {"TunnelSecret": "EXAMPLE-generated-secret"},
+                    "tunnel_secret": "EXAMPLE-secret",
+                }
+                secret = "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=" if rotate else None
+                module = FakeModule(params(config_src=config_src, rotate_secrets=rotate, tunnel_secret=secret))
+                with (
+                    patch.object(cfd_tunnel, "find_by_name", return_value=safe_result.copy() if rotate else None),
+                    patch.object(cfd_tunnel, "post_result", return_value=response) as post,
+                    patch.object(cfd_tunnel, "patch_result", return_value=response) as patched,
+                    self.assertRaises(ModuleExit) as raised,
+                ):
+                    cfd_tunnel.ensure_present(module, {})
+
+                self.assertTrue(raised.exception.values["changed"])
+                self.assertEqual(raised.exception.values["cfd_tunnel"], safe_result)
+                if rotate:
+                    self.assertEqual(patched.call_args.args[2], {"tunnel_secret": secret})
+                    post.assert_not_called()
+                else:
+                    patched.assert_not_called()
+
+    def test_redacts_credentials_from_existing_tunnel_results(self):
+        for absent, check_mode in ((False, False), (False, True), (True, False), (True, True)):
+            with self.subTest(absent=absent, check_mode=check_mode):
+                current = {
+                    "id": "tunnel-id",
+                    "name": "tunnel",
+                    "token": "EXAMPLE-token",
+                    "credentials_file": {"TunnelSecret": "EXAMPLE-secret"},
+                }
+                module = FakeModule(params(), check_mode=check_mode)
+                with (
+                    patch.object(cfd_tunnel, "find_by_name", return_value=current),
+                    patch.object(cfd_tunnel, "delete_result"),
+                    self.assertRaises(ModuleExit) as raised,
+                ):
+                    operation = cfd_tunnel.ensure_absent if absent else cfd_tunnel.ensure_present
+                    operation(module, {})
+
+                self.assertEqual(raised.exception.values["cfd_tunnel"], {"id": "tunnel-id", "name": "tunnel"})
+
     def test_existing_tunnel_is_unchanged(self):
         current = {"id": "tunnel-id", "name": "tunnel"}
         module = FakeModule(params())
