@@ -100,6 +100,7 @@ def list_resources(module, client):
         rules = list_all(
             client,
             cloudflare_path("zones", zone_id, "pagerules"),
+            paginate=False,
         )
         validate_resource_fields(module, rules, "id", "page rule")
         for rule in rules:

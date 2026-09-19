@@ -1,8 +1,16 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
+import json
+import signal
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import Mock, patch
+
+import httpx
+from cloudflare import Cloudflare
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import rules_lists
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
@@ -82,7 +90,7 @@ class RulesListsTests(TestCase):
             patch.object(
                 rules_lists.time,
                 "monotonic",
-                side_effect=[1, 2, 3],
+                side_effect=[1, 2, 3, 4],
             ),
             patch.object(rules_lists.time, "sleep") as sleep,
         ):
@@ -154,6 +162,105 @@ class RulesListsTests(TestCase):
             timeout=29,
         )
         self.assertEqual(result, completed)
+
+    def test_rejects_responses_received_after_deadline(self):
+        with (
+            patch.object(rules_lists.time, "monotonic", side_effect=[0, 2]),
+            patch.object(rules_lists, "put_result", return_value={"operation_id": "operation"}),
+            self.assertRaisesRegex(rules_lists.CloudflareResponseError, "Timed out submitting"),
+        ):
+            rules_lists.submit_items({}, "account", "list", [], 1)
+
+        with (
+            patch.object(rules_lists.time, "monotonic", side_effect=[0, 2]),
+            patch.object(rules_lists, "get_result", return_value={"id": "operation", "status": "completed"}),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            rules_lists.wait_for_operation(FakeModule({}), {}, "account", {"id": "operation"}, 1)
+
+        self.assertIn("Timed out waiting", raised.exception.values["msg"])
+
+    def test_deadline_restores_alarm_after_success_and_error(self):
+        original_handler = signal.getsignal(signal.SIGALRM)
+        for fail in (False, True):
+            with self.subTest(fail=fail):
+                try:
+                    with rules_lists.operation_deadline(5):
+                        if fail:
+                            raise ValueError("failure")
+                except ValueError:
+                    pass
+
+                self.assertEqual(signal.getsignal(signal.SIGALRM), original_handler)
+                self.assertEqual(signal.getitimer(signal.ITIMER_REAL), (0, 0))
+
+    def test_deadline_interrupts_slow_submission_and_polling(self):
+        body = json.dumps({"success": True, "result": {"id": "operation", "status": "completed"}}).encode()
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def respond(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    for offset in range(0, len(body), 5):
+                        time.sleep(0.1)
+                        self.wfile.write(body[offset : offset + 5])
+                        self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def do_GET(self):
+                self.respond()
+
+            def do_PUT(self):
+                self.rfile.read(int(self.headers["Content-Length"]))
+                self.respond()
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
+        thread.start()
+        original_handler = signal.getsignal(signal.SIGALRM)
+        try:
+            with Cloudflare(
+                api_token="EXAMPLE_TOKEN",
+                base_url=f"http://127.0.0.1:{server.server_port}",
+                http_client=httpx.Client(trust_env=False),
+            ) as client:
+                for submit in (True, False):
+                    with self.subTest(submit=submit):
+                        with (
+                            self.assertRaisesRegex(rules_lists.CloudflareResponseError, "Timed out completing"),
+                            rules_lists.operation_deadline(0.5) as deadline,
+                        ):
+                            if submit:
+                                rules_lists.submit_items(client, "account", "list", [], deadline)
+                            else:
+                                rules_lists.wait_for_operation(
+                                    FakeModule({}), client, "account", {"id": "operation"}, deadline
+                                )
+
+                        self.assertEqual(signal.getsignal(signal.SIGALRM), original_handler)
+                        self.assertEqual(signal.getitimer(signal.ITIMER_REAL), (0, 0))
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
+    def test_deadline_expiring_during_cleanup_is_reported_cleanly(self):
+        original_handler = signal.getsignal(signal.SIGALRM)
+        with (
+            patch.object(rules_lists.signal, "setitimer", side_effect=[(0, 0), rules_lists.OperationDeadlineExpired()]),
+            self.assertRaisesRegex(rules_lists.CloudflareResponseError, "Timed out completing"),
+            rules_lists.operation_deadline(5),
+        ):
+            pass
+
+        self.assertEqual(signal.getsignal(signal.SIGALRM), original_handler)
 
     def test_wait_uses_remaining_subsecond_budget(self):
         module = FakeModule({})

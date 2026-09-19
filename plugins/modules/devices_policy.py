@@ -52,6 +52,7 @@ options:
     elements: dict
     description:
       - Split tunnel routes excluded from the WARP tunnel.
+      - Mutually exclusive with O(include).
   exclude_office_ips:
     type: bool
     description:
@@ -61,6 +62,7 @@ options:
     elements: dict
     description:
       - Split tunnel routes included in the WARP tunnel.
+      - Mutually exclusive with O(exclude).
   lan_allow_minutes:
     type: float
     description:

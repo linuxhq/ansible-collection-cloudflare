@@ -1,7 +1,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import pagerules_info
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
@@ -12,6 +12,21 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 
 
 class PageRulesInfoTests(TestCase):
+    def test_lists_large_unpaginated_response_once(self):
+        rules = [{"id": str(index), "actions": [], "targets": []} for index in range(125)]
+        client = MagicMock()
+        client.get.side_effect = [
+            {"success": True, "result": [{"id": "zone", "name": "example.com"}]},
+            {"success": True, "result": rules},
+        ]
+
+        with self.assertRaises(ModuleExit) as raised:
+            pagerules_info.list_resources(FakeModule({}), client)
+
+        self.assertEqual(raised.exception.values["pagerules"][0]["pagerules"], rules)
+        self.assertEqual(client.get.call_count, 2)
+        client.get.assert_any_call("/zones/zone/pagerules", cast_to=object, options={})
+
     def test_lists_rules_for_zones_with_ids(self):
         module = FakeModule({})
         zones = [{"id": "zone", "name": "example.com"}]
@@ -29,7 +44,7 @@ class PageRulesInfoTests(TestCase):
 
         self.assertEqual(listed.call_count, 2)
         listed.assert_any_call({}, "/zones")
-        listed.assert_any_call({}, "/zones/zone/pagerules")
+        listed.assert_any_call({}, "/zones/zone/pagerules", paginate=False)
         self.assertEqual(
             raised.exception.values["pagerules"],
             [

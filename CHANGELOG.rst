@@ -4,6 +4,30 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.1.11
+=======
+
+Release Summary
+---------------
+
+Patch release hardening explicit API-token authentication and tunnel credential redaction, correcting tunnel configuration comparisons and Page Rules pagination, and enforcing Rules list operation deadlines and supported ruleset kinds. The minimum supported Cloudflare SDK version is now 5.7.0.
+
+Security Fixes
+--------------
+
+- cfd_tunnel - redact connector tokens and tunnel credentials from returned tunnel data.
+- cloudflare_client - prevent ambient Cloudflare email and global API key credentials from overriding the explicitly supplied API token.
+- cloudflare_client - prevent authentication headers from CLOUDFLARE_CUSTOM_HEADERS from overriding the explicitly supplied API token, regardless of header casing.
+
+Bugfixes
+--------
+
+- cfd_tunnel_configurations - compare ingress Access authentication independently of global Access settings so enabling required JWT validation is applied.
+- cfd_tunnel_configurations - detect removed optional configuration fields and validate their removal after updating, while normalizing origin defaults.
+- pagerules and pagerules_info - disable pagination for the unpaginated Page Rules endpoint to prevent repeated requests for zones with 50 or more rules.
+- rules_lists - interrupt bulk submission and polling at the operation deadline, including responses that continue delivering data slowly.
+- rulesets - reject unsupported ruleset kinds before API requests to prevent creating custom rulesets that entrypoint lookups cannot manage.
+
 v2.1.10
 =======
 
