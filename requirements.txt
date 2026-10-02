@@ -4,7 +4,7 @@ antsibull-changelog==0.35.1
 black==26.5.1
 blank-line-after-blocks==0.1.4
 cloudflare>=5.7.0,<6
-isort==9.0.1
+isort==9.0.2
 jmespath==1.1.0
 json2yaml==1.2.0
 molecule==25.1.0
