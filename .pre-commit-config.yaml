@@ -49,7 +49,7 @@ repos:
         verbose: true
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.6
+    rev: v0.16.9
     hooks:
       - id: ruff-check
         files: ^(plugins|tests)/.*\.py$
