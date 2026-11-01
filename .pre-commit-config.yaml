@@ -12,7 +12,7 @@ repos:
         entry: yamllint --strict
 
   - repo: https://github.com/ansible-community/antsibull-changelog
-    rev: 0.35.1
+    rev: 0.36.0
     hooks:
       - id: antsibull-changelog-lint
         verbose: true
