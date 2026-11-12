@@ -9,31 +9,19 @@ module: rulesets_info
 short_description: Gather information about Cloudflare rulesets
 description:
   - Gather a ruleset entrypoint phase for all accessible zones.
+  - Results include sensitive values returned by Cloudflare, such as header values set by rules; protect registered
+    results and task output, for example with C(no_log).
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
 options:
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   phase:
     type: str
     default: http_request_firewall_custom
     description:
       - Cloudflare request phase whose entrypoint ruleset is returned.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
 """
 
 EXAMPLES = r"""
@@ -78,40 +66,37 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    get_result,
-    list_all,
+    cloudflare_error_context,
+    get_or_none,
     require_mapping,
     resource_field,
     resource_id,
+    resource_list,
+    serialize_resource,
 )
 
 
-def list_resources(module, client):
+def get_entrypoint(client, zone_id, phase):
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering the ruleset entrypoint",
+        zone_id=zone_id,
+        phase=phase,
+    ):
+        return serialize_resource(get_or_none(client.rulesets.phases.get, phase, zone_id=zone_id))
+
+
+def run(module, client):
+    phase = module.params["phase"]
+    with cloudflare_error_context("Cloudflare API request failed while gathering zones"):
+        zones = resource_list(module, client.zones.list(), "zone", ("id", "name"))
+
     rulesets = []
-    zones = list_all(client, "/zones")
-
     for zone in zones:
-        zone_id = resource_id(module, zone, "zone")
-        zone_name = resource_field(module, zone, "name", "zone")
-
-        ruleset = get_result(
-            client,
-            cloudflare_path(
-                "zones",
-                zone_id,
-                "rulesets",
-                "phases",
-                module.params["phase"],
-                "entrypoint",
-            ),
-            default=None,
-            ok_statuses=[404],
-        )
-        rules = []
+        entry = {"name": zone["name"], "rules": [], "zone_id": zone["id"]}
+        ruleset = get_entrypoint(client, zone["id"], phase)
         if ruleset is not None:
-            ruleset_id = resource_id(module, ruleset, "ruleset")
-            resource_field(module, ruleset, "phase", "ruleset", expected=module.params["phase"])
+            entry["id"] = resource_id(module, ruleset, "ruleset")
+            entry["phase"] = resource_field(module, ruleset, "phase", "ruleset", expected=phase)
             rules = ruleset.get("rules")
             if rules is None:
                 rules = []
@@ -121,9 +106,7 @@ def list_resources(module, client):
             for rule in rules:
                 require_mapping(module, rule, "ruleset rule")
 
-        entry = {"name": zone_name, "rules": rules, "zone_id": zone_id}
-        if ruleset is not None:
-            entry.update(id=ruleset_id, phase=ruleset["phase"])
+            entry["rules"] = rules
 
         rulesets.append(entry)
 
@@ -140,7 +123,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list_resources(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,10 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
+import cloudflare
+import httpx
+
+REQUEST = httpx.Request("GET", "https://api.cloudflare.com/client/v4/")
+
 
 class ModuleResult(Exception):
     def __init__(self, values):
@@ -25,3 +30,27 @@ class FakeModule:
 
     def fail_json(self, **values):
         raise ModuleFail(values)
+
+
+def status_error(status_code, body=None):
+    """Return the SDK exception Cloudflare raises for an HTTP error status."""
+    body = body if body is not None else {"success": False, "errors": [], "messages": []}
+    response = httpx.Response(status_code, json=body, request=REQUEST)
+    error_class = {
+        400: cloudflare.BadRequestError,
+        401: cloudflare.AuthenticationError,
+        403: cloudflare.PermissionDeniedError,
+        404: cloudflare.NotFoundError,
+        409: cloudflare.ConflictError,
+        422: cloudflare.UnprocessableEntityError,
+        429: cloudflare.RateLimitError,
+    }.get(status_code, cloudflare.InternalServerError if status_code >= 500 else cloudflare.APIStatusError)
+    return error_class(f"Error code: {status_code}", response=response, body=body)
+
+
+def connection_error():
+    return cloudflare.APIConnectionError(request=REQUEST)
+
+
+def timeout_error():
+    return cloudflare.APITimeoutError(request=REQUEST)

@@ -12,28 +12,10 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
-options:
-  account_id:
-    description:
-      - Cloudflare account identifier.
-    required: true
-    type: str
-  api_token:
-    description:
-      - Cloudflare API token with permissions to read Access service tokens.
-    required: true
-    type: str
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
+options: {}
 """
 
 EXAMPLES = r"""
@@ -70,28 +52,23 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    list_all,
-    validate_resource_fields,
+    cloudflare_error_context,
+    exit_resource_list,
 )
 
 
-def list_resources(module, client):
-    service_tokens = list_all(
-        client,
-        cloudflare_path(
-            "accounts",
-            module.params["account_id"],
-            "access",
+def run(module, client):
+    account_id = module.params["account_id"]
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering Access service tokens",
+        account_id=account_id,
+    ):
+        exit_resource_list(
+            module,
             "service_tokens",
-        ),
-    )
-    validate_resource_fields(module, service_tokens, ("id", "name"), "Access service token")
-
-    module.exit_json(
-        changed=False,
-        service_tokens=service_tokens,
-    )
+            client.zero_trust.access.service_tokens.list(account_id=account_id),
+            "Access service token",
+        )
 
 
 def main():
@@ -104,7 +81,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list_resources(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

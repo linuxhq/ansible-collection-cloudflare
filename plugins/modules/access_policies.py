@@ -9,20 +9,15 @@ module: access_policies
 short_description: Manage Cloudflare Access policies
 description:
   - Create, update, and delete Cloudflare Access policies by name.
+  - Settings this module does not manage, such as C(session_duration), are
+    preserved on an existing policy.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
 options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   name:
     required: true
     type: str
@@ -49,16 +44,19 @@ options:
     elements: dict
     description:
       - Access selectors that remove users from the policy.
+      - An existing policy's value is preserved when omitted.
   require:
     type: list
     elements: dict
     description:
       - Additional Access selectors every included user must satisfy.
+      - An existing policy's value is preserved when omitted.
   approval_groups:
     type: list
     elements: dict
     description:
       - Approval groups authorized to approve access requests.
+      - An existing policy's value is preserved when omitted.
   approval_required:
     type: bool
     default: false
@@ -73,6 +71,7 @@ options:
     type: str
     description:
       - Prompt shown when requesting an access justification.
+      - An existing policy's value is preserved when omitted.
   purpose_justification_required:
     type: bool
     default: false
@@ -86,17 +85,6 @@ options:
     default: present
     description:
       - Desired state of the resource.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
 """
 
 EXAMPLES = r"""
@@ -138,18 +126,11 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    delete_result,
-    find_by_field,
-    normalize_current_by_desired_fields,
+    cloudflare_error_context,
+    ensure_resource_absent,
+    ensure_resource_present,
+    find_resource,
     payload_from_params,
-    post_result,
-    put_result,
-    resource_field,
-    resource_id,
-    select_fields,
-    validate_requested_values,
-    values_differ,
 )
 
 FIELDS = (
@@ -165,6 +146,17 @@ FIELDS = (
     "require",
 )
 
+PRESERVED_FIELDS = (
+    "approval_groups",
+    "exclude",
+    "purpose_justification_prompt",
+    "require",
+)
+
+# The update replaces the policy, so settings this module does not manage are
+# carried over too.
+UNMANAGED_FIELDS = ("connection_rules", "mfa_config", "session_duration")
+
 FALSE_FIELDS = (
     "approval_required",
     "isolation_required",
@@ -172,105 +164,47 @@ FALSE_FIELDS = (
 )
 
 
-def endpoint(account_id):
-    return cloudflare_path("accounts", account_id, "access", "policies")
-
-
-def ensure_present(module, client):
+def run(module, client):
     params = module.params
+    account_id = params["account_id"]
+    policies = client.zero_trust.access.policies
 
-    current = find_by_field(client, endpoint(params["account_id"]), "name", params["name"])
-
-    payload = payload_from_params(params, FIELDS)
-
-    if current is None:
-        if module.check_mode:
-            module.exit_json(changed=True, message="Access policy would be created")
-
-        access_policy = post_result(client, endpoint(params["account_id"]), payload)
-        resource_id(module, access_policy, "Access policy")
-        resource_field(module, access_policy, "name", "Access policy", expected=params["name"])
-        validate_requested_values(
-            module,
-            {**dict.fromkeys(FALSE_FIELDS, False), **access_policy},
-            payload,
-            "Access policy",
-        )
-        module.exit_json(
-            changed=True,
-            message="Access policy created",
-            access_policy=access_policy,
-        )
-
-    current_id = resource_id(module, current, "Access policy")
-    comparable_current = {**dict.fromkeys(FALSE_FIELDS, False), **current}
-
-    if not values_differ(
-        normalize_current_by_desired_fields(
-            select_fields(comparable_current, payload.keys()),
-            payload,
-        ),
-        payload,
+    # The list endpoint has no name filter, so match the name locally.
+    with cloudflare_error_context(
+        "Cloudflare API request failed while finding the Access policy",
+        account_id=account_id,
+        name=params["name"],
     ):
-        module.exit_json(
-            changed=False,
-            message="Access policy already present",
-            access_policy=current,
+        current = find_resource(
+            module,
+            policies.list(account_id=account_id),
+            "Access policy",
+            "name",
+            params["name"],
         )
 
-    if module.check_mode:
-        module.exit_json(
-            changed=True,
-            message="Access policy would be updated",
-            access_policy=current,
+    if params["state"] == "absent":
+        ensure_resource_absent(
+            module,
+            "access_policy",
+            "Access policy",
+            current,
+            delete=lambda policy_id: policies.delete(policy_id, account_id=account_id),
+            context={"account_id": account_id},
         )
 
-    access_policy = put_result(
-        client,
-        cloudflare_path("accounts", params["account_id"], "access", "policies", current_id),
-        payload,
-    )
-    resource_id(module, access_policy, "Access policy", expected=current_id)
-    resource_field(module, access_policy, "name", "Access policy", expected=params["name"])
-    validate_requested_values(
+    ensure_resource_present(
         module,
-        {**dict.fromkeys(FALSE_FIELDS, False), **access_policy},
-        payload,
+        "access_policy",
         "Access policy",
-    )
-    module.exit_json(
-        changed=True,
-        message="Access policy updated",
-        access_policy=access_policy,
-    )
-
-
-def ensure_absent(module, client):
-    params = module.params
-
-    current = find_by_field(client, endpoint(params["account_id"]), "name", params["name"])
-
-    if current is None:
-        module.exit_json(changed=False, message="Access policy already absent")
-
-    current_id = resource_id(module, current, "Access policy")
-
-    if module.check_mode:
-        module.exit_json(
-            changed=True,
-            message="Access policy would be deleted",
-            access_policy=current,
-        )
-
-    delete_result(
-        client,
-        cloudflare_path("accounts", params["account_id"], "access", "policies", current_id),
-        expected_id=current_id,
-    )
-    module.exit_json(
-        changed=True,
-        message="Access policy deleted",
-        access_policy=current,
+        current,
+        payload_from_params(params, FIELDS),
+        create=lambda payload: policies.create(account_id=account_id, **payload),
+        update=lambda policy_id, payload: policies.update(policy_id, account_id=account_id, **payload),
+        expected_name=params["name"],
+        defaults=dict.fromkeys(FALSE_FIELDS, False),
+        preserved_fields=PRESERVED_FIELDS + UNMANAGED_FIELDS,
+        context={"account_id": account_id},
     )
 
 
@@ -303,10 +237,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        if module.params["state"] == "present":
-            ensure_present(module, client)
-        else:
-            ensure_absent(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

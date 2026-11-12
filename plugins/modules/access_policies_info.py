@@ -12,28 +12,10 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
-options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
+options: {}
 """
 
 EXAMPLES = r"""
@@ -66,25 +48,23 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    list_all,
-    validate_resource_fields,
+    cloudflare_error_context,
+    exit_resource_list,
 )
 
 
-def list_resources(module, client):
-    access_policies = list_all(
-        client,
-        cloudflare_path(
-            "accounts",
-            module.params["account_id"],
-            "access",
-            "policies",
-        ),
-    )
-    validate_resource_fields(module, access_policies, ("id", "name"), "Access policy")
-
-    module.exit_json(changed=False, access_policies=access_policies)
+def run(module, client):
+    account_id = module.params["account_id"]
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering Access policies",
+        account_id=account_id,
+    ):
+        exit_resource_list(
+            module,
+            "access_policies",
+            client.zero_trust.access.policies.list(account_id=account_id),
+            "Access policy",
+        )
 
 
 def main():
@@ -97,7 +77,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list_resources(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

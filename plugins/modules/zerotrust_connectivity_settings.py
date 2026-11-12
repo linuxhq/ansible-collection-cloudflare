@@ -12,38 +12,20 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
 options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   icmp_proxy_enabled:
     type: bool
-    default: false
     description:
       - Whether Cloudflare proxies ICMP traffic for the account.
+      - When omitted, the current value is left unchanged.
   offramp_warp_enabled:
     type: bool
-    default: false
     description:
-      - Whether WARP traffic may use configured off-ramps.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
+      - Whether WARP-to-WARP traffic is enabled for the account.
+      - When omitted, the current value is left unchanged.
 """
 
 EXAMPLES = r"""
@@ -66,7 +48,7 @@ connectivity_settings:
       returned: when available
       type: bool
     offramp_warp_enabled:
-      description: Whether WARP traffic may use configured off-ramps.
+      description: Whether WARP-to-WARP traffic is enabled for the account.
       returned: when available
       type: bool
 message:
@@ -81,51 +63,31 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    get_result,
-    patch_result,
+    cloudflare_error_context,
+    ensure_settings,
     payload_from_params,
-    require_mapping,
-    select_fields,
-    validate_requested_values,
-    values_differ,
 )
 
 FIELDS = ("icmp_proxy_enabled", "offramp_warp_enabled")
 
 
-def endpoint(account_id):
-    return cloudflare_path("accounts", account_id, "zerotrust", "connectivity_settings")
+def run(module, client):
+    account_id = module.params["account_id"]
+    settings = client.zero_trust.connectivity_settings
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering connectivity settings",
+        account_id=account_id,
+    ):
+        current = settings.get(account_id=account_id)
 
-
-def ensure_present(module, client):
-    params = module.params
-
-    payload = payload_from_params(params, FIELDS)
-
-    current = get_result(client, endpoint(params["account_id"]), default={})
-    require_mapping(module, current, "connectivity settings")
-
-    if not values_differ(select_fields(current, payload.keys()), payload):
-        module.exit_json(
-            changed=False,
-            message="Connectivity settings already present",
-            connectivity_settings=current,
-        )
-
-    if module.check_mode:
-        module.exit_json(
-            changed=True,
-            message="Connectivity settings would be updated",
-            connectivity_settings=current,
-        )
-
-    settings = patch_result(client, endpoint(params["account_id"]), payload)
-    validate_requested_values(module, settings, payload, "connectivity settings")
-    module.exit_json(
-        changed=True,
-        message="Connectivity settings updated",
-        connectivity_settings=settings,
+    ensure_settings(
+        module,
+        "connectivity_settings",
+        "connectivity settings",
+        current,
+        payload_from_params(module.params, FIELDS),
+        edit=lambda payload: settings.edit(account_id=account_id, **payload),
+        context={"account_id": account_id},
     )
 
 
@@ -134,14 +96,14 @@ def main():
         argument_spec={
             "account_id": {"required": True, "type": "str"},
             "api_token": {"required": True, "type": "str", "no_log": True},
-            "icmp_proxy_enabled": {"type": "bool", "default": False},
-            "offramp_warp_enabled": {"type": "bool", "default": False},
+            "icmp_proxy_enabled": {"type": "bool"},
+            "offramp_warp_enabled": {"type": "bool"},
         },
         supports_check_mode=True,
     )
 
     with cloudflare_client(module) as client:
-        ensure_present(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

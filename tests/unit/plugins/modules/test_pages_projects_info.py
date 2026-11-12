@@ -1,12 +1,13 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import Mock
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import pages_projects_info
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
 )
 
 
@@ -50,60 +51,18 @@ class PagesProjectsInfoTests(TestCase):
             }
         ]
 
-        with (
-            patch.object(
-                pages_projects_info,
-                "list_all",
-                return_value=projects,
-            ) as listed,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            pages_projects_info.list_resources(module, {})
+        client = Mock()
+        client.pages.projects.list.return_value = iter(projects)
 
-        listed.assert_called_once_with(
-            {},
-            "/accounts/account/pages/projects",
-            per_page=10,
-        )
-        self.assertEqual(
-            raised.exception.values["pages_projects"][0]["deployment_configs"]["production"]["env_vars"]["TOKEN"],
-            {"type": "secret_text"},
-        )
-        self.assertNotIn(
-            "web_analytics_token",
-            raised.exception.values["pages_projects"][0]["build_config"],
-        )
-        for field, variable in (
-            ("canonical_deployment", "CANONICAL_TOKEN"),
-            ("latest_deployment", "LATEST_TOKEN"),
-        ):
-            self.assertEqual(
-                raised.exception.values["pages_projects"][0][field]["env_vars"][variable],
-                {"type": "secret_text"},
-            )
-            self.assertNotIn(
-                "web_analytics_token",
-                raised.exception.values["pages_projects"][0][field]["build_config"],
-            )
+        with self.assertRaises(ModuleExit) as raised:
+            pages_projects_info.run(module, client)
 
-        self.assertEqual(
-            projects[0]["deployment_configs"]["production"]["env_vars"]["TOKEN"]["value"],
-            "secret",
-        )
-        self.assertEqual(projects[0]["build_config"]["web_analytics_token"], "analytics-secret")
-        self.assertEqual(
-            projects[0]["latest_deployment"]["env_vars"]["LATEST_TOKEN"]["value"],
-            "latest-secret",
-        )
-        self.assertEqual(
-            projects[0]["latest_deployment"]["build_config"]["web_analytics_token"],
-            "latest-analytics",
-        )
-        self.assertEqual(
-            raised.exception.values["pages_projects"][0]["unexpected"],
-            [{"variable": {"type": "secret_text"}}],
-        )
-        self.assertEqual(
-            projects[0]["unexpected"][0]["variable"]["value"],
-            "unexpected-secret",
-        )
+        client.pages.projects.list.assert_called_once_with(account_id="account", per_page=10)
+        self.assertEqual(raised.exception.values, {"changed": False, "pages_projects": projects})
+
+    def test_rejects_projects_without_name(self):
+        client = Mock()
+        client.pages.projects.list.return_value = [{"id": "project"}]
+
+        with self.assertRaises(ModuleFail):
+            pages_projects_info.run(FakeModule({"account_id": "account"}), client)

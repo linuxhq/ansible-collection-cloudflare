@@ -12,17 +12,10 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
 options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   name:
     required: true
     type: str
@@ -39,11 +32,13 @@ options:
     elements: dict
     description:
       - Access selectors that exclude users from the group.
+      - An existing group's exclusions are preserved when omitted.
   require:
     type: list
     elements: dict
     description:
       - Additional Access selectors every included user must satisfy.
+      - An existing group's requirements are preserved when omitted.
   is_default:
     type: bool
     default: false
@@ -57,17 +52,6 @@ options:
     default: present
     description:
       - Desired state of the resource.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
 """
 
 EXAMPLES = r"""
@@ -108,130 +92,57 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    delete_result,
-    find_by_name,
-    normalize_current_by_desired_fields,
+    cloudflare_error_context,
+    ensure_resource_absent,
+    ensure_resource_present,
+    find_resource,
     payload_from_params,
-    post_result,
-    put_result,
-    resource_field,
-    resource_id,
-    select_fields,
-    validate_requested_values,
-    values_differ,
 )
 
 FIELDS = ("exclude", "include", "is_default", "name", "require")
+PRESERVED_FIELDS = ("exclude", "require")
 
 
-def endpoint(account_id):
-    return cloudflare_path("accounts", account_id, "access", "groups")
-
-
-def ensure_present(module, client):
+def run(module, client):
     params = module.params
+    account_id = params["account_id"]
+    groups = client.zero_trust.access.groups
 
-    current = find_by_name(
-        client,
-        endpoint(params["account_id"]),
-        params["name"],
-    )
-
-    payload = payload_from_params(params, FIELDS)
-
-    if current is None:
-        if module.check_mode:
-            module.exit_json(changed=True, message="Access group would be created")
-
-        access_group = post_result(client, endpoint(params["account_id"]), payload)
-        resource_id(module, access_group, "Access group")
-        resource_field(module, access_group, "name", "Access group", expected=params["name"])
-        validate_requested_values(
-            module,
-            {"is_default": False, **access_group},
-            payload,
-            "Access group",
-        )
-        module.exit_json(
-            changed=True,
-            message="Access group created",
-            access_group=access_group,
-        )
-
-    current_id = resource_id(module, current, "Access group")
-    comparable_current = {"is_default": False, **current}
-
-    if not values_differ(
-        normalize_current_by_desired_fields(
-            select_fields(comparable_current, payload.keys()),
-            payload,
-        ),
-        payload,
+    with cloudflare_error_context(
+        "Cloudflare API request failed while finding the Access group",
+        account_id=account_id,
+        name=params["name"],
     ):
-        module.exit_json(
-            changed=False,
-            message="Access group already present",
-            access_group=current,
+        current = find_resource(
+            module,
+            groups.list(account_id=account_id, name=params["name"]),
+            "Access group",
+            "name",
+            params["name"],
         )
 
-    if module.check_mode:
-        module.exit_json(
-            changed=True,
-            message="Access group would be updated",
-            access_group=current,
+    if params["state"] == "absent":
+        ensure_resource_absent(
+            module,
+            "access_group",
+            "Access group",
+            current,
+            delete=lambda group_id: groups.delete(group_id, account_id=account_id),
+            context={"account_id": account_id},
         )
 
-    access_group = put_result(
-        client,
-        cloudflare_path("accounts", params["account_id"], "access", "groups", current_id),
-        payload,
-    )
-    resource_id(module, access_group, "Access group", expected=current_id)
-    resource_field(module, access_group, "name", "Access group", expected=params["name"])
-    validate_requested_values(
+    ensure_resource_present(
         module,
-        {"is_default": False, **access_group},
-        payload,
+        "access_group",
         "Access group",
-    )
-    module.exit_json(
-        changed=True,
-        message="Access group updated",
-        access_group=access_group,
-    )
-
-
-def ensure_absent(module, client):
-    params = module.params
-
-    current = find_by_name(
-        client,
-        endpoint(params["account_id"]),
-        params["name"],
-    )
-
-    if current is None:
-        module.exit_json(changed=False, message="Access group already absent")
-
-    current_id = resource_id(module, current, "Access group")
-
-    if module.check_mode:
-        module.exit_json(
-            changed=True,
-            message="Access group would be deleted",
-            access_group=current,
-        )
-
-    delete_result(
-        client,
-        cloudflare_path("accounts", params["account_id"], "access", "groups", current_id),
-        expected_id=current_id,
-    )
-    module.exit_json(
-        changed=True,
-        message="Access group deleted",
-        access_group=current,
+        current,
+        payload_from_params(params, FIELDS),
+        create=lambda payload: groups.create(account_id=account_id, **payload),
+        update=lambda group_id, payload: groups.update(group_id, account_id=account_id, **payload),
+        expected_name=params["name"],
+        defaults={"is_default": False},
+        preserved_fields=PRESERVED_FIELDS,
+        context={"account_id": account_id},
     )
 
 
@@ -256,10 +167,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        if module.params["state"] == "present":
-            ensure_present(module, client)
-        else:
-            ensure_absent(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

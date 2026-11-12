@@ -8,39 +8,22 @@ DOCUMENTATION = r"""
 module: warp_connector_info
 short_description: Gather information about Cloudflare WARP Connectors
 description:
-  - Gather active Cloudflare WARP Connectors and optionally their connector tokens.
+  - Gather Cloudflare WARP Connectors that have not been deleted, and optionally
+    their connector tokens.
   - Results contain sensitive connector tokens when O(include_token=true); protect
     registered results and task output appropriately.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
 options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   include_token:
     type: bool
     default: false
     description:
       - Whether to retrieve and return each sensitive connector token.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
 """
 
 EXAMPLES = r"""
@@ -77,46 +60,36 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    cloudflare_query,
-    get_result,
-    list_all,
+    cloudflare_error_context,
     resource_field,
-    resource_id,
+    resource_list,
 )
 
 
-def list_resources(module, client):
+def run(module, client):
     account_id = module.params["account_id"]
-    warp_connectors = list_all(
-        client,
-        cloudflare_query(
-            cloudflare_path("accounts", account_id, "warp_connector"),
-            {"is_deleted": "false"},
-        ),
-        per_page=1000,
-    )
+    connectors = client.zero_trust.tunnels.warp_connector
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering WARP Connectors",
+        account_id=account_id,
+    ):
+        warp_connectors = resource_list(
+            module,
+            connectors.list(account_id=account_id, is_deleted=False, per_page=1000),
+            "WARP Connector",
+            required_fields=("id", "name"),
+        )
 
-    for connector in warp_connectors:
-        connector_id = resource_id(module, connector, "WARP Connector")
-        resource_field(module, connector, "name", "WARP Connector")
-        if module.params["include_token"]:
-            token = get_result(
-                client,
-                cloudflare_path(
-                    "accounts",
-                    account_id,
-                    "warp_connector",
-                    connector_id,
-                    "token",
-                ),
-            )
-            connector["token"] = resource_field(
-                module,
-                {"token": token},
-                "token",
-                "WARP Connector token",
-            )
+    if module.params["include_token"]:
+        for connector in warp_connectors:
+            with cloudflare_error_context(
+                "Cloudflare API request failed while gathering the WARP Connector token",
+                account_id=account_id,
+                resource_id=connector["id"],
+            ):
+                token = connectors.token.get(connector["id"], account_id=account_id)
+
+            connector["token"] = resource_field(module, {"token": token}, "token", "WARP Connector token")
 
     module.exit_json(changed=False, warp_connectors=warp_connectors)
 
@@ -132,7 +105,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list_resources(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

@@ -8,16 +8,14 @@ DOCUMENTATION = r"""
 module: zones_info
 short_description: Gather information about Cloudflare zones
 description:
-  - Gather Cloudflare zones visible to the supplied API token.
+  - Gather Cloudflare zones visible to the supplied API token, including internal
+    zones.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
 options:
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   match:
     type: str
     choices:
@@ -26,17 +24,8 @@ options:
     default: all
     description:
       - Whether all or any supplied filters must match.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
+      - This module exposes no zone filters, so this option currently has no
+        effect on the returned zones.
 """
 
 EXAMPLES = r"""
@@ -72,21 +61,24 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    cloudflare_query,
-    list_all,
-    validate_resource_fields,
+    cloudflare_error_context,
+    exit_resource_list,
 )
 
+# Cloudflare omits internal zones unless a type filter names them. The API reads
+# a comma-separated value; the SDK's list encoding repeats the parameter instead,
+# which Cloudflare treats as matching no zones.
+ZONE_TYPES = "full,partial,secondary,internal"
 
-def list_resources(module, client):
-    zones = list_all(
-        client,
-        cloudflare_query(cloudflare_path("zones"), {"match": module.params["match"]}),
-    )
-    validate_resource_fields(module, zones, ("id", "name"), "zone")
 
-    module.exit_json(changed=False, zones=zones)
+def run(module, client):
+    with cloudflare_error_context("Cloudflare API request failed while gathering zones"):
+        exit_resource_list(
+            module,
+            "zones",
+            client.zones.list(match=module.params["match"], type=ZONE_TYPES),
+            "zone",
+        )
 
 
 def main():
@@ -99,7 +91,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list_resources(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

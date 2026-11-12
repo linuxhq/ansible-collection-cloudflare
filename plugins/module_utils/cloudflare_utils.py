@@ -5,11 +5,8 @@
 import os
 from base64 import b64decode
 from contextlib import contextmanager
-from copy import deepcopy
-from urllib.parse import quote, urlencode
 
 from ansible.module_utils.basic import missing_required_lib
-from ansible.module_utils.common.dict_transformations import recursive_diff
 
 try:
     import cloudflare
@@ -18,15 +15,6 @@ except ImportError:
     cloudflare = None
     BaseModel = None
     Cloudflare = None
-
-SENSITIVE_KEY_PARTS = (
-    "api_key",
-    "api_token",
-    "authorization",
-    "password",
-    "secret",
-    "token",
-)
 
 
 class CloudflareResponseError(Exception):
@@ -44,29 +32,6 @@ def cloudflare_error_context(message, **context):
         raise
 
 
-def api_request(client, method, path, body=None, ok_statuses=None, timeout=None):
-    ok_statuses = ok_statuses or []
-    request = getattr(client, method)
-    options = {"timeout": timeout, "max_retries": 0} if timeout is not None else {}
-
-    try:
-        if method in ("post", "put", "patch", "delete"):
-            return request(path, cast_to=object, body=body, options=options)
-
-        return request(path, cast_to=object, options=options)
-    except cloudflare.APIStatusError as exc:
-        if getattr(exc, "status_code", None) in ok_statuses:
-            return None
-
-        exc._cloudflare_message = f"Cloudflare API {method.upper()} request failed"
-        exc._cloudflare_context = {"method": method.upper(), "path": path}
-        raise
-    except cloudflare.APIError as exc:
-        exc._cloudflare_message = f"Cloudflare API {method.upper()} request failed"
-        exc._cloudflare_context = {"method": method.upper(), "path": path}
-        raise
-
-
 @contextmanager
 def cloudflare_client(module):
     if Cloudflare is None:
@@ -76,9 +41,17 @@ def cloudflare_client(module):
         )
 
     api_token = validate_cloudflare_params(module)
-    # Override each original spelling: SDK header dictionaries are case-sensitive
-    # until HTTPX builds the request. Preserve unrelated custom headers.
-    headers = {"Authorization": f"Bearer {api_token}"}
+    # Omit the other authentication headers so ambient credentials never apply,
+    # including in client copies made by with_options(), which reload them from
+    # the environment. Also override each custom header spelling: SDK header
+    # dictionaries are case-sensitive until HTTPX builds the request. Preserve
+    # unrelated custom headers.
+    headers = {
+        "Authorization": f"Bearer {api_token}",
+        "X-Auth-Email": cloudflare.omit,
+        "X-Auth-Key": cloudflare.omit,
+        "X-Auth-User-Service-Key": cloudflare.omit,
+    }
     for line in os.environ.get("CLOUDFLARE_CUSTOM_HEADERS", "").split("\n"):
         header = line.split(":", 1)[0].strip()
         if (
@@ -90,7 +63,7 @@ def cloudflare_client(module):
                 "x-auth-key",
                 "x-auth-user-service-key",
             )
-            and header != "Authorization"
+            and header not in headers
         ):
             headers[header] = cloudflare.omit
 
@@ -102,24 +75,17 @@ def cloudflare_client(module):
             client.api_key = None
             client.user_service_key = None
             yield client
-    except cloudflare.APIConnectionError as exc:
-        fail_from_cloudflare_error(
-            module,
-            getattr(exc, "_cloudflare_message", "Cloudflare API connection failed"),
-            exc,
-            **getattr(exc, "_cloudflare_context", {}),
-        )
-    except cloudflare.APIStatusError as exc:
-        fail_from_cloudflare_error(
-            module,
-            getattr(exc, "_cloudflare_message", "Cloudflare API request failed"),
-            exc,
-            **getattr(exc, "_cloudflare_context", {}),
-        )
     except cloudflare.APIError as exc:
+        if isinstance(exc, cloudflare.APIConnectionError):
+            default_message = "Cloudflare API connection failed"
+        elif isinstance(exc, cloudflare.APIStatusError):
+            default_message = "Cloudflare API request failed"
+        else:
+            default_message = "Cloudflare API error"
+
         fail_from_cloudflare_error(
             module,
-            getattr(exc, "_cloudflare_message", "Cloudflare API error"),
+            getattr(exc, "_cloudflare_message", default_message),
             exc,
             **getattr(exc, "_cloudflare_context", {}),
         )
@@ -148,282 +114,56 @@ def validate_cloudflare_params(module):
     return api_token.strip()
 
 
-def delete_result(client, path, expected_id=None):
-    result = response_result(api_request(client, "delete", path))
-    if expected_id is not None and (not isinstance(result, dict) or result.get("id") != expected_id):
-        raise CloudflareResponseError("Cloudflare API returned the wrong deleted resource")
+def error_response_body(exc):
+    response = getattr(exc, "response", None)
+    if response is None or not hasattr(response, "json"):
+        return None
 
-    return result
+    try:
+        return response.json()
+    except ValueError:
+        return None
 
 
 def fail_from_cloudflare_error(module, message, exc, **context):
-    response = getattr(exc, "response", None)
     status_code = getattr(exc, "status_code", None)
-    response_body = None
+    response_body = error_response_body(exc)
 
-    if response is not None and hasattr(response, "json"):
-        try:
-            response_body = response.json()
-        except ValueError:
-            response_body = None
-
-    failure = {"msg": message, **redact_sensitive_values(context)}
-    if response is None:
+    failure = {"msg": message, **context}
+    if getattr(exc, "response", None) is None:
         failure["error"] = str(exc)
 
     if status_code is not None:
         failure["status_code"] = status_code
 
     if response_body is not None:
-        failure["response"] = redact_sensitive_values(response_body)
+        failure["response"] = response_body
 
     module.fail_json(**failure)
 
 
-def cloudflare_path(*segments):
-    return "/" + "/".join(quote(str(segment), safe="") for segment in segments)
+def serialize_resource(resource):
+    if resource is None:
+        return None
 
+    if BaseModel is not None and isinstance(resource, BaseModel):
+        # Generated models can mistype a field, such as an Access group's
+        # is_default; keep the value and skip Pydantic's stderr warning.
+        return serialize_resource(resource.to_dict(mode="json", warnings=False))
 
-def cloudflare_query(path, values):
-    query = urlencode([(key, value) for key, value in values.items() if value is not None])
-    if not query:
-        return path
-
-    return f"{path}{'&' if '?' in path else '?'}{query}"
-
-
-def find_by_field(client, path, field, value, paginate=True):
-    for item in iter_items(client, path, paginate=paginate):
-        if not isinstance(item, dict):
-            raise CloudflareResponseError("Cloudflare API returned malformed resource data")
-
-        item_value = item.get(field)
-        if (
-            item_value is None
-            or isinstance(value, str)
-            and (not isinstance(item_value, str) or not item_value.strip() or item_value != item_value.strip())
-        ):
-            raise CloudflareResponseError("Cloudflare API returned malformed resource data")
-
-        if item_value == value:
-            return item
-
-    return None
-
-
-def find_by_name(client, path, name, extra_query=None, paginate=True):
-    return find_by_field(
-        client,
-        cloudflare_query(path, {**(extra_query or {}), "name": name}),
-        "name",
-        name,
-        paginate=paginate,
-    )
-
-
-def get_result(client, path, default=None, ok_statuses=None, timeout=None):
-    return response_result(
-        api_request(client, "get", path, ok_statuses=ok_statuses, timeout=timeout),
-        default=default,
-    )
-
-
-def iter_items(client, path, per_page=50, paginate=True):
-    if not paginate:
-        response = serialize_resource(api_request(client, "get", path))
-        yield from parse_list_response(response)[0]
-        return
-
-    fetched = 0
-    page = 1
-
-    while True:
-        result, result_info = parse_list_response(
-            serialize_resource(
-                api_request(
-                    client,
-                    "get",
-                    cloudflare_query(path, {"page": page, "per_page": per_page}),
-                )
-            )
-        )
-
-        fetched += len(result)
-        for field in ("page", "count", "total_pages", "total_count"):
-            value = result_info.get(field)
-            if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 0):
-                raise CloudflareResponseError("Cloudflare API returned malformed pagination data")
-
-        total_pages = result_info.get("total_pages")
-        total_count = result_info.get("total_count")
-        if result_info.get("page", page) != page or result_info.get("count", len(result)) != len(result):
-            raise CloudflareResponseError("Cloudflare API returned malformed pagination data")
-
-        if (
-            result
-            and (total_pages is not None and page > total_pages or total_count is not None and fetched > total_count)
-        ) or (
-            not result
-            and (total_pages is not None and page < total_pages or total_count is not None and fetched < total_count)
-        ):
-            raise CloudflareResponseError("Cloudflare API returned malformed pagination data")
-
-        yield from result
-
-        if not result:
-            return
-
-        if total_pages is not None and page >= total_pages:
-            if total_count is not None and fetched < total_count:
-                raise CloudflareResponseError("Cloudflare API returned malformed pagination data")
-
-            return
-
-        if total_pages is None and total_count is not None and fetched >= total_count:
-            return
-
-        if total_pages is None and total_count is None and len(result) < per_page:
-            return
-
-        page += 1
-
-
-def list_all(client, path, per_page=50, paginate=True):
-    return list(iter_items(client, path, per_page=per_page, paginate=paginate))
-
-
-def normalize_current_by_desired_fields(current, desired):
-    if isinstance(current, dict) and isinstance(desired, dict):
-        if not desired:
-            return current
-
-        return {key: normalize_current_by_desired_fields(current.get(key), value) for key, value in desired.items()}
-
-    if isinstance(current, list) and isinstance(desired, list):
-        if len(current) != len(desired):
-            return current
-
-        return [
-            normalize_current_by_desired_fields(current_item, desired_item)
-            for current_item, desired_item in zip(current, desired)
-        ]
-
-    return current
-
-
-def parse_list_response(response):
-    if isinstance(response, dict) and ("result" in response or "success" in response):
-        if "success" in response and not isinstance(response["success"], bool):
-            raise CloudflareResponseError("Cloudflare API returned malformed list data")
-
-        if response.get("success") is False:
-            raise CloudflareResponseError("Cloudflare API returned an unsuccessful response")
-
-        if "result" not in response:
-            raise CloudflareResponseError("Cloudflare API returned malformed list data")
-
-        result = response.get("result")
-        result_info = response.get("result_info")
-        if result is None:
-            result = []
-
-        if result_info is None:
-            result_info = {}
-    else:
-        result = [] if response is None else response
-        result_info = {}
-
-    if not isinstance(result, list) or not isinstance(result_info, dict):
-        raise CloudflareResponseError("Cloudflare API returned malformed list data")
-
-    return result, result_info
-
-
-def patch_result(client, path, body):
-    return response_result(api_request(client, "patch", path, body=body))
-
-
-def payload_from_params(params, fields):
-    payload = {}
-
-    for field in fields:
-        value = params.get(field)
-        if value is not None:
-            payload[field] = value
-
-    return payload
-
-
-def post_result(client, path, body):
-    return response_result(api_request(client, "post", path, body=body))
-
-
-def put_result(client, path, body, timeout=None):
-    return response_result(api_request(client, "put", path, body=body, timeout=timeout))
-
-
-def remove_fields(value, fields):
-    if isinstance(value, dict):
-        for field in fields:
-            value.pop(field, None)
-
-        for item in value.values():
-            remove_fields(item, fields)
-    elif isinstance(value, list):
-        for item in value:
-            remove_fields(item, fields)
-
-
-def redact_access_app_secrets(resource):
     if isinstance(resource, dict):
-        remove_fields(resource, ("client_secret", "password", "token"))
+        return {key: serialize_resource(value) for key, value in resource.items() if value is not None}
+
+    if isinstance(resource, (list, tuple)):
+        return [serialize_resource(value) for value in resource]
 
     return resource
-
-
-def redact_pages_secrets(resource):
-    redacted = deepcopy(resource)
-
-    def redact(value):
-        if isinstance(value, dict):
-            value.pop("web_analytics_token", None)
-            if value.get("type") == "secret_text":
-                value.pop("value", None)
-
-            for item in value.values():
-                redact(item)
-        elif isinstance(value, list):
-            for item in value:
-                redact(item)
-
-    redact(redacted)
-
-    return redacted
-
-
-def redact_sensitive_values(value):
-    if isinstance(value, dict):
-        return {
-            key: (
-                "********"
-                if any(part in str(key).lower() for part in SENSITIVE_KEY_PARTS)
-                else redact_sensitive_values(item)
-            )
-            for key, item in value.items()
-        }
-
-    if isinstance(value, (list, tuple)):
-        return [redact_sensitive_values(item) for item in value]
-
-    return value
 
 
 def resource_field(module, resource, field, resource_name, expected=None):
     value = resource.get(field) if isinstance(resource, dict) else None
     if not isinstance(value, str) or not value.strip() or value != value.strip():
-        module.fail_json(
-            msg=f"Cloudflare API returned malformed {resource_name} data",
-        )
+        module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data")
 
     if expected is not None and value != expected:
         module.fail_json(msg=f"Cloudflare API returned the wrong {resource_name}")
@@ -440,19 +180,102 @@ def require_mapping(module, value, resource_name):
         module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data")
 
 
-def validate_resource_fields(module, resources, field, resource_name):
-    fields = (field,) if isinstance(field, str) else field
+def resource_list(module, items, resource_name, required_fields=("id",)):
+    """Serialize every item of an SDK list, validating its required fields."""
+    resources = [serialize_resource(item) for item in items]
     for resource in resources:
-        for required_field in fields:
-            resource_field(module, resource, required_field, resource_name)
+        for field in required_fields:
+            resource_field(module, resource, field, resource_name)
+
+    return resources
 
 
-def validate_requested_values(module, resource, desired, resource_name):
+def get_or_none(get, *args, **kwargs):
+    """Call an SDK get method, returning None when Cloudflare responds 404."""
+    try:
+        return get(*args, **kwargs)
+    except cloudflare.NotFoundError:
+        return None
+
+
+def find_resource(module, items, resource_name, field, value):
+    """Return the first serialized item whose field equals value, or None."""
+    for item in items:
+        resource = serialize_resource(item)
+        if resource_field(module, resource, field, resource_name) == value:
+            return resource
+
+    return None
+
+
+def payload_from_params(params, fields):
+    return {field: params[field] for field in fields if params.get(field) is not None}
+
+
+def select_fields(value, fields):
+    value = serialize_resource(value) or {}
+    return {field: value[field] for field in fields if field in value}
+
+
+def normalize_current_by_desired_fields(current, desired, exact_fields=()):
+    """Project current onto the fields of desired.
+
+    Mappings under a key in exact_fields keep every current key, so entries the
+    caller omitted still count as differences.
+    """
+    if isinstance(current, dict) and isinstance(desired, dict):
+        if not desired:
+            return current
+
+        projected = {}
+        for key, value in desired.items():
+            item = current.get(key)
+            if key in exact_fields and isinstance(item, dict) and isinstance(value, dict):
+                projected[key] = {
+                    name: (
+                        normalize_current_by_desired_fields(entry, value[name], exact_fields)
+                        if name in value
+                        else entry
+                    )
+                    for name, entry in item.items()
+                }
+            else:
+                projected[key] = normalize_current_by_desired_fields(item, value, exact_fields)
+
+        return projected
+
+    if isinstance(current, list) and isinstance(desired, list):
+        if len(current) != len(desired):
+            return current
+
+        return [
+            normalize_current_by_desired_fields(current_item, desired_item, exact_fields)
+            for current_item, desired_item in zip(current, desired)
+        ]
+
+    return current
+
+
+def values_differ(current, desired):
+    return serialize_resource(current) != serialize_resource(desired)
+
+
+def differs(current, desired, defaults=None, exact_fields=()):
+    """Return whether current differs from desired on the desired fields only.
+
+    Fields the API omits are filled from defaults before comparing. Mappings
+    under exact_fields are compared on their complete key sets.
+    """
+    if not desired:
+        return False
+
+    current = {**(defaults or {}), **(serialize_resource(current) or {})}
+    return values_differ(normalize_current_by_desired_fields(current, desired, exact_fields), desired)
+
+
+def require_applied(module, resource, desired, resource_name, defaults=None, exact_fields=()):
     require_mapping(module, resource, resource_name)
-    if values_differ(
-        normalize_current_by_desired_fields(resource, desired),
-        desired,
-    ):
+    if differs(resource, desired, defaults, exact_fields):
         module.fail_json(msg=f"Cloudflare did not apply the requested {resource_name}")
 
 
@@ -469,62 +292,133 @@ def validate_tunnel_secret(module, secret):
     module.fail_json(msg="tunnel_secret must be base64-encoded and at least 32 bytes")
 
 
-def response_result(response, default=None):
-    null_result = isinstance(response, dict) and "result" in response and response["result"] is None
-    response = serialize_resource(response)
-    if null_result:
-        response["result"] = None
-
-    if isinstance(response, dict) and ("result" in response or "success" in response):
-        if "success" in response and not isinstance(response["success"], bool):
-            raise CloudflareResponseError("Cloudflare API returned malformed data")
-
-        if response.get("success") is False:
-            raise CloudflareResponseError("Cloudflare API returned an unsuccessful response")
-
-        if "result" not in response:
-            raise CloudflareResponseError("Cloudflare API returned malformed data")
-
-        result = response.get("result")
-        if result is None:
-            return default
-
-        return result
-
-    if response is None:
-        return default
-
-    return response
+def exit_resource_list(module, result_key, items, resource_name, required_fields=("id", "name")):
+    """Exit an info module with the serialized and validated items."""
+    module.exit_json(changed=False, **{result_key: resource_list(module, items, resource_name, required_fields)})
 
 
-def select_fields(value, fields):
-    value = serialize_resource(value) or {}
-    return {field: value.get(field) for field in fields if field in value}
+def exit_settings(module, result_key, settings, resource_name):
+    """Exit an info module with account-wide settings."""
+    settings = serialize_resource(settings) or {}
+    require_mapping(module, settings, resource_name)
+    module.exit_json(changed=False, **{result_key: settings})
 
 
-def serialize_resource(resource):
-    if resource is None:
-        return None
+def ensure_settings(module, result_key, resource_name, current, payload, edit, comparable=None, context=None):
+    """Converge settings that Cloudflare updates with PATCH semantics.
 
-    if BaseModel is not None and isinstance(resource, BaseModel):
-        return serialize_resource(resource.to_dict(mode="json"))
+    comparable optionally maps a settings mapping to its comparable form;
+    context names the settings' owner in failures.
+    """
+    comparable = comparable or (lambda settings: settings)
+    label = resource_name[0].upper() + resource_name[1:]
+    current = serialize_resource(current) or {}
+    require_mapping(module, current, resource_name)
 
-    if hasattr(resource, "to_dict"):
-        return serialize_resource(resource.to_dict())
+    if not differs(comparable(current), payload):
+        module.exit_json(changed=False, message=f"{label} already present", **{result_key: current})
 
-    if isinstance(resource, dict):
-        return {key: serialize_resource(value) for key, value in resource.items() if value is not None}
+    if module.check_mode:
+        module.exit_json(changed=True, message=f"{label} would be updated", **{result_key: current})
 
-    if isinstance(resource, (list, tuple)):
-        return [serialize_resource(value) for value in resource]
+    with cloudflare_error_context(f"Cloudflare API request failed while updating {resource_name}", **(context or {})):
+        settings = serialize_resource(edit(payload))
 
-    return resource
+    require_mapping(module, settings, resource_name)
+    require_applied(module, comparable(settings), payload, resource_name)
+    module.exit_json(changed=True, message=f"{label} updated", **{result_key: settings})
 
 
-def values_differ(current, desired):
-    current = serialize_resource(current)
-    desired = serialize_resource(desired)
-    if not isinstance(current, dict) or not isinstance(desired, dict):
-        return current != desired
+def ensure_resource_present(
+    module,
+    result_key,
+    resource_name,
+    current,
+    payload,
+    create,
+    update,
+    expected_name=None,
+    defaults=None,
+    preserved_fields=(),
+    exact_fields=(),
+    context=None,
+):
+    """Create the resource, or update it when the managed fields differ.
 
-    return recursive_diff(current, desired) is not None
+    The update replaces the resource, so preserved_fields omitted from payload
+    are carried over from current. context names the resource's owner in failures.
+    """
+    context = context or {}
+    label = resource_name[0].upper() + resource_name[1:]
+
+    def checked(resource, expected_id=None):
+        resource = serialize_resource(resource)
+        resource_id(module, resource, resource_name, expected=expected_id)
+        if expected_name is not None:
+            resource_field(module, resource, "name", resource_name, expected=expected_name)
+
+        return resource
+
+    if current is None:
+        if module.check_mode:
+            module.exit_json(changed=True, message=f"{label} would be created")
+
+        name_context = {} if expected_name is None else {"name": expected_name}
+        with cloudflare_error_context(
+            f"Cloudflare API request failed while creating the {resource_name}",
+            **name_context,
+            **context,
+        ):
+            resource = checked(create(payload))
+
+        require_applied(module, resource, payload, resource_name, defaults, exact_fields)
+        module.exit_json(changed=True, message=f"{label} created", **{result_key: resource})
+
+    current_id = resource_id(module, current, resource_name)
+    payload = {**select_fields(current, preserved_fields), **payload}
+    if not differs(current, payload, defaults, exact_fields):
+        module.exit_json(
+            changed=False,
+            message=f"{label} already present",
+            **{result_key: current},
+        )
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message=f"{label} would be updated",
+            **{result_key: current},
+        )
+
+    with cloudflare_error_context(
+        f"Cloudflare API request failed while updating the {resource_name}",
+        resource_id=current_id,
+        **context,
+    ):
+        resource = checked(update(current_id, payload), expected_id=current_id)
+
+    require_applied(module, resource, payload, resource_name, defaults, exact_fields)
+    module.exit_json(changed=True, message=f"{label} updated", **{result_key: resource})
+
+
+def ensure_resource_absent(module, result_key, resource_name, current, delete, context=None):
+    """Delete the resource when it exists; context names its owner in failures."""
+    label = resource_name[0].upper() + resource_name[1:]
+    if current is None:
+        module.exit_json(changed=False, message=f"{label} already absent")
+
+    current_id = resource_id(module, current, resource_name)
+    if module.check_mode:
+        module.exit_json(changed=True, message=f"{label} would be deleted", **{result_key: current})
+
+    with cloudflare_error_context(
+        f"Cloudflare API request failed while deleting the {resource_name}",
+        resource_id=current_id,
+        **(context or {}),
+    ):
+        deleted = serialize_resource(delete(current_id))
+
+    if isinstance(deleted, dict) and "id" in deleted:
+        resource_id(module, deleted, resource_name, expected=current_id)
+
+    module.exit_json(changed=True, message=f"{label} deleted", **{result_key: current})

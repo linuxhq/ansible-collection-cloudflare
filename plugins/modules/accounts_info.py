@@ -12,28 +12,14 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
 options:
-  api_token:
-    description:
-      - Cloudflare API token with permissions to read account settings.
-    required: true
-    type: str
   name:
     description:
       - Cloudflare account name to look up.
     required: true
     type: str
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
 """
 
 EXAMPLES = r"""
@@ -66,31 +52,20 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_error_context,
-    resource_field,
+    find_resource,
     resource_id,
-    serialize_resource,
 )
 
 
-def info(module, client):
-    account = {}
+def run(module, client):
+    name = module.params["name"]
+    with cloudflare_error_context("Cloudflare API request failed while gathering accounts", name=name):
+        account = find_resource(module, client.accounts.list(name=name), "account", "name", name)
 
-    with cloudflare_error_context(
-        "Cloudflare API request failed while gathering accounts",
-        name=module.params["name"],
-    ):
-        for account_info in client.accounts.list(name=module.params["name"]):
-            account_info = serialize_resource(account_info)
-            account_name = resource_field(module, account_info, "name", "account")
-            resource_id(module, account_info, "account")
-            if account_name == module.params["name"]:
-                account = account_info
-                break
+    if account is not None:
+        resource_id(module, account, "account")
 
-    module.exit_json(
-        changed=False,
-        account=account,
-    )
+    module.exit_json(changed=False, account=account or {})
 
 
 def main():
@@ -103,7 +78,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        info(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import Mock
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import pagerules_info
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
@@ -10,66 +10,58 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     ModuleFail,
 )
 
+ZONES = [{"id": "zone", "name": "example.com"}, {"id": "other", "name": "example.net"}]
+
+
+def client_with(zones, rules_by_zone):
+    client = Mock()
+    client.zones.list.return_value = iter(zones)
+    client.page_rules.list.side_effect = lambda zone_id: list(rules_by_zone[zone_id])
+    return client
+
 
 class PageRulesInfoTests(TestCase):
-    def test_lists_large_unpaginated_response_once(self):
-        rules = [{"id": str(index), "actions": [], "targets": []} for index in range(125)]
-        client = MagicMock()
-        client.get.side_effect = [
-            {"success": True, "result": [{"id": "zone", "name": "example.com"}]},
-            {"success": True, "result": rules},
-        ]
+    def test_lists_rules_grouped_by_zone(self):
+        rules = [{"id": str(index), "actions": [{"id": "ssl"}], "targets": []} for index in range(125)]
+        client = client_with(ZONES, {"zone": rules, "other": []})
 
         with self.assertRaises(ModuleExit) as raised:
-            pagerules_info.list_resources(FakeModule({}), client)
+            pagerules_info.run(FakeModule({}), client)
 
-        self.assertEqual(raised.exception.values["pagerules"][0]["pagerules"], rules)
-        self.assertEqual(client.get.call_count, 2)
-        client.get.assert_any_call("/zones/zone/pagerules", cast_to=object, options={})
-
-    def test_lists_rules_for_zones_with_ids(self):
-        module = FakeModule({})
-        zones = [{"id": "zone", "name": "example.com"}]
-        rules = [{"id": "rule", "actions": [], "targets": []}]
-
-        with (
-            patch.object(
-                pagerules_info,
-                "list_all",
-                side_effect=[zones, rules],
-            ) as listed,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            pagerules_info.list_resources(module, {})
-
-        self.assertEqual(listed.call_count, 2)
-        listed.assert_any_call({}, "/zones")
-        listed.assert_any_call({}, "/zones/zone/pagerules", paginate=False)
+        client.zones.list.assert_called_once_with()
         self.assertEqual(
-            raised.exception.values["pagerules"],
-            [
-                {
-                    "id": "zone",
-                    "name": "example.com",
-                    "pagerules": rules,
-                }
-            ],
+            [call.kwargs for call in client.page_rules.list.call_args_list],
+            [{"zone_id": "zone"}, {"zone_id": "other"}],
         )
+        self.assertEqual(
+            raised.exception.values,
+            {
+                "changed": False,
+                "pagerules": [
+                    {"id": "zone", "name": "example.com", "pagerules": rules},
+                    {"id": "other", "name": "example.net", "pagerules": []},
+                ],
+            },
+        )
+
+    def test_rejects_malformed_zones(self):
+        client = client_with([{"id": "zone"}], {})
+
+        with self.assertRaises(ModuleFail) as raised:
+            pagerules_info.run(FakeModule({}), client)
+
+        self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed zone data")
 
     def test_rejects_malformed_rule_collections(self):
         for rule in (
+            {"actions": [], "targets": []},
             {"id": "rule", "actions": {}, "targets": []},
             {"id": "rule", "actions": [], "targets": ["invalid"]},
         ):
-            with (
-                self.subTest(rule=rule),
-                patch.object(
-                    pagerules_info,
-                    "list_all",
-                    side_effect=[[{"id": "zone", "name": "example.com"}], [rule]],
-                ),
-                self.assertRaises(ModuleFail) as raised,
-            ):
-                pagerules_info.list_resources(FakeModule({}), {})
+            with self.subTest(rule=rule):
+                client = client_with(ZONES[:1], {"zone": [rule]})
 
-            self.assertIn("malformed page rule", raised.exception.values["msg"])
+                with self.assertRaises(ModuleFail) as raised:
+                    pagerules_info.run(FakeModule({}), client)
+
+                self.assertIn("malformed page rule", raised.exception.values["msg"])

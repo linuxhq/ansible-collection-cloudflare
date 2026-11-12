@@ -90,10 +90,8 @@ filter plugins under `plugins/`. Apply these with `ansible-plugins.md`.
   required.
 - Treat `NotFoundError`, or status 404, as absence only when the operation's
   contract defines it that way.
-- Preserve the operation, resource identifier, status code, and sanitized API
-  response in actionable failures.
-- Never expose request headers, authentication values, or secret response
-  fields.
+- Preserve the operation, resource identifier, status code, and API response
+  in actionable failures.
 - Account for automatic SDK retries when enforcing an operation deadline.
 - Do not stack an unbounded plugin retry loop on the SDK retry policy.
 - Disable SDK retries when a module owns a bounded retry loop or a strict

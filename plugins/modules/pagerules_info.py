@@ -12,23 +12,9 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
-options:
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+options: {}
 """
 
 EXAMPLES = r"""
@@ -80,29 +66,24 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    list_all,
+    cloudflare_error_context,
     require_mapping,
-    resource_field,
-    resource_id,
-    validate_resource_fields,
+    resource_list,
 )
 
 
-def list_resources(module, client):
+def run(module, client):
     pagerules = []
-    zones = list_all(client, "/zones")
+    with cloudflare_error_context("Cloudflare API request failed while gathering zones"):
+        zones = resource_list(module, client.zones.list(), "zone", ("id", "name"))
 
     for zone in zones:
-        zone_id = resource_id(module, zone, "zone")
-        zone_name = resource_field(module, zone, "name", "zone")
+        with cloudflare_error_context(
+            "Cloudflare API request failed while gathering page rules",
+            zone_id=zone["id"],
+        ):
+            rules = resource_list(module, client.page_rules.list(zone_id=zone["id"]) or [], "page rule")
 
-        rules = list_all(
-            client,
-            cloudflare_path("zones", zone_id, "pagerules"),
-            paginate=False,
-        )
-        validate_resource_fields(module, rules, "id", "page rule")
         for rule in rules:
             for field in ("actions", "targets"):
                 values = rule.get(field)
@@ -112,13 +93,7 @@ def list_resources(module, client):
                 for value in values:
                     require_mapping(module, value, f"page rule {field[:-1]}")
 
-        pagerules.append(
-            {
-                "id": zone_id,
-                "name": zone_name,
-                "pagerules": rules,
-            }
-        )
+        pagerules.append({"id": zone["id"], "name": zone["name"], "pagerules": rules})
 
     module.exit_json(changed=False, pagerules=pagerules)
 
@@ -132,7 +107,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list_resources(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

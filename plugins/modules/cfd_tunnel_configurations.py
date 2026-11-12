@@ -12,17 +12,10 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
 options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   tunnel_id:
     required: true
     type: str
@@ -34,17 +27,8 @@ options:
     description:
       - Complete remotely managed tunnel configuration.
       - Omitted optional settings are reset to their defaults.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
+      - Use the Cloudflare API field names, such as C(originRequest), C(noTLSVerify),
+        and C(warp-routing); snake_case aliases are not compared and never converge.
 """
 
 EXAMPLES = r"""
@@ -67,7 +51,7 @@ configuration:
   contains:
     config:
       description: Remotely managed tunnel configuration.
-      returned: always
+      returned: when the tunnel has a configuration
       type: dict
 message:
   returned: always
@@ -81,10 +65,8 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    get_result,
+    cloudflare_error_context,
     normalize_current_by_desired_fields,
-    put_result,
     require_mapping,
     serialize_resource,
     values_differ,
@@ -203,18 +185,17 @@ def comparable_config(config, desired=None):
     return config
 
 
-def endpoint(account_id, tunnel_id):
-    return cloudflare_path("accounts", account_id, "cfd_tunnel", tunnel_id, "configurations")
-
-
-def ensure_present(module, client):
+def run(module, client):
     params = module.params
+    configurations = client.zero_trust.tunnels.cloudflared.configurations
+    identifiers = {"account_id": params["account_id"], "tunnel_id": params["tunnel_id"]}
 
-    current = get_result(
-        client,
-        endpoint(params["account_id"], params["tunnel_id"]),
-        default={},
-    )
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering the tunnel configuration",
+        **identifiers,
+    ):
+        current = serialize_resource(configurations.get(params["tunnel_id"], account_id=params["account_id"])) or {}
+
     require_mapping(module, current, "tunnel configuration")
     current_config = current.get("config")
     if current_config is None:
@@ -239,11 +220,14 @@ def ensure_present(module, client):
             configuration=current,
         )
 
-    configuration = put_result(
-        client,
-        endpoint(params["account_id"], params["tunnel_id"]),
-        {"config": params["config"]},
-    )
+    with cloudflare_error_context(
+        "Cloudflare API request failed while updating the tunnel configuration",
+        **identifiers,
+    ):
+        configuration = serialize_resource(
+            configurations.update(params["tunnel_id"], account_id=params["account_id"], config=params["config"])
+        )
+
     require_mapping(module, configuration, "tunnel configuration")
     returned_config = configuration.get("config")
     require_mapping(module, returned_config, "tunnel configuration")
@@ -272,7 +256,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        ensure_present(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

@@ -12,12 +12,10 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
 options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
   allow_mode_switch:
     type: bool
     description:
@@ -30,11 +28,6 @@ options:
     type: bool
     description:
       - Whether to allow devices to leave the organization.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   auto_connect:
     type: float
     description:
@@ -90,22 +83,11 @@ options:
   switch_locked:
     type: bool
     description:
-      - Whether to allow the user to turn off WARP and disconnect the client.
+      - Whether to prevent users from turning off WARP and disconnecting the client.
   tunnel_protocol:
     type: str
     description:
       - Tunnel protocol to use.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
 """
 
 EXAMPLES = r"""
@@ -129,7 +111,7 @@ devices_policy:
   type: dict
   contains:
     allow_updates:
-      description: Whether users may update the WARP client.
+      description: Whether the WARP client receives update notifications.
       returned: when available
       type: bool
     service_mode_v2:
@@ -148,14 +130,9 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    get_result,
-    normalize_current_by_desired_fields,
-    patch_result,
+    cloudflare_error_context,
+    ensure_settings,
     payload_from_params,
-    require_mapping,
-    validate_requested_values,
-    values_differ,
 )
 
 FIELDS = (
@@ -179,43 +156,27 @@ FIELDS = (
 )
 
 
-def endpoint(account_id):
-    return cloudflare_path("accounts", account_id, "devices", "policy")
-
-
-def ensure_present(module, client):
-    params = module.params
-
-    payload = payload_from_params(params, FIELDS)
+def run(module, client):
+    account_id = module.params["account_id"]
+    payload = payload_from_params(module.params, FIELDS)
     if not payload:
         module.exit_json(changed=False, message="No device policy fields provided")
 
-    current = get_result(client, endpoint(params["account_id"]), default={})
-    require_mapping(module, current, "device policy")
-
-    if not values_differ(
-        normalize_current_by_desired_fields(current, payload),
-        payload,
+    policy = client.zero_trust.devices.policies.default
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering the device policy",
+        account_id=account_id,
     ):
-        module.exit_json(
-            changed=False,
-            message="Device policy already present",
-            devices_policy=current,
-        )
+        current = policy.get(account_id=account_id)
 
-    if module.check_mode:
-        module.exit_json(
-            changed=True,
-            message="Device policy would be updated",
-            devices_policy=current,
-        )
-
-    policy = patch_result(client, endpoint(params["account_id"]), payload)
-    validate_requested_values(module, policy, payload, "device policy")
-    module.exit_json(
-        changed=True,
-        message="Device policy updated",
-        devices_policy=policy,
+    ensure_settings(
+        module,
+        "devices_policy",
+        "device policy",
+        current,
+        payload,
+        edit=lambda payload: policy.edit(account_id=account_id, **payload),
+        context={"account_id": account_id},
     )
 
 
@@ -247,7 +208,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        ensure_present(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

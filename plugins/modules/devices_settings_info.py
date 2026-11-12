@@ -12,28 +12,10 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
-options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
+options: {}
 """
 
 EXAMPLES = r"""
@@ -65,21 +47,20 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    get_result,
-    require_mapping,
+    cloudflare_error_context,
+    exit_settings,
 )
 
 
-def info(module, client):
-    settings = get_result(
-        client,
-        cloudflare_path("accounts", module.params["account_id"], "devices", "settings"),
-        default={},
-    )
-    require_mapping(module, settings, "device settings")
+def run(module, client):
+    account_id = module.params["account_id"]
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering device settings",
+        account_id=account_id,
+    ):
+        settings = client.zero_trust.devices.settings.get(account_id=account_id)
 
-    module.exit_json(changed=False, devices_settings=settings)
+    exit_settings(module, "devices_settings", settings, "device settings")
 
 
 def main():
@@ -92,7 +73,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        info(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

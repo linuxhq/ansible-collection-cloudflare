@@ -23,59 +23,54 @@ def params(**updates):
     return values
 
 
-class Model:
-    def __init__(self, value):
-        self.value = value
-
-    def to_dict(self):
-        return self.value
-
-
 class DnssecTests(TestCase):
-    def test_pending_status_is_equivalent_to_active(self):
-        module = FakeModule(params())
+    def run_module(self, module, current, edited=None):
         client = Mock()
-        client.dns.dnssec.get.return_value = Model({"status": "pending"})
+        client.dns.dnssec.get.return_value = current
+        client.dns.dnssec.edit.return_value = edited
+        with self.assertRaises((ModuleExit, ModuleFail)) as raised:
+            dnssec.run(module, client)
 
-        with self.assertRaises(ModuleExit) as raised:
-            dnssec.ensure_present(module, client)
+        client.dns.dnssec.get.assert_called_once_with(zone_id="zone")
+        return raised.exception.values, client.dns.dnssec
 
-        client.dns.dnssec.edit.assert_not_called()
-        self.assertFalse(raised.exception.values["changed"])
+    def test_pending_status_is_equivalent_to_requested_status(self):
+        for current, status in (("pending", "active"), ("pending-disabled", "disabled")):
+            with self.subTest(current=current):
+                result, api = self.run_module(FakeModule(params(status=status)), {"status": current})
+
+                api.edit.assert_not_called()
+                self.assertFalse(result["changed"])
+                self.assertEqual(result["dnssec"], {"status": current})
+
+    def test_check_mode_does_not_edit(self):
+        result, api = self.run_module(FakeModule(params(), check_mode=True), {"status": "disabled"})
+
+        api.edit.assert_not_called()
+        self.assertTrue(result["changed"])
 
     def test_updates_only_explicit_fields(self):
-        module = FakeModule(params(dnssec_presigned=True))
-        client = Mock()
-        client.dns.dnssec.get.return_value = Model(
-            {
-                "status": "disabled",
-                "dnssec_multi_signer": False,
-                "dnssec_presigned": False,
-                "dnssec_use_nsec3": False,
-            }
+        current = {
+            "status": "disabled",
+            "dnssec_multi_signer": False,
+            "dnssec_presigned": False,
+            "dnssec_use_nsec3": False,
+        }
+        result, api = self.run_module(
+            FakeModule(params(dnssec_presigned=True)), current, {"status": "pending", "dnssec_presigned": True}
         )
-        client.dns.dnssec.edit.return_value = Model({"status": "pending", "dnssec_presigned": True})
 
-        with self.assertRaises(ModuleExit) as raised:
-            dnssec.ensure_present(module, client)
+        api.edit.assert_called_once_with(zone_id="zone", dnssec_presigned=True, status="active")
+        self.assertTrue(result["changed"])
 
-        client.dns.dnssec.edit.assert_called_once_with(
-            zone_id="zone",
-            dnssec_presigned=True,
-            status="active",
-        )
-        self.assertTrue(raised.exception.values["changed"])
+    def test_rejects_settings_without_status(self):
+        result, api = self.run_module(FakeModule(params(status=None)), {"dnssec_presigned": False})
+
+        api.edit.assert_not_called()
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed DNSSEC settings data")
 
     def test_rejects_an_unmet_update_postcondition(self):
-        module = FakeModule(params(dnssec_presigned=True))
-        client = Mock()
-        client.dns.dnssec.get.return_value = Model({"status": "active", "dnssec_presigned": False})
-        client.dns.dnssec.edit.return_value = Model({"status": "active", "dnssec_presigned": False})
+        settings = {"status": "active", "dnssec_presigned": False}
+        result, _ignored = self.run_module(FakeModule(params(dnssec_presigned=True)), settings, settings)
 
-        with self.assertRaises(ModuleFail) as raised:
-            dnssec.ensure_present(module, client)
-
-        self.assertEqual(
-            raised.exception.values["msg"],
-            "Cloudflare did not apply the requested DNSSEC settings",
-        )
+        self.assertEqual(result["msg"], "Cloudflare did not apply the requested DNSSEC settings")

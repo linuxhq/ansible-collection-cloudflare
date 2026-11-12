@@ -8,39 +8,22 @@ DOCUMENTATION = r"""
 module: cfd_tunnel_info
 short_description: Gather information about Cloudflare cloudflared tunnels
 description:
-  - Gather active Cloudflare cloudflared tunnels and optionally their connector tokens.
+  - Gather Cloudflare cloudflared tunnels that have not been deleted, and optionally
+    their connector tokens.
   - Results contain sensitive connector tokens when O(include_token=true); protect
     registered results and task output appropriately.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
 options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   include_token:
     type: bool
     default: false
     description:
       - Whether to retrieve and return each sensitive tunnel token.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
 """
 
 EXAMPLES = r"""
@@ -77,40 +60,36 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    cloudflare_query,
-    get_result,
-    list_all,
+    cloudflare_error_context,
     resource_field,
-    resource_id,
+    resource_list,
 )
 
 
-def list_resources(module, client):
+def run(module, client):
     account_id = module.params["account_id"]
-    cfd_tunnels = list_all(
-        client,
-        cloudflare_query(
-            cloudflare_path("accounts", account_id, "cfd_tunnel"),
-            {"is_deleted": "false"},
-        ),
-        per_page=1000,
-    )
+    tunnels = client.zero_trust.tunnels.cloudflared
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering cloudflared tunnels",
+        account_id=account_id,
+    ):
+        cfd_tunnels = resource_list(
+            module,
+            tunnels.list(account_id=account_id, is_deleted=False, per_page=1000),
+            "cloudflared tunnel",
+            required_fields=("id", "name"),
+        )
 
-    for tunnel in cfd_tunnels:
-        tunnel_id = resource_id(module, tunnel, "cloudflared tunnel")
-        resource_field(module, tunnel, "name", "cloudflared tunnel")
-        if module.params["include_token"]:
-            token = get_result(
-                client,
-                cloudflare_path("accounts", account_id, "cfd_tunnel", tunnel_id, "token"),
-            )
-            tunnel["token"] = resource_field(
-                module,
-                {"token": token},
-                "token",
-                "cloudflared tunnel token",
-            )
+    if module.params["include_token"]:
+        for tunnel in cfd_tunnels:
+            with cloudflare_error_context(
+                "Cloudflare API request failed while gathering the cloudflared tunnel token",
+                account_id=account_id,
+                resource_id=tunnel["id"],
+            ):
+                token = tunnels.token.get(tunnel["id"], account_id=account_id)
+
+            tunnel["token"] = resource_field(module, {"token": token}, "token", "cloudflared tunnel token")
 
     module.exit_json(changed=False, cfd_tunnels=cfd_tunnels)
 
@@ -126,7 +105,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list_resources(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":
