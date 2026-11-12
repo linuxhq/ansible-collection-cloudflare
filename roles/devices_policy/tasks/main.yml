@@ -11,9 +11,15 @@
     auto_connect: "{{ devices_policy_auto_connect | d(omit) }}"
     captive_portal: "{{ devices_policy_captive_portal | d(omit) }}"
     disable_auto_fallback: "{{ devices_policy_disable_auto_fallback | d(omit) }}"
-    exclude: "{{ devices_policy_exclude | d(omit) }}"
+    exclude:
+      "{{ devices_policy_exclude
+          if devices_policy_exclude is not none
+          else omit }}"
     exclude_office_ips: "{{ devices_policy_exclude_office_ips | d(omit) }}"
-    include: "{{ devices_policy_include | d(omit) }}"
+    include:
+      "{{ devices_policy_include
+          if devices_policy_include is not none
+          else omit }}"
     lan_allow_minutes: "{{ devices_policy_lan_allow_minutes | d(omit) }}"
     lan_allow_subnet_size: "{{ devices_policy_lan_allow_subnet_size | d(omit) }}"
     register_interface_ip_with_dns:
