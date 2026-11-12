@@ -12,23 +12,9 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
-options:
-  api_token:
-    description:
-      - Cloudflare API token with permissions to read DNS settings.
-    required: true
-    type: str
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+options: {}
 """
 
 EXAMPLES = r"""
@@ -155,54 +141,36 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
-    fail_from_cloudflare_error,
-    redact_sensitive_values,
+    error_response_body,
     require_mapping,
     resource_field,
-    resource_id,
+    resource_list,
     serialize_resource,
 )
 
 SKIP_STATUSES = (400, 404)
 
 
-def list_resources(module, client):
+def run(module, client):
     dnssec = []
     skipped_zones = []
-    zones = []
 
     with cloudflare_error_context("Cloudflare API request failed while gathering zones for DNSSEC information"):
-        for zone in client.zones.list():
-            zone_dict = serialize_resource(zone)
-            zones.append(
-                {
-                    "id": resource_id(module, zone_dict, "zone"),
-                    "name": resource_field(module, zone_dict, "name", "zone"),
-                }
-            )
+        zones = resource_list(module, client.zones.list(), "zone", ("id", "name"))
 
     for zone in zones:
         try:
-            dnssec_settings = client.dns.dnssec.get(zone_id=zone["id"])
+            with cloudflare_error_context(
+                "Cloudflare API request failed while gathering DNSSEC information",
+                zone_id=zone["id"],
+            ):
+                dnssec_settings = client.dns.dnssec.get(zone_id=zone["id"])
         except cloudflare.APIStatusError as exc:
             status_code = getattr(exc, "status_code", None)
             if status_code not in SKIP_STATUSES:
-                fail_from_cloudflare_error(
-                    module,
-                    "Cloudflare API request failed while gathering DNSSEC information",
-                    exc,
-                    zone=zone,
-                )
+                raise
 
-            response = getattr(exc, "response", None)
-            response_body = None
-
-            if response is not None and hasattr(response, "json"):
-                try:
-                    response_body = redact_sensitive_values(response.json())
-                except ValueError:
-                    response_body = None
-
+            response_body = error_response_body(exc)
             skipped_zone = {
                 "zone_id": zone["id"],
                 "zone_name": zone["name"],
@@ -220,14 +188,6 @@ def list_resources(module, client):
 
             skipped_zones.append(skipped_zone)
             continue
-        except cloudflare.APIConnectionError as exc:
-            exc._cloudflare_message = "Cloudflare API connection failed while gathering DNSSEC information"
-            exc._cloudflare_context = {"zone": zone}
-            raise
-        except cloudflare.APIError as exc:
-            exc._cloudflare_message = "Cloudflare API error while gathering DNSSEC information"
-            exc._cloudflare_context = {"zone": zone}
-            raise
 
         dnssec_settings = serialize_resource(dnssec_settings)
         require_mapping(module, dnssec_settings, "DNSSEC settings")
@@ -257,7 +217,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list_resources(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

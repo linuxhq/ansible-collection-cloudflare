@@ -1,47 +1,26 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-import json
-import signal
-import threading
-import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-import httpx
-from cloudflare import Cloudflare
+import cloudflare
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import rules_lists
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
     ModuleFail,
+    connection_error,
+    status_error,
+    timeout_error,
 )
 
-
-class ApiConnectionError(Exception):
-    pass
-
-
-class ApiStatusError(Exception):
-    def __init__(self, message, status_code=None):
-        super().__init__(message)
-        self.status_code = status_code
-
-
-ERRORS = SimpleNamespace(
-    APIConnectionError=ApiConnectionError,
-    APIStatusError=ApiStatusError,
-)
-
-
-class Model:
-    def __init__(self, value):
-        self.value = value
-
-    def to_dict(self):
-        return self.value
+PENDING_BODY = {
+    "success": False,
+    "errors": [{"code": 10000, "message": "a bulk operation is already pending"}],
+    "messages": [],
+}
+CURRENT = {"id": "list", "name": "addresses", "kind": "ip", "description": "current"}
 
 
 def params(**updates):
@@ -52,12 +31,35 @@ def params(**updates):
         "description": None,
         "elements": None,
         "operation_timeout": 30,
+        "state": "present",
     }
     values.update(updates)
     return values
 
 
+def make_client(lists=(), items=(), created=None, updated=None, fetched=None, deleted=None):
+    client = Mock()
+    # Per-request overrides return the same client so their calls are observable.
+    client.with_options.return_value = client
+    api = client.rules.lists
+    api.list.return_value = list(lists)
+    api.create.return_value = created
+    api.update.return_value = updated
+    api.get.return_value = fetched
+    api.delete.return_value = deleted
+    api.items.list.return_value = list(items)
+    api.items.update.return_value = {"operation_id": "operation"}
+    api.bulk_operations.get.return_value = {"id": "operation", "status": "completed"}
+    return client, api
+
+
 class RulesListsTests(TestCase):
+    def run_module(self, module, client):
+        with self.assertRaises((ModuleExit, ModuleFail)) as raised:
+            rules_lists.run(module, client)
+
+        return raised.exception.values
+
     def test_normalizes_metadata_defaults_and_duplicates(self):
         items = [
             {
@@ -77,54 +79,82 @@ class RulesListsTests(TestCase):
             [{"redirect": {"source_url": "example.com"}}],
         )
 
+    def test_rejects_operation_timeout_below_one_second(self):
+        client, api = make_client()
+
+        result = self.run_module(FakeModule(params(operation_timeout=0)), client)
+
+        api.list.assert_not_called()
+        self.assertEqual(result["msg"], "operation_timeout must be at least 1 second")
+
     def test_submit_retries_pending_operation_within_deadline(self):
-        pending = ApiStatusError("bulk operation pending", status_code=409)
+        client, api = make_client()
+        api.items.update.side_effect = [status_error(409, PENDING_BODY), {"operation_id": "operation"}]
 
         with (
-            patch.object(rules_lists, "cloudflare", ERRORS),
-            patch.object(
-                rules_lists,
-                "put_result",
-                side_effect=[pending, {"operation_id": "operation"}],
-            ) as put,
-            patch.object(
-                rules_lists.time,
-                "monotonic",
-                side_effect=[1, 2, 3, 4],
-            ),
+            patch.object(rules_lists.time, "monotonic", side_effect=[1, 2, 3, 4]),
             patch.object(rules_lists.time, "sleep") as sleep,
         ):
-            result = rules_lists.submit_items(
-                {},
-                "account",
-                "list",
-                [{"ip": "192.0.2.1"}],
-                30,
-            )
+            result = rules_lists.submit_items(FakeModule({}), client, "account", "list", [{"ip": "192.0.2.1"}], 30)
 
         self.assertEqual(result, {"operation_id": "operation"})
-        self.assertEqual(put.call_count, 2)
+        self.assertEqual(api.items.update.call_count, 2)
+        api.items.update.assert_called_with("list", account_id="account", body=[{"ip": "192.0.2.1"}])
+        self.assertEqual(
+            [call.kwargs for call in client.with_options.call_args_list],
+            [{"timeout": 29, "max_retries": 0}, {"timeout": 27, "max_retries": 0}],
+        )
         sleep.assert_called_once_with(rules_lists.OPERATION_POLL_SECONDS)
 
-    def test_submit_honors_subsecond_and_expired_deadlines(self):
-        with (
-            patch.object(rules_lists.time, "monotonic", return_value=0.5),
-            patch.object(rules_lists, "put_result", return_value={"id": "operation"}) as put,
-        ):
-            rules_lists.submit_items({}, "account", "list", [], 1)
+    def test_submit_retries_transient_errors_within_deadline(self):
+        for error in (connection_error(), timeout_error(), status_error(503)):
+            client, api = make_client()
+            api.items.update.side_effect = [error, {"operation_id": "operation"}]
+            with (
+                self.subTest(error=type(error).__name__),
+                patch.object(rules_lists.time, "monotonic", side_effect=[1, 2, 3, 4]),
+                patch.object(rules_lists.time, "sleep"),
+            ):
+                result = rules_lists.submit_items(FakeModule({}), client, "account", "list", [], 30)
 
-        put.assert_called_once_with(
-            {},
-            "/accounts/account/rules/lists/list/items",
-            [],
-            timeout=0.5,
+            self.assertEqual(result, {"operation_id": "operation"})
+
+    def test_submit_does_not_retry_permanent_errors_or_past_the_deadline(self):
+        cases = (
+            (status_error(400), [1, 2]),
+            (status_error(409, PENDING_BODY), [1, 29]),
         )
+        for error, clock in cases:
+            client, api = make_client()
+            api.items.update.side_effect = error
+            with (
+                self.subTest(status=error.status_code, clock=clock),
+                patch.object(rules_lists.time, "monotonic", side_effect=clock),
+                patch.object(rules_lists.time, "sleep") as sleep,
+                self.assertRaises(cloudflare.APIStatusError) as raised,
+            ):
+                rules_lists.submit_items(FakeModule({}), client, "account", "list", [], 30)
 
+            sleep.assert_not_called()
+            self.assertEqual(api.items.update.call_count, 1)
+            self.assertIn("submitting the Rules list items", raised.exception._cloudflare_message)
+
+    def test_submit_honors_subsecond_and_expired_deadlines(self):
+        client, api = make_client()
+        with patch.object(rules_lists.time, "monotonic", return_value=0.5):
+            rules_lists.submit_items(FakeModule({}), client, "account", "list", [], 1)
+
+        client.with_options.assert_called_once_with(timeout=0.5, max_retries=0)
+
+        client, api = make_client()
         with (
             patch.object(rules_lists.time, "monotonic", return_value=1),
-            self.assertRaisesRegex(rules_lists.CloudflareResponseError, "Timed out submitting"),
+            self.assertRaises(ModuleFail) as raised,
         ):
-            rules_lists.submit_items({}, "account", "list", [], 1)
+            rules_lists.submit_items(FakeModule({}), client, "account", "list", [], 1)
+
+        api.items.update.assert_not_called()
+        self.assertIn("Timed out submitting", raised.exception.values["msg"])
 
     def test_wait_rejects_missing_operation_identifier(self):
         for operation in ({}, {"operation_id": " operation "}):
@@ -132,7 +162,7 @@ class RulesListsTests(TestCase):
                 self.subTest(operation=operation),
                 self.assertRaises(ModuleFail) as raised,
             ):
-                rules_lists.wait_for_operation(FakeModule({}), {}, "account", operation, 30)
+                rules_lists.wait_for_operation(FakeModule({}), Mock(), "account", operation, 30)
 
             self.assertEqual(
                 raised.exception.values["msg"],
@@ -140,165 +170,95 @@ class RulesListsTests(TestCase):
             )
 
     def test_wait_returns_completed_operation(self):
-        module = FakeModule({})
-        completed = {"id": "operation", "status": "completed"}
+        client, api = make_client()
+
+        with patch.object(rules_lists.time, "monotonic", return_value=1):
+            result = rules_lists.wait_for_operation(
+                FakeModule({}), client, "account", {"operation_id": "operation"}, 30
+            )
+
+        api.bulk_operations.get.assert_called_once_with("operation", account_id="account")
+        client.with_options.assert_called_once_with(timeout=29, max_retries=0)
+        self.assertEqual(result, {"id": "operation", "status": "completed"})
+
+    def test_wait_polls_until_completed_without_overrunning_deadline(self):
+        client, api = make_client()
+        api.bulk_operations.get.side_effect = [
+            {"id": "operation", "status": "pending"},
+            connection_error(),
+            {"id": "operation", "status": "completed"},
+        ]
+
+        with (
+            patch.object(rules_lists.time, "monotonic", side_effect=[1, 2, 3, 4, 5, 29.7, 29.8, 29.9]),
+            patch.object(rules_lists.time, "sleep") as sleep,
+        ):
+            result = rules_lists.wait_for_operation(FakeModule({}), client, "account", {"id": "operation"}, 30)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(sleep.call_args_list[0].args, (rules_lists.OPERATION_POLL_SECONDS,))
+        self.assertAlmostEqual(sleep.call_args_list[1].args[0], 0.3)
+
+    def test_wait_reports_failed_operation(self):
+        client, api = make_client()
+        api.bulk_operations.get.return_value = {"id": "operation", "status": "failed", "error": "bad"}
 
         with (
             patch.object(rules_lists.time, "monotonic", return_value=1),
-            patch.object(rules_lists, "get_result", return_value=completed) as get,
-        ):
-            result = rules_lists.wait_for_operation(
-                module,
-                {},
-                "account",
-                {"operation_id": "operation"},
-                30,
-            )
-
-        get.assert_called_once_with(
-            {},
-            "/accounts/account/rules/lists/bulk_operations/operation",
-            default={},
-            timeout=29,
-        )
-        self.assertEqual(result, completed)
-
-    def test_rejects_responses_received_after_deadline(self):
-        with (
-            patch.object(rules_lists.time, "monotonic", side_effect=[0, 2]),
-            patch.object(rules_lists, "put_result", return_value={"operation_id": "operation"}),
-            self.assertRaisesRegex(rules_lists.CloudflareResponseError, "Timed out submitting"),
-        ):
-            rules_lists.submit_items({}, "account", "list", [], 1)
-
-        with (
-            patch.object(rules_lists.time, "monotonic", side_effect=[0, 2]),
-            patch.object(rules_lists, "get_result", return_value={"id": "operation", "status": "completed"}),
             self.assertRaises(ModuleFail) as raised,
         ):
-            rules_lists.wait_for_operation(FakeModule({}), {}, "account", {"id": "operation"}, 1)
+            rules_lists.wait_for_operation(FakeModule({}), client, "account", {"id": "operation"}, 30)
+
+        self.assertEqual(raised.exception.values["msg"], "Rules list items operation failed")
+
+    def test_wait_raises_permanent_polling_errors_with_context(self):
+        client, api = make_client()
+        api.bulk_operations.get.side_effect = status_error(403)
+
+        with (
+            patch.object(rules_lists.time, "monotonic", return_value=1),
+            self.assertRaises(cloudflare.PermissionDeniedError) as raised,
+        ):
+            rules_lists.wait_for_operation(FakeModule({}), client, "account", {"id": "operation"}, 30)
+
+        self.assertEqual(raised.exception._cloudflare_context, {"account_id": "account", "operation_id": "operation"})
+
+    def test_rejects_responses_received_after_deadline(self):
+        client, _ignored = make_client()
+        with (
+            patch.object(rules_lists.time, "monotonic", side_effect=[0, 2]),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            rules_lists.submit_items(FakeModule({}), client, "account", "list", [], 1)
+
+        self.assertIn("Timed out submitting", raised.exception.values["msg"])
+
+        with (
+            patch.object(rules_lists.time, "monotonic", side_effect=[0, 2]),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            rules_lists.wait_for_operation(FakeModule({}), client, "account", {"id": "operation"}, 1)
 
         self.assertIn("Timed out waiting", raised.exception.values["msg"])
 
-    def test_deadline_restores_alarm_after_success_and_error(self):
-        original_handler = signal.getsignal(signal.SIGALRM)
-        for fail in (False, True):
-            with self.subTest(fail=fail):
-                try:
-                    with rules_lists.operation_deadline(5):
-                        if fail:
-                            raise ValueError("failure")
-                except ValueError:
-                    pass
-
-                self.assertEqual(signal.getsignal(signal.SIGALRM), original_handler)
-                self.assertEqual(signal.getitimer(signal.ITIMER_REAL), (0, 0))
-
-    def test_deadline_interrupts_slow_submission_and_polling(self):
-        body = json.dumps({"success": True, "result": {"id": "operation", "status": "completed"}}).encode()
-
-        class Handler(BaseHTTPRequestHandler):
-            def log_message(self, *args):
-                pass
-
-            def respond(self):
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                try:
-                    for offset in range(0, len(body), 5):
-                        time.sleep(0.1)
-                        self.wfile.write(body[offset : offset + 5])
-                        self.wfile.flush()
-                except (BrokenPipeError, ConnectionResetError):
-                    pass
-
-            def do_GET(self):
-                self.respond()
-
-            def do_PUT(self):
-                self.rfile.read(int(self.headers["Content-Length"]))
-                self.respond()
-
-        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
-        thread.start()
-        original_handler = signal.getsignal(signal.SIGALRM)
-        try:
-            with Cloudflare(
-                api_token="EXAMPLE_TOKEN",
-                base_url=f"http://127.0.0.1:{server.server_port}",
-                http_client=httpx.Client(trust_env=False),
-            ) as client:
-                for submit in (True, False):
-                    with self.subTest(submit=submit):
-                        with (
-                            self.assertRaisesRegex(rules_lists.CloudflareResponseError, "Timed out completing"),
-                            rules_lists.operation_deadline(0.5) as deadline,
-                        ):
-                            if submit:
-                                rules_lists.submit_items(client, "account", "list", [], deadline)
-                            else:
-                                rules_lists.wait_for_operation(
-                                    FakeModule({}), client, "account", {"id": "operation"}, deadline
-                                )
-
-                        self.assertEqual(signal.getsignal(signal.SIGALRM), original_handler)
-                        self.assertEqual(signal.getitimer(signal.ITIMER_REAL), (0, 0))
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join()
-
-    def test_deadline_expiring_during_cleanup_is_reported_cleanly(self):
-        original_handler = signal.getsignal(signal.SIGALRM)
-        with (
-            patch.object(rules_lists.signal, "setitimer", side_effect=[(0, 0), rules_lists.OperationDeadlineExpired()]),
-            self.assertRaisesRegex(rules_lists.CloudflareResponseError, "Timed out completing"),
-            rules_lists.operation_deadline(5),
-        ):
-            pass
-
-        self.assertEqual(signal.getsignal(signal.SIGALRM), original_handler)
-
     def test_wait_uses_remaining_subsecond_budget(self):
-        module = FakeModule({})
-        completed = {"id": "operation", "status": "completed"}
+        client, _ignored = make_client()
 
-        with (
-            patch.object(rules_lists.time, "monotonic", return_value=0.5),
-            patch.object(rules_lists, "get_result", return_value=completed) as get,
-        ):
-            result = rules_lists.wait_for_operation(module, {}, "account", {"id": "operation"}, 1)
+        with patch.object(rules_lists.time, "monotonic", return_value=0.5):
+            result = rules_lists.wait_for_operation(FakeModule({}), client, "account", {"id": "operation"}, 1)
 
-        get.assert_called_once_with(
-            {},
-            "/accounts/account/rules/lists/bulk_operations/operation",
-            default={},
-            timeout=0.5,
-        )
-        self.assertEqual(result, completed)
+        client.with_options.assert_called_once_with(timeout=0.5, max_retries=0)
+        self.assertEqual(result["status"], "completed")
 
     def test_wait_rejects_unknown_operation_status(self):
-        module = FakeModule({})
+        client, api = make_client()
+        api.bulk_operations.get.return_value = {"id": "operation", "status": "unknown"}
 
         with (
             patch.object(rules_lists.time, "monotonic", return_value=1),
-            patch.object(
-                rules_lists,
-                "get_result",
-                return_value={"id": "operation", "status": "unknown"},
-            ),
             self.assertRaises(ModuleFail) as raised,
         ):
-            rules_lists.wait_for_operation(
-                module,
-                {},
-                "account",
-                {"operation_id": "operation"},
-                30,
-            )
+            rules_lists.wait_for_operation(FakeModule({}), client, "account", {"operation_id": "operation"}, 30)
 
         self.assertEqual(
             raised.exception.values["msg"],
@@ -306,169 +266,128 @@ class RulesListsTests(TestCase):
         )
 
     def test_check_mode_does_not_create(self):
-        module = FakeModule(params(), check_mode=True)
+        client, api = make_client()
 
-        with (
-            patch.object(rules_lists, "find_by_field", return_value=None),
-            patch.object(rules_lists, "post_result") as post,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            rules_lists.ensure_present(module, {})
+        result = self.run_module(FakeModule(params(), check_mode=True), client)
 
-        post.assert_not_called()
-        self.assertTrue(raised.exception.values["changed"])
+        api.list.assert_called_once_with(account_id="account")
+        api.create.assert_not_called()
+        self.assertTrue(result["changed"])
+
+    def test_create_requires_kind(self):
+        client, api = make_client()
+
+        result = self.run_module(FakeModule(params(kind=None)), client)
+
+        api.create.assert_not_called()
+        self.assertEqual(result["msg"], "kind is required when creating a Rules list")
+
+    def test_creates_list_with_default_description(self):
+        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
+        client, api = make_client(created=created)
+
+        result = self.run_module(FakeModule(params()), client)
+
+        api.create.assert_called_once_with(account_id="account", description="addresses", kind="ip", name="addresses")
+        self.assertEqual(result["message"], "Rules list created")
+        self.assertEqual(result["rules_list"], created)
 
     def test_existing_list_without_managed_items_is_unchanged(self):
-        module = FakeModule(params())
-        current = {
-            "id": "list",
-            "name": "addresses",
-            "kind": "ip",
-            "description": "current",
-        }
+        client, api = make_client([CURRENT])
 
-        with (
-            patch.object(rules_lists, "find_by_field", return_value=current),
-            patch.object(rules_lists, "put_result") as put,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            rules_lists.ensure_present(module, {})
+        result = self.run_module(FakeModule(params()), client)
 
-        put.assert_not_called()
-        self.assertFalse(raised.exception.values["changed"])
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
 
     def test_rejects_update_response_with_wrong_description(self):
-        module = FakeModule(params(description="desired"))
-        current = {
-            "id": "list",
-            "name": "addresses",
-            "kind": "ip",
-            "description": "current",
-        }
+        client, _ignored = make_client([CURRENT], updated=CURRENT)
 
-        with (
-            patch.object(rules_lists, "find_by_field", return_value=current),
-            patch.object(rules_lists, "put_result", return_value=current),
-            self.assertRaises(ModuleFail) as raised,
-        ):
-            rules_lists.ensure_present(module, {})
+        result = self.run_module(FakeModule(params(description="desired")), client)
 
-        self.assertIn("did not apply", raised.exception.values["msg"])
+        self.assertIn("did not apply", result["msg"])
 
     def test_metadata_update_omits_items_operation(self):
-        module = FakeModule(params(description="desired"))
-        current = {
-            "id": "list",
-            "name": "addresses",
-            "kind": "ip",
-            "description": "current",
-        }
-        updated = {**current, "description": "desired"}
+        client, api = make_client([CURRENT], updated={**CURRENT, "description": "desired"})
 
-        with (
-            patch.object(rules_lists, "find_by_field", return_value=current),
-            patch.object(rules_lists, "put_result", return_value=updated),
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            rules_lists.ensure_present(module, {})
+        result = self.run_module(FakeModule(params(description="desired")), client)
 
-        self.assertNotIn("items_operation", raised.exception.values)
+        api.update.assert_called_once_with("list", account_id="account", description="desired")
+        self.assertTrue(result["changed"])
+        self.assertNotIn("items_operation", result)
 
     def test_rejects_kind_change(self):
-        module = FakeModule(params(kind="hostname", elements=[]))
-        current = {"id": "list", "name": "addresses", "kind": "ip"}
+        client, _ignored = make_client([CURRENT])
 
-        with (
-            patch.object(rules_lists, "find_by_field", return_value=current),
-            self.assertRaises(ModuleFail) as raised,
-        ):
-            rules_lists.ensure_present(module, Mock())
+        result = self.run_module(FakeModule(params(kind="hostname", elements=[])), client)
 
-        self.assertEqual(
-            raised.exception.values["msg"],
-            "An existing Rules list kind cannot be changed",
-        )
+        self.assertEqual(result["msg"], "An existing Rules list kind cannot be changed")
 
     def test_generated_sdk_iterator_reads_all_current_items(self):
-        module = FakeModule(params(elements=[{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}]))
-        current = {
-            "id": "list",
-            "name": "addresses",
-            "kind": "ip",
-            "num_items": 2,
-        }
-        client = Mock()
-        client.rules.lists.items.list.return_value = [
-            Model({"ip": "192.0.2.1"}),
-            Model({"ip": "192.0.2.2"}),
-        ]
+        current = {**CURRENT, "num_items": 2}
+        client, api = make_client([current], items=[{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}])
 
-        with (
-            patch.object(rules_lists, "find_by_field", return_value=current),
-            patch.object(rules_lists, "submit_items") as submit,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            rules_lists.ensure_present(module, client)
+        result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}])), client)
 
-        client.rules.lists.items.list.assert_called_once_with(
-            "list",
-            account_id="account",
-            per_page=rules_lists.ITEMS_PER_PAGE,
-        )
-        submit.assert_not_called()
-        self.assertFalse(raised.exception.values["changed"])
+        api.items.list.assert_called_once_with("list", account_id="account", per_page=rules_lists.ITEMS_PER_PAGE)
+        api.items.update.assert_not_called()
+        self.assertFalse(result["changed"])
 
-    def test_submits_normalized_items(self):
-        elements = [{"ip": "192.0.2.1", "comment": ""}, {"ip": "192.0.2.1"}]
-        module = FakeModule(params(elements=elements))
-        current = {
-            "id": "list",
-            "name": "addresses",
-            "kind": "ip",
-            "num_items": 0,
-        }
-        client = Mock()
-        client.rules.lists.items.list.return_value = [Model({"ip": "192.0.2.1"})]
+    def test_count_mismatch_skips_item_listing_in_check_mode(self):
+        client, api = make_client([{**CURRENT, "num_items": 0}])
 
-        with (
-            patch.object(rules_lists, "find_by_field", return_value=current),
-            patch.object(rules_lists, "submit_items", return_value={"id": "operation"}) as submit,
-            patch.object(
-                rules_lists,
-                "wait_for_operation",
-                return_value={"id": "operation", "status": "completed"},
-            ),
-            patch.object(rules_lists, "get_result", return_value=current),
-            patch.object(rules_lists.time, "monotonic", return_value=1),
-            self.assertRaises(ModuleExit),
-        ):
-            rules_lists.ensure_present(module, client)
+        result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}]), check_mode=True), client)
 
-        submit.assert_called_once_with(client, "account", "list", [{"ip": "192.0.2.1"}], 31)
+        api.items.list.assert_not_called()
+        api.items.update.assert_not_called()
+        self.assertEqual(result["message"], "Rules list items would be updated")
+
+    def test_submits_normalized_items_and_verifies_result(self):
+        current = {**CURRENT, "num_items": 0}
+        elements = [{"ip": "2001:DB8::1", "comment": ""}, {"ip": "2001:db8::1"}]
+        client, api = make_client([current], items=[{"ip": "2001:db8::1"}], fetched={**current, "num_items": 1})
+
+        with patch.object(rules_lists.time, "monotonic", return_value=1):
+            result = self.run_module(FakeModule(params(elements=elements)), client)
+
+        api.items.update.assert_called_once_with("list", account_id="account", body=[{"ip": "2001:db8::1"}])
+        api.get.assert_called_once_with("list", account_id="account")
+        self.assertEqual(client.with_options.call_args_list[0].kwargs, {"timeout": 30, "max_retries": 0})
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["message"], "Rules list updated")
+        self.assertEqual(result["items_operation"], {"id": "operation", "status": "completed"})
+        self.assertEqual(result["rules_list"]["num_items"], 1)
 
     def test_rejects_completed_update_with_wrong_items(self):
-        module = FakeModule(params(elements=[{"ip": "192.0.2.1"}]))
-        current = {
-            "id": "list",
-            "name": "addresses",
-            "kind": "ip",
-            "num_items": 0,
-        }
-        client = Mock()
-        client.rules.lists.items.list.return_value = []
+        current = {**CURRENT, "num_items": 0}
+        client, _ignored = make_client([current], fetched=current)
 
-        with (
-            patch.object(rules_lists, "find_by_field", return_value=current),
-            patch.object(rules_lists, "submit_items", return_value={"id": "operation"}),
-            patch.object(
-                rules_lists,
-                "wait_for_operation",
-                return_value={"id": "operation", "status": "completed"},
-            ),
-            patch.object(rules_lists, "get_result", return_value=current),
-            patch.object(rules_lists.time, "monotonic", return_value=1),
-            self.assertRaises(ModuleFail) as raised,
-        ):
-            rules_lists.ensure_present(module, client)
+        with patch.object(rules_lists.time, "monotonic", return_value=1):
+            result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
 
-        self.assertIn("did not apply", raised.exception.values["msg"])
+        self.assertIn("did not apply", result["msg"])
+
+    def test_deletes_list(self):
+        client, api = make_client([CURRENT], deleted={"id": "list"})
+
+        result = self.run_module(FakeModule(params(state="absent")), client)
+
+        api.delete.assert_called_once_with("list", account_id="account")
+        self.assertTrue(result["changed"])
+
+    def test_check_mode_does_not_delete(self):
+        client, api = make_client([CURRENT])
+
+        result = self.run_module(FakeModule(params(state="absent"), check_mode=True), client)
+
+        api.delete.assert_not_called()
+        self.assertTrue(result["changed"])
+
+
+class CanonicalIpTests(TestCase):
+    def test_normalizes_equivalent_addresses(self):
+        self.assertEqual(
+            rules_lists.normalize_items([{"ip": "2400:d400:0011:19::2"}, {"ip": "2001:DB8:0::/32"}]),
+            rules_lists.normalize_items([{"ip": "2400:d400:11:19::2"}, {"ip": "2001:db8::/32"}]),
+        )
+        self.assertEqual(rules_lists.canonical_ip("not-an-ip"), "not-an-ip")

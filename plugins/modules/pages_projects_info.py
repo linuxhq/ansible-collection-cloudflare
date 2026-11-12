@@ -9,33 +9,15 @@ module: pages_projects_info
 short_description: Gather information about Cloudflare Pages projects
 description:
   - Gather Cloudflare Pages projects for an account.
-  - Secret environment variable values and the web analytics token are redacted
-    from returned projects.
+  - Results include sensitive values returned by Cloudflare, such as the web analytics
+    token; protect registered results and task output, for example with C(no_log).
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
-options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
+options: {}
 """
 
 EXAMPLES = r"""
@@ -48,7 +30,7 @@ EXAMPLES = r"""
 RETURN = r"""
 ---
 pages_projects:
-  description: Cloudflare Pages projects with credential values redacted.
+  description: Cloudflare Pages projects.
   returned: always
   type: list
   elements: dict
@@ -68,25 +50,24 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    list_all,
-    redact_pages_secrets,
-    validate_resource_fields,
+    cloudflare_error_context,
+    exit_resource_list,
 )
 
 
-def list_resources(module, client):
-    projects = list_all(
-        client,
-        cloudflare_path("accounts", module.params["account_id"], "pages", "projects"),
-        per_page=10,
-    )
-    validate_resource_fields(module, projects, "name", "Pages project")
-
-    module.exit_json(
-        changed=False,
-        pages_projects=[redact_pages_secrets(project) for project in projects],
-    )
+def run(module, client):
+    account_id = module.params["account_id"]
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering Pages projects",
+        account_id=account_id,
+    ):
+        exit_resource_list(
+            module,
+            "pages_projects",
+            client.pages.projects.list(account_id=account_id, per_page=10),
+            "Pages project",
+            required_fields=("name",),
+        )
 
 
 def main():
@@ -99,7 +80,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list_resources(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

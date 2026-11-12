@@ -102,8 +102,6 @@ Standards for Python modules, lookup plugins, and filter plugins under
   provider-dependent constraints.
 - Validate inputs before external operations whenever possible.
 - Model each valid alternate identifier with relationship validators.
-- Mark secrets with `no_log=True`.
-- Never expose secrets in results, failures, examples, or logs.
 
 #### State and check mode
 
@@ -124,6 +122,8 @@ Standards for Python modules, lookup plugins, and filter plugins under
 - Omit unset values from provider requests.
 - Validate external response structure before relying on required fields.
 - Return a top-level dictionary containing JSON-serializable UTF-8 data.
+- Return provider data unmodified; do not redact fields. Callers protect
+  sensitive output with task-level `no_log`.
 - Keep result keys and value types stable across execution paths.
 - Return useful state when `changed=False`.
 - Return through `module.exit_json` and fail through the module's failure
@@ -157,7 +157,6 @@ Standards for Python modules, lookup plugins, and filter plugins under
 - Use `set_options` and `get_option` when Ansible configuration applies.
 - Validate terms and options before performing work.
 - Raise `AnsibleLookupError` with actionable context for expected failures.
-- Never include secret values in failures or display output.
 
 ### Filter plugins
 

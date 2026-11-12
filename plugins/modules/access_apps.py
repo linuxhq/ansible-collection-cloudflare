@@ -9,21 +9,18 @@ module: access_apps
 short_description: Manage Cloudflare Access applications
 description:
   - Create, update, and delete Cloudflare Access applications by name.
-  - Secret fields are redacted from returned applications.
+  - Results include sensitive values returned by Cloudflare, such as client secrets; protect registered
+    results and task output, for example with C(no_log).
+  - Optional settings without a default are preserved on an existing application
+    when omitted, and so are settings this module does not manage, such as
+    C(tags) or C(custom_pages).
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
 options:
-  account_id:
-    description:
-      - Cloudflare account identifier.
-    required: true
-    type: str
-  api_token:
-    description:
-      - Cloudflare API token with permissions to manage Access applications.
-    required: true
-    type: str
   name:
     description:
       - Access application name.
@@ -37,8 +34,17 @@ options:
   type:
     description:
       - Access application type.
+      - Only types that are reached through O(domain) and need no other required
+        settings are supported.
       - Required when O(state=present).
     type: str
+    choices:
+      - bookmark
+      - mcp_portal
+      - proxy_endpoint
+      - self_hosted
+      - ssh
+      - vnc
   allowed_idps:
     type: list
     elements: str
@@ -97,7 +103,8 @@ options:
   service_auth_401_redirect:
     type: bool
     description:
-      - Whether service authentication failures redirect with HTTP 401.
+      - Whether to return HTTP 401 instead of redirecting to the login page when a
+        Service Auth policy blocks a request.
   session_duration:
     type: str
     default: 24h
@@ -115,17 +122,6 @@ options:
     default: present
     description:
       - Desired state of the resource.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
 """
 
 EXAMPLES = r"""
@@ -164,19 +160,11 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    delete_result,
-    find_by_name,
-    normalize_current_by_desired_fields,
+    cloudflare_error_context,
+    ensure_resource_absent,
+    ensure_resource_present,
+    find_resource,
     payload_from_params,
-    post_result,
-    put_result,
-    redact_access_app_secrets,
-    resource_field,
-    resource_id,
-    select_fields,
-    validate_requested_values,
-    values_differ,
 )
 
 FIELDS = (
@@ -200,6 +188,46 @@ FIELDS = (
     "type",
 )
 
+PRESERVED_FIELDS = (
+    "allowed_idps",
+    "cors_headers",
+    "custom_deny_message",
+    "custom_deny_url",
+    "destinations",
+    "logo_url",
+    "policies",
+    "same_site_cookie_attribute",
+    "service_auth_401_redirect",
+    "skip_interstitial",
+)
+
+# The update replaces the application, so settings this module does not manage
+# are carried over too. self_hosted_domains is omitted: it mirrors domain and
+# destinations and would conflict with a changed domain.
+UNMANAGED_FIELDS = (
+    "allow_authenticate_via_warp",
+    "allow_iframe",
+    "app_launcher_logo_url",
+    "bg_color",
+    "custom_non_identity_deny_url",
+    "custom_pages",
+    "eager_redirect_cookie_setting",
+    "footer_links",
+    "header_bg_color",
+    "landing_page_design",
+    "mfa_config",
+    "oauth_configuration",
+    "options_preflight_bypass",
+    "path_cookie_attribute",
+    "read_service_tokens_from_header",
+    "saas_app",
+    "scim_config",
+    "skip_app_launcher_login_page",
+    "tags",
+    "target_criteria",
+    "use_clientless_isolation_app_launcher_url",
+)
+
 DEFAULT_FIELDS = {
     "app_launcher_visible": True,
     "auto_redirect_to_identity": False,
@@ -209,121 +237,46 @@ DEFAULT_FIELDS = {
 }
 
 
-def endpoint(account_id):
-    return cloudflare_path("accounts", account_id, "access", "apps")
-
-
-def item_endpoint(account_id, app_id):
-    return cloudflare_path("accounts", account_id, "access", "apps", app_id)
-
-
-def ensure_present(module, client):
+def run(module, client):
     params = module.params
+    account_id = params["account_id"]
+    applications = client.zero_trust.access.applications
 
-    current = redact_access_app_secrets(
-        find_by_name(
-            client,
-            endpoint(params["account_id"]),
-            params["name"],
-            extra_query={"exact": "true"},
-            paginate=False,
-        )
-    )
-
-    payload = payload_from_params(params, FIELDS)
-
-    if current is None:
-        if module.check_mode:
-            module.exit_json(changed=True, message="Access application would be created")
-
-        access_app = post_result(client, endpoint(params["account_id"]), payload)
-        resource_id(module, access_app, "Access application")
-        resource_field(module, access_app, "name", "Access application", expected=params["name"])
-        validate_requested_values(
-            module,
-            {**DEFAULT_FIELDS, **access_app},
-            payload,
-            "Access application",
-        )
-        module.exit_json(
-            changed=True,
-            message="Access application created",
-            access_app=redact_access_app_secrets(access_app),
-        )
-
-    current_id = resource_id(module, current, "Access application")
-    comparable_current = {**DEFAULT_FIELDS, **current}
-
-    if not values_differ(
-        normalize_current_by_desired_fields(
-            select_fields(comparable_current, payload.keys()),
-            payload,
-        ),
-        payload,
+    with cloudflare_error_context(
+        "Cloudflare API request failed while finding the Access application",
+        account_id=account_id,
+        name=params["name"],
     ):
-        module.exit_json(
-            changed=False,
-            message="Access application already present",
-            access_app=current,
-        )
-
-    if module.check_mode:
-        module.exit_json(
-            changed=True,
-            message="Access application would be updated",
-            access_app=current,
-        )
-
-    access_app = put_result(
-        client,
-        item_endpoint(params["account_id"], current_id),
-        payload,
-    )
-    resource_id(module, access_app, "Access application", expected=current_id)
-    resource_field(module, access_app, "name", "Access application", expected=params["name"])
-    validate_requested_values(
-        module,
-        {**DEFAULT_FIELDS, **access_app},
-        payload,
-        "Access application",
-    )
-    module.exit_json(
-        changed=True,
-        message="Access application updated",
-        access_app=redact_access_app_secrets(access_app),
-    )
-
-
-def ensure_absent(module, client):
-    params = module.params
-
-    current = redact_access_app_secrets(
-        find_by_name(
-            client,
-            endpoint(params["account_id"]),
+        current = find_resource(
+            module,
+            applications.list(account_id=account_id, name=params["name"], exact=True),
+            "Access application",
+            "name",
             params["name"],
-            extra_query={"exact": "true"},
-            paginate=False,
-        )
-    )
-
-    if current is None:
-        module.exit_json(changed=False, message="Access application already absent")
-
-    current_id = resource_id(module, current, "Access application")
-
-    if module.check_mode:
-        module.exit_json(
-            changed=True,
-            message="Access application would be deleted",
-            access_app=current,
         )
 
-    delete_result(client, item_endpoint(params["account_id"], current_id), expected_id=current_id)
-    module.exit_json(
-        changed=True,
-        message="Access application deleted",
-        access_app=current,
+    if params["state"] == "absent":
+        ensure_resource_absent(
+            module,
+            "access_app",
+            "Access application",
+            current,
+            delete=lambda app_id: applications.delete(app_id, account_id=account_id),
+            context={"account_id": account_id},
+        )
+
+    ensure_resource_present(
+        module,
+        "access_app",
+        "Access application",
+        current,
+        payload_from_params(params, FIELDS),
+        create=lambda payload: applications.create(account_id=account_id, **payload),
+        update=lambda app_id, payload: applications.update(app_id, account_id=account_id, **payload),
+        expected_name=params["name"],
+        defaults=DEFAULT_FIELDS,
+        preserved_fields=PRESERVED_FIELDS + UNMANAGED_FIELDS,
+        context={"account_id": account_id},
     )
 
 
@@ -334,7 +287,10 @@ def main():
             "api_token": {"required": True, "type": "str", "no_log": True},
             "name": {"required": True, "type": "str"},
             "domain": {"type": "str"},
-            "type": {"type": "str"},
+            "type": {
+                "type": "str",
+                "choices": ["bookmark", "mcp_portal", "proxy_endpoint", "self_hosted", "ssh", "vnc"],
+            },
             "allowed_idps": {"type": "list", "elements": "str"},
             "app_launcher_visible": {"type": "bool", "default": True},
             "auto_redirect_to_identity": {"type": "bool", "default": False},
@@ -361,10 +317,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        if module.params["state"] == "present":
-            ensure_present(module, client)
-        else:
-            ensure_absent(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

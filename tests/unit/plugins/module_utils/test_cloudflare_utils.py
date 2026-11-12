@@ -2,7 +2,6 @@
 
 import os
 from datetime import datetime, timezone
-from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -11,65 +10,34 @@ import httpx
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudflare_utils
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
-    CloudflareResponseError,
-    api_request,
     cloudflare_client,
     cloudflare_error_context,
-    cloudflare_path,
-    cloudflare_query,
-    delete_result,
-    find_by_field,
-    find_by_name,
-    iter_items,
+    differs,
+    ensure_resource_absent,
+    ensure_resource_present,
+    ensure_settings,
+    exit_resource_list,
+    exit_settings,
+    find_resource,
+    get_or_none,
     normalize_current_by_desired_fields,
-    parse_list_response,
     payload_from_params,
-    redact_access_app_secrets,
-    redact_sensitive_values,
+    require_applied,
     require_mapping,
     resource_field,
     resource_id,
-    response_result,
+    resource_list,
     serialize_resource,
-    validate_requested_values,
-    validate_resource_fields,
     validate_tunnel_secret,
     values_differ,
 )
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
+    ModuleExit,
     ModuleFail,
+    connection_error,
+    status_error,
 )
-
-
-class ApiConnectionError(Exception):
-    pass
-
-
-class ApiStatusError(Exception):
-    def __init__(self, message, status_code=None, response=None):
-        super().__init__(message)
-        self.response = response
-        self.status_code = status_code
-
-
-class ApiError(Exception):
-    pass
-
-
-ERRORS = SimpleNamespace(
-    APIConnectionError=ApiConnectionError,
-    APIStatusError=ApiStatusError,
-    APIError=ApiError,
-)
-
-
-class Model:
-    def __init__(self, value):
-        self.value = value
-
-    def to_dict(self):
-        return self.value
 
 
 class SdkModel:
@@ -77,7 +45,7 @@ class SdkModel:
         self.resource_id = resource_id
         self.expires_at = expires_at
 
-    def to_dict(self, mode=None):
+    def to_dict(self, mode=None, warnings=True):
         if mode != "json":
             raise ValueError("expected JSON serialization")
 
@@ -87,7 +55,22 @@ class SdkModel:
         }
 
 
-class CloudflareUtilsTests(TestCase):
+EXPECTED_HEADERS = {
+    "Authorization": "Bearer secret",
+    "X-Auth-Email": cloudflare.omit,
+    "X-Auth-Key": cloudflare.omit,
+    "X-Auth-User-Service-Key": cloudflare.omit,
+}
+
+
+def sdk_context(client):
+    context = Mock()
+    context.__enter__ = Mock(return_value=client)
+    context.__exit__ = Mock(return_value=False)
+    return context
+
+
+class ClientTests(TestCase):
     def test_client_uses_only_explicit_token_with_environment_credentials(self):
         environments = (
             {},
@@ -138,8 +121,8 @@ class CloudflareUtilsTests(TestCase):
                     patch.object(cloudflare_utils, "Cloudflare", side_effect=make_client),
                     cloudflare_client(FakeModule({"api_token": "  EXAMPLE-explicit-token  "})) as client,
                 ):
-                    api_request(client, "get", "/zones/zone")
                     client.zones.get(zone_id="zone")
+                    client.with_options(timeout=5, max_retries=0).zones.get(zone_id="zone")
                     self.assertEqual(dict(os.environ), environment)
 
                 self.assertEqual(len(requests), 2)
@@ -151,158 +134,42 @@ class CloudflareUtilsTests(TestCase):
                     for header in ("X-Auth-Email", "X-Auth-Key", "X-Auth-User-Service-Key"):
                         self.assertNotIn(header, request.headers)
 
-    def test_error_context_preserves_non_sdk_errors_without_sdk(self):
-        with (
-            patch.object(cloudflare_utils, "cloudflare", None),
-            self.assertRaisesRegex(RuntimeError, "validation failed"),
-            cloudflare_error_context("Request failed"),
-        ):
-            raise RuntimeError("validation failed")
-
-    def test_delete_result_verifies_expected_resource(self):
-        with patch.object(
-            cloudflare_utils,
-            "api_request",
-            return_value={"result": {"id": "one"}},
-        ):
-            self.assertEqual(
-                delete_result(Mock(), "/resources/one", expected_id="one"),
-                {"id": "one"},
-            )
-
-        with (
-            patch.object(
-                cloudflare_utils,
-                "api_request",
-                return_value={"result": {"id": "two"}},
-            ),
-            self.assertRaisesRegex(CloudflareResponseError, "wrong deleted resource"),
-        ):
-            delete_result(Mock(), "/resources/one", expected_id="one")
-
-    def test_validates_tunnel_secrets(self):
-        validate_tunnel_secret(FakeModule({}), "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=")
-
-        for secret in ("not-base64", "c2hvcnQ="):
-            with self.subTest(secret=secret), self.assertRaises(ModuleFail):
-                validate_tunnel_secret(FakeModule({}), secret)
-
-    def test_api_request_passes_body_and_bounded_options(self):
-        client = Mock()
-        client.patch.return_value = {"result": {"id": "one"}}
-
-        result = api_request(
-            client,
-            "patch",
-            "/resources/one",
-            body={"enabled": True},
-            timeout=12,
-        )
-
-        client.patch.assert_called_once_with(
-            "/resources/one",
-            cast_to=object,
-            body={"enabled": True},
-            options={"timeout": 12, "max_retries": 0},
-        )
-        self.assertEqual(result, {"result": {"id": "one"}})
-
-    def test_api_request_accepts_expected_status(self):
-        client = Mock()
-        client.get.side_effect = ApiStatusError("missing", status_code=404)
-
-        with patch.object(cloudflare_utils, "cloudflare", ERRORS):
-            result = api_request(client, "get", "/missing", ok_statuses=[404])
-
-        self.assertIsNone(result)
-
-    def test_api_request_adds_failure_context(self):
-        client = Mock()
-        error = ApiStatusError("rejected", status_code=400)
-        client.put.side_effect = error
-
-        with (
-            patch.object(cloudflare_utils, "cloudflare", ERRORS),
-            self.assertRaises(ApiStatusError),
-        ):
-            api_request(client, "put", "/resources/one", body={})
-
-        self.assertEqual(error._cloudflare_message, "Cloudflare API PUT request failed")
-        self.assertEqual(
-            error._cloudflare_context,
-            {"method": "PUT", "path": "/resources/one"},
-        )
-
-    def test_sdk_error_context_adds_failure_context(self):
-        error = ApiError("rejected")
-
-        with (
-            patch.object(cloudflare_utils, "cloudflare", ERRORS),
-            self.assertRaises(ApiError),
-            cloudflare_error_context("Creating resource failed", resource_id="one"),
-        ):
-            raise error
-
-        self.assertEqual(error._cloudflare_message, "Creating resource failed")
-        self.assertEqual(error._cloudflare_context, {"resource_id": "one"})
-
     def test_client_reports_missing_sdk(self):
-        module = FakeModule({"api_token": "secret"})
-
         with (
             patch.object(cloudflare_utils, "Cloudflare", None),
             self.assertRaises(ModuleFail) as raised,
-            cloudflare_client(module),
+            cloudflare_client(FakeModule({"api_token": "secret"})),
         ):
             pass
 
-        self.assertEqual(
-            raised.exception.values["missing_python_package"],
-            "cloudflare",
-        )
+        self.assertEqual(raised.exception.values["missing_python_package"], "cloudflare")
 
     def test_client_closes_sdk_context(self):
-        module = FakeModule({"api_token": "secret"})
         client = Mock()
-        context = Mock()
-        context.__enter__ = Mock(return_value=client)
-        context.__exit__ = Mock(return_value=False)
+        context = sdk_context(client)
         constructor = Mock(return_value=context)
 
         with (
             patch.object(cloudflare_utils, "Cloudflare", constructor),
-            patch.object(cloudflare_utils, "cloudflare", ERRORS),
-            cloudflare_client(module) as result,
+            cloudflare_client(FakeModule({"api_token": "secret"})) as result,
         ):
             self.assertIs(result, client)
 
-        constructor.assert_called_once_with(api_token="secret", default_headers={"Authorization": "Bearer secret"})
+        constructor.assert_called_once_with(api_token="secret", default_headers=EXPECTED_HEADERS)
         context.__exit__.assert_called_once()
 
     def test_client_normalizes_token_and_rejects_empty_identifiers(self):
-        context = Mock()
-        context.__enter__ = Mock(return_value=Mock())
-        context.__exit__ = Mock(return_value=False)
-        constructor = Mock(return_value=context)
+        constructor = Mock(return_value=sdk_context(Mock()))
 
         with (
             patch.object(cloudflare_utils, "Cloudflare", constructor),
-            patch.object(cloudflare_utils, "cloudflare", ERRORS),
             cloudflare_client(FakeModule({"api_token": "  secret  ", "name": "app"})),
         ):
             pass
 
-        constructor.assert_called_once_with(api_token="secret", default_headers={"Authorization": "Bearer secret"})
+        constructor.assert_called_once_with(api_token="secret", default_headers=EXPECTED_HEADERS)
 
-        for name in (
-            "account_id",
-            "domain",
-            "name",
-            "phase",
-            "production_branch",
-            "tunnel_id",
-            "zone_id",
-        ):
+        for name in ("account_id", "domain", "name", "phase", "production_branch", "tunnel_id", "zone_id"):
             with (
                 self.subTest(name=name),
                 patch.object(cloudflare_utils, "Cloudflare", constructor),
@@ -340,205 +207,67 @@ class CloudflareUtilsTests(TestCase):
 
             self.assertEqual(raised.exception.values["msg"], message)
 
-    def test_client_sanitizes_sdk_failure(self):
-        module = FakeModule({"api_token": "secret"})
-        context = Mock()
-        context.__enter__ = Mock(side_effect=ApiConnectionError("offline"))
-        context.__exit__ = Mock(return_value=False)
+    def test_client_reports_sdk_failures_with_context(self):
+        cases = (
+            (connection_error(), None),
+            (status_error(403, {"errors": [{"message": "denied"}], "api_token": "x"}), 403),
+        )
+        for error, status_code in cases:
+            with (
+                self.subTest(error=type(error).__name__),
+                patch.object(cloudflare_utils, "Cloudflare", return_value=sdk_context(Mock())),
+                self.assertRaises(ModuleFail) as raised,
+                cloudflare_client(FakeModule({"api_token": "secret"})),
+                cloudflare_error_context("Reading the resource failed", resource_id="one"),
+            ):
+                raise error
+
+            values = raised.exception.values
+            self.assertEqual(values["msg"], "Reading the resource failed")
+            self.assertEqual(values["resource_id"], "one")
+            if status_code:
+                self.assertEqual(values["status_code"], status_code)
+                self.assertEqual(values["response"]["api_token"], "x")
+            else:
+                self.assertIn("error", values)
 
         with (
-            patch.object(cloudflare_utils, "Cloudflare", return_value=context),
-            patch.object(cloudflare_utils, "cloudflare", ERRORS),
+            patch.object(cloudflare_utils, "Cloudflare", return_value=sdk_context(Mock())),
             self.assertRaises(ModuleFail) as raised,
-            cloudflare_client(module),
+            cloudflare_client(FakeModule({"api_token": "secret"})),
         ):
-            pass
+            raise connection_error()
 
-        self.assertEqual(
-            raised.exception.values["msg"],
-            "Cloudflare API connection failed",
-        )
-        self.assertEqual(raised.exception.values["error"], "offline")
+        self.assertEqual(raised.exception.values["msg"], "Cloudflare API connection failed")
 
-    def test_find_by_name_encodes_query_values(self):
-        client = Mock()
-
-        with patch.object(
-            cloudflare_utils,
-            "iter_items",
-            return_value=[{"name": "one & two"}],
-        ) as items:
-            result = find_by_name(
-                client,
-                "/resources?active=true",
-                "one & two",
-                extra_query={"scope": "a/b"},
-            )
-
-        self.assertEqual(result, {"name": "one & two"})
-        items.assert_called_once_with(
-            client,
-            "/resources?active=true&scope=a%2Fb&name=one+%26+two",
-            paginate=True,
-        )
-
-    def test_find_by_field_rejects_malformed_resources(self):
-        for resource in (
-            "invalid",
-            {},
-            {"name": 1},
-            {"name": " "},
-            {"name": " padded"},
-        ):
-            with (
-                self.subTest(resource=resource),
-                patch.object(
-                    cloudflare_utils,
-                    "iter_items",
-                    return_value=[resource],
-                ),
-                self.assertRaisesRegex(CloudflareResponseError, "malformed resource"),
-            ):
-                find_by_field(Mock(), "/resources", "name", "resource")
-
-    def test_builds_encoded_paths_and_queries(self):
-        path = cloudflare_path("accounts", "account/id", "projects", "docs site")
-
-        self.assertEqual(path, "/accounts/account%2Fid/projects/docs%20site")
-        self.assertEqual(
-            cloudflare_query(path, {"name": "one & two", "cursor": None}),
-            "/accounts/account%2Fid/projects/docs%20site?name=one+%26+two",
-        )
-
-    def test_iter_items_follows_result_info_pages(self):
-        client = Mock()
-        responses = [
-            {"result": [{"id": "one"}], "result_info": {"total_pages": 2}},
-            {"result": [{"id": "two"}], "result_info": {"total_pages": 2}},
-        ]
-
-        with patch.object(cloudflare_utils, "api_request", side_effect=responses):
-            result = list(iter_items(client, "/resources", per_page=1))
-
-        self.assertEqual(result, [{"id": "one"}, {"id": "two"}])
-
-    def test_iter_items_follows_full_bare_list_pages(self):
-        client = Mock()
-
-        with patch.object(
-            cloudflare_utils,
-            "api_request",
-            side_effect=[[{"id": "one"}], [{"id": "two"}], []],
-        ):
-            result = list(iter_items(client, "/resources", per_page=1))
-
-        self.assertEqual(result, [{"id": "one"}, {"id": "two"}])
-
-    def test_iter_items_rejects_malformed_pagination_data(self):
-        for result_info in (
-            {"page": True},
-            {"count": -1},
-            {"total_pages": -1},
-            {"total_pages": True},
-            {"total_count": -1},
-            {"total_count": 1.5},
-        ):
-            with (
-                self.subTest(result_info=result_info),
-                patch.object(
-                    cloudflare_utils,
-                    "api_request",
-                    return_value={"result": [], "result_info": result_info},
-                ),
-                self.assertRaisesRegex(CloudflareResponseError, "malformed pagination"),
-            ):
-                list(iter_items(Mock(), "/resources"))
-
-    def test_iter_items_rejects_inconsistent_pagination_data(self):
-        for response in (
-            {"result": [{"id": "one"}], "result_info": {"page": 2}},
-            {"result": [{"id": "one"}], "result_info": {"count": 0}},
-            {"result": [{"id": "one"}], "result_info": {"total_pages": 0}},
-            {"result": [{"id": "one"}], "result_info": {"total_count": 0}},
-            {"result": [], "result_info": {"total_count": 1}},
-            {
-                "result": [{"id": "one"}],
-                "result_info": {"total_pages": 1, "total_count": 2},
-            },
-        ):
-            with (
-                self.subTest(response=response),
-                patch.object(cloudflare_utils, "api_request", return_value=response),
-                self.assertRaisesRegex(CloudflareResponseError, "malformed pagination"),
-            ):
-                list(iter_items(Mock(), "/resources", per_page=1))
-
-    def test_iter_items_validates_page_metadata_before_yielding(self):
+    def test_error_context_preserves_non_sdk_errors_without_sdk(self):
         with (
-            patch.object(
-                cloudflare_utils,
-                "api_request",
-                return_value={
-                    "result": [{"id": "one"}],
-                    "result_info": {"page": 2},
-                },
-            ),
-            self.assertRaisesRegex(CloudflareResponseError, "malformed pagination"),
+            patch.object(cloudflare_utils, "cloudflare", None),
+            self.assertRaisesRegex(RuntimeError, "validation failed"),
+            cloudflare_error_context("Request failed"),
         ):
-            next(iter_items(Mock(), "/resources"))
+            raise RuntimeError("validation failed")
 
-    def test_response_helpers_handle_envelopes_and_models(self):
-        self.assertEqual(
-            response_result(Model({"result": Model({"id": "one"})})),
-            {"id": "one"},
-        )
-        self.assertIsNone(response_result({"result": None, "success": True}))
-        self.assertEqual(parse_list_response({"result": [{"id": "one"}]})[0], [{"id": "one"}])
-        self.assertEqual(
-            serialize_resource({"items": [Model({"id": "one", "empty": None})]}),
-            {"items": [{"id": "one"}]},
-        )
 
-        for response in (
-            {"success": False, "result": []},
-            {"success": True},
-            {"success": "true", "result": []},
-            {"result": {}},
-            {},
-        ):
-            with (
-                self.subTest(response=response),
-                self.assertRaises(CloudflareResponseError),
-            ):
-                parse_list_response(response)
+class ValueTests(TestCase):
+    def test_validates_tunnel_secrets(self):
+        validate_tunnel_secret(FakeModule({}), None)
+        validate_tunnel_secret(FakeModule({}), "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
 
-        for response in ({"success": True}, {"success": "true", "result": {}}):
-            with self.assertRaisesRegex(CloudflareResponseError, "malformed data"):
-                response_result(response)
-
-    def test_validate_requested_values_rejects_nested_mismatch(self):
-        module = FakeModule({})
-
-        with self.assertRaises(ModuleFail) as raised:
-            validate_requested_values(
-                module,
-                {"config": {"enabled": False, "ignored": True}},
-                {"config": {"enabled": True}},
-                "settings",
-            )
-
-        self.assertIn("did not apply", raised.exception.values["msg"])
+        for secret in ("not-base64", "c2hvcnQ="):
+            with self.subTest(secret=secret), self.assertRaises(ModuleFail):
+                validate_tunnel_secret(FakeModule({}), secret)
 
     def test_serializes_sdk_models_to_json_values(self):
         expires_at = datetime(2026, 8, 11, 12, 30, tzinfo=timezone.utc)
 
         with patch.object(cloudflare_utils, "BaseModel", SdkModel):
             self.assertEqual(
-                serialize_resource(SdkModel("token", expires_at)),
-                {"id": "token", "expires_at": "2026-08-11T12:30:00Z"},
+                serialize_resource([SdkModel("token", expires_at), {"name": None}]),
+                [{"id": "token", "expires_at": "2026-08-11T12:30:00Z"}, {}],
             )
 
-    def test_payload_and_comparison_helpers_manage_only_desired_fields(self):
+    def test_comparison_manages_only_desired_fields(self):
         desired = {"nested": {"enabled": True}, "items": [{"id": "one"}]}
         current = {
             "ignored": "value",
@@ -546,93 +275,261 @@ class CloudflareUtilsTests(TestCase):
             "items": [{"id": "one", "provider": "value"}],
         }
 
-        self.assertEqual(
-            normalize_current_by_desired_fields(current, desired),
-            desired,
-        )
+        self.assertEqual(normalize_current_by_desired_fields(current, desired), desired)
         self.assertFalse(values_differ(desired, desired.copy()))
-        self.assertTrue(values_differ(desired, {"nested": {"enabled": False}}))
+        self.assertFalse(differs(current, desired))
+        self.assertTrue(differs(current, {"nested": {"enabled": False}}))
+        self.assertFalse(differs(current, {}))
+        self.assertFalse(differs({}, {"enabled": False}, defaults={"enabled": False}))
+        self.assertTrue(differs({}, {"enabled": False}))
+        self.assertTrue(differs({"include": [{"email": {}}]}, {"include": [{"everyone": {}}]}))
+        headers = {"headers": {"A": {"value": 1, "extra": 2}, "B": {"value": 2}}}
+        self.assertFalse(differs(headers, {"headers": {"A": {"value": 1}}}))
+        self.assertTrue(differs(headers, {"headers": {"A": {"value": 1}}}, exact_fields=("headers",)))
+        self.assertFalse(
+            differs(headers, {"headers": {"A": {"value": 1}, "B": {"value": 2}}}, exact_fields=("headers",))
+        )
         self.assertEqual(
-            payload_from_params(
-                {"enabled": False, "name": None},
-                ("enabled", "name", "count"),
-            ),
+            payload_from_params({"enabled": False, "name": None}, ("enabled", "name", "count")),
             {"enabled": False},
         )
 
-    def test_redacts_access_app_secrets_recursively(self):
-        resource = {
-            "saas_app": {"client_secret": "secret", "name": "example"},
-            "scim_config": {
-                "authentication": [
-                    {"client_secret": "secret", "method": "oauth"},
-                    {"nested": [{"password": "secret", "token": "secret"}]},
-                ]
-            },
-        }
+    def test_require_applied_rejects_nested_mismatch(self):
+        require_applied(FakeModule({}), {"a": {"b": 1, "c": 2}}, {"a": {"b": 1}}, "resource")
 
-        self.assertEqual(
-            redact_access_app_secrets(resource),
-            {
-                "saas_app": {"name": "example"},
-                "scim_config": {
-                    "authentication": [
-                        {"method": "oauth"},
-                        {"nested": [{}]},
-                    ],
-                },
-            },
-        )
+        with self.assertRaises(ModuleFail) as raised:
+            require_applied(FakeModule({}), {"a": {"b": 2}}, {"a": {"b": 1}}, "resource")
 
-    def test_redacts_sensitive_error_response_fields(self):
-        self.assertEqual(
-            redact_sensitive_values(
-                {
-                    "client_secret": "secret",
-                    "nested": [{"api_token": "token", "message": "safe"}],
-                }
-            ),
-            {
-                "client_secret": "********",
-                "nested": [{"api_token": "********", "message": "safe"}],
-            },
-        )
+        self.assertEqual(raised.exception.values["msg"], "Cloudflare did not apply the requested resource")
 
     def test_validates_required_resource_fields(self):
         module = FakeModule({})
 
         self.assertEqual(resource_id(module, {"id": "one"}, "resource"), "one")
-        self.assertEqual(
-            resource_field(module, {"name": "example"}, "name", "resource"),
-            "example",
-        )
-        resources = [{"id": "one", "name": "One"}, {"id": "two", "name": "Two"}]
-        validate_resource_fields(module, resources, ("id", "name"), "resource")
+        self.assertEqual(resource_field(module, {"name": "example"}, "name", "resource"), "example")
         require_mapping(module, {"id": "one"}, "resource")
 
         with self.assertRaises(ModuleFail) as raised:
             resource_id(module, {"id": "one"}, "resource", expected="two")
 
-        self.assertEqual(
-            raised.exception.values["msg"],
-            "Cloudflare API returned the wrong resource",
-        )
+        self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned the wrong resource")
 
-        for resource in (
-            None,
-            {},
-            {"id": None},
-            {"id": " "},
-            {"id": " one"},
-            {"id": 1},
-        ):
-            with (
-                self.subTest(resource=resource),
-                self.assertRaises(ModuleFail) as raised,
-            ):
+        for resource in (None, {}, {"id": None}, {"id": " "}, {"id": " one"}, {"id": 1}):
+            with self.subTest(resource=resource), self.assertRaises(ModuleFail) as raised:
                 resource_id(module, resource, "resource")
 
-            self.assertEqual(
-                raised.exception.values["msg"],
-                "Cloudflare API returned malformed resource data",
+            self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed resource data")
+
+    def test_lists_and_finds_resources(self):
+        module = FakeModule({})
+        items = [{"id": "one", "name": "One"}, {"id": "two", "name": "Two"}]
+
+        self.assertEqual(resource_list(module, iter(items), "resource", ("id", "name")), items)
+        self.assertEqual(find_resource(module, iter(items), "resource", "name", "Two"), items[1])
+        self.assertIsNone(find_resource(module, iter(items), "resource", "name", "Three"))
+
+        with self.assertRaises(ModuleFail):
+            find_resource(module, [{"id": "one"}], "resource", "name", "One")
+
+    def test_get_or_none_maps_only_not_found(self):
+        self.assertIsNone(get_or_none(Mock(side_effect=status_error(404))))
+        self.assertEqual(get_or_none(Mock(return_value={"id": "one"}), "one", zone_id="z"), {"id": "one"})
+
+        with self.assertRaises(cloudflare.PermissionDeniedError):
+            get_or_none(Mock(side_effect=status_error(403)))
+
+    def test_find_resource_stops_at_first_match(self):
+        def items():
+            yield {"id": "one", "name": "One"}
+            raise AssertionError("iterated past the match")
+
+        self.assertEqual(find_resource(FakeModule({}), items(), "resource", "name", "One")["id"], "one")
+
+
+class InfoTests(TestCase):
+    def test_exit_resource_list_returns_all_fields_and_validates(self):
+        with self.assertRaises(ModuleExit) as raised:
+            exit_resource_list(FakeModule({}), "things", [{"id": "one", "name": "One", "token": "secret"}], "thing")
+
+        self.assertEqual(
+            raised.exception.values, {"changed": False, "things": [{"id": "one", "name": "One", "token": "secret"}]}
+        )
+
+        with self.assertRaises(ModuleFail):
+            exit_resource_list(FakeModule({}), "things", [{"id": "one"}], "thing")
+
+    def test_exit_settings_treats_null_as_empty(self):
+        with self.assertRaises(ModuleExit) as raised:
+            exit_settings(FakeModule({}), "settings", None, "settings")
+
+        self.assertEqual(raised.exception.values, {"changed": False, "settings": {}})
+
+        with self.assertRaises(ModuleFail):
+            exit_settings(FakeModule({}), "settings", ["bad"], "settings")
+
+
+class EnsureSettingsTests(TestCase):
+    def run_settings(self, current, payload, edited=None, check_mode=False, comparable=None):
+        edit = Mock(return_value=edited)
+        with self.assertRaises((ModuleExit, ModuleFail)) as raised:
+            ensure_settings(
+                FakeModule({}, check_mode=check_mode),
+                "settings",
+                "device settings",
+                current,
+                payload,
+                edit,
+                comparable=comparable,
             )
+
+        return raised.exception, edit
+
+    def test_unchanged_settings_skip_edit(self):
+        result, edit = self.run_settings({"enabled": True, "other": 1}, {"enabled": True})
+
+        edit.assert_not_called()
+        self.assertEqual(result.values["message"], "Device settings already present")
+        self.assertFalse(result.values["changed"])
+
+    def test_check_mode_predicts_without_edit(self):
+        result, edit = self.run_settings({"enabled": False}, {"enabled": True}, check_mode=True)
+
+        edit.assert_not_called()
+        self.assertTrue(result.values["changed"])
+
+    def test_edits_and_verifies(self):
+        result, edit = self.run_settings({"enabled": False}, {"enabled": True}, edited={"enabled": True})
+
+        edit.assert_called_once_with({"enabled": True})
+        self.assertEqual(result.values["settings"], {"enabled": True})
+        self.assertTrue(result.values["changed"])
+
+        result, _ignored = self.run_settings({"enabled": False}, {"enabled": True}, edited={"enabled": False})
+        self.assertIsInstance(result, ModuleFail)
+
+    def test_comparable_normalizes_both_sides(self):
+        def comparable(settings):
+            return {**settings, "status": {"pending": "active"}.get(settings.get("status"), settings.get("status"))}
+
+        result, edit = self.run_settings({"status": "pending"}, {"status": "active"}, comparable=comparable)
+
+        edit.assert_not_called()
+        self.assertFalse(result.values["changed"])
+
+
+class EnsureResourceTests(TestCase):
+    def present(self, current, payload, created=None, updated=None, check_mode=False, **kwargs):
+        create = Mock(return_value=created)
+        update = Mock(return_value=updated)
+        with self.assertRaises((ModuleExit, ModuleFail)) as raised:
+            ensure_resource_present(
+                FakeModule({}, check_mode=check_mode),
+                "thing",
+                "thing",
+                current,
+                payload,
+                create,
+                update,
+                **kwargs,
+            )
+
+        return raised.exception, create, update
+
+    def test_creates_and_verifies(self):
+        created = {"id": "one", "name": "n", "enabled": True, "token": "secret"}
+        result, create, _ignored = self.present(
+            None, {"name": "n", "enabled": True}, created=created, expected_name="n"
+        )
+
+        create.assert_called_once_with({"name": "n", "enabled": True})
+        self.assertEqual(result.values["thing"], created)
+        self.assertEqual(result.values["message"], "Thing created")
+
+        result, _ignored, _ignored = self.present(
+            None, {"name": "n"}, created={"id": "one", "name": "other"}, expected_name="n"
+        )
+        self.assertEqual(result.values["msg"], "Cloudflare API returned the wrong thing")
+
+    def test_check_mode_never_mutates(self):
+        for current in (None, {"id": "one", "enabled": False}):
+            result, create, update = self.present(current, {"enabled": True}, check_mode=True)
+
+            create.assert_not_called()
+            update.assert_not_called()
+            self.assertTrue(result.values["changed"])
+
+    def test_unchanged_with_defaults(self):
+        result, _ignored, update = self.present({"id": "one"}, {"enabled": False}, defaults={"enabled": False})
+
+        update.assert_not_called()
+        self.assertFalse(result.values["changed"])
+
+    def test_update_preserves_omitted_fields_and_verifies_identity(self):
+        current = {"id": "one", "enabled": False, "exclude": ["x"]}
+        updated = {"id": "one", "enabled": True, "exclude": ["x"]}
+        result, _ignored, update = self.present(
+            current, {"enabled": True}, updated=updated, preserved_fields=("exclude", "require")
+        )
+
+        update.assert_called_once_with("one", {"exclude": ["x"], "enabled": True})
+        self.assertTrue(result.values["changed"])
+
+        result, _ignored, _ignored = self.present(current, {"enabled": True}, updated={**updated, "id": "two"})
+        self.assertEqual(result.values["msg"], "Cloudflare API returned the wrong thing")
+
+    def absent(self, current, deleted=None, check_mode=False):
+        delete = Mock(return_value=deleted)
+        with self.assertRaises((ModuleExit, ModuleFail)) as raised:
+            ensure_resource_absent(FakeModule({}, check_mode=check_mode), "thing", "thing", current, delete)
+
+        return raised.exception, delete
+
+    def test_absent_paths(self):
+        result, delete = self.absent(None)
+        delete.assert_not_called()
+        self.assertFalse(result.values["changed"])
+
+        result, delete = self.absent({"id": "one"}, check_mode=True)
+        delete.assert_not_called()
+        self.assertTrue(result.values["changed"])
+
+        result, delete = self.absent({"id": "one"}, deleted={"id": "one"})
+        delete.assert_called_once_with("one")
+        self.assertEqual(result.values["thing"], {"id": "one"})
+
+        result, _ignored = self.absent({"id": "one"}, deleted={"id": "two"})
+        self.assertIsInstance(result, ModuleFail)
+
+    def test_mutation_errors_carry_context(self):
+        error = status_error(400)
+        create = Mock(side_effect=error)
+
+        with self.assertRaises(cloudflare.BadRequestError):
+            ensure_resource_present(FakeModule({}), "thing", "thing", None, {"a": 1}, create, Mock())
+
+        self.assertEqual(error._cloudflare_message, "Cloudflare API request failed while creating the thing")
+        self.assertEqual(error._cloudflare_context, {})
+
+        error = status_error(409)
+        with self.assertRaises(cloudflare.ConflictError):
+            ensure_resource_present(
+                FakeModule({}),
+                "thing",
+                "thing",
+                None,
+                {"a": 1},
+                Mock(side_effect=error),
+                Mock(),
+                expected_name="n",
+                context={"account_id": "acc"},
+            )
+
+        self.assertEqual(error._cloudflare_context, {"name": "n", "account_id": "acc"})
+
+        error = status_error(400)
+        with self.assertRaises(cloudflare.BadRequestError):
+            ensure_resource_absent(
+                FakeModule({}), "thing", "thing", {"id": "one"}, Mock(side_effect=error), context={"zone_id": "z"}
+            )
+
+        self.assertEqual(error._cloudflare_context, {"resource_id": "one", "zone_id": "z"})

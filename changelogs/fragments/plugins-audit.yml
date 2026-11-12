@@ -1,0 +1,78 @@
+---
+minor_changes:
+  - plugins - call Cloudflare through the generated SDK resources instead of raw API requests, so pagination, retries,
+    and response parsing follow the SDK.
+  - plugins - share the API token, requirements, and check mode documentation through a documentation fragment.
+breaking_changes:
+  - devices_settings, zerotrust_connectivity_settings - options no longer default to V(false) or V(0); omitted options
+    leave the current setting unchanged instead of resetting it. The roles pass their variables explicitly, so role
+    behavior is unchanged.
+  - access_apps, access_apps_info, access_identity_providers_info, cfd_tunnel, cfd_tunnel_info, pages_projects,
+    pages_projects_info, rulesets, rulesets_info, warp_connector, warp_connector_info - return every field Cloudflare
+    sends, including secrets such as tunnel credentials, client secrets, and the Pages web analytics token, instead of
+    redacting them. Failure output also includes Cloudflare error responses unmodified. Protect results that hold
+    secrets.
+  - purge_cache - reject cache keys other than C(purge_everything), C(files), C(tags), C(hosts), and C(prefixes) before
+    calling Cloudflare.
+  - rules_lists - O(operation_timeout) now bounds each submission and polling request by the remaining budget instead of
+    enforcing a hard wall-clock deadline with an alarm signal.
+bugfixes:
+  - module_utils - treat a null list result from Cloudflare as an empty list instead of failing with malformed list data.
+  - zones - scope zone lookups to O(account_id) when provided, so a same-named zone in another account is never updated or deleted.
+  - access_groups - preserve an existing group's O(exclude) and O(require) selectors when they are omitted, instead of clearing them on update.
+  - access_policies - preserve an existing policy's omitted optional fields on update instead of clearing them.
+  - access_apps - preserve an existing application's omitted optional settings, such as O(policies), on update instead of clearing them.
+  - rules_lists - correct the RETURN documentation for the bulk items operation and document the O(description) default.
+  - plugins - document the minimum supported Cloudflare SDK version as 5.8.0 to match the collection requirements.
+  - pages_projects - re-read the project after attaching custom domains so the returned C(pages_project.domains) includes them.
+  - zones - update O(type) and O(vanity_name_servers) in separate requests because Cloudflare edits only one zone property per request.
+  - zones - compare only the provided nested fields of object setting values so partial settings converge.
+  - rules_lists - compare IP items in canonical form so equivalent IPv6 notations do not cause repeated updates or false failures.
+  - devices_policy - correct the O(switch_locked) description; V(true) prevents users from disconnecting the client.
+  - pages_projects - treat an empty O(build_config) as unmanaged; Cloudflare merges build settings, so it could never converge.
+  - devices_policy, devices_policy_info, devices_settings, access_apps, access_service_tokens, cfd_tunnel - correct option and
+    return descriptions whose meaning did not match Cloudflare's API.
+  - module_utils - never send ambient Cloudflare API key or email headers, including from client copies made with per-request
+    options.
+  - zones - manage settings Cloudflare exposes as an C(enabled) flag, such as C(ssl_recommender).
+  - zerotrust_connectivity_settings, zerotrust_connectivity_settings_info - describe O(offramp_warp_enabled) as WARP-to-WARP
+    traffic, matching Cloudflare's API.
+  - pagerules, pagerules_info - treat a null page rules list as empty.
+  - pages_projects - delete environment variables set explicitly to null, as Cloudflare documents, instead of ignoring them.
+  - zones - document the C(enabled) field returned for flag-style settings.
+  - cfd_tunnel, access_apps, access_groups, access_policies - name the account and resource in create and update failures.
+  - cfd_tunnel - allow O(rotate_secrets) on remotely managed tunnels, which Cloudflare supports for token rotation.
+  - access_apps - limit O(type) to application types that use O(domain); other types could never be created or converge.
+  - pages_projects - treat null O(deployment_configs) environment variables from Cloudflare as the requested empty map,
+    so clearing every variable converges.
+  - warp_connector - name the account and connector in create and update failures.
+  - pages_projects - document that O(domains) are removed before the project is deleted with O(state=absent).
+  - rulesets - compare each rule's headers on their complete set, so removing a header is applied.
+  - zones - compare integer settings that the SDK decodes as floats, such as C(browser_cache_ttl), as integers.
+  - pages_projects - ignore empty O(deployment_configs) mappings, and require an actual secret value for
+    O(rotate_secrets).
+  - cfd_tunnel_info, warp_connector_info, cfd_tunnel_configurations_info - describe results as tunnels that have not been
+    deleted, rather than active tunnels.
+  - pages_projects - delete bindings set to null, such as O(deployment_configs) C(kv_namespaces) entries, and compare
+    plain environment variables even when named like a secret.
+  - zones - match zone names case-insensitively.
+  - access_apps - drop C(rdp) from O(type); it also requires target criteria the module cannot set.
+  - cfd_tunnel_configurations - document that C(configuration.config) is returned only when the tunnel has one.
+  - pages_projects - clear build settings set to null, such as C(web_analytics_tag), treat requested empty binding maps
+    as equal to null collections, and ignore an empty O(source).
+  - zones - document that O(account_id) is required when creating a zone.
+  - zones_info - include internal zones, which Cloudflare omits unless the zone types are named.
+  - zones, pages_projects - document that C(settings) and C(domains) are returned only when O(state=present) changes
+    something outside check mode, and that C(domains) lists the domains added during the run.
+  - rulesets - compare skip rules' C(action_parameters.rules) maps on their complete key sets, so removing an entry is
+    applied.
+  - pages_projects - clear nested binding fields set to null, such as a service binding C(entrypoint).
+  - access_apps, access_policies - carry over settings the modules do not manage, such as C(tags) and
+    C(session_duration), when an update replaces the resource.
+  - cfd_tunnel - accept O(tunnel_secret) when creating a remotely managed tunnel, matching secret rotation.
+  - pages_projects - treat empty binding maps as no change, and treat an empty-string build setting as cleared.
+  - rulesets - give rules without C(enabled) Cloudflare's default of V(true), so an existing disabled rule is reported
+    as a change instead of being silently re-enabled by an unrelated update.
+  - module_utils - stop SDK model serialization from printing Pydantic warnings to stderr when a generated model
+    mistypes a field, such as an Access group's C(is_default).
+  - access_service_tokens - document that O(state=absent) returns the token as it was before deletion.

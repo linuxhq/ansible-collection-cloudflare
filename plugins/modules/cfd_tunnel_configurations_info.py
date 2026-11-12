@@ -8,34 +8,17 @@ DOCUMENTATION = r"""
 module: cfd_tunnel_configurations_info
 short_description: Gather information about cloudflared tunnel configurations
 description:
-  - Gather configurations for active cloudflared tunnels in an account.
+  - Gather configurations for cloudflared tunnels in an account that have not been
+    deleted.
   - Only remotely-managed tunnels are queried; locally-managed tunnel
     configurations are stored on the origin host.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
-options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
+options: {}
 """
 
 EXAMPLES = r"""
@@ -72,46 +55,39 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    cloudflare_query,
-    get_result,
-    list_all,
+    cloudflare_error_context,
     require_mapping,
-    resource_field,
-    resource_id,
+    resource_list,
+    serialize_resource,
 )
 
 
-def list_resources(module, client):
+def run(module, client):
     account_id = module.params["account_id"]
+    tunnels = client.zero_trust.tunnels.cloudflared
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering cloudflared tunnels",
+        account_id=account_id,
+    ):
+        listed = resource_list(
+            module,
+            tunnels.list(account_id=account_id, is_deleted=False, per_page=1000),
+            "cloudflared tunnel",
+            required_fields=("id", "name"),
+        )
+
     configurations = []
-    tunnels = list_all(
-        client,
-        cloudflare_query(
-            cloudflare_path("accounts", account_id, "cfd_tunnel"),
-            {"is_deleted": "false"},
-        ),
-        per_page=1000,
-    )
-
-    for tunnel in tunnels:
-        tunnel_id = resource_id(module, tunnel, "cloudflared tunnel")
-
+    for tunnel in listed:
         if tunnel.get("remote_config") is False or tunnel.get("config_src") == "local":
             continue
 
-        tunnel_name = resource_field(module, tunnel, "name", "cloudflared tunnel")
-        configuration = get_result(
-            client,
-            cloudflare_path(
-                "accounts",
-                account_id,
-                "cfd_tunnel",
-                tunnel_id,
-                "configurations",
-            ),
-            default={},
-        )
+        with cloudflare_error_context(
+            "Cloudflare API request failed while gathering the tunnel configuration",
+            account_id=account_id,
+            tunnel_id=tunnel["id"],
+        ):
+            configuration = serialize_resource(tunnels.configurations.get(tunnel["id"], account_id=account_id)) or {}
+
         require_mapping(module, configuration, "tunnel configuration")
         config = configuration.get("config")
         if config is None:
@@ -119,13 +95,7 @@ def list_resources(module, client):
         else:
             require_mapping(module, config, "tunnel configuration")
 
-        configurations.append(
-            {
-                "id": tunnel_id,
-                "name": tunnel_name,
-                "config": config,
-            }
-        )
+        configurations.append({"id": tunnel["id"], "name": tunnel["name"], "config": config})
 
     module.exit_json(changed=False, cfd_tunnel_configurations=configurations)
 
@@ -140,7 +110,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list_resources(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

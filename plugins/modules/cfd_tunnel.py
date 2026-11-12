@@ -9,24 +9,18 @@ module: cfd_tunnel
 short_description: Manage Cloudflare cloudflared tunnels
 description:
   - Create and delete Cloudflare cloudflared tunnels by name.
-  - Connector tokens and tunnel credentials are redacted from returned tunnels.
+  - Results include sensitive values returned by Cloudflare, such as connector tokens and tunnel credentials; protect registered
+    results and task output, for example with C(no_log).
   - Tunnel secrets are sent when creating a tunnel, or when O(rotate_secrets) is
     enabled, because Cloudflare does not return the current secret for idempotent
     comparison.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
 options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   name:
     required: true
     type: str
@@ -40,10 +34,12 @@ options:
     description:
       - Location from which the tunnel receives its configuration.
       - Required when creating a cloudflared tunnel.
+      - Only applied when creating a tunnel; an existing tunnel's configuration
+        source is not compared or changed.
   tunnel_secret:
     type: str
     description:
-      - Tunnel secret for locally-managed tunnels.
+      - Tunnel secret, which locally-managed tunnels need to run.
       - Must be base64-encoded and decode to at least 32 bytes.
       - Applied when creating a tunnel. Cloudflare does not return the current
         secret, so changes are not detected; use O(rotate_secrets) to apply the
@@ -52,7 +48,8 @@ options:
     type: bool
     default: false
     description:
-      - Apply O(tunnel_secret) to an existing tunnel, rotating its secret.
+      - Apply O(tunnel_secret) to an existing tunnel, rotating its secret and
+        connector token. Applies to locally and remotely managed tunnels.
       - The module always reports C(changed) when enabled and a secret is given.
       - Requires O(tunnel_secret).
   state:
@@ -63,17 +60,6 @@ options:
     default: present
     description:
       - Desired state of the resource.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
 """
 
 EXAMPLES = r"""
@@ -116,143 +102,97 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    delete_result,
-    find_by_name,
-    patch_result,
+    cloudflare_error_context,
+    ensure_resource_absent,
+    find_resource,
     payload_from_params,
-    post_result,
-    remove_fields,
     resource_field,
     resource_id,
+    serialize_resource,
     validate_tunnel_secret,
 )
 
 FIELDS = ("config_src", "name", "tunnel_secret")
-SECRET_FIELDS = ("token", "credentials_file", "tunnel_secret", "TunnelSecret")
 
 
-def endpoint(account_id):
-    return cloudflare_path("accounts", account_id, "cfd_tunnel")
+def checked_tunnel(module, tunnel, expected_id=None):
+    tunnel = serialize_resource(tunnel)
+    resource_id(module, tunnel, "cloudflared tunnel", expected=expected_id)
+    resource_field(module, tunnel, "name", "cloudflared tunnel", expected=module.params["name"])
+    return tunnel
 
 
-def ensure_present(module, client):
+def ensure_present(module, tunnels, current):
     params = module.params
-    validate_tunnel_secret(module, params.get("tunnel_secret"))
-
-    current = find_by_name(
-        client,
-        endpoint(params["account_id"]),
-        params["name"],
-        extra_query={"is_deleted": "false"},
-    )
+    account_id = params["account_id"]
 
     if current is not None:
-        remove_fields(current, SECRET_FIELDS)
         current_id = resource_id(module, current, "cloudflared tunnel")
-        if params["rotate_secrets"] and params.get("tunnel_secret") is not None:
-            local = current.get("config_src") == "local" or current.get("remote_config") is False
-            remote = current.get("config_src") == "cloudflare" or current.get("remote_config") is True
-            if not local or remote:
-                module.fail_json(msg="tunnel_secret is only valid for locally-managed tunnels")
+        if not params["rotate_secrets"]:
+            module.exit_json(changed=False, message="Cloudflared tunnel already present", cfd_tunnel=current)
 
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Cloudflared tunnel would be updated",
-                    cfd_tunnel=current,
-                )
+        if module.check_mode:
+            module.exit_json(changed=True, message="Cloudflared tunnel would be updated", cfd_tunnel=current)
 
-            cfd_tunnel = patch_result(
-                client,
-                cloudflare_path("accounts", params["account_id"], "cfd_tunnel", current_id),
-                {"tunnel_secret": params["tunnel_secret"]},
-            )
-            remove_fields(cfd_tunnel, SECRET_FIELDS)
-            resource_id(module, cfd_tunnel, "cloudflared tunnel", expected=current_id)
-            resource_field(
-                module,
-                cfd_tunnel,
-                "name",
-                "cloudflared tunnel",
-                expected=params["name"],
-            )
-            module.exit_json(
-                changed=True,
-                message="Cloudflared tunnel updated",
-                cfd_tunnel=cfd_tunnel,
-            )
+        with cloudflare_error_context(
+            "Cloudflare API request failed while updating the cloudflared tunnel",
+            account_id=account_id,
+            resource_id=current_id,
+        ):
+            cfd_tunnel = tunnels.edit(current_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
 
-        module.exit_json(
-            changed=False,
-            message="Cloudflared tunnel already present",
-            cfd_tunnel=current,
-        )
+        cfd_tunnel = checked_tunnel(module, cfd_tunnel, expected_id=current_id)
+        module.exit_json(changed=True, message="Cloudflared tunnel updated", cfd_tunnel=cfd_tunnel)
 
     if not params.get("config_src"):
         module.fail_json(msg="config_src is required when creating a cloudflared tunnel")
 
-    if params["config_src"] != "local" and params.get("tunnel_secret") is not None:
-        module.fail_json(msg="tunnel_secret is only valid for locally-managed tunnels")
-
     if module.check_mode:
         module.exit_json(changed=True, message="Cloudflared tunnel would be created")
 
-    cfd_tunnel = post_result(
-        client,
-        endpoint(params["account_id"]),
-        payload_from_params(params, FIELDS),
-    )
-    remove_fields(cfd_tunnel, SECRET_FIELDS)
-    resource_id(module, cfd_tunnel, "cloudflared tunnel")
-    resource_field(module, cfd_tunnel, "name", "cloudflared tunnel", expected=params["name"])
-    resource_field(
-        module,
-        cfd_tunnel,
-        "config_src",
-        "cloudflared tunnel",
-        expected=params["config_src"],
-    )
-    module.exit_json(
-        changed=True,
-        message="Cloudflared tunnel created",
-        cfd_tunnel=cfd_tunnel,
-    )
+    with cloudflare_error_context(
+        "Cloudflare API request failed while creating the cloudflared tunnel",
+        account_id=account_id,
+        name=params["name"],
+    ):
+        cfd_tunnel = tunnels.create(account_id=account_id, **payload_from_params(params, FIELDS))
+
+    cfd_tunnel = checked_tunnel(module, cfd_tunnel)
+    resource_field(module, cfd_tunnel, "config_src", "cloudflared tunnel", expected=params["config_src"])
+    module.exit_json(changed=True, message="Cloudflared tunnel created", cfd_tunnel=cfd_tunnel)
 
 
-def ensure_absent(module, client):
+def run(module, client):
     params = module.params
+    account_id = params["account_id"]
+    tunnels = client.zero_trust.tunnels.cloudflared
+    if params["state"] == "present":
+        validate_tunnel_secret(module, params.get("tunnel_secret"))
 
-    current = find_by_name(
-        client,
-        endpoint(params["account_id"]),
-        params["name"],
-        extra_query={"is_deleted": "false"},
-    )
-
-    if current is None:
-        module.exit_json(changed=False, message="Cloudflared tunnel already absent")
-
-    remove_fields(current, SECRET_FIELDS)
-    current_id = resource_id(module, current, "cloudflared tunnel")
-
-    if module.check_mode:
-        module.exit_json(
-            changed=True,
-            message="Cloudflared tunnel would be deleted",
-            cfd_tunnel=current,
+    with cloudflare_error_context(
+        "Cloudflare API request failed while finding the cloudflared tunnel",
+        account_id=account_id,
+        name=params["name"],
+    ):
+        current = find_resource(
+            module,
+            tunnels.list(account_id=account_id, name=params["name"], is_deleted=False),
+            "cloudflared tunnel",
+            "name",
+            params["name"],
         )
 
-    delete_result(
-        client,
-        cloudflare_path("accounts", params["account_id"], "cfd_tunnel", current_id),
-        expected_id=current_id,
-    )
-    module.exit_json(
-        changed=True,
-        message="Cloudflared tunnel deleted",
-        cfd_tunnel=current,
-    )
+    if params["state"] == "absent":
+        ensure_resource_absent(
+            module,
+            "cfd_tunnel",
+            "cloudflared tunnel",
+            current,
+            delete=lambda tunnel_id: tunnels.delete(tunnel_id, account_id=account_id),
+            context={"account_id": account_id},
+        )
+
+    ensure_present(module, tunnels, current)
 
 
 def main():
@@ -275,10 +215,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        if module.params["state"] == "present":
-            ensure_present(module, client)
-        else:
-            ensure_absent(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

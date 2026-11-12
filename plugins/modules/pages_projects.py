@@ -10,22 +10,17 @@ short_description: Manage Cloudflare Pages projects
 description:
   - Create, update, and delete Cloudflare Pages projects by name.
   - Optionally ensures listed custom domains are attached to the project.
-  - Secret environment variable values and the web analytics token are redacted
-    from returned projects.
+  - Results include sensitive values returned by Cloudflare, such as the web analytics
+    token; protect registered results and task output, for example with C(no_log).
+  - O(build_config) and O(deployment_configs) are C(no_log) options, so Ansible may
+    mask any of their values that also appear elsewhere in the returned project.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
 options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   name:
     required: true
     type: str
@@ -40,6 +35,8 @@ options:
     type: dict
     description:
       - Pages build command, output directory, and related settings.
+      - An empty mapping leaves the existing build configuration unchanged.
+      - Settings set to null, such as C(web_analytics_tag), are cleared.
       - C(web_analytics_token) is treated as write-only; use O(rotate_secrets) to
         apply a new value to an existing project.
   deployment_configs:
@@ -51,6 +48,8 @@ options:
       - Use O(rotate_secrets) to force an update that resends secret values.
       - Environment variables removed from C(env_vars) are deleted from the
         project.
+      - Environment variables and bindings, such as C(kv_namespaces) entries, set
+        to null are deleted from the project. An empty binding map changes nothing.
   rotate_secrets:
     type: bool
     default: false
@@ -64,11 +63,14 @@ options:
     type: dict
     description:
       - Git provider and repository configuration.
+      - An empty mapping leaves the existing source unchanged.
   domains:
     type: list
     elements: dict
     description:
       - Custom domains that must exist on the project.
+      - With O(state=absent), listed domains are removed from the project before
+        it is deleted.
     suboptions:
       name:
         description:
@@ -83,17 +85,6 @@ options:
     default: present
     description:
       - Desired state of the resource.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
 """
 
 EXAMPLES = r"""
@@ -108,7 +99,7 @@ EXAMPLES = r"""
 RETURN = r"""
 ---
 pages_project:
-  description: Cloudflare Pages project with credential values redacted.
+  description: Cloudflare Pages project.
   returned: when available
   type: dict
   contains:
@@ -126,13 +117,13 @@ pages_project:
       type: list
       elements: str
 domains:
-  description: Managed custom domains.
-  returned: when the project or its domains changed
+  description: Custom domains added to the project during this run.
+  returned: when O(state=present) changed the project or its domains, outside check mode
   type: list
   elements: dict
   contains:
     name:
-      description: Managed custom domain name.
+      description: Added custom domain name.
       returned: always
       type: str
 message:
@@ -149,59 +140,130 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    delete_result,
-    get_result,
-    list_all,
-    normalize_current_by_desired_fields,
-    patch_result,
+    cloudflare_error_context,
+    differs,
+    get_or_none,
     payload_from_params,
-    post_result,
-    redact_pages_secrets,
+    require_applied,
     resource_field,
-    select_fields,
-    validate_requested_values,
+    resource_list,
+    serialize_resource,
     values_differ,
 )
 
 FIELDS = ("build_config", "deployment_configs", "name", "production_branch", "source")
 
 
-def comparable_pages_payload(payload):
-    comparable = redact_pages_secrets(payload)
-    build_config = payload.get("build_config")
-    if isinstance(build_config, dict) and set(build_config) == {"web_analytics_token"}:
-        comparable.pop("build_config")
+def without_secret_values(resource):
+    """Return a serialized copy without write-only secrets, which are never compared.
 
+    Only build_config.web_analytics_token and the values of secret_text
+    environment variables are write-only.
+    """
+    resource = serialize_resource(resource)
+    build_config = resource.get("build_config")
+    if isinstance(build_config, dict):
+        build_config.pop("web_analytics_token", None)
+
+    for config in (resource.get("deployment_configs") or {}).values():
+        env_vars = config.get("env_vars") if isinstance(config, dict) else None
+        for variable in (env_vars or {}).values() if isinstance(env_vars, dict) else ():
+            if isinstance(variable, dict) and variable.get("type") == "secret_text":
+                variable.pop("value", None)
+
+    return resource
+
+
+def comparable_pages_payload(payload):
+    """Return the payload fields to compare.
+
+    A requested mapping that holds only deletions or write-only secrets manages
+    nothing else, so it is dropped rather than compared as empty; deletions are
+    verified separately. An explicitly empty mapping, such as env_vars: {}, is
+    kept.
+    """
+    comparable = without_secret_values(payload)
+
+    def prune(requested, compared):
+        for key in list(compared):
+            requested_value, compared_value = requested.get(key), compared[key]
+            if isinstance(requested_value, dict) and isinstance(compared_value, dict):
+                prune(requested_value, compared_value)
+                if requested_value and not compared_value:
+                    compared.pop(key)
+
+    prune(payload, comparable)
     return comparable
 
 
-def payload_with_removed_env_vars(payload, current):
+def comparable_project(project, comparable_payload):
+    """Return the comparable project, treating a null map as the empty map requested.
+
+    Cloudflare may return an empty environment-variable or binding collection,
+    such as kv_namespaces, as null or omit it.
+    """
+    project = without_secret_values(project)
+    for environment, config in (comparable_payload.get("deployment_configs") or {}).items():
+        for key, value in config.items() if isinstance(config, dict) else ():
+            if value == {}:
+                current_config = project.setdefault("deployment_configs", {}).setdefault(environment, {})
+                if isinstance(current_config, dict) and current_config.get(key) is None:
+                    current_config[key] = {}
+
+    return project
+
+
+def cleared(value):
+    # Cloudflare reports some cleared settings, such as build_config
+    # web_analytics_tag, as an empty string.
+    return value is None or value == ""
+
+
+def payload_with_removals(payload, current):
+    """Return payload with deletions marked as None, and the deleted entries' key paths.
+
+    Cloudflare clears build settings, environment variables, bindings such as
+    kv_namespaces entries, and nested binding fields that are set to null.
+    Environment variables omitted from env_vars are deleted too.
+    """
     merged = deepcopy(payload)
-    configs = merged.get("deployment_configs")
-    current_configs = current.get("deployment_configs") if isinstance(current, dict) else None
-    if not isinstance(configs, dict) or not isinstance(current_configs, dict):
-        return merged
+    removed = []
 
-    for environment, desired_env in configs.items():
-        if not isinstance(desired_env, dict):
-            continue
+    def mark(desired, existing, path):
+        if not isinstance(desired, dict) or not isinstance(existing, dict):
+            return
 
-        desired_vars = desired_env.get("env_vars")
-        current_env = current_configs.get(environment)
-        current_vars = current_env.get("env_vars") if isinstance(current_env, dict) else None
-        if not isinstance(desired_vars, dict) or not isinstance(current_vars, dict):
-            continue
+        if path[-1:] == ("env_vars",):
+            for name in existing:
+                desired.setdefault(name, None)
 
-        for name in current_vars:
-            if name not in desired_vars:
-                desired_vars[name] = None
+        for key, value in desired.items():
+            if value is None:
+                if not cleared(existing.get(key)):
+                    removed.append(path + (key,))
+            else:
+                mark(value, existing.get(key), path + (key,))
 
-    return merged
+    for field in ("build_config", "deployment_configs"):
+        mark(merged.get(field), current.get(field), (field,))
+
+    return merged, removed
+
+
+def removals_remain(project, removed):
+    """Return whether any removed key path is still set in the project."""
+    for path in removed:
+        value = project
+        for key in path:
+            value = value.get(key) if isinstance(value, dict) else None
+
+        if not cleared(value):
+            return True
+
+    return False
 
 
 def current_domain_names(module, project, domains):
-    names = set()
     project_domains = project.get("domains")
     if project_domains is None:
         project_domains = []
@@ -212,19 +274,15 @@ def current_domain_names(module, project, domains):
         if not isinstance(name, str) or not name.strip() or name != name.strip():
             module.fail_json(msg="Cloudflare API returned malformed Pages domain data")
 
-        names.add(name)
-
-    for domain in domains:
-        names.add(resource_field(module, domain, "name", "Pages domain"))
-
-    return names
+    domain_names = [domain["name"] for domain in resource_list(module, domains, "Pages domain", ("name",))]
+    return set(project_domains) | set(domain_names)
 
 
 def desired_domain_names(module):
     names = []
     for domain in module.params.get("domains") or []:
-        domain_name = domain.get("name") if isinstance(domain, dict) else None
-        if not isinstance(domain_name, str) or not domain_name.strip() or domain_name != domain_name.strip():
+        domain_name = domain["name"]
+        if not domain_name.strip() or domain_name != domain_name.strip():
             module.fail_json(msg="Each Pages project domain requires a valid name")
 
         if domain_name not in names:
@@ -233,184 +291,220 @@ def desired_domain_names(module):
     return names
 
 
-def domains_endpoint(account_id, project_name):
-    return cloudflare_path("accounts", account_id, "pages", "projects", project_name, "domains")
+def checked_project(module, project):
+    project = serialize_resource(project)
+    resource_field(module, project, "name", "Pages project", expected=module.params["name"])
+    return project
 
 
-def endpoint(account_id):
-    return cloudflare_path("accounts", account_id, "pages", "projects")
-
-
-def item_endpoint(account_id, project_name):
-    return cloudflare_path("accounts", account_id, "pages", "projects", project_name)
-
-
-def ensure_present(module, client):
+def get_project(module, client):
     params = module.params
-    domain_names = desired_domain_names(module)
-    production_branch = params.get("production_branch")
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering the Pages project",
+        account_id=params["account_id"],
+        name=params["name"],
+    ):
+        project = get_or_none(client.pages.projects.get, project_name=params["name"], account_id=params["account_id"])
+
+    return None if project is None else checked_project(module, project)
+
+
+def existing_domain_names(module, client, project):
+    params = module.params
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering Pages project domains",
+        account_id=params["account_id"],
+        name=params["name"],
+    ):
+        domains = client.pages.projects.domains.list(project_name=params["name"], account_id=params["account_id"])
+        return current_domain_names(module, project, domains)
+
+
+def update_project(module, client, current, payload, secrets_requested):
+    params = module.params
+    payload, removed = payload_with_removals(payload, current)
+    comparable_payload = comparable_pages_payload(payload)
+    if (
+        not secrets_requested
+        and not removed
+        and not differs(comparable_project(current, comparable_payload), comparable_payload)
+    ):
+        return current, False
+
+    if module.check_mode:
+        module.exit_json(
+            changed=True,
+            message="Pages project would be updated",
+            pages_project=current,
+        )
+
+    with cloudflare_error_context(
+        "Cloudflare API request failed while updating the Pages project",
+        account_id=params["account_id"],
+        name=params["name"],
+    ):
+        project = checked_project(
+            module,
+            client.pages.projects.edit(project_name=params["name"], account_id=params["account_id"], **payload),
+        )
+
+    require_applied(module, comparable_project(project, comparable_payload), comparable_payload, "Pages project")
+    if removals_remain(project, removed):
+        module.fail_json(msg="Cloudflare did not apply the requested Pages project")
+
+    return project, True
+
+
+def add_domains(module, client, project, domain_names):
+    params = module.params
+    existing_names = existing_domain_names(module, client, project)
+    missing_domains = [domain_name for domain_name in domain_names if domain_name not in existing_names]
+    if module.check_mode and missing_domains:
+        module.exit_json(
+            changed=True,
+            message="Pages project domains would be updated",
+            pages_project=project,
+        )
+
+    added_domains = []
+    for domain_name in missing_domains:
+        with cloudflare_error_context(
+            "Cloudflare API request failed while adding the Pages project domain",
+            account_id=params["account_id"],
+            name=params["name"],
+            domain=domain_name,
+        ):
+            domain = serialize_resource(
+                client.pages.projects.domains.create(
+                    project_name=params["name"], account_id=params["account_id"], name=domain_name
+                )
+            )
+
+        resource_field(module, domain, "name", "Pages domain", expected=domain_name)
+        added_domains.append(domain)
+
+    return added_domains
+
+
+def ensure_present(module, client, domain_names):
+    params = module.params
     payload = payload_from_params(params, FIELDS)
-    credential_payload = payload_from_params(params, ("build_config", "deployment_configs"))
+    # Cloudflare merges build_config and deployment_configs updates, so empty
+    # mappings change nothing.
+    for field in ("build_config", "source"):
+        if payload.get(field) == {}:
+            payload.pop(field)
+
+    # Binding maps merge like the rest of deployment_configs, so an empty one
+    # changes nothing. An empty env_vars still deletes every variable.
+    configs = {}
+    for environment, config in (payload.get("deployment_configs") or {}).items():
+        if isinstance(config, dict):
+            config = {key: value for key, value in config.items() if value != {} or key == "env_vars"}
+
+        if config != {}:
+            configs[environment] = config
+
+    if configs:
+        payload["deployment_configs"] = configs
+    else:
+        payload.pop("deployment_configs", None)
+
     secrets_requested = params["rotate_secrets"] and values_differ(
-        redact_pages_secrets(credential_payload), credential_payload
+        without_secret_values(payload), serialize_resource(payload)
     )
     if params["rotate_secrets"] and not secrets_requested:
-        module.fail_json(msg=("rotate_secrets requires a secret_text value or " "build_config.web_analytics_token"))
+        module.fail_json(msg="rotate_secrets requires a secret_text value or build_config.web_analytics_token")
 
-    current = get_result(
-        client,
-        item_endpoint(params["account_id"], params["name"]),
-        ok_statuses=[404],
-    )
+    current = get_project(module, client)
+    created = current is None
+    if created:
+        if params.get("production_branch") is None:
+            module.fail_json(msg="production_branch is required when creating a Pages project")
 
-    if current is None and production_branch is None:
-        module.fail_json(msg="production_branch is required when creating a Pages project")
-
-    changed = False
-    created = False
-    domains_changed = False
-    managed_domains = []
-
-    if current is None:
         if module.check_mode:
             module.exit_json(changed=True, message="Pages project would be created")
 
-        current = post_result(client, endpoint(params["account_id"]), payload)
-        resource_field(module, current, "name", "Pages project", expected=params["name"])
-        validate_requested_values(
-            module,
-            redact_pages_secrets(current),
-            comparable_pages_payload(payload),
-            "Pages project",
-        )
-        changed = True
-        created = True
-    else:
-        resource_field(module, current, "name", "Pages project", expected=params["name"])
-        payload = payload_with_removed_env_vars(payload, current)
+        with cloudflare_error_context(
+            "Cloudflare API request failed while creating the Pages project",
+            account_id=params["account_id"],
+            name=params["name"],
+        ):
+            current = checked_project(module, client.pages.projects.create(account_id=params["account_id"], **payload))
 
         comparable_payload = comparable_pages_payload(payload)
-        if secrets_requested or values_differ(
-            normalize_current_by_desired_fields(
-                select_fields(current, payload.keys()),
-                comparable_payload,
-            ),
-            comparable_payload,
-        ):
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Pages project would be updated",
-                    pages_project=redact_pages_secrets(current),
-                )
+        require_applied(module, comparable_project(current, comparable_payload), comparable_payload, "Pages project")
+        changed = True
+    else:
+        current, changed = update_project(module, client, current, payload, secrets_requested)
 
-            current = patch_result(
-                client,
-                item_endpoint(params["account_id"], params["name"]),
-                payload,
-            )
-            resource_field(module, current, "name", "Pages project", expected=params["name"])
-            validate_requested_values(
-                module,
-                redact_pages_secrets(current),
-                comparable_payload,
-                "Pages project",
-            )
-            changed = True
+    added_domains = add_domains(module, client, current, domain_names) if domain_names else []
+    if added_domains:
+        current = get_project(module, client)
+        if current is None:
+            module.fail_json(msg="Cloudflare API returned malformed Pages project data")
 
-    if domain_names:
-        existing_domains = list_all(
-            client,
-            domains_endpoint(params["account_id"], params["name"]),
-            paginate=False,
-        )
-        existing_names = current_domain_names(module, current, existing_domains)
-        missing_domains = [domain_name for domain_name in domain_names if domain_name not in existing_names]
-
-        domains_changed = bool(missing_domains)
-
-        if module.check_mode and domains_changed:
-            module.exit_json(
-                changed=True,
-                message="Pages project domains would be updated",
-                pages_project=redact_pages_secrets(current),
-            )
-
-        for domain_name in missing_domains:
-            domain = post_result(
-                client,
-                domains_endpoint(params["account_id"], params["name"]),
-                {"name": domain_name},
-            )
-            resource_field(module, domain, "name", "Pages domain", expected=domain_name)
-            managed_domains.append(domain)
-
-    if not changed and not domains_changed:
+    if not changed and not added_domains:
         module.exit_json(
             changed=False,
             message="Pages project already present",
-            pages_project=redact_pages_secrets(current),
+            pages_project=current,
         )
 
     module.exit_json(
         changed=True,
         message="Pages project created" if created else "Pages project updated",
-        pages_project=redact_pages_secrets(current),
-        domains=managed_domains,
+        pages_project=current,
+        domains=added_domains,
     )
 
 
-def ensure_absent(module, client):
+def ensure_absent(module, client, domain_names):
     params = module.params
-    domain_names = desired_domain_names(module)
-
-    current = get_result(
-        client,
-        item_endpoint(params["account_id"], params["name"]),
-        ok_statuses=[404],
-    )
-
+    current = get_project(module, client)
     if current is None:
         module.exit_json(changed=False, message="Pages project already absent")
-
-    resource_field(module, current, "name", "Pages project", expected=params["name"])
 
     if module.check_mode:
         module.exit_json(
             changed=True,
             message="Pages project would be deleted",
-            pages_project=redact_pages_secrets(current),
+            pages_project=current,
         )
 
-    if domain_names:
-        existing_domains = list_all(
-            client,
-            domains_endpoint(params["account_id"], params["name"]),
-            paginate=False,
-        )
-        existing_names = current_domain_names(module, current, existing_domains)
-
-        for domain_name in domain_names:
-            if domain_name in existing_names:
-                delete_result(
-                    client,
-                    cloudflare_path(
-                        "accounts",
-                        params["account_id"],
-                        "pages",
-                        "projects",
-                        params["name"],
-                        "domains",
-                        domain_name,
-                    ),
+    existing_names = existing_domain_names(module, client, current) if domain_names else set()
+    for domain_name in domain_names:
+        if domain_name in existing_names:
+            with cloudflare_error_context(
+                "Cloudflare API request failed while deleting the Pages project domain",
+                account_id=params["account_id"],
+                name=params["name"],
+                domain=domain_name,
+            ):
+                client.pages.projects.domains.delete(
+                    domain_name=domain_name, account_id=params["account_id"], project_name=params["name"]
                 )
 
-    delete_result(client, item_endpoint(params["account_id"], params["name"]))
+    with cloudflare_error_context(
+        "Cloudflare API request failed while deleting the Pages project",
+        account_id=params["account_id"],
+        name=params["name"],
+    ):
+        client.pages.projects.delete(project_name=params["name"], account_id=params["account_id"])
+
     module.exit_json(
         changed=True,
         message="Pages project deleted",
-        pages_project=redact_pages_secrets(current),
+        pages_project=current,
     )
+
+
+def run(module, client):
+    domain_names = desired_domain_names(module)
+    if module.params["state"] == "present":
+        ensure_present(module, client, domain_names)
+
+    ensure_absent(module, client, domain_names)
 
 
 def main():
@@ -439,10 +533,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        if module.params["state"] == "present":
-            ensure_present(module, client)
-        else:
-            ensure_absent(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

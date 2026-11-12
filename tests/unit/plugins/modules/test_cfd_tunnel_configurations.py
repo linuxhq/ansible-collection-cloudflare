@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import Mock
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import (
     cfd_tunnel_configurations,
@@ -14,7 +14,22 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 )
 
 
+def module_for(config, check_mode=False):
+    return FakeModule({"account_id": "account", "tunnel_id": "tunnel", "config": config}, check_mode)
+
+
 class CfdTunnelConfigurationsTests(TestCase):
+    def run_module(self, module, current, updated=None):
+        client = Mock()
+        api = client.zero_trust.tunnels.cloudflared.configurations
+        api.get.return_value = current
+        api.update.return_value = updated
+        with self.assertRaises((ModuleExit, ModuleFail)) as raised:
+            cfd_tunnel_configurations.run(module, client)
+
+        api.get.assert_called_once_with("tunnel", account_id="account")
+        return raised.exception, api
+
     def test_ingress_access_required_is_applied_independently_of_global_access(self):
         access = {"required": True, "teamName": "example", "audTag": ["aud"]}
         desired = {
@@ -33,43 +48,31 @@ class CfdTunnelConfigurationsTests(TestCase):
             current["ingress"][0]["originRequest"] = {} if local_access is None else {"access": local_access}
             original = deepcopy(current)
             for check_mode, applied in ((True, False), (False, False), (False, True)):
-                module = FakeModule({"account_id": "account", "tunnel_id": "tunnel", "config": desired}, check_mode)
-                with (
-                    self.subTest(local_access=local_access, check_mode=check_mode, applied=applied),
-                    patch.object(cfd_tunnel_configurations, "get_result", return_value={"config": current}),
-                    patch.object(
-                        cfd_tunnel_configurations,
-                        "put_result",
-                        return_value={"config": desired if applied else current},
-                    ) as put,
-                    self.assertRaises(ModuleExit if check_mode or applied else ModuleFail) as raised,
-                ):
-                    cfd_tunnel_configurations.ensure_present(module, {})
-
-                if check_mode:
-                    put.assert_not_called()
-                else:
-                    put.assert_called_once_with(
-                        {}, "/accounts/account/cfd_tunnel/tunnel/configurations", {"config": desired}
+                with self.subTest(local_access=local_access, check_mode=check_mode, applied=applied):
+                    raised, api = self.run_module(
+                        module_for(desired, check_mode),
+                        {"config": current},
+                        {"config": desired if applied else current},
                     )
 
-                if check_mode or applied:
-                    self.assertTrue(raised.exception.values["changed"])
-                else:
-                    self.assertIn("did not apply", raised.exception.values["msg"])
+                    if check_mode:
+                        api.update.assert_not_called()
+                    else:
+                        api.update.assert_called_once_with("tunnel", account_id="account", config=desired)
 
-                self.assertEqual(current, original)
+                    if check_mode or applied:
+                        self.assertIsInstance(raised, ModuleExit)
+                        self.assertTrue(raised.values["changed"])
+                    else:
+                        self.assertIsInstance(raised, ModuleFail)
+                        self.assertIn("did not apply", raised.values["msg"])
 
-        module = FakeModule({"account_id": "account", "tunnel_id": "tunnel", "config": desired})
-        with (
-            patch.object(cfd_tunnel_configurations, "get_result", return_value={"config": desired}),
-            patch.object(cfd_tunnel_configurations, "put_result") as put,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            cfd_tunnel_configurations.ensure_present(module, {})
+                    self.assertEqual(current, original)
 
-        self.assertFalse(raised.exception.values["changed"])
-        put.assert_not_called()
+        raised, api = self.run_module(module_for(desired), {"config": desired})
+
+        self.assertFalse(raised.values["changed"])
+        api.update.assert_not_called()
 
     def test_nested_provider_fields_do_not_cause_change(self):
         config = {"ingress": [{"service": "http_status:404"}]}
@@ -80,16 +83,11 @@ class CfdTunnelConfigurationsTests(TestCase):
                 "ingress": [{"service": "http_status:404", "provider_field": "ignored"}],
             }
         }
-        module = FakeModule({"account_id": "account", "tunnel_id": "tunnel", "config": config})
-        with (
-            patch.object(cfd_tunnel_configurations, "get_result", return_value=current),
-            patch.object(cfd_tunnel_configurations, "put_result") as put,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            cfd_tunnel_configurations.ensure_present(module, {})
 
-        put.assert_not_called()
-        self.assertFalse(raised.exception.values["changed"])
+        raised, api = self.run_module(module_for(config), current)
+
+        api.update.assert_not_called()
+        self.assertFalse(raised.values["changed"])
 
     def test_update_tolerates_server_added_fields(self):
         config = {"ingress": [{"service": "http_status:404"}]}
@@ -100,15 +98,11 @@ class CfdTunnelConfigurationsTests(TestCase):
                 "ingress": [{"service": "http_status:404", "originRequest": {"future_default": "value"}}],
             }
         }
-        module = FakeModule({"account_id": "account", "tunnel_id": "tunnel", "config": config})
-        with (
-            patch.object(cfd_tunnel_configurations, "get_result", return_value={"config": {}}),
-            patch.object(cfd_tunnel_configurations, "put_result", return_value=returned),
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            cfd_tunnel_configurations.ensure_present(module, {})
 
-        self.assertTrue(raised.exception.values["changed"])
+        raised, _ignored = self.run_module(module_for(config), {"config": {}}, returned)
+
+        self.assertIsInstance(raised, ModuleExit)
+        self.assertTrue(raised.values["changed"])
 
     def test_explicit_new_api_fields_are_compared(self):
         desired = {"ingress": [{"service": "http_status:404", "originRequest": {"future_option": True}}]}
@@ -134,21 +128,11 @@ class CfdTunnelConfigurationsTests(TestCase):
                 "warp-routing": {"enabled": False},
             }
         }
-        module = FakeModule({"account_id": "account", "tunnel_id": "tunnel", "config": config})
 
-        with (
-            patch.object(
-                cfd_tunnel_configurations,
-                "get_result",
-                return_value=current,
-            ),
-            patch.object(cfd_tunnel_configurations, "put_result") as put,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            cfd_tunnel_configurations.ensure_present(module, {})
+        raised, api = self.run_module(module_for(config), current)
 
-        put.assert_not_called()
-        self.assertFalse(raised.exception.values["changed"])
+        api.update.assert_not_called()
+        self.assertFalse(raised.values["changed"])
 
     def test_removed_origin_setting_is_updated_and_then_idempotent(self):
         config = {"ingress": [{"service": "https://localhost:443"}, {"service": "http_status:404"}]}
@@ -160,44 +144,29 @@ class CfdTunnelConfigurationsTests(TestCase):
                 ]
             }
         }
-        module = FakeModule({"account_id": "account", "tunnel_id": "tunnel", "config": config})
-        with (
-            patch.object(cfd_tunnel_configurations, "get_result", return_value=current),
-            patch.object(cfd_tunnel_configurations, "put_result", return_value={"config": config}) as put,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            cfd_tunnel_configurations.ensure_present(module, {})
 
-        self.assertTrue(raised.exception.values["changed"])
-        put.assert_called_once_with({}, "/accounts/account/cfd_tunnel/tunnel/configurations", {"config": config})
-        with (
-            patch.object(cfd_tunnel_configurations, "get_result", return_value={"config": config}),
-            patch.object(cfd_tunnel_configurations, "put_result") as put,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            cfd_tunnel_configurations.ensure_present(module, {})
+        raised, api = self.run_module(module_for(config), current, {"config": config})
 
-        self.assertFalse(raised.exception.values["changed"])
-        put.assert_not_called()
+        self.assertTrue(raised.values["changed"])
+        api.update.assert_called_once_with("tunnel", account_id="account", config=config)
+
+        raised, api = self.run_module(module_for(config), {"config": config})
+
+        self.assertFalse(raised.values["changed"])
+        api.update.assert_not_called()
 
     def test_removal_is_predicted_and_postcondition_is_checked(self):
         config = {"ingress": [{"service": "http_status:404"}]}
         current = {"config": {**config, "originRequest": {"noTLSVerify": True}}}
         for check_mode in (True, False):
-            module = FakeModule({"account_id": "account", "tunnel_id": "tunnel", "config": config}, check_mode)
-            with (
-                self.subTest(check_mode=check_mode),
-                patch.object(cfd_tunnel_configurations, "get_result", return_value=current),
-                patch.object(cfd_tunnel_configurations, "put_result", return_value=current) as put,
-                self.assertRaises(ModuleExit if check_mode else ModuleFail) as raised,
-            ):
-                cfd_tunnel_configurations.ensure_present(module, {})
+            with self.subTest(check_mode=check_mode):
+                raised, api = self.run_module(module_for(config, check_mode), current, current)
 
-            if check_mode:
-                put.assert_not_called()
-                self.assertTrue(raised.exception.values["changed"])
-            else:
-                self.assertIn("did not apply", raised.exception.values["msg"])
+                if check_mode:
+                    api.update.assert_not_called()
+                    self.assertTrue(raised.values["changed"])
+                else:
+                    self.assertIn("did not apply", raised.values["msg"])
 
     def test_ingress_defaults_inherit_global_origin_settings(self):
         current = {
@@ -212,64 +181,22 @@ class CfdTunnelConfigurationsTests(TestCase):
         self.assertFalse(current["ingress"][0]["originRequest"]["noTLSVerify"])
 
     def test_check_mode_does_not_update(self):
-        module = FakeModule(
-            {"account_id": "account", "tunnel_id": "tunnel", "config": {"warp": True}},
-            check_mode=True,
-        )
+        raised, api = self.run_module(module_for({"warp": True}, check_mode=True), {"config": {"warp": False}})
 
-        with (
-            patch.object(
-                cfd_tunnel_configurations,
-                "get_result",
-                return_value={"config": {"warp": False}},
-            ),
-            patch.object(cfd_tunnel_configurations, "put_result") as put,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            cfd_tunnel_configurations.ensure_present(module, {})
-
-        put.assert_not_called()
-        self.assertTrue(raised.exception.values["changed"])
+        api.update.assert_not_called()
+        self.assertTrue(raised.values["changed"])
 
     def test_unconfigured_tunnel_is_updated(self):
-        module = FakeModule(
-            {"account_id": "account", "tunnel_id": "tunnel", "config": {"warp": True}},
-            check_mode=True,
-        )
+        for current in ({"config": None}, None):
+            with self.subTest(current=current):
+                raised, api = self.run_module(module_for({"warp": True}, check_mode=True), current)
 
-        with (
-            patch.object(
-                cfd_tunnel_configurations,
-                "get_result",
-                return_value={"config": None},
-            ),
-            patch.object(cfd_tunnel_configurations, "put_result") as put,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            cfd_tunnel_configurations.ensure_present(module, {})
-
-        put.assert_not_called()
-        self.assertTrue(raised.exception.values["changed"])
+                api.update.assert_not_called()
+                self.assertTrue(raised.values["changed"])
 
     def test_rejects_an_unmet_update_postcondition(self):
-        module = FakeModule({"account_id": "account", "tunnel_id": "tunnel", "config": {"warp": True}})
-
-        with (
-            patch.object(
-                cfd_tunnel_configurations,
-                "get_result",
-                return_value={"config": {"warp": False}},
-            ),
-            patch.object(
-                cfd_tunnel_configurations,
-                "put_result",
-                return_value={"config": {"warp": False}},
-            ),
-            self.assertRaises(ModuleFail) as raised,
-        ):
-            cfd_tunnel_configurations.ensure_present(module, {})
-
-        self.assertEqual(
-            raised.exception.values["msg"],
-            "Cloudflare did not apply the tunnel configuration",
+        raised, _ignored = self.run_module(
+            module_for({"warp": True}), {"config": {"warp": False}}, {"config": {"warp": False}}
         )
+
+        self.assertEqual(raised.values["msg"], "Cloudflare did not apply the tunnel configuration")

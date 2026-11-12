@@ -14,17 +14,10 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
 options:
-  account_id:
-    required: true
-    type: str
-    description:
-      - Cloudflare account identifier.
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   name:
     required: true
     type: str
@@ -45,6 +38,8 @@ options:
     type: str
     description:
       - Human-readable purpose of the Rules list.
+      - Defaults to O(name) when creating a Rules list; an existing list's
+        description is preserved when omitted.
   elements:
     type: list
     elements: dict
@@ -56,9 +51,11 @@ options:
     description:
       - Maximum seconds to wait for the bulk item operation to complete, including
         retrying submission while another bulk operation is pending on the account.
-      - Enforced as an upper bound; the remaining budget is applied to every
-        submission and polling request as a single attempt, and the module handles
-        retries within the budget.
+      - Each submission and polling request is made as a single attempt whose
+        timeout is the remaining budget, and the module retries only while budget
+        remains, so polling sleeps never extend past it.
+      - The budget bounds each request's timeout rather than enforcing a hard
+        wall-clock limit, so a single slow request can briefly exceed it.
       - Must be at least 1 second.
       - When executed asynchronously, the async budget must exceed this value.
   state:
@@ -69,17 +66,6 @@ options:
     default: present
     description:
       - Desired state of the resource.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
 """
 
 EXAMPLES = r"""
@@ -123,11 +109,7 @@ items_operation:
   contains:
     id:
       description: Bulk operation identifier.
-      returned: when provided by Cloudflare
-      type: str
-    operation_id:
-      description: Bulk operation identifier.
-      returned: when provided by Cloudflare
+      returned: always
       type: str
     status:
       description: Final bulk operation status.
@@ -142,35 +124,27 @@ message:
 """
 
 import json
-import signal
 import time
-from contextlib import contextmanager
+from ipaddress import ip_address
 
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
-    CloudflareResponseError,
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
-    cloudflare_path,
-    delete_result,
-    fail_from_cloudflare_error,
-    find_by_field,
-    get_result,
-    post_result,
-    put_result,
+    ensure_resource_absent,
+    find_resource,
+    require_applied,
     require_mapping,
     resource_field,
     resource_id,
     serialize_resource,
-    validate_requested_values,
     values_differ,
 )
 
 ITEMS_PER_PAGE = 500
 OPERATION_POLL_SECONDS = 2
-
 
 ITEM_META_FIELDS = (
     "created_on",
@@ -187,52 +161,17 @@ REDIRECT_DEFAULTS = {
 }
 
 
-class OperationDeadlineExpired(BaseException):
-    # Bypass the SDK's broad Exception handler so an expired request cannot retry.
-    pass
-
-
-@contextmanager
-def operation_deadline(seconds):
-    def expire(signum, frame):
-        raise OperationDeadlineExpired()
-
-    started = time.monotonic()
-    previous_handler = signal.signal(signal.SIGALRM, expire)
-    previous_timer = signal.getitimer(signal.ITIMER_REAL)
+def canonical_ip(value):
+    # Cloudflare stores addresses in canonical form, such as compressed IPv6.
+    address, separator, prefix = value.partition("/")
     try:
-        try:
-            signal.setitimer(signal.ITIMER_REAL, seconds)
-            yield started + seconds
-        finally:
-            try:
-                signal.setitimer(signal.ITIMER_REAL, 0)
-            finally:
-                signal.signal(signal.SIGALRM, previous_handler)
-                if previous_timer[0] > 0:
-                    signal.setitimer(
-                        signal.ITIMER_REAL,
-                        max(previous_timer[0] - (time.monotonic() - started), 0.000001),
-                        previous_timer[1],
-                    )
-    except OperationDeadlineExpired:
-        raise CloudflareResponseError("Timed out completing the Rules list items operation") from None
+        return f"{ip_address(address)}{separator}{prefix}"
+    except ValueError:
+        return value
 
 
 def canonical_item(item):
     return json.dumps(item, sort_keys=True, separators=(",", ":"))
-
-
-def endpoint(account_id):
-    return cloudflare_path("accounts", account_id, "rules", "lists")
-
-
-def item_endpoint(account_id, list_id):
-    return cloudflare_path("accounts", account_id, "rules", "lists", list_id)
-
-
-def items_endpoint(account_id, list_id):
-    return cloudflare_path("accounts", account_id, "rules", "lists", list_id, "items")
 
 
 def list_items(module, client, account_id, list_id):
@@ -256,22 +195,11 @@ def list_items(module, client, account_id, list_id):
     return items
 
 
-def operation_endpoint(account_id, operation_id):
-    return cloudflare_path(
-        "accounts",
-        account_id,
-        "rules",
-        "lists",
-        "bulk_operations",
-        operation_id,
-    )
-
-
 def pending_operation_error(exc):
     if getattr(exc, "status_code", None) not in (400, 409, 429):
         return False
 
-    return "operation" in str(exc).lower()
+    return "operation" in f"{exc} {getattr(exc, 'body', '')}".lower()
 
 
 def transient_error(exc):
@@ -282,23 +210,23 @@ def transient_error(exc):
     return status_code == 429 or (isinstance(status_code, int) and status_code >= 500)
 
 
-def submit_items(client, account_id, list_id, elements, deadline):
+def submit_items(module, client, account_id, list_id, items, deadline):
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise CloudflareResponseError("Timed out submitting the Rules list items operation")
+            module.fail_json(msg="Timed out submitting the Rules list items operation", rules_list_id=list_id)
 
         try:
-            operation = put_result(
-                client,
-                items_endpoint(account_id, list_id),
-                elements,
-                timeout=remaining,
-            )
-            if time.monotonic() >= deadline:
-                raise CloudflareResponseError("Timed out submitting the Rules list items operation")
-
-            return operation
+            with cloudflare_error_context(
+                "Cloudflare API request failed while submitting the Rules list items",
+                account_id=account_id,
+                rules_list_id=list_id,
+            ):
+                operation = client.with_options(timeout=remaining, max_retries=0).rules.lists.items.update(
+                    list_id,
+                    account_id=account_id,
+                    body=items,
+                )
         except (cloudflare.APIConnectionError, cloudflare.APIStatusError) as exc:
             if (
                 not (pending_operation_error(exc) or transient_error(exc))
@@ -306,7 +234,13 @@ def submit_items(client, account_id, list_id, elements, deadline):
             ):
                 raise
 
-        time.sleep(OPERATION_POLL_SECONDS)
+            time.sleep(OPERATION_POLL_SECONDS)
+            continue
+
+        if time.monotonic() >= deadline:
+            module.fail_json(msg="Timed out submitting the Rules list items operation", rules_list_id=list_id)
+
+        return serialize_resource(operation)
 
 
 def wait_for_operation(module, client, account_id, operation, deadline):
@@ -325,27 +259,26 @@ def wait_for_operation(module, client, account_id, operation, deadline):
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             module.fail_json(
-                msg="Timed out waiting for the rules list items operation to complete",
+                msg="Timed out waiting for the Rules list items operation to complete",
                 operation_id=operation_id,
                 operation=status,
             )
 
         try:
-            status = get_result(
-                client,
-                operation_endpoint(account_id, operation_id),
-                default={},
-                timeout=remaining,
-            )
+            with cloudflare_error_context(
+                "Cloudflare API request failed while waiting for the Rules list items operation",
+                account_id=account_id,
+                operation_id=operation_id,
+            ):
+                status = serialize_resource(
+                    client.with_options(timeout=remaining, max_retries=0).rules.lists.bulk_operations.get(
+                        operation_id,
+                        account_id=account_id,
+                    )
+                )
         except (cloudflare.APIConnectionError, cloudflare.APIStatusError) as exc:
             if not transient_error(exc) or deadline - time.monotonic() <= 0:
-                fail_from_cloudflare_error(
-                    module,
-                    "Cloudflare API request failed while waiting for the rules list items operation",
-                    exc,
-                    operation_id=operation_id,
-                    operation=status,
-                )
+                raise
 
             status = {}
             time.sleep(min(OPERATION_POLL_SECONDS, max(deadline - time.monotonic(), 0)))
@@ -353,7 +286,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
 
         if time.monotonic() >= deadline:
             module.fail_json(
-                msg="Timed out waiting for the rules list items operation to complete",
+                msg="Timed out waiting for the Rules list items operation to complete",
                 operation_id=operation_id,
             )
 
@@ -363,12 +296,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
                 operation_id=operation_id,
             )
 
-        status_id = resource_id(module, status, "Rules list operation")
-        if status_id != operation_id:
-            module.fail_json(
-                msg="Cloudflare API returned the wrong Rules list operation",
-                operation_id=operation_id,
-            )
+        resource_id(module, status, "Rules list operation", expected=operation_id)
 
         operation_status = status["status"]
         if operation_status == "completed":
@@ -403,6 +331,9 @@ def normalize_items(items):
                 continue
 
             normalized_value = value
+            if key == "ip" and isinstance(normalized_value, str):
+                normalized_value = canonical_ip(normalized_value)
+
             if key == "hostname" and isinstance(normalized_value, dict):
                 hostname = {
                     hostname_key: hostname_value
@@ -429,16 +360,18 @@ def normalize_items(items):
     return sorted(normalized_items.values(), key=canonical_item)
 
 
-def ensure_present(module, client):
-    params = module.params
+def checked_list(module, rules_list, name, kind, expected_id=None):
+    rules_list = serialize_resource(rules_list)
+    resource_id(module, rules_list, "Rules list", expected=expected_id)
+    resource_field(module, rules_list, "name", "Rules list", expected=name)
+    resource_field(module, rules_list, "kind", "Rules list", expected=kind)
+    return rules_list
 
-    current = find_by_field(
-        client,
-        endpoint(params["account_id"]),
-        "name",
-        params["name"],
-        paginate=False,
-    )
+
+def ensure_present(module, client, current):
+    params = module.params
+    account_id = params["account_id"]
+    lists = client.rules.lists
 
     if current is None and params.get("kind") is None:
         module.fail_json(msg="kind is required when creating a Rules list")
@@ -457,15 +390,17 @@ def ensure_present(module, client):
             "kind": params["kind"],
             "name": params["name"],
         }
-        current = post_result(
-            client,
-            endpoint(params["account_id"]),
-            payload,
-        )
-        resource_id(module, current, "Rules list")
-        resource_field(module, current, "name", "Rules list", expected=params["name"])
-        resource_field(module, current, "kind", "Rules list", expected=params["kind"])
-        validate_requested_values(module, current, payload, "Rules list")
+        with cloudflare_error_context(
+            "Cloudflare API request failed while creating the Rules list",
+            account_id=account_id,
+            name=params["name"],
+        ):
+            current = checked_list(
+                module, lists.create(account_id=account_id, **payload), params["name"], params["kind"]
+            )
+
+        require_applied(module, current, payload, "Rules list")
+        current_id = current["id"]
         current_kind = params["kind"]
         changed = True
         created = True
@@ -487,23 +422,21 @@ def ensure_present(module, client):
                     rules_list=current,
                 )
 
-            current = put_result(
-                client,
-                item_endpoint(params["account_id"], current_id),
-                {"description": desired_description},
-            )
-            resource_id(module, current, "Rules list", expected=current_id)
-            resource_field(module, current, "name", "Rules list", expected=params["name"])
-            resource_field(module, current, "kind", "Rules list", expected=current_kind)
-            validate_requested_values(
-                module,
-                current,
-                {"description": desired_description},
-                "Rules list",
-            )
-            changed = True
+            with cloudflare_error_context(
+                "Cloudflare API request failed while updating the Rules list",
+                account_id=account_id,
+                rules_list_id=current_id,
+            ):
+                current = checked_list(
+                    module,
+                    lists.update(current_id, account_id=account_id, description=desired_description),
+                    params["name"],
+                    current_kind,
+                    expected_id=current_id,
+                )
 
-    current_id = resource_id(module, current, "Rules list")
+            require_applied(module, current, {"description": desired_description}, "Rules list")
+            changed = True
 
     if params.get("elements") is not None:
         desired_items = normalize_items(params["elements"])
@@ -521,7 +454,7 @@ def ensure_present(module, client):
             items_changed = True
         else:
             items_changed = values_differ(
-                normalize_items(list_items(module, client, params["account_id"], current_id)),
+                normalize_items(list_items(module, client, account_id, current_id)),
                 desired_items,
             )
 
@@ -533,31 +466,30 @@ def ensure_present(module, client):
             )
 
         if items_changed:
-            with operation_deadline(params["operation_timeout"]) as deadline:
-                items_operation = wait_for_operation(
+            deadline = time.monotonic() + params["operation_timeout"]
+            items_operation = wait_for_operation(
+                module,
+                client,
+                account_id,
+                submit_items(module, client, account_id, current_id, desired_items, deadline),
+                deadline,
+            )
+
+            with cloudflare_error_context(
+                "Cloudflare API request failed while reading the updated Rules list",
+                account_id=account_id,
+                rules_list_id=current_id,
+            ):
+                current = checked_list(
                     module,
-                    client,
-                    params["account_id"],
-                    submit_items(
-                        client,
-                        params["account_id"],
-                        current_id,
-                        desired_items,
-                        deadline,
-                    ),
-                    deadline,
+                    lists.get(current_id, account_id=account_id),
+                    params["name"],
+                    current_kind,
+                    expected_id=current_id,
                 )
 
-            current = get_result(
-                client,
-                item_endpoint(params["account_id"], current_id),
-                default=current,
-            )
-            resource_id(module, current, "Rules list", expected=current_id)
-            resource_field(module, current, "name", "Rules list", expected=params["name"])
-            resource_field(module, current, "kind", "Rules list", expected=current_kind)
             if values_differ(
-                normalize_items(list_items(module, client, params["account_id"], current_id)),
+                normalize_items(list_items(module, client, account_id, current_id)),
                 desired_items,
             ):
                 module.fail_json(msg="Cloudflare did not apply the requested Rules list items")
@@ -580,34 +512,32 @@ def ensure_present(module, client):
     module.exit_json(**result)
 
 
-def ensure_absent(module, client):
+def run(module, client):
     params = module.params
+    account_id = params["account_id"]
+    lists = client.rules.lists
 
-    current = find_by_field(
-        client,
-        endpoint(params["account_id"]),
-        "name",
-        params["name"],
-        paginate=False,
-    )
+    if params["operation_timeout"] < 1:
+        module.fail_json(msg="operation_timeout must be at least 1 second")
 
-    if current is None:
-        module.exit_json(changed=False, message="Rules list already absent")
+    with cloudflare_error_context(
+        "Cloudflare API request failed while finding the Rules list",
+        account_id=account_id,
+        name=params["name"],
+    ):
+        current = find_resource(module, lists.list(account_id=account_id), "Rules list", "name", params["name"])
 
-    if module.check_mode:
-        module.exit_json(
-            changed=True,
-            message="Rules list would be deleted",
-            rules_list=current,
+    if params["state"] == "absent":
+        ensure_resource_absent(
+            module,
+            "rules_list",
+            "Rules list",
+            current,
+            delete=lambda list_id: lists.delete(list_id, account_id=account_id),
+            context={"account_id": account_id},
         )
 
-    current_id = resource_id(module, current, "Rules list")
-    delete_result(client, item_endpoint(params["account_id"], current_id), expected_id=current_id)
-    module.exit_json(
-        changed=True,
-        message="Rules list deleted",
-        rules_list=current,
-    )
+    ensure_present(module, client, current)
 
 
 def main():
@@ -629,14 +559,8 @@ def main():
         supports_check_mode=True,
     )
 
-    if module.params["operation_timeout"] < 1:
-        module.fail_json(msg="operation_timeout must be at least 1 second")
-
     with cloudflare_client(module) as client:
-        if module.params["state"] == "present":
-            ensure_present(module, client)
-        else:
-            ensure_absent(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

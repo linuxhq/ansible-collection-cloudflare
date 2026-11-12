@@ -12,12 +12,9 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
 options:
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   zone_id:
     required: true
     type: str
@@ -57,17 +54,6 @@ options:
     default: present
     description:
       - Desired state of the resource.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
 """
 
 EXAMPLES = r"""
@@ -128,29 +114,18 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    delete_result,
-    list_all,
+    cloudflare_error_context,
+    ensure_resource_absent,
+    ensure_resource_present,
     normalize_current_by_desired_fields,
     payload_from_params,
-    post_result,
-    put_result,
     require_mapping,
-    resource_id,
-    select_fields,
-    validate_requested_values,
+    serialize_resource,
     values_differ,
 )
 
 FIELDS = ("actions", "priority", "status", "targets")
-
-
-def endpoint(zone_id):
-    return cloudflare_path("zones", zone_id, "pagerules")
-
-
-def item_endpoint(zone_id, pagerule_id):
-    return cloudflare_path("zones", zone_id, "pagerules", pagerule_id)
+PRESERVED_FIELDS = ("priority", "status")
 
 
 def pagerule_targets(module, pagerule):
@@ -166,12 +141,19 @@ def pagerule_targets(module, pagerule):
 
 
 def find_pagerule(module, client):
+    zone_id = module.params["zone_id"]
+    targets = module.params["targets"]
+    with cloudflare_error_context(
+        "Cloudflare API request failed while finding the page rule",
+        zone_id=zone_id,
+    ):
+        # The SDK types this response as optional; treat null as no rules.
+        pagerules = client.page_rules.list(zone_id=zone_id) or []
+
     found = None
-    for pagerule in list_all(client, endpoint(module.params["zone_id"]), paginate=False):
-        if not values_differ(
-            normalize_current_by_desired_fields(pagerule_targets(module, pagerule), module.params["targets"]),
-            module.params["targets"],
-        ):
+    for pagerule in pagerules:
+        pagerule = serialize_resource(pagerule)
+        if not values_differ(normalize_current_by_desired_fields(pagerule_targets(module, pagerule), targets), targets):
             if found is not None:
                 module.fail_json(msg="Multiple page rules match the requested target constraints")
 
@@ -180,83 +162,35 @@ def find_pagerule(module, client):
     return found
 
 
-def ensure_present(module, client):
-    params = module.params
+def run(module, client):
+    zone_id = module.params["zone_id"]
+    page_rules = client.page_rules
     current = find_pagerule(module, client)
 
-    payload = payload_from_params(params, FIELDS)
+    if module.params["state"] == "absent":
+        ensure_resource_absent(
+            module,
+            "pagerule",
+            "page rule",
+            current,
+            delete=lambda pagerule_id: page_rules.delete(pagerule_id=pagerule_id, zone_id=zone_id),
+            context={"zone_id": zone_id},
+        )
 
+    payload = payload_from_params(module.params, FIELDS)
     if current is None:
         payload.setdefault("status", "active")
 
-        if module.check_mode:
-            module.exit_json(changed=True, message="Page rule would be created")
-
-        pagerule = post_result(client, endpoint(params["zone_id"]), payload)
-        resource_id(module, pagerule, "page rule")
-        validate_requested_values(module, pagerule, payload, "page rule")
-        module.exit_json(
-            changed=True,
-            message="Page rule created",
-            pagerule=pagerule,
-        )
-
-    for field in ("priority", "status"):
-        if field not in payload and current.get(field) is not None:
-            payload[field] = current[field]
-
-    if not values_differ(
-        normalize_current_by_desired_fields(select_fields(current, payload.keys()), payload),
+    ensure_resource_present(
+        module,
+        "pagerule",
+        "page rule",
+        current,
         payload,
-    ):
-        module.exit_json(
-            changed=False,
-            message="Page rule already present",
-            pagerule=current,
-        )
-
-    if module.check_mode:
-        module.exit_json(
-            changed=True,
-            message="Page rule would be updated",
-            pagerule=current,
-        )
-
-    current_id = resource_id(module, current, "page rule")
-    pagerule = put_result(
-        client,
-        item_endpoint(params["zone_id"], current_id),
-        payload,
-    )
-    resource_id(module, pagerule, "page rule", expected=current_id)
-    validate_requested_values(module, pagerule, payload, "page rule")
-    module.exit_json(
-        changed=True,
-        message="Page rule updated",
-        pagerule=pagerule,
-    )
-
-
-def ensure_absent(module, client):
-    params = module.params
-    current = find_pagerule(module, client)
-
-    if current is None:
-        module.exit_json(changed=False, message="Page rule already absent")
-
-    if module.check_mode:
-        module.exit_json(
-            changed=True,
-            message="Page rule would be deleted",
-            pagerule=current,
-        )
-
-    current_id = resource_id(module, current, "page rule")
-    delete_result(client, item_endpoint(params["zone_id"], current_id), expected_id=current_id)
-    module.exit_json(
-        changed=True,
-        message="Page rule deleted",
-        pagerule=current,
+        create=lambda payload: page_rules.create(zone_id=zone_id, **payload),
+        update=lambda pagerule_id, payload: page_rules.update(pagerule_id=pagerule_id, zone_id=zone_id, **payload),
+        preserved_fields=PRESERVED_FIELDS,
+        context={"zone_id": zone_id},
     )
 
 
@@ -283,10 +217,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        if module.params["state"] == "present":
-            ensure_present(module, client)
-        else:
-            ensure_absent(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

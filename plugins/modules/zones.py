@@ -12,20 +12,20 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
 options:
-  api_token:
-    required: true
-    type: str
-    description:
-      - Cloudflare API token.
   name:
     required: true
     type: str
     description:
       - Fully qualified domain name of the zone.
+      - Matched case-insensitively.
   account_id:
     description:
       - Account identifier used when creating a zone.
+      - Required when creating a zone.
+      - When provided, also limits the zone lookup to this account.
     type: str
   type:
     type: str
@@ -56,6 +56,9 @@ options:
       value:
         description:
           - Desired zone setting value.
+          - For object values, only the provided nested fields are compared.
+          - For settings Cloudflare exposes as an C(enabled) flag, such as
+            C(ssl_recommender), the value sets that flag.
         required: true
         type: raw
   state:
@@ -66,17 +69,6 @@ options:
     default: present
     description:
       - Desired state of the resource.
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
 """
 
 EXAMPLES = r"""
@@ -113,7 +105,7 @@ zone:
       type: str
 settings:
   description: Updated zone settings.
-  returned: when the zone or its settings changed
+  returned: when O(state=present) changed the zone or its settings, outside check mode
   type: list
   elements: dict
   contains:
@@ -123,8 +115,12 @@ settings:
       type: str
     value:
       description: Updated zone setting value.
-      returned: always
+      returned: when the setting holds a value
       type: raw
+    enabled:
+      description: Updated flag of a setting Cloudflare exposes as enabled, such as C(ssl_recommender).
+      returned: when the setting holds an enabled flag
+      type: bool
 message:
   returned: always
   type: str
@@ -137,22 +133,17 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    delete_result,
-    find_by_name,
-    get_result,
-    patch_result,
-    post_result,
+    cloudflare_error_context,
+    ensure_resource_absent,
+    find_resource,
+    normalize_current_by_desired_fields,
+    require_applied,
     resource_field,
     resource_id,
     select_fields,
-    validate_requested_values,
+    serialize_resource,
     values_differ,
 )
-
-
-def settings_endpoint(zone_id, setting_id):
-    return cloudflare_path("zones", zone_id, "settings", setting_id)
 
 
 def normalize_setting_value(value):
@@ -165,165 +156,198 @@ def normalize_setting_value(value):
     if isinstance(value, bool):
         return str(value).lower()
 
+    if isinstance(value, float) and value.is_integer():
+        # The SDK decodes some integer settings, such as browser_cache_ttl, as floats.
+        value = int(value)
+
     if isinstance(value, (int, float)):
         return str(value)
 
     return value
 
 
-def zone_endpoint(zone_id=None):
-    if zone_id is None:
-        return cloudflare_path("zones")
+def setting_matches(current_value, desired_value):
+    return normalize_setting_value(
+        normalize_current_by_desired_fields(current_value, desired_value)
+    ) == normalize_setting_value(desired_value)
 
-    return cloudflare_path("zones", zone_id)
 
-
-def ensure_present(module, client):
-    params = module.params
-
+def validate_settings(module):
     setting_ids = set()
-    for setting in params.get("settings") or []:
-        if (
-            not isinstance(setting.get("id"), str)
-            or not setting["id"].strip()
-            or setting["id"] != setting["id"].strip()
-            or "value" not in setting
-            or setting["id"] in setting_ids
-        ):
-            module.fail_json(msg="Each zone setting requires a unique valid id and value")
+    for setting in module.params.get("settings") or []:
+        if not setting["id"].strip() or setting["id"] != setting["id"].strip() or setting["id"] in setting_ids:
+            module.fail_json(msg="Each zone setting requires a unique valid id")
 
         setting_ids.add(setting["id"])
 
-    current = find_by_name(
-        client,
-        zone_endpoint(),
-        params["name"],
-        paginate=False,
-    )
 
-    if current is None:
-        if params.get("account_id") is None:
-            module.fail_json(msg="account_id is required when creating a zone")
+def find_zone(module, client):
+    name = module.params["name"]
+    account_id = module.params.get("account_id")
+    query = {"name": name}
+    context = {"name": name}
+    if account_id is not None:
+        query["account"] = {"id": account_id}
+        context["account_id"] = account_id
 
-        if module.check_mode:
-            module.exit_json(changed=True, message="Zone would be created")
+    with cloudflare_error_context("Cloudflare API request failed while finding the zone", **context):
+        return find_resource(module, client.zones.list(**query), "zone", "name", name)
 
-        payload = {
-            "account": {"id": params["account_id"]},
-            "name": params["name"],
-            "type": params.get("type") or "full",
-        }
-        current = post_result(client, zone_endpoint(), payload)
-        current_id = resource_id(module, current, "zone")
-        resource_field(module, current, "name", "zone", expected=params["name"])
-        validate_requested_values(module, current, payload, "zone")
 
-        if params.get("vanity_name_servers") is not None:
-            current = patch_result(
-                client,
-                zone_endpoint(current_id),
-                {"vanity_name_servers": params["vanity_name_servers"]},
-            )
-            current_id = resource_id(module, current, "zone", expected=current_id)
-            resource_field(module, current, "name", "zone", expected=params["name"])
-            validate_requested_values(
-                module,
-                current,
-                {"vanity_name_servers": params["vanity_name_servers"]},
-                "zone",
-            )
+def checked_zone(module, zone, payload, expected_id=None):
+    zone = serialize_resource(zone)
+    resource_id(module, zone, "zone", expected=expected_id)
+    resource_field(module, zone, "name", "zone", expected=module.params["name"])
+    require_applied(module, zone, payload, "zone")
+    return zone
 
-        changed = True
-        created = True
-    else:
-        current_id = resource_id(module, current, "zone")
-        payload = {field: params[field] for field in ("type", "vanity_name_servers") if params.get(field) is not None}
-        changed = False
-        if payload and values_differ(select_fields(current, payload.keys()), payload):
-            if module.check_mode:
-                module.exit_json(
-                    changed=True,
-                    message="Zone would be updated",
-                    zone=current,
-                )
 
-            current = patch_result(client, zone_endpoint(current_id), payload)
-            current_id = resource_id(module, current, "zone", expected=current_id)
-            resource_field(module, current, "name", "zone", expected=params["name"])
-            validate_requested_values(module, current, payload, "zone")
-            changed = True
+def edit_zone(module, client, zone_id, payload):
+    with cloudflare_error_context(
+        "Cloudflare API request failed while updating the zone",
+        zone_id=zone_id,
+    ):
+        return checked_zone(module, client.zones.edit(zone_id=zone_id, **payload), payload, expected_id=zone_id)
 
-        created = False
 
-    updated_settings = []
-    for setting in params.get("settings") or []:
-        existing = get_result(
+def create_zone(module, client):
+    params = module.params
+    if params.get("account_id") is None:
+        module.fail_json(msg="account_id is required when creating a zone")
+
+    if module.check_mode:
+        module.exit_json(changed=True, message="Zone would be created")
+
+    payload = {
+        "account": {"id": params["account_id"]},
+        "name": params["name"],
+        "type": params.get("type") or "full",
+    }
+    with cloudflare_error_context(
+        "Cloudflare API request failed while creating the zone",
+        account_id=params["account_id"],
+        name=params["name"],
+    ):
+        zone = checked_zone(module, client.zones.create(**payload), payload)
+
+    if params.get("vanity_name_servers") is not None:
+        zone = edit_zone(
+            module,
             client,
-            settings_endpoint(current_id, setting["id"]),
-            default={},
+            zone["id"],
+            {"vanity_name_servers": params["vanity_name_servers"]},
         )
-        if not isinstance(existing, dict) or "value" not in existing:
-            module.fail_json(msg="Cloudflare API returned malformed zone setting data")
 
-        if normalize_setting_value(existing.get("value")) == normalize_setting_value(setting["value"]):
+    return zone
+
+
+def update_zone(module, client, zone):
+    changed = False
+    # Cloudflare edits only one zone property per request.
+    for field in ("type", "vanity_name_servers"):
+        if module.params.get(field) is None:
+            continue
+
+        payload = {field: module.params[field]}
+        if not values_differ(select_fields(zone, payload), payload):
             continue
 
         if module.check_mode:
-            module.exit_json(
-                changed=True,
-                message="Zone settings would be updated",
-                zone=current,
-            )
+            module.exit_json(changed=True, message="Zone would be updated", zone=zone)
 
-        updated_setting = patch_result(
-            client,
-            settings_endpoint(current_id, setting["id"]),
-            {"value": setting["value"]},
-        )
-        resource_id(module, updated_setting, "zone setting", expected=setting["id"])
-        if "value" not in updated_setting:
+        zone = edit_zone(module, client, zone["id"], payload)
+        changed = True
+
+    return zone, changed
+
+
+def setting_field(setting):
+    if isinstance(setting, dict):
+        for field in ("value", "enabled"):
+            if field in setting:
+                return field
+
+    return None
+
+
+def update_settings(module, client, zone):
+    zone_id = zone["id"]
+    updated_settings = []
+    for setting in module.params.get("settings") or []:
+        setting_id = setting["id"]
+        with cloudflare_error_context(
+            "Cloudflare API request failed while gathering the zone setting",
+            zone_id=zone_id,
+            setting_id=setting_id,
+        ):
+            existing = serialize_resource(client.zones.settings.get(setting_id=setting_id, zone_id=zone_id))
+
+        # Most settings hold a value; a few, such as ssl_recommender, an enabled flag.
+        field = setting_field(existing)
+        if field is None:
             module.fail_json(msg="Cloudflare API returned malformed zone setting data")
 
-        if normalize_setting_value(updated_setting["value"]) != normalize_setting_value(setting["value"]):
+        if setting_matches(existing[field], setting["value"]):
+            continue
+
+        if module.check_mode:
+            module.exit_json(changed=True, message="Zone settings would be updated", zone=zone)
+
+        with cloudflare_error_context(
+            "Cloudflare API request failed while updating the zone setting",
+            zone_id=zone_id,
+            setting_id=setting_id,
+        ):
+            updated = serialize_resource(
+                client.zones.settings.edit(setting_id=setting_id, zone_id=zone_id, **{field: setting["value"]})
+            )
+
+        resource_id(module, updated, "zone setting", expected=setting_id)
+        if field not in updated:
+            module.fail_json(msg="Cloudflare API returned malformed zone setting data")
+
+        if not setting_matches(updated[field], setting["value"]):
             module.fail_json(msg="Cloudflare did not apply the requested zone setting")
 
-        updated_settings.append(updated_setting)
+        updated_settings.append(updated)
 
+    return updated_settings
+
+
+def run(module, client):
+    # DNS names are case-insensitive and Cloudflare stores zone names in lowercase.
+    module.params["name"] = module.params["name"].lower()
+    if module.params["state"] == "present":
+        validate_settings(module)
+
+    current = find_zone(module, client)
+
+    if module.params["state"] == "absent":
+        ensure_resource_absent(
+            module,
+            "zone",
+            "zone",
+            current,
+            delete=lambda zone_id: client.zones.delete(zone_id=zone_id),
+        )
+
+    if current is None:
+        zone = create_zone(module, client)
+        changed = True
+    else:
+        resource_id(module, current, "zone")
+        zone, changed = update_zone(module, client, current)
+
+    updated_settings = update_settings(module, client, zone)
     if not changed and not updated_settings:
-        module.exit_json(changed=False, message="Zone already present", zone=current)
+        module.exit_json(changed=False, message="Zone already present", zone=zone)
 
     module.exit_json(
         changed=True,
-        message="Zone created" if created else "Zone updated",
-        zone=current,
+        message="Zone created" if current is None else "Zone updated",
+        zone=zone,
         settings=updated_settings,
     )
-
-
-def ensure_absent(module, client):
-    params = module.params
-
-    current = find_by_name(
-        client,
-        zone_endpoint(),
-        params["name"],
-        paginate=False,
-    )
-
-    if current is None:
-        module.exit_json(changed=False, message="Zone already absent")
-
-    current_id = resource_id(module, current, "zone")
-
-    if module.check_mode:
-        module.exit_json(
-            changed=True,
-            message="Zone would be deleted",
-            zone=current,
-        )
-
-    delete_result(client, zone_endpoint(current_id), expected_id=current_id)
-    module.exit_json(changed=True, message="Zone deleted", zone=current)
 
 
 def main():
@@ -355,10 +379,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        if module.params["state"] == "present":
-            ensure_present(module, client)
-        else:
-            ensure_absent(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

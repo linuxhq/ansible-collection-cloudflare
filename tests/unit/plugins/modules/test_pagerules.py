@@ -1,7 +1,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import Mock
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import pagerules
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
@@ -10,164 +10,147 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     ModuleFail,
 )
 
+ACTIONS = [{"id": "always_use_https"}]
 TARGETS = [{"target": "url", "constraint": {"value": "example.com/*"}}]
 
 
 def params(**updates):
     values = {
         "zone_id": "zone",
-        "actions": [{"id": "always_use_https"}],
+        "actions": ACTIONS,
         "targets": TARGETS,
         "priority": None,
         "status": None,
+        "state": "present",
     }
     values.update(updates)
     return values
 
 
-class PageRulesTests(TestCase):
-    def test_finds_rule_in_large_unpaginated_response(self):
-        rules = [{"id": str(index), "targets": []} for index in range(124)]
-        rules.append({"id": "match", "targets": TARGETS})
-        client = MagicMock()
-        client.get.side_effect = [{"success": True, "result": rules}]
+def client_with(rules=(), created=None, updated=None, deleted=None):
+    client = Mock()
+    api = client.page_rules
+    api.list.return_value = list(rules)
+    api.create.return_value = created
+    api.update.return_value = updated
+    api.delete.return_value = deleted
+    return client, api
 
-        self.assertEqual(pagerules.find_pagerule(FakeModule(params()), client), rules[-1])
-        client.get.assert_called_once_with("/zones/zone/pagerules", cast_to=object, options={})
+
+class PageRulesTests(TestCase):
+    def run_module(self, module, client):
+        with self.assertRaises((ModuleExit, ModuleFail)) as raised:
+            pagerules.run(module, client)
+
+        return raised.exception.values
+
+    def test_finds_rule_by_targets(self):
+        rules = [{"id": str(index), "targets": []} for index in range(124)]
+        rules.append({"id": "match", "actions": ACTIONS, "targets": TARGETS})
+        client, api = client_with(rules)
+
+        result = self.run_module(FakeModule(params()), client)
+
+        api.list.assert_called_once_with(zone_id="zone")
+        self.assertEqual(result["pagerule"], rules[-1])
 
     def test_rejects_malformed_targets(self):
         for targets in ({}, ["invalid"]):
-            module = FakeModule(params())
+            with self.subTest(targets=targets):
+                client, _ignored = client_with([{"id": "rule", "targets": targets}])
 
-            with (
-                self.subTest(targets=targets),
-                patch.object(pagerules, "list_all", return_value=[{"targets": targets}]),
-                self.assertRaises(ModuleFail) as raised,
-            ):
-                pagerules.find_pagerule(module, {})
+                result = self.run_module(FakeModule(params()), client)
 
-            self.assertIn("malformed page rule", raised.exception.values["msg"])
+                self.assertIn("malformed page rule", result["msg"])
 
     def test_rejects_ambiguous_target_match(self):
-        module = FakeModule(params())
+        client, _ignored = client_with([{"id": "one", "targets": TARGETS}, {"id": "two", "targets": TARGETS}])
 
-        with (
-            patch.object(
-                pagerules,
-                "list_all",
-                return_value=[
-                    {"id": "one", "targets": TARGETS},
-                    {"id": "two", "targets": TARGETS},
-                ],
-            ),
-            self.assertRaises(ModuleFail) as raised,
-        ):
-            pagerules.find_pagerule(module, {})
+        result = self.run_module(FakeModule(params()), client)
 
-        self.assertIn("Multiple page rules", raised.exception.values["msg"])
+        self.assertIn("Multiple page rules", result["msg"])
+
+    def test_check_mode_does_not_create(self):
+        client, api = client_with()
+
+        result = self.run_module(FakeModule(params(), check_mode=True), client)
+
+        api.create.assert_not_called()
+        self.assertTrue(result["changed"])
 
     def test_create_defaults_status_to_active(self):
-        module = FakeModule(params())
-        created = {
-            "id": "rule",
-            "actions": [{"id": "always_use_https"}],
-            "status": "active",
-            "targets": TARGETS,
-        }
+        created = {"id": "rule", "actions": ACTIONS, "status": "active", "targets": TARGETS}
+        client, api = client_with(created=created)
 
-        with (
-            patch.object(pagerules, "list_all", return_value=[]),
-            patch.object(pagerules, "post_result", return_value=created) as post,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            pagerules.ensure_present(module, {})
+        result = self.run_module(FakeModule(params()), client)
 
-        post.assert_called_once_with(
-            {},
-            "/zones/zone/pagerules",
-            {
-                "actions": [{"id": "always_use_https"}],
-                "status": "active",
-                "targets": TARGETS,
-            },
-        )
-        self.assertEqual(raised.exception.values["pagerule"], created)
+        api.create.assert_called_once_with(zone_id="zone", actions=ACTIONS, status="active", targets=TARGETS)
+        self.assertEqual(result["pagerule"], created)
 
     def test_rejects_a_create_response_with_different_targets(self):
-        module = FakeModule(params())
+        client, _ignored = client_with(created={"id": "rule", "targets": []})
 
-        with (
-            patch.object(pagerules, "list_all", return_value=[]),
-            patch.object(
-                pagerules,
-                "post_result",
-                return_value={"id": "rule", "targets": []},
-            ),
-            self.assertRaises(ModuleFail) as raised,
-        ):
-            pagerules.ensure_present(module, {})
+        result = self.run_module(FakeModule(params()), client)
 
-        self.assertEqual(
-            raised.exception.values["msg"],
-            "Cloudflare did not apply the requested page rule",
-        )
+        self.assertEqual(result["msg"], "Cloudflare did not apply the requested page rule")
 
     def test_omitted_status_and_priority_preserve_current_values(self):
-        current = {
-            "id": "rule",
-            "actions": [{"id": "always_use_https"}],
-            "priority": 10,
-            "status": "disabled",
-            "targets": TARGETS,
-        }
-        module = FakeModule(params())
+        current = {"id": "rule", "actions": ACTIONS, "priority": 10, "status": "disabled", "targets": TARGETS}
+        client, api = client_with([current])
 
-        with (
-            patch.object(pagerules, "list_all", return_value=[current]),
-            patch.object(pagerules, "put_result") as put,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            pagerules.ensure_present(module, {})
+        result = self.run_module(FakeModule(params()), client)
 
-        put.assert_not_called()
-        self.assertFalse(raised.exception.values["changed"])
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_update_sends_preserved_status_and_priority(self):
+        actions = [{"id": "ssl", "value": "full"}]
+        current = {"id": "rule", "actions": ACTIONS, "priority": 10, "status": "disabled", "targets": TARGETS}
+        updated = {**current, "actions": actions}
+        client, api = client_with([current], updated=updated)
+
+        result = self.run_module(FakeModule(params(actions=actions)), client)
+
+        api.update.assert_called_once_with(
+            pagerule_id="rule", zone_id="zone", actions=actions, priority=10, status="disabled", targets=TARGETS
+        )
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["pagerule"], updated)
+
+    def test_check_mode_does_not_update(self):
+        current = {"id": "rule", "actions": ACTIONS, "status": "active", "targets": TARGETS}
+        client, api = client_with([current])
+
+        result = self.run_module(FakeModule(params(status="disabled"), check_mode=True), client)
+
+        api.update.assert_not_called()
+        self.assertTrue(result["changed"])
 
     def test_nested_provider_fields_do_not_cause_change(self):
         current = {
             "id": "rule",
             "actions": [{"id": "always_use_https", "provider_default": True}],
-            "targets": [
-                {
-                    "target": "url",
-                    "constraint": {
-                        "value": "example.com/*",
-                        "provider_default": True,
-                    },
-                }
-            ],
+            "targets": [{"target": "url", "constraint": {"value": "example.com/*", "provider_default": True}}],
         }
-        module = FakeModule(params())
+        client, api = client_with([current])
 
-        with (
-            patch.object(pagerules, "list_all", return_value=[current]),
-            patch.object(pagerules, "put_result") as put,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            pagerules.ensure_present(module, {})
+        result = self.run_module(FakeModule(params()), client)
 
-        put.assert_not_called()
-        self.assertFalse(raised.exception.values["changed"])
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
 
     def test_check_mode_does_not_delete_matching_rule(self):
-        current = {"id": "rule", "targets": TARGETS}
-        module = FakeModule(params(), check_mode=True)
+        client, api = client_with([{"id": "rule", "targets": TARGETS}])
 
-        with (
-            patch.object(pagerules, "list_all", return_value=[current]),
-            patch.object(pagerules, "delete_result") as delete,
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            pagerules.ensure_absent(module, {})
+        result = self.run_module(FakeModule(params(state="absent"), check_mode=True), client)
 
-        delete.assert_not_called()
-        self.assertTrue(raised.exception.values["changed"])
+        api.delete.assert_not_called()
+        self.assertTrue(result["changed"])
+
+    def test_deletes_matching_rule(self):
+        client, api = client_with([{"id": "rule", "targets": TARGETS}], deleted={"id": "rule"})
+
+        result = self.run_module(FakeModule(params(state="absent")), client)
+
+        api.delete.assert_called_once_with(pagerule_id="rule", zone_id="zone")
+        self.assertTrue(result["changed"])

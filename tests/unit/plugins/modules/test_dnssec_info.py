@@ -1,126 +1,81 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import dnssec_info
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    connection_error,
+    status_error,
 )
 
 
-class Model:
-    def __init__(self, value):
-        self.value = value
-
-    def to_dict(self):
-        return self.value
-
-
-class ApiError(Exception):
-    pass
-
-
-class ApiStatusError(ApiError):
-    pass
-
-
-class ApiConnectionError(ApiError):
-    pass
+def client_with(dnssec=None, error=None):
+    client = Mock()
+    client.zones.list.return_value = [{"id": "zone", "name": "example.com"}]
+    client.dns.dnssec.get.return_value = dnssec
+    client.dns.dnssec.get.side_effect = error
+    return client
 
 
 class DnssecInfoTests(TestCase):
     def test_lists_dnssec_for_valid_zones(self):
-        module = FakeModule({})
-        client = Mock()
-        client.zones.list.return_value = [
-            Model({"id": "zone", "name": "example.com"}),
-        ]
-        client.dns.dnssec.get.return_value = Model({"status": "active"})
+        client = client_with({"status": "active"})
 
         with self.assertRaises(ModuleExit) as raised:
-            dnssec_info.list_resources(module, client)
+            dnssec_info.run(FakeModule({}), client)
 
         client.dns.dnssec.get.assert_called_once_with(zone_id="zone")
         self.assertEqual(
-            raised.exception.values["dnssec"],
-            [
-                {
-                    "id": "zone",
-                    "name": "example.com",
-                    "dnssec": {"status": "active"},
-                }
-            ],
+            raised.exception.values,
+            {
+                "changed": False,
+                "dnssec": [{"id": "zone", "name": "example.com", "dnssec": {"status": "active"}}],
+                "skipped_zones": [],
+            },
         )
-        self.assertEqual(raised.exception.values["skipped_zones"], [])
-        self.assertFalse(raised.exception.values["changed"])
 
-    def test_redacts_skipped_zone_error_details(self):
-        client = Mock()
-        client.zones.list.return_value = [
-            Model({"id": "zone", "name": "example.com"}),
-        ]
-        error = ApiStatusError("unsupported")
-        error.status_code = 400
-        error.response = Mock()
-        error.response.json.return_value = {
-            "errors": [{"api_token": "secret"}],
-            "messages": ["invalid"],
-        }
-        client.dns.dnssec.get.side_effect = error
+    def test_skips_unsupported_zones_with_error_details(self):
+        for status_code in (400, 404):
+            with self.subTest(status_code=status_code):
+                error = status_error(status_code, {"errors": [{"api_token": "secret"}], "messages": ["invalid"]})
 
-        with (
-            patch.object(
-                dnssec_info,
-                "cloudflare",
-                SimpleNamespace(
-                    APIConnectionError=ApiConnectionError,
-                    APIStatusError=ApiStatusError,
-                    APIError=ApiError,
-                ),
-            ),
-            self.assertRaises(ModuleExit) as raised,
-        ):
-            dnssec_info.list_resources(FakeModule({}), client)
+                with self.assertRaises(ModuleExit) as raised:
+                    dnssec_info.run(FakeModule({}), client_with(error=error))
+
+                self.assertEqual(raised.exception.values["dnssec"], [])
+                self.assertEqual(
+                    raised.exception.values["skipped_zones"],
+                    [
+                        {
+                            "zone_id": "zone",
+                            "zone_name": "example.com",
+                            "status_code": status_code,
+                            "errors": [{"api_token": "secret"}],
+                            "messages": [],
+                        }
+                    ],
+                )
+
+    def test_reports_unstructured_skip_details(self):
+        with self.assertRaises(ModuleExit) as raised:
+            dnssec_info.run(FakeModule({}), client_with(error=status_error(404, ["not-a-mapping"])))
 
         self.assertEqual(
-            raised.exception.values["skipped_zones"][0]["errors"],
-            [{"api_token": "********"}],
-        )
-        self.assertEqual(
-            raised.exception.values["skipped_zones"][0]["messages"],
-            [],
+            raised.exception.values["skipped_zones"][0]["error"],
+            "Cloudflare API did not return structured error details",
         )
 
-    def test_preserves_zone_context_for_generic_sdk_errors(self):
-        client = Mock()
-        client.zones.list.return_value = [
-            Model({"id": "zone", "name": "example.com"}),
-        ]
-        error = ApiError("invalid response")
-        client.dns.dnssec.get.side_effect = error
+    def test_preserves_zone_context_for_other_errors(self):
+        for error in (status_error(403), connection_error()):
+            with self.subTest(error=type(error).__name__), self.assertRaises(type(error)) as raised:
+                dnssec_info.run(FakeModule({}), client_with(error=error))
 
-        with (
-            patch.object(
-                dnssec_info,
-                "cloudflare",
-                SimpleNamespace(
-                    APIConnectionError=ApiConnectionError,
-                    APIStatusError=ApiStatusError,
-                    APIError=ApiError,
-                ),
-            ),
-            self.assertRaises(ApiError),
-        ):
-            dnssec_info.list_resources(FakeModule({}), client)
-
-        self.assertEqual(
-            error._cloudflare_message,
-            "Cloudflare API error while gathering DNSSEC information",
-        )
-        self.assertEqual(
-            error._cloudflare_context,
-            {"zone": {"id": "zone", "name": "example.com"}},
-        )
+            self.assertIs(raised.exception, error)
+            self.assertEqual(
+                error._cloudflare_message,
+                "Cloudflare API request failed while gathering DNSSEC information",
+            )
+            self.assertEqual(error._cloudflare_context, {"zone_id": "zone"})

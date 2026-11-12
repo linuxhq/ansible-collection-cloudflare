@@ -6,13 +6,13 @@
     account_id: "{{ devices_settings_account_id }}"
     api_token: "{{ devices_settings_api_token }}"
     disable_for_time:
-      "{{ devices_settings_disable_for_time or omit }}"
+      "{{ devices_settings_disable_for_time }}"
     gateway_proxy_enabled:
-      "{{ devices_settings_gateway_proxy_enabled or omit }}"
+      "{{ devices_settings_gateway_proxy_enabled }}"
     gateway_udp_proxy_enabled:
-      "{{ devices_settings_gateway_udp_proxy_enabled or omit }}"
+      "{{ devices_settings_gateway_udp_proxy_enabled }}"
     root_certificate_installation_enabled:
-      "{{ devices_settings_root_certificate_installation_enabled or omit }}"
+      "{{ devices_settings_root_certificate_installation_enabled }}"
     use_zt_virtual_ip:
       "{{ devices_settings_use_zt_virtual_ip }}"
   when:

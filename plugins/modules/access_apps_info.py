@@ -9,32 +9,15 @@ module: access_apps_info
 short_description: Gather information about Cloudflare Access applications
 description:
   - Gather Cloudflare Access applications for an account.
-  - Secret fields are redacted from returned applications.
+  - Results include sensitive values returned by Cloudflare, such as client secrets; protect registered
+    results and task output, for example with C(no_log).
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
-options:
-  account_id:
-    description:
-      - Cloudflare account identifier.
-    required: true
-    type: str
-  api_token:
-    description:
-      - Cloudflare API token with permissions to read Access applications.
-    required: true
-    type: str
-requirements:
-  - python >= 3.9
-  - cloudflare >= 5.7.0, < 6
-attributes:
-  check_mode:
-    description: Supports predicting changes without applying them.
-    support: full
-  diff_mode:
-    description: Determines whether the module returns change details in diff format.
-    support: none
-
+extends_documentation_fragment:
+  - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.account
+options: {}
 """
 
 EXAMPLES = r"""
@@ -67,24 +50,23 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
-    cloudflare_path,
-    list_all,
-    redact_access_app_secrets,
-    validate_resource_fields,
+    cloudflare_error_context,
+    exit_resource_list,
 )
 
 
-def list_resources(module, client):
-    access_apps = list_all(
-        client,
-        cloudflare_path("accounts", module.params["account_id"], "access", "apps"),
-    )
-    validate_resource_fields(module, access_apps, ("id", "name"), "Access application")
-
-    for access_app in access_apps:
-        redact_access_app_secrets(access_app)
-
-    module.exit_json(changed=False, access_apps=access_apps)
+def run(module, client):
+    account_id = module.params["account_id"]
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering Access applications",
+        account_id=account_id,
+    ):
+        exit_resource_list(
+            module,
+            "access_apps",
+            client.zero_trust.access.applications.list(account_id=account_id),
+            "Access application",
+        )
 
 
 def main():
@@ -97,7 +79,7 @@ def main():
     )
 
     with cloudflare_client(module) as client:
-        list_resources(module, client)
+        run(module, client)
 
 
 if __name__ == "__main__":

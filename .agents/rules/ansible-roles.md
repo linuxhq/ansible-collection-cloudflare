@@ -163,7 +163,6 @@ Standards for designing, implementing, documenting, and testing content under
 - Set asynchronous execution to zero in check mode.
 - Poll submitted jobs with `ansible.builtin.async_status` and a bounded retry.
 - Let completed job results report the operation's final change and failure.
-- Keep secret protection on both submission and status tasks.
 
 ## Info roles
 
@@ -174,7 +173,8 @@ Standards for designing, implementing, documenting, and testing content under
 - Publish `_{{ role }}_dict` only when items have a stable, unique key.
 - Publish named scalar facts when list or dictionary output is not meaningful.
 - Default missing provider collections to `[]` and mappings to `{}`.
-- Never publish credentials, secret values, or unfiltered sensitive results.
+- Publish provider data unmodified; callers protect sensitive output with
+  task-level `no_log`.
 - Document every published fact under `Return Values`.
 - Set `allow_duplicates: true` when the info role must run repeatedly as a
   dependency or with distinct parameters.
@@ -238,15 +238,12 @@ Standards for designing, implementing, documenting, and testing content under
 
 ## Security
 
-- Keep credentials and secret material out of defaults, examples, labels,
-  debug output, registered public facts, and failure messages.
-- Apply `no_log` to every task and async status path that can expose a secret.
+- Keep credentials out of defaults, examples, and loop labels.
 - Do not disable TLS certificate validation by default.
 - Pass certificate validation as `true` when a module exposes the option, or
   use a public override whose default remains `true`.
 - Use HTTPS and provider-supported integrity checks for downloaded artifacts.
 - Do not make sensitive files readable by users that do not require access.
-- Avoid logging complete provider results when they may contain secret data.
 
 ## Metadata and documentation
 
@@ -280,7 +277,6 @@ Standards for designing, implementing, documenting, and testing content under
 - Exercise check mode, converge, a second check, idempotence, and verification.
 - For manager roles, verify create, stable state, and cleanup or absence.
 - For info roles, create representative fixtures and assert published facts.
-- Verify sensitive fields are absent from public facts and displayed output.
 - For host roles, verify files, permissions, rendered content, and services.
 - Keep prerequisite fixture roles out of the role's idempotence measurement.
 - Read credentials from the environment and never commit live values.
