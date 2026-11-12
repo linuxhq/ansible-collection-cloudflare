@@ -1,6 +1,6 @@
 ansible>=14.4.0,<15
 ansible-lint==26.9.0
-antsibull-changelog==0.35.1
+antsibull-changelog==0.36.0
 black==26.5.1
 blank-line-after-blocks==0.1.4
 cloudflare>=5.8.0,<6
