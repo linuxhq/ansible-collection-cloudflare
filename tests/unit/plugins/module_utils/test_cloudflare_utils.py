@@ -267,6 +267,20 @@ class ValueTests(TestCase):
                 [{"id": "token", "expires_at": "2026-08-11T12:30:00Z"}, {}],
             )
 
+    def test_serializes_without_warnings_argument_on_pydantic_v1(self):
+        model = Mock(spec=["to_dict"])
+        model.to_dict.return_value = {"id": "one"}
+
+        for pydantic_v2, expected in ((True, {"mode": "json", "warnings": False}), (False, {"mode": "json"})):
+            with self.subTest(pydantic_v2=pydantic_v2):
+                with (
+                    patch.object(cloudflare_utils, "BaseModel", Mock),
+                    patch.object(cloudflare_utils, "PYDANTIC_V2", pydantic_v2),
+                ):
+                    self.assertEqual(serialize_resource(model), {"id": "one"})
+
+                self.assertEqual(model.to_dict.call_args.kwargs, expected)
+
     def test_comparison_manages_only_desired_fields(self):
         desired = {"nested": {"enabled": True}, "items": [{"id": "one"}]}
         current = {
@@ -293,6 +307,15 @@ class ValueTests(TestCase):
             payload_from_params({"enabled": False, "name": None}, ("enabled", "name", "count")),
             {"enabled": False},
         )
+
+    def test_comparison_distinguishes_booleans_from_numbers(self):
+        for number, boolean in ((1, True), (0, False), ({"a": [1]}, {"a": [True]})):
+            with self.subTest(number=number, boolean=boolean):
+                self.assertTrue(values_differ(number, boolean))
+                self.assertTrue(values_differ(boolean, number))
+
+        self.assertFalse(values_differ({"ttl": 60.0}, {"ttl": 60}))
+        self.assertTrue(differs({"enabled": 1}, {"enabled": True}))
 
     def test_require_applied_rejects_nested_mismatch(self):
         require_applied(FakeModule({}), {"a": {"b": 1, "c": 2}}, {"a": {"b": 1}}, "resource")
@@ -338,12 +361,14 @@ class ValueTests(TestCase):
         with self.assertRaises(cloudflare.PermissionDeniedError):
             get_or_none(Mock(side_effect=status_error(403)))
 
-    def test_find_resource_stops_at_first_match(self):
-        def items():
-            yield {"id": "one", "name": "One"}
-            raise AssertionError("iterated past the match")
+    def test_find_resource_fails_on_duplicate_names(self):
+        items = [{"id": "one", "name": "One"}, {"id": "two", "name": "Two"}, {"id": "three", "name": "One"}]
 
-        self.assertEqual(find_resource(FakeModule({}), items(), "resource", "name", "One")["id"], "one")
+        with self.assertRaises(ModuleFail) as raised:
+            find_resource(FakeModule({}), iter(items), "resource", "name", "One")
+
+        self.assertEqual(raised.exception.values["msg"], "Found more than one resource with name 'One'")
+        self.assertEqual(raised.exception.values["matching_ids"], ["one", "three"])
 
 
 class InfoTests(TestCase):

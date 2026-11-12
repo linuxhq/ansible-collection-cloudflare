@@ -22,11 +22,14 @@ class DevicesPolicyTests(TestCase):
 
         return raised.exception.values, api
 
-    def test_no_managed_fields_skips_api(self):
-        result, api = self.run_module(FakeModule({"account_id": "account"}))
+    def test_no_managed_fields_returns_current_policy(self):
+        current = {"allow_updates": True}
+        result, api = self.run_module(FakeModule({"account_id": "account"}), current=current)
 
-        api.get.assert_not_called()
+        api.get.assert_called_once_with(account_id="account")
+        api.edit.assert_not_called()
         self.assertFalse(result["changed"])
+        self.assertEqual(result["devices_policy"], current)
 
     def test_equivalent_nested_policy_is_unchanged(self):
         result, api = self.run_module(

@@ -18,15 +18,9 @@ def client_with(accounts):
 
 
 class AccountsInfoTests(TestCase):
-    def test_finds_exact_account_and_stops_iteration(self):
-        accounts = iter(
-            [
-                {"id": "other", "name": "other"},
-                {"id": "account", "name": "wanted"},
-                {"id": "unread", "name": "wanted"},
-            ]
-        )
-        client = client_with(accounts)
+    def test_finds_exact_account(self):
+        accounts = [{"id": "other", "name": "other"}, {"id": "account", "name": "wanted"}]
+        client = client_with(iter(accounts))
 
         with self.assertRaises(ModuleExit) as raised:
             accounts_info.run(FakeModule({"name": "wanted"}), client)
@@ -36,7 +30,14 @@ class AccountsInfoTests(TestCase):
             raised.exception.values,
             {"changed": False, "account": {"id": "account", "name": "wanted"}},
         )
-        self.assertEqual(next(accounts)["id"], "unread")
+
+    def test_duplicate_account_names_fail(self):
+        accounts = [{"id": "account", "name": "wanted"}, {"id": "duplicate", "name": "wanted"}]
+
+        with self.assertRaises(ModuleFail) as raised:
+            accounts_info.run(FakeModule({"name": "wanted"}), client_with(iter(accounts)))
+
+        self.assertEqual(raised.exception.values["matching_ids"], ["account", "duplicate"])
 
     def test_missing_account_returns_empty_mapping(self):
         with self.assertRaises(ModuleExit) as raised:

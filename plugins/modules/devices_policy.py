@@ -107,7 +107,7 @@ RETURN = r"""
 ---
 devices_policy:
   description: Cloudflare device policy.
-  returned: when available
+  returned: always
   type: dict
   contains:
     allow_updates:
@@ -159,9 +159,6 @@ FIELDS = (
 def run(module, client):
     account_id = module.params["account_id"]
     payload = payload_from_params(module.params, FIELDS)
-    if not payload:
-        module.exit_json(changed=False, message="No device policy fields provided")
-
     policy = client.zero_trust.devices.policies.default
     with cloudflare_error_context(
         "Cloudflare API request failed while gathering the device policy",

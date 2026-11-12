@@ -7,7 +7,7 @@
     api_token: "{{ pagerules_api_token }}"
     priority: "{{ _pagerule.1.priority | d(omit) }}"
     state: "{{ _pagerule.0.state | d('present') }}"
-    status: "{{ _pagerule.1.status | d('active') }}"
+    status: "{{ _pagerule.1.status | d(omit) }}"
     targets: "{{ _pagerule.1.targets }}"
     zone_id: "{{ _pagerule.0.zone_id }}"
   register: __pagerules_result
