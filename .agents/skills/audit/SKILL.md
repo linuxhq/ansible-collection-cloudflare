@@ -1,109 +1,94 @@
 ---
 name: audit
-description: Review modules with fresh reviewers from the primary agent, fix approved findings, have a second agent review each change, and open pull requests until two full passes find nothing.
+description: Audit plugins in passes with fresh read-only reviewers, fix every confirmed finding in a pull request reviewed by a second agent, and repeat until two passes in a row find nothing.
 ---
 
 # audit
 
-Audit one group of related modules, or the whole collection, chosen by the
-user. The repository's rules win over this checklist.
+Audit a group of modules, or every file under `plugins/`, until two review
+passes in a row find nothing. The repository's rules win over this skill.
 
-## Modes
+Work without asking. Ask the user only when a finding has two valid paths;
+name the one you recommend. Make breaking changes only with explicit approval.
 
-- Group audit: one group the user names; one review pass, then fixes.
-- Full audit: every file under `plugins/`, split into groups, reviewed in
-  passes until two consecutive passes find nothing.
+The second agent is the other coding agent: Codex when Claude is primary,
+Claude when Codex is primary. It reviews committed changes only; never start
+it for reviews, triage, or probes.
 
-## Second agent
+## 1. Set up
 
-- The second agent is the other coding agent: Codex when Claude is primary,
-  Claude when Codex is primary.
-- It runs only through the stop-time review gate and the change review in
-  Fixes, after a change is committed.
-- Never start the second agent for review passes, triage, or live probes.
-- Before the first review, enable its stop-time review gate:
+- Enable the second agent's stop-time review gate:
 
 | Agent  | Command                              |
 | ------ | ------------------------------------ |
 | Claude | `/codex:setup --enable-review-gate`  |
 | Codex  | `$claude:setup --enable-review-gate` |
 
-## Review passes
+- Split the files into groups of related modules with their helpers and
+  tests.
+- Write a brief: the repository rules, the checklist below, the scope rule,
+  and the decisions ledger.
+- The ledger lists settled items with where each was decided: user
+  decisions, dropped findings, and out-of-scope classes.
 
-- Only the primary agent's own subagents review files.
-- Each pass uses new reviewers; never reuse a reviewer from an earlier pass.
-- Give each reviewer one group, the brief, and the decisions ledger, not
-  earlier findings or conclusions.
-- Reviewers read the agent instructions and every imported rule first.
-- Reviewers read every assigned file in full, including docs, examples,
-  returns, helpers they call, and unit tests.
-- Reviewers find what outside the group depends on it.
-- Reviewers check docs and examples against the provider's API reference and
-  guides, and client library behavior against the pinned library version.
-- Reviewers are read-only: no edits, no git changes, no live calls.
-- Reviewers report findings with evidence and mark breaking changes, open
-  decisions, and anything unverified.
-- A pass is clean when no reviewer reports a confirmed finding.
-- Done means two consecutive clean passes after the last merged change.
-- Any merged fix, however small, restarts the count.
+## 2. Review
 
-## Decisions ledger
+- Start one new read-only subagent per group, all at once.
+- Give each one its group, the brief, and the ledger, never earlier findings.
+- Each reads every file in full: docs, examples, returns, helpers, and tests.
+- Each checks the checklist, the provider's API reference and guides, and the
+  pinned client library.
+- Each writes its findings with evidence, marking anything unverified.
+- No edits, git changes, live calls, or second agent during review.
 
-- Keep a ledger of settled items: user decisions, dropped findings, and
-  out-of-scope classes, each with where it was decided.
-- Give the ledger to every reviewer; settled items are not reported again.
-- Record every pass's outcome and every new decision in the ledger.
-- Only the user reopens a settled item.
+## 3. Triage
 
-## Scope
+- Verify every finding yourself or with a read-only subagent.
+- Classify it: previously decided, out of scope, wrong, confirmed, or needs a
+  live check.
+- Out of scope: a value the provider rejects on the run's first write with
+  nothing changed.
+- In scope: a rejection after an earlier write in the same run, or a check
+  the module already makes that disagrees with the provider.
+- Settle "needs a live check" with a probe:
+  - use only the user's authorized credentials and environment;
+  - name resources with a unique prefix;
+  - delete everything, even after a failure, and verify it;
+  - report anything that could not be undone;
+  - never touch resources the probe did not create.
 
-- A value the provider rejects on the run's first write, with nothing
-  changed, is out of scope.
-- A rejection is in scope when an earlier write in the same run has already
-  happened, or when the module already validates that constraint and
-  disagrees with the provider.
-- Check-mode predictions are in scope when the value follows from the inputs.
+## 4. Fix
 
-## Triage
+- Start one fix subagent in its own worktree for all confirmed findings.
+- It branches from an up-to-date default branch and fixes each finding at
+  its source, checking siblings for the same pattern.
+- It adds a regression test and a changelog entry for each fix.
+- It runs formatting, lint, sanity, and unit tests.
+- It verifies behavior changes live, against the default branch and the fix.
+- It runs affected Molecule scenarios on the final commit, one at a time.
+- It has the second agent review the branch diff, fixes what it confirms, and
+  reviews again on the final commit.
+- It opens a pull request describing only what was verified, and never
+  merges.
+- Its title is a conventional commit: the type that fits each change (a
+  bug fix, docs, tests, refactoring, and so on), the affected modules as the
+  scope, and a summary of what changed. When the pull request mixes types,
+  the title names each. It never refers to the pass or audit.
 
-- Classify every finding before fixing it: previously decided, out of scope,
-  wrong, confirmed, or needs a live check.
-- Cite the ledger entry, rule, code, or reproduction behind each class.
-- Settle "needs a live check" with a probe, not reasoning.
-- Bring behavior or contract choices to the user before fixing.
+## 5. Merge
 
-## Live probes
+- Report the pull request: changes, tests, live results, and the second
+  agent's verdict.
+- Merge only when the user says so, after every CI check has finished and
+  passed; rerun infrastructure failures first.
+- Remove the merged branch and worktree.
+- Record the pass's outcome and any new decisions in the ledger.
 
-- Run probes only with the user's authorized credentials and environment.
-- Name probe resources with a unique, recognizable prefix.
-- Delete everything a probe creates, even after a failure, and verify it.
-- Report side effects a probe could not undo, such as resources the provider
-  creates on first use.
-- Never touch resources the probe did not create.
+## 6. Repeat
 
-## Fixes
-
-- Branch from an up-to-date default branch.
-- Fix only confirmed findings the user approves.
-- Make breaking changes only with explicit approval.
-- Fix each bug at its source and check siblings for the same pattern.
-- Add a regression test and changelog entry for each fix.
-- Run formatting, lint, sanity, and unit tests.
-- Verify behavior changes live, against the default branch and the fix.
-- Run affected Molecule scenarios on the final commit, one at a time.
-- Wait for running tests instead of working around them.
-- Have a second, different agent review only the change, on its final
-  commit; fix what it confirms and have it review again.
-- Commit, push, and open a pull request; do not merge.
-- Keep pull request descriptions in sync with the final commits.
-- State only what was verified.
-
-## Merging
-
-- Merge only when the user says so.
-- Merge only after every CI check has finished and passed; rerun
-  infrastructure failures first.
-- Remove merged branches and worktrees.
+- Go back to step 2 with new reviewers on the updated default branch.
+- A pass is clean when no finding is confirmed.
+- Stop after two clean passes in a row; any merged fix restarts the count.
 
 ## Checklist
 
