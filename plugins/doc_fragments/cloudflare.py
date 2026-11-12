@@ -12,7 +12,7 @@ options:
     type: str
 requirements:
   - python >= 3.9
-  - cloudflare >= 5.8.0, < 6
+  - cloudflare >= 5.9.0, < 6
 attributes:
   check_mode:
     description: Supports predicting changes without applying them.
