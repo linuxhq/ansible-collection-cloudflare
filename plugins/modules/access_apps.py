@@ -77,6 +77,8 @@ options:
     elements: dict
     description:
       - Public destinations protected by the application.
+      - When omitted, the current destinations are kept unless O(domain) changes,
+        in which case Cloudflare derives them from the new O(domain).
   enable_binding_cookie:
     type: bool
     default: false
@@ -265,6 +267,12 @@ def run(module, client):
             context={"account_id": account_id},
         )
 
+    preserved_fields = PRESERVED_FIELDS + UNMANAGED_FIELDS
+    if current is not None and current.get("domain") != params["domain"]:
+        # Cloudflare rejects a domain that is not among the destinations, so
+        # kept destinations would block every domain change.
+        preserved_fields = tuple(field for field in preserved_fields if field != "destinations")
+
     ensure_resource_present(
         module,
         "access_app",
@@ -275,7 +283,7 @@ def run(module, client):
         update=lambda app_id, payload: applications.update(app_id, account_id=account_id, **payload),
         expected_name=params["name"],
         defaults=DEFAULT_FIELDS,
-        preserved_fields=PRESERVED_FIELDS + UNMANAGED_FIELDS,
+        preserved_fields=preserved_fields,
         context={"account_id": account_id},
     )
 

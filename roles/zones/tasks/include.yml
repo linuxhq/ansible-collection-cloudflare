@@ -8,7 +8,7 @@
     name: "{{ _zone.name }}"
     settings: "{{ _zone.settings | d(omit) }}"
     state: "{{ _zone.state | d('present') }}"
-    type: "{{ _zone.type | d('full') }}"
+    type: "{{ _zone.type | d(omit) }}"
     vanity_name_servers: "{{ _zone.vanity_name_servers | d(omit) }}"
   register: __zones_result
   loop: "{{ __zones_list }}"

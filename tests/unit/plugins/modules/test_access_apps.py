@@ -81,6 +81,32 @@ class AccessAppsTests(TestCase):
         self.assertEqual(api.update.call_args.kwargs["account_id"], "account")
         self.assertTrue(result["changed"])
 
+    def test_domain_change_drops_kept_destinations(self):
+        destinations = [{"type": "public", "uri": "app.example.com"}]
+        current = {**params(), "id": "app-id", "destinations": destinations}
+        del current["state"], current["account_id"]
+        updated = {
+            **current,
+            "domain": "new.example.com",
+            "destinations": [{"type": "public", "uri": "new.example.com"}],
+        }
+        client, api = client_with([current], updated=updated)
+
+        result = self.run_module(FakeModule(params(domain="new.example.com")), client)
+
+        self.assertNotIn("destinations", api.update.call_args.kwargs)
+        self.assertTrue(result["changed"])
+
+    def test_unchanged_domain_keeps_destinations(self):
+        destinations = [{"type": "public", "uri": "app.example.com"}]
+        current = {**params(), "id": "app-id", "destinations": destinations}
+        del current["state"], current["account_id"]
+        client, api = client_with([current], updated={**current, "session_duration": "1h"})
+
+        self.run_module(FakeModule(params(session_duration="1h")), client)
+
+        self.assertEqual(api.update.call_args.kwargs["destinations"], destinations)
+
     def test_update_preserves_unmanaged_settings_except_self_hosted_domains(self):
         current = {**params(), "id": "app-id", "tags": ["engineering"], "self_hosted_domains": ["app.example.com"]}
         del current["state"], current["account_id"]

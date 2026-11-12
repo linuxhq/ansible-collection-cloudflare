@@ -1,0 +1,21 @@
+---
+breaking_changes:
+  - access_apps, access_groups, access_policies, access_service_tokens, accounts_info, cfd_tunnel, rules_lists,
+    warp_connector, zones - fail when more than one resource matches O(name), naming the matching IDs, instead of
+    silently updating, deleting, or returning whichever match Cloudflare lists first.
+  - cfd_tunnel_configurations - no longer compare C(warp-routing) in O(config). Cloudflare ignores it in tunnel
+    configurations and manages WARP routing at the account level, so requesting it could never converge.
+  - zones role - stop sending C(type=full) for zones that omit C(type), so an existing partial or secondary zone is
+    never converted. New zones still default to C(full).
+  - pagerules role - stop sending C(status=active) for rules that omit C(status), so a rule disabled outside Ansible
+    stays disabled. New rules still default to C(active).
+bugfixes:
+  - module_utils - serialize SDK models on managed nodes with Pydantic v1, which the Cloudflare SDK supports, instead
+    of failing after the API request.
+  - module_utils - compare Booleans and numbers as different values, so changing C(1) to V(true) is applied.
+  - zones - match whole-number float setting values, such as C(min_tls_version) V(1.0), against the string Cloudflare
+    stores, so the setting converges instead of failing after the update.
+  - devices_policy - return the current C(devices_policy) when no policy options are given.
+  - access_apps - allow changing O(domain) when O(destinations) is omitted; the kept destinations made Cloudflare
+    reject the update.
+  - devices_policy role - pass V(false), V(0), and empty list values to the module instead of silently dropping them.

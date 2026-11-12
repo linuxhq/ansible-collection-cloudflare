@@ -10,11 +10,16 @@ from ansible.module_utils.basic import missing_required_lib
 
 try:
     import cloudflare
+    import pydantic
     from cloudflare import BaseModel, Cloudflare
 except ImportError:
     cloudflare = None
     BaseModel = None
     Cloudflare = None
+    PYDANTIC_V2 = False
+else:
+    # The SDK supports Pydantic v1, whose to_dict() rejects the warnings argument.
+    PYDANTIC_V2 = int(pydantic.VERSION.split(".", 1)[0]) >= 2
 
 
 class CloudflareResponseError(Exception):
@@ -148,8 +153,9 @@ def serialize_resource(resource):
 
     if BaseModel is not None and isinstance(resource, BaseModel):
         # Generated models can mistype a field, such as an Access group's
-        # is_default; keep the value and skip Pydantic's stderr warning.
-        return serialize_resource(resource.to_dict(mode="json", warnings=False))
+        # is_default; keep the value and skip Pydantic v2's stderr warning.
+        options = {"warnings": False} if PYDANTIC_V2 else {}
+        return serialize_resource(resource.to_dict(mode="json", **options))
 
     if isinstance(resource, dict):
         return {key: serialize_resource(value) for key, value in resource.items() if value is not None}
@@ -199,13 +205,25 @@ def get_or_none(get, *args, **kwargs):
 
 
 def find_resource(module, items, resource_name, field, value):
-    """Return the first serialized item whose field equals value, or None."""
+    """Return the serialized item whose field equals value, or None.
+
+    Fail when more than one item matches, so an ambiguous name never selects
+    an arbitrary resource.
+    """
+    matches = []
     for item in items:
         resource = serialize_resource(item)
         if resource_field(module, resource, field, resource_name) == value:
-            return resource
+            matches.append(resource)
 
-    return None
+    if len(matches) > 1:
+        module.fail_json(
+            msg=f"Found more than one {resource_name} with {field} {value!r}",
+            **{field: value},
+            matching_ids=[resource_id(module, resource, resource_name) for resource in matches],
+        )
+
+    return matches[0] if matches else None
 
 
 def payload_from_params(params, fields):
@@ -256,8 +274,22 @@ def normalize_current_by_desired_fields(current, desired, exact_fields=()):
     return current
 
 
+def values_equal(current, desired):
+    """Compare JSON values, treating Booleans and numbers as different types."""
+    if isinstance(current, dict) and isinstance(desired, dict):
+        return current.keys() == desired.keys() and all(values_equal(current[key], desired[key]) for key in current)
+
+    if isinstance(current, list) and isinstance(desired, list):
+        return len(current) == len(desired) and all(values_equal(*pair) for pair in zip(current, desired))
+
+    if isinstance(current, bool) or isinstance(desired, bool):
+        return type(current) is type(desired) and current == desired
+
+    return current == desired
+
+
 def values_differ(current, desired):
-    return serialize_resource(current) != serialize_resource(desired)
+    return not values_equal(serialize_resource(current), serialize_resource(desired))
 
 
 def differs(current, desired, defaults=None, exact_fields=()):

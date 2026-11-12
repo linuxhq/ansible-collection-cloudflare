@@ -27,8 +27,10 @@ options:
     description:
       - Complete remotely managed tunnel configuration.
       - Omitted optional settings are reset to their defaults.
-      - Use the Cloudflare API field names, such as C(originRequest), C(noTLSVerify),
-        and C(warp-routing); snake_case aliases are not compared and never converge.
+      - Use the Cloudflare API field names, such as C(originRequest) and C(noTLSVerify);
+        snake_case aliases are not compared and never converge.
+      - C(warp-routing) is not compared. Cloudflare manages WARP routing at the
+        account level and ignores it in tunnel configurations.
 """
 
 EXAMPLES = r"""
@@ -101,7 +103,6 @@ ORIGIN_FIELDS = {
 CONFIG_FIELDS = {
     "ingress": [{"hostname": None, "service": None, "path": None, "originRequest": ORIGIN_FIELDS}],
     "originRequest": ORIGIN_FIELDS,
-    "warp-routing": {"enabled": None},
 }
 
 
@@ -179,8 +180,8 @@ def comparable_config(config, desired=None):
         else:
             ingress.pop("originRequest", None)
 
-    if config.get("warp-routing") in ({}, {"enabled": False}):
-        config.pop("warp-routing")
+    # Cloudflare ignores warp-routing here and returns its own value.
+    config.pop("warp-routing", None)
 
     return config
 

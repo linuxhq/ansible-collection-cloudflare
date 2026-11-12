@@ -44,11 +44,22 @@ class ZonesTests(TestCase):
 
         return raised.exception.values
 
-    def test_normalizes_setting_scalar_values_recursively(self):
-        self.assertEqual(
-            zones.normalize_setting_value({"enabled": True, "ports": [80, 443], "ratio": 1.5}),
-            {"enabled": "true", "ports": ["80", "443"], "ratio": "1.5"},
+    def test_setting_scalar_values_match_recursively(self):
+        self.assertTrue(
+            zones.setting_matches(
+                {"enabled": "true", "ports": ["80", "443"], "ratio": "1.5"},
+                {"enabled": True, "ports": [80, 443], "ratio": 1.5},
+            )
         )
+        self.assertFalse(zones.setting_matches({"ports": ["80"]}, {"ports": [80, 443]}))
+
+    def test_whole_number_float_matches_string_setting(self):
+        for current in ("1.0", "1"):
+            with self.subTest(current=current):
+                self.assertTrue(zones.setting_matches(current, 1.0))
+
+        self.assertTrue(zones.setting_matches("1.3", 1.3))
+        self.assertFalse(zones.setting_matches("1.2", 1.0))
 
     def test_integral_float_settings_match_integers(self):
         self.assertTrue(zones.setting_matches(14400.0, 14400))

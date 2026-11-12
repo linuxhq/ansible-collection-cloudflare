@@ -146,30 +146,40 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
-def normalize_setting_value(value):
-    if isinstance(value, dict):
-        return {key: normalize_setting_value(item) for key, item in value.items()}
-
-    if isinstance(value, (list, tuple)):
-        return [normalize_setting_value(item) for item in value]
-
+def setting_value_forms(value):
+    """Return the string forms a scalar setting value matches."""
     if isinstance(value, bool):
-        return str(value).lower()
-
-    if isinstance(value, float) and value.is_integer():
-        # The SDK decodes some integer settings, such as browser_cache_ttl, as floats.
-        value = int(value)
+        return {str(value).lower()}
 
     if isinstance(value, (int, float)):
-        return str(value)
+        # The SDK decodes some integer settings, such as browser_cache_ttl, as
+        # floats, while string settings, such as min_tls_version, keep "1.0".
+        forms = {str(value), str(float(value))}
+        if float(value).is_integer():
+            forms.add(str(int(value)))
 
-    return value
+        return forms
+
+    return {value}
+
+
+def setting_values_equal(current, desired):
+    if isinstance(current, dict) and isinstance(desired, dict):
+        return current.keys() == desired.keys() and all(
+            setting_values_equal(current[key], desired[key]) for key in current
+        )
+
+    if isinstance(current, (list, tuple)) and isinstance(desired, (list, tuple)):
+        return len(current) == len(desired) and all(setting_values_equal(*pair) for pair in zip(current, desired))
+
+    if isinstance(current, (dict, list, tuple)) or isinstance(desired, (dict, list, tuple)):
+        return False
+
+    return bool(setting_value_forms(current) & setting_value_forms(desired))
 
 
 def setting_matches(current_value, desired_value):
-    return normalize_setting_value(
-        normalize_current_by_desired_fields(current_value, desired_value)
-    ) == normalize_setting_value(desired_value)
+    return setting_values_equal(normalize_current_by_desired_fields(current_value, desired_value), desired_value)
 
 
 def validate_settings(module):

@@ -112,6 +112,15 @@ class CfdTunnelConfigurationsTests(TestCase):
             cfd_tunnel_configurations.comparable_config(desired),
         )
 
+    def test_warp_routing_is_not_compared(self):
+        config = {"ingress": [{"service": "http_status:404"}], "warp-routing": {"enabled": True}}
+        current = {"config": {"ingress": [{"service": "http_status:404"}], "warp-routing": {"enabled": False}}}
+
+        raised, api = self.run_module(module_for(config), current)
+
+        api.update.assert_not_called()
+        self.assertFalse(raised.values["changed"])
+
     def test_returned_defaults_do_not_cause_change(self):
         config = {"ingress": [{"service": "http_status:404"}]}
         current = {
