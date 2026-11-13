@@ -67,6 +67,70 @@ class AccessAppsTests(TestCase):
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_removed_cors_header_key_is_a_change(self):
+        cors = {"allowed_methods": ["GET"]}
+        current = {**params(), "id": "app-id", "cors_headers": {**cors, "allow_all_origins": True}}
+        del current["state"], current["account_id"]
+        client, api = client_with([current], updated={**current, "cors_headers": cors})
+
+        result = self.run_module(FakeModule(params(cors_headers=cors)), client)
+
+        self.assertEqual(api.update.call_args.kwargs["cors_headers"], cors)
+        self.assertTrue(result["changed"])
+
+        client, api = client_with([current], updated=current)
+        result = self.run_module(FakeModule(params(cors_headers=cors)), client)
+
+        self.assertIn("did not apply", result["msg"])
+
+    def test_change_to_bookmark_carries_only_fields_bookmarks_store(self):
+        current = {
+            **params(),
+            "id": "app-id",
+            "allowed_idps": [],
+            "cors_headers": {"allowed_methods": ["GET"]},
+            "custom_deny_message": "denied",
+            "destinations": [{"type": "public", "uri": "app.example.com"}],
+            "eager_redirect_cookie_setting": False,
+            "logo_url": "https://example.com/logo.png",
+            "options_preflight_bypass": False,
+            "policies": [{"id": "policy-id", "precedence": 1}],
+            "skip_interstitial": True,
+            "tags": ["tag"],
+        }
+        del current["state"], current["account_id"]
+        updated = {
+            "id": "app-id",
+            "name": "app",
+            "domain": "app.example.com",
+            "type": "bookmark",
+            "app_launcher_visible": True,
+            "logo_url": current["logo_url"],
+            "policies": current["policies"],
+            "tags": current["tags"],
+        }
+        client, api = client_with([current], updated=updated)
+
+        result = self.run_module(FakeModule(params(type="bookmark")), client)
+
+        sent = api.update.call_args.kwargs
+        for field in ("allowed_idps", "cors_headers", "custom_deny_message", "destinations", "skip_interstitial"):
+            self.assertNotIn(field, sent)
+
+        for field in ("eager_redirect_cookie_setting", "options_preflight_bypass"):
+            self.assertNotIn(field, sent)
+
+        self.assertEqual(sent["policies"], current["policies"])
+        self.assertEqual(sent["tags"], current["tags"])
+        self.assertEqual(sent["logo_url"], current["logo_url"])
+        self.assertTrue(result["changed"])
+
+        client, api = client_with([updated])
+        result = self.run_module(FakeModule(params(type="bookmark")), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_update_preserves_omitted_optional_fields(self):
         policies = [{"id": "policy-id", "precedence": 1}]
         current = {**params(), "id": "app-id", "policies": policies}

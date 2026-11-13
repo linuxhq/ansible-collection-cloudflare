@@ -49,6 +49,8 @@ options:
         O(destinations), O(enable_binding_cookie), O(http_only_cookie_attribute),
         O(logo_url), O(same_site_cookie_attribute), O(service_auth_401_redirect),
         or O(skip_interstitial).
+      - Changing an existing application to type V(bookmark) keeps only its
+        O(logo_url), O(policies), and tags.
     type: str
     choices:
       - bookmark
@@ -76,6 +78,7 @@ options:
     type: dict
     description:
       - Cross-origin resource sharing headers for the application.
+      - Compared exactly, so omitting a key removes it.
   custom_deny_message:
     type: str
     description:
@@ -284,6 +287,10 @@ UNSUPPORTED_FIELDS = {
     ),
 }
 
+# Cloudflare stores only these of the carried-over fields for the application
+# types below, so the others are dropped from the update.
+STORED_FIELDS = {"bookmark": ("logo_url", "policies", "tags")}
+
 
 def validate_type_fields(module):
     params = module.params
@@ -335,6 +342,9 @@ def run(module, client):
         # kept destinations would block every domain change.
         preserved_fields = tuple(field for field in preserved_fields if field != "destinations")
 
+    if params["type"] in STORED_FIELDS:
+        preserved_fields = tuple(field for field in preserved_fields if field in STORED_FIELDS[params["type"]])
+
     ensure_resource_present(
         module,
         "access_app",
@@ -346,6 +356,7 @@ def run(module, client):
         expected_name=params["name"],
         defaults=DEFAULT_FIELDS,
         preserved_fields=preserved_fields,
+        exact_values=("cors_headers",),
         context={"account_id": account_id},
     )
 

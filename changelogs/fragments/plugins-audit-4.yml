@@ -1,0 +1,28 @@
+---
+breaking_changes:
+  - access_groups - O(is_default) no longer defaults to V(false). When omitted, an existing group's default status is
+    carried over on update and nothing is sent on create; previously any update of the account's default group
+    without O(is_default=true) cleared its default status.
+  - access_groups role - pass C(is_default) only when the list item sets it, instead of forcing V(false).
+bugfixes:
+  - purge_cache - fail in check mode, as in a real run, when the C(cloudflare) Python library is missing, instead of
+    reporting C(changed).
+  - purge_cache - declare O(cache) suboptions, so Ansible validates and converts C(purge_everything), C(files),
+    C(tags), C(hosts), and C(prefixes) and rejects unknown keys; unset suboptions are not sent.
+  - rulesets - fail before any change when a C(set_cache_control) action parameter uses an SDK snake_case spelling,
+    such as C(max_age) or C(no_cache), naming the Cloudflare API key (C(max-age), C(no-cache)). The SDK renamed the
+    key on write, so the module wrote and then failed on every run.
+  - pages_projects - fail before any change when a whole C(env_vars) or binding map, such as C(kv_namespaces), or a
+    field inside an entry other than C(services) C(entrypoint) and C(r2_buckets) C(jurisdiction), is set to null.
+    Cloudflare kept the value, so the module wrote and then failed on every run.
+  - access_apps - compare O(cors_headers) exactly, so removing a key is applied instead of reported as unchanged.
+  - access_apps - when changing an existing application to O(type=bookmark), carry over only the fields bookmarks
+    store (C(logo_url), C(policies), and C(tags)). Cloudflare dropped the others, so the type change wrote and then
+    failed.
+  - pagerules - fail before any change when O(priority) exceeds the number of page rules in the zone after the
+    change. Cloudflare stored the rule at the last position, so the module wrote and then failed on every run.
+  - pagerules_info - skip a zone deleted while the module runs (HTTP 404, or 400 with error code 1001) instead of
+    failing.
+trivial:
+  - Molecule scenarios - set task-level C(no_log) and C(diff=false) on role entries that create Access service
+    tokens or tunnels, or gather identity provider secrets.

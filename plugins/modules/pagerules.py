@@ -38,7 +38,10 @@ options:
   priority:
     type: int
     description:
-      - Evaluation priority of the page rule.
+      - Evaluation priority of the page rule, as an ordinal position from 1 to
+        the number of page rules in the zone, including a rule being created.
+      - A priority above that number fails before any change, because Cloudflare
+        would store the rule at the last position instead.
       - An existing rule's priority is preserved when omitted.
   status:
     type: str
@@ -196,6 +199,7 @@ def ordered_actions(actions, current):
 
 
 def find_pagerule(module, client, targets):
+    """Return the page rule matching targets, or None, and the zone's rule count."""
     zone_id = module.params["zone_id"]
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the page rule",
@@ -213,14 +217,25 @@ def find_pagerule(module, client, targets):
 
             found = pagerule
 
-    return found
+    return found, len(pagerules)
+
+
+def validate_priority(module, current, rule_count):
+    """Fail when priority exceeds the zone's rule count after this change."""
+    priority = module.params.get("priority")
+    maximum = rule_count + (1 if current is None else 0)
+    if priority is not None and priority > maximum:
+        module.fail_json(
+            msg=f"priority {priority} exceeds the number of page rules in the zone; the maximum is {maximum}",
+            zone_id=module.params["zone_id"],
+        )
 
 
 def run(module, client):
     zone_id = module.params["zone_id"]
     page_rules = client.page_rules
     targets = canonical_targets(module.params["targets"])
-    current = find_pagerule(module, client, targets)
+    current, rule_count = find_pagerule(module, client, targets)
 
     if module.params["state"] == "absent":
         ensure_resource_absent(
@@ -232,6 +247,7 @@ def run(module, client):
             context={"zone_id": zone_id},
         )
 
+    validate_priority(module, current, rule_count)
     payload = payload_from_params(module.params, FIELDS)
     payload["targets"] = targets
     payload["actions"] = ordered_actions(payload["actions"], current)

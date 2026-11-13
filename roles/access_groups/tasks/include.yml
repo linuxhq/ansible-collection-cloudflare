@@ -7,7 +7,7 @@
     api_token: "{{ access_groups_api_token }}"
     exclude: "{{ _access_group.exclude | d(omit) }}"
     include: "{{ _access_group.include | d(omit) }}"
-    is_default: "{{ _access_group.is_default | d(false) }}"
+    is_default: "{{ _access_group.is_default | d(omit) }}"
     name: "{{ _access_group.name }}"
     require: "{{ _access_group.require | d(omit) }}"
     state: "{{ _access_group.state | d('present') }}"

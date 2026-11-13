@@ -9,6 +9,7 @@ module: pagerules_info
 short_description: Gather information about Cloudflare Page Rules
 description:
   - Gather page rules for all accessible zones.
+  - Zones deleted while the module runs are skipped.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
@@ -65,11 +66,28 @@ pagerules:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    cloudflare,
     cloudflare_client,
     cloudflare_error_context,
+    error_response_body,
     require_mapping,
     resource_list,
 )
+
+# Cloudflare answers a request for a deleted zone with this error code.
+INVALID_ZONE_CODE = 1001
+
+
+def zone_missing(exc):
+    """Return whether an API error means the zone no longer exists."""
+    if exc.status_code == 404:
+        return True
+
+    body = error_response_body(exc)
+    errors = body.get("errors") if isinstance(body, dict) else None
+    return exc.status_code == 400 and any(
+        isinstance(error, dict) and error.get("code") == INVALID_ZONE_CODE for error in errors or ()
+    )
 
 
 def run(module, client):
@@ -78,11 +96,18 @@ def run(module, client):
         zones = resource_list(module, client.zones.list(), "zone", ("id", "name"))
 
     for zone in zones:
-        with cloudflare_error_context(
-            "Cloudflare API request failed while gathering page rules",
-            zone_id=zone["id"],
-        ):
-            rules = resource_list(module, client.page_rules.list(zone_id=zone["id"]) or [], "page rule")
+        try:
+            with cloudflare_error_context(
+                "Cloudflare API request failed while gathering page rules",
+                zone_id=zone["id"],
+            ):
+                rules = resource_list(module, client.page_rules.list(zone_id=zone["id"]) or [], "page rule")
+        except cloudflare.APIStatusError as exc:
+            # Skip a zone deleted after it was listed.
+            if not zone_missing(exc):
+                raise
+
+            continue
 
         for rule in rules:
             for field in ("actions", "targets"):

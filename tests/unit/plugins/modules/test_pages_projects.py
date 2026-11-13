@@ -195,6 +195,28 @@ class PagesProjectsTests(TestCase):
                 ["deployment_configs.preview.placement"],
             ),
             ({"deployment_configs": {"preview": None}}, ["deployment_configs.preview"]),
+            (
+                {"deployment_configs": {"production": {"env_vars": None, "kv_namespaces": None}}},
+                ["deployment_configs.production.env_vars", "deployment_configs.production.kv_namespaces"],
+            ),
+            (
+                {
+                    "deployment_configs": {
+                        "production": {
+                            "env_vars": {"A": {"type": "plain_text", "value": None}},
+                            "kv_namespaces": {"NS": {"namespace_id": None}},
+                            "r2_buckets": {"B": {"name": None, "jurisdiction": None}},
+                            "services": {"S": {"service": "worker", "environment": None, "entrypoint": None}},
+                        }
+                    }
+                },
+                [
+                    "deployment_configs.production.env_vars.A.value",
+                    "deployment_configs.production.kv_namespaces.NS.namespace_id",
+                    "deployment_configs.production.r2_buckets.B.name",
+                    "deployment_configs.production.services.S.environment",
+                ],
+            ),
         )
         for options, unsupported in cases:
             with self.subTest(options=options):
@@ -206,6 +228,20 @@ class PagesProjectsTests(TestCase):
                 self.assertIn("does not clear Pages project settings set to null", result["msg"])
                 api.get.assert_not_called()
                 api.edit.assert_not_called()
+
+    def test_null_r2_jurisdiction_is_sent(self):
+        current = {
+            **PROJECT,
+            "deployment_configs": {"production": {"r2_buckets": {"B": {"name": "bucket", "jurisdiction": "eu"}}}},
+        }
+        cleared = {**PROJECT, "deployment_configs": {"production": {"r2_buckets": {"B": {"name": "bucket"}}}}}
+        desired = {"production": {"r2_buckets": {"B": {"name": "bucket", "jurisdiction": None}}}}
+        client, api = client_with([current], edited=cleared)
+
+        result = self.run_module(FakeModule(params(deployment_configs=desired)), client)
+
+        self.assertEqual(api.edit.call_args.kwargs["deployment_configs"], desired)
+        self.assertTrue(result["changed"])
 
     def test_empty_string_build_setting_counts_as_cleared(self):
         current = {**PROJECT, "build_config": {"build_command": "make", "web_analytics_tag": ""}}

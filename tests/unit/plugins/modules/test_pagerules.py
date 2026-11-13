@@ -117,6 +117,36 @@ class PageRulesTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertEqual(result["pagerule"], updated)
 
+    def test_rejects_priority_above_rule_count_before_any_write(self):
+        other = {"id": "other", "actions": ACTIONS, "priority": 1, "targets": []}
+        current = {"id": "rule", "actions": ACTIONS, "priority": 2, "status": "active", "targets": TARGETS}
+        cases = (([other], 3, 2), ([other, current], 3, 2))
+        for rules, priority, maximum in cases:
+            for check_mode in (False, True):
+                with self.subTest(rules=len(rules), check_mode=check_mode):
+                    client, api = client_with(rules)
+
+                    result = self.run_module(FakeModule(params(priority=priority), check_mode), client)
+
+                    api.create.assert_not_called()
+                    api.update.assert_not_called()
+                    self.assertEqual(
+                        result["msg"],
+                        f"priority {priority} exceeds the number of page rules in the zone; the maximum is {maximum}",
+                    )
+
+    def test_accepts_priority_up_to_rule_count(self):
+        other = {"id": "other", "actions": ACTIONS, "priority": 1, "targets": []}
+        created = {"id": "rule", "actions": ACTIONS, "priority": 2, "status": "active", "targets": TARGETS}
+        client, api = client_with([other], created=created)
+
+        result = self.run_module(FakeModule(params(priority=2)), client)
+
+        api.create.assert_called_once_with(
+            zone_id="zone", actions=ACTIONS, priority=2, status="active", targets=TARGETS
+        )
+        self.assertTrue(result["changed"])
+
     def test_check_mode_does_not_update(self):
         current = {"id": "rule", "actions": ACTIONS, "status": "active", "targets": TARGETS}
         client, api = client_with([current])
