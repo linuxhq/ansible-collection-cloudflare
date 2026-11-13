@@ -3,7 +3,9 @@
   hosts: all
 
   roles:
-    - cfd_tunnel_info
+    - role: cfd_tunnel_info
+      diff: false
+      no_log: true
 
   post_tasks:
     - name: Ensure info is verified
@@ -23,16 +25,23 @@
           - _cfd_tunnel_info_dict['molecule-remote'].status is defined
           - _cfd_tunnel_info_dict['molecule-remote'].token is defined
           - _cfd_tunnel_info_dict['molecule-remote'].tun_type == 'cfd_tunnel'
+      diff: false
+      no_log: true
 
     - name: Ensure inventory lists are formatted
       ansible.builtin.set_fact:
         cfd_tunnel_list:
           "{{ cfd_tunnel_list |
               map('combine', {'state': 'absent'}) }}"
+      diff: false
+      no_log: true
 
     - name: Ensure roles are included
       ansible.builtin.include_role:
         name: "{{ _role }}"
+        apply:
+          diff: false
+          no_log: true
       loop:
         - cfd_tunnel
       loop_control:

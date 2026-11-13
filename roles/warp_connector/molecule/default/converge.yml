@@ -7,5 +7,7 @@
       tags:
         - molecule-idempotence-notest
 
-    - warp_connector
+    - role: warp_connector
+      diff: false
+      no_log: true
 ...

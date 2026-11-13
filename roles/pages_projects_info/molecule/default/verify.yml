@@ -12,6 +12,11 @@
           - _pages_projects_info_dict[_item].deployment_configs.preview | length > 0
           - _pages_projects_info_dict[_item].deployment_configs.production | length > 0
           - _pages_projects_info_dict[_item].domains.0 == _item ~ '.pages.dev'
+          - (pages_projects_list |
+             selectattr('name', '==', _item) |
+             map(attribute='domains') |
+             first |
+             map(attribute='name')) is subset(_pages_projects_info_dict[_item].domains)
           - _pages_projects_info_dict[_item].id is defined
           - _pages_projects_info_dict[_item].name is defined
           - _pages_projects_info_dict[_item].production_branch == 'main'

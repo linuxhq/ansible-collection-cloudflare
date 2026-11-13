@@ -6,6 +6,8 @@
       tags:
         - molecule-idempotence-notest
       check_mode: false
+      diff: false
+      no_log: true
 
     - role: warp_connector_info
       warp_connector_info_account_id: null
@@ -13,5 +15,7 @@
       tags:
         - molecule-idempotence-notest
 
-    - warp_connector_info
+    - role: warp_connector_info
+      diff: false
+      no_log: true
 ...

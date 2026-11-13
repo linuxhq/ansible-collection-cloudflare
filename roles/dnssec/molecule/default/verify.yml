@@ -11,17 +11,46 @@
         dnssec_list:
           "{{ dnssec_list |
               map('combine', {'status': 'disabled'}) }}"
+
+    - name: Ensure dnssec is disabled
+      ansible.builtin.include_role:
+        name: dnssec
+
+    - name: Ensure inventory lists omit status
+      ansible.builtin.set_fact:
+        dnssec_list:
+          "{{ dnssec_list |
+              map(attribute='zone_id') |
+              map('community.general.dict_kv', 'zone_id') }}"
+
+    - name: Ensure dnssec without status is managed
+      ansible.builtin.include_role:
+        name: dnssec
+
+    - name: Ensure dnssec status is queried
+      linuxhq.cloudflare.dnssec:
+        api_token: "{{ dnssec_api_token }}"
+        status: disabled
+        zone_id: "{{ _dnssec.zone_id }}"
+      register: __dnssec_query
+      check_mode: true
+      loop: "{{ dnssec_list }}"
+      loop_control:
+        label: "{{ _dnssec.zone_id | d(none) }}"
+        loop_var: _dnssec
+
+    - name: Ensure omitted status leaves dnssec unchanged
+      ansible.builtin.assert:
+        that:
+          - __dnssec_query is not changed
+
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
         zones_list:
           "{{ zones_list |
               map('combine', {'state': 'absent'}) }}"
 
-    - name: Ensure roles are included
+    - name: Ensure zones are removed
       ansible.builtin.include_role:
-        name: "{{ _role }}"
-      loop:
-        - dnssec
-        - zones
-      loop_control:
-        label: "{{ _role | d(none) }}"
-        loop_var: _role
+        name: zones
 ...
