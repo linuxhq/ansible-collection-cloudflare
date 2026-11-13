@@ -135,6 +135,19 @@ class PageRulesTests(TestCase):
                         f"priority {priority} exceeds the number of page rules in the zone; the maximum is {maximum}",
                     )
 
+    def test_rejects_priority_below_one_before_any_write(self):
+        current = {"id": "rule", "actions": ACTIONS, "priority": 1, "status": "active", "targets": TARGETS}
+        for rules in ([], [current]):
+            for check_mode in (False, True):
+                with self.subTest(rules=len(rules), check_mode=check_mode):
+                    client, api = client_with(rules)
+
+                    result = self.run_module(FakeModule(params(priority=0), check_mode), client)
+
+                    api.create.assert_not_called()
+                    api.update.assert_not_called()
+                    self.assertEqual(result["msg"], "priority 0 must be at least 1")
+
     def test_accepts_priority_up_to_rule_count(self):
         other = {"id": "other", "actions": ACTIONS, "priority": 1, "targets": []}
         created = {"id": "rule", "actions": ACTIONS, "priority": 2, "status": "active", "targets": TARGETS}

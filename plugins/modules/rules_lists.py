@@ -45,6 +45,8 @@ options:
     elements: dict
     description:
       - Complete set of entries that the Rules list must contain.
+      - Each entry must set the field named by the list kind, such as C(ip) or
+        C(hostname).
   operation_timeout:
     type: int
     default: 240
@@ -368,13 +370,33 @@ def checked_list(module, rules_list, name, kind, expected_id=None):
     return rules_list
 
 
+def validate_elements(module, kind):
+    """Fail when an element lacks the field that stores the list kind."""
+    for index, element in enumerate(module.params.get("elements") or ()):
+        if element.get(kind) is None:
+            module.fail_json(msg=f"elements[{index}] must set {kind!r} for a Rules list of kind {kind!r}")
+
+
 def ensure_present(module, client, current):
     params = module.params
     account_id = params["account_id"]
     lists = client.rules.lists
 
-    if current is None and params.get("kind") is None:
-        module.fail_json(msg="kind is required when creating a Rules list")
+    if current is None:
+        if params.get("kind") is None:
+            module.fail_json(msg="kind is required when creating a Rules list")
+
+        current_kind = params["kind"]
+    else:
+        current_id = resource_id(module, current, "Rules list")
+        current_kind = resource_field(module, current, "kind", "Rules list")
+        if params.get("kind") is not None and params["kind"] != current_kind:
+            module.fail_json(
+                msg="An existing Rules list kind cannot be changed",
+                rules_list=current,
+            )
+
+    validate_elements(module, current_kind)
 
     changed = False
     created = False
@@ -401,18 +423,9 @@ def ensure_present(module, client, current):
 
         require_applied(module, current, payload, "Rules list")
         current_id = current["id"]
-        current_kind = params["kind"]
         changed = True
         created = True
     else:
-        current_id = resource_id(module, current, "Rules list")
-        current_kind = resource_field(module, current, "kind", "Rules list")
-        if params.get("kind") is not None and params["kind"] != current_kind:
-            module.fail_json(
-                msg="An existing Rules list kind cannot be changed",
-                rules_list=current,
-            )
-
         desired_description = params.get("description")
         if desired_description is not None and current.get("description") != desired_description:
             if module.check_mode:

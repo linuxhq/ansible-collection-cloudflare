@@ -51,6 +51,7 @@ options:
     elements: dict
     description:
       - Split tunnel routes excluded from the WARP tunnel.
+      - Replaces the current routes; each route is compared on all of its fields.
       - When omitted, the current value is left unchanged.
       - Mutually exclusive with O(include).
   exclude_office_ips:
@@ -63,6 +64,7 @@ options:
     elements: dict
     description:
       - Split tunnel routes included in the WARP tunnel.
+      - Replaces the current routes; each route is compared on all of its fields.
       - When omitted, the current value is left unchanged.
       - Mutually exclusive with O(exclude).
   lan_allow_minutes:
@@ -191,6 +193,7 @@ def run(module, client):
         payload,
         edit=lambda payload: policy.edit(account_id=account_id, **payload),
         context={"account_id": account_id},
+        exact_values=("exclude", "include"),
     )
 
 

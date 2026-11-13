@@ -505,15 +505,6 @@ class PagesProjectsTests(TestCase):
         api.domains.create.assert_called_once_with(project_name="docs", account_id="account", name="new.example.com")
         self.assertEqual(result["domains"], [{"name": "new.example.com"}])
 
-    def test_deletes_mixed_case_domain(self):
-        client, api = client_with([PROJECT], domains=[{"name": "a.example.com"}])
-
-        self.run_module(FakeModule(params(state="absent", domains=[{"name": "A.Example.com"}])), client)
-
-        api.domains.delete.assert_called_once_with(
-            domain_name="a.example.com", account_id="account", project_name="docs"
-        )
-
     def test_check_mode_does_not_add_domains(self):
         client, api = client_with([PROJECT])
 
@@ -548,18 +539,19 @@ class PagesProjectsTests(TestCase):
         api.delete.assert_not_called()
         self.assertTrue(result["changed"])
 
-    def test_deletes_listed_domains_then_project(self):
-        client, api = client_with([PROJECT], domains=[{"name": "a.example.com"}])
+    def test_deletes_only_the_project(self):
+        project = {**PROJECT, "domains": ["a.example.com"]}
+        client, api = client_with([project], domains=[{"name": "a.example.com"}])
 
         result = self.run_module(
-            FakeModule(params(state="absent", domains=[{"name": "a.example.com"}, {"name": "b.example.com"}])),
+            FakeModule(params(state="absent", domains=[{"name": "A.Example.com"}, {"name": "b.example.com"}])),
             client,
         )
 
-        api.domains.delete.assert_called_once_with(
-            domain_name="a.example.com", account_id="account", project_name="docs"
-        )
+        api.domains.list.assert_not_called()
+        api.domains.delete.assert_not_called()
         api.delete.assert_called_once_with(project_name="docs", account_id="account")
+        self.assertEqual(result["message"], "Pages project deleted")
         self.assertTrue(result["changed"])
 
     def test_lookup_errors_other_than_not_found_propagate(self):

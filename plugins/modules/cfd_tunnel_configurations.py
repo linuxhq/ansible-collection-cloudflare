@@ -27,8 +27,9 @@ options:
     description:
       - Complete remotely managed tunnel configuration.
       - Omitted optional settings are reset to their defaults.
-      - Use the Cloudflare API field names, such as C(originRequest) and C(noTLSVerify);
-        snake_case aliases are not compared and never converge.
+      - Use the Cloudflare API field names, such as C(originRequest) and C(noTLSVerify).
+        The module fails before any change when the configuration or an ingress
+        rule uses C(origin_request).
       - C(warp-routing) is not compared. Cloudflare manages WARP routing at the
         account level and ignores it in tunnel configurations.
 """
@@ -186,8 +187,18 @@ def comparable_config(config, desired=None):
     return config
 
 
+def validate_config(module, config):
+    """Fail when the configuration uses the SDK spelling of originRequest."""
+    ingress_rules = config.get("ingress")
+    rules = ingress_rules if isinstance(ingress_rules, list) else []
+    for item in [config, *rules]:
+        if isinstance(item, dict) and "origin_request" in item:
+            module.fail_json(msg="config key 'origin_request' must use the Cloudflare API key 'originRequest'")
+
+
 def run(module, client):
     params = module.params
+    validate_config(module, params["config"])
     configurations = client.zero_trust.tunnels.cloudflared.configurations
     identifiers = {"account_id": params["account_id"], "tunnel_id": params["tunnel_id"]}
 

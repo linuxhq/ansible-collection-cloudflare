@@ -189,6 +189,26 @@ class CfdTunnelConfigurationsTests(TestCase):
         )
         self.assertFalse(current["ingress"][0]["originRequest"]["noTLSVerify"])
 
+    def test_sdk_origin_request_spelling_fails_before_any_request(self):
+        origin = {"no_tls_verify": True}
+        for config in (
+            {"origin_request": origin, "ingress": [{"service": "http_status:404"}]},
+            {
+                "ingress": [
+                    {"hostname": "app.example.com", "service": "http://localhost", "origin_request": origin},
+                    {"service": "http_status:404"},
+                ]
+            },
+        ):
+            for check_mode in (False, True):
+                with self.subTest(config=config, check_mode=check_mode):
+                    client = Mock()
+                    with self.assertRaises(ModuleFail) as raised:
+                        cfd_tunnel_configurations.run(module_for(config, check_mode), client)
+
+                    self.assertIn("'originRequest'", raised.exception.values["msg"])
+                    self.assertEqual(client.mock_calls, [])
+
     def test_check_mode_does_not_update(self):
         raised, api = self.run_module(module_for({"warp": True}, check_mode=True), {"config": {"warp": False}})
 

@@ -170,10 +170,18 @@ def serialize_resource(resource):
     return resource
 
 
-def resource_field(module, resource, field, resource_name, expected=None):
+def resource_field(module, resource, field, resource_name, expected=None, strict=True):
+    """Return a string field of resource, failing when it is malformed.
+
+    strict also rejects an empty value or one with surrounding whitespace.
+    """
     value = resource.get(field) if isinstance(resource, dict) else None
-    if not isinstance(value, str) or not value.strip() or value != value.strip():
-        module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data")
+    if not isinstance(value, str) or strict and (not value.strip() or value != value.strip()):
+        failure = {"msg": f"Cloudflare API returned malformed {resource_name} data"}
+        if isinstance(resource, dict) and "id" in resource:
+            failure["resource_id"] = resource["id"]
+
+        module.fail_json(**failure)
 
     if expected is not None and value != expected:
         module.fail_json(msg=f"Cloudflare API returned the wrong {resource_name}")
@@ -191,11 +199,15 @@ def require_mapping(module, value, resource_name):
 
 
 def resource_list(module, items, resource_name, required_fields=("id",)):
-    """Serialize every item of an SDK list, validating its required fields."""
+    """Serialize every item of an SDK list, validating its required fields.
+
+    Names need only be strings: Cloudflare can store names with surrounding
+    whitespace, which must not fail a listing of every resource.
+    """
     resources = [serialize_resource(item) for item in items]
     for resource in resources:
         for field in required_fields:
-            resource_field(module, resource, field, resource_name)
+            resource_field(module, resource, field, resource_name, strict=field != "name")
 
     return resources
 
@@ -212,12 +224,14 @@ def find_resource(module, items, resource_name, field, value):
     """Return the serialized item whose field equals value, or None.
 
     Fail when more than one item matches, so an ambiguous name never selects
-    an arbitrary resource.
+    an arbitrary resource. Only the matched items are validated strictly, so
+    an unrelated item with surrounding whitespace in its field is skipped.
     """
     matches = []
     for item in items:
         resource = serialize_resource(item)
-        if resource_field(module, resource, field, resource_name) == value:
+        if resource_field(module, resource, field, resource_name, strict=False) == value:
+            resource_field(module, resource, field, resource_name)
             matches.append(resource)
 
     if len(matches) > 1:
@@ -365,18 +379,21 @@ def exit_settings(module, result_key, settings, resource_name):
     module.exit_json(changed=False, **{result_key: settings})
 
 
-def ensure_settings(module, result_key, resource_name, current, payload, edit, comparable=None, context=None):
+def ensure_settings(
+    module, result_key, resource_name, current, payload, edit, comparable=None, context=None, exact_values=()
+):
     """Converge settings that Cloudflare updates with PATCH semantics.
 
     comparable optionally maps a settings mapping to its comparable form;
-    context names the settings' owner in failures.
+    context names the settings' owner in failures. exact_values are compared
+    exactly, for settings that the PATCH replaces as a whole.
     """
     comparable = comparable or (lambda settings: settings)
     label = resource_name[0].upper() + resource_name[1:]
     current = serialize_resource(current) or {}
     require_mapping(module, current, resource_name)
 
-    if not differs(comparable(current), payload):
+    if not differs(comparable(current), payload, exact_values=exact_values):
         module.exit_json(changed=False, message=f"{label} already present", **{result_key: current})
 
     if module.check_mode:
@@ -386,7 +403,7 @@ def ensure_settings(module, result_key, resource_name, current, payload, edit, c
         settings = serialize_resource(edit(payload))
 
     require_mapping(module, settings, resource_name)
-    require_applied(module, comparable(settings), payload, resource_name)
+    require_applied(module, comparable(settings), payload, resource_name, exact_values=exact_values)
     module.exit_json(changed=True, message=f"{label} updated", **{result_key: settings})
 
 

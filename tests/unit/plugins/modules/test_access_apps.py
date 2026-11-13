@@ -221,6 +221,62 @@ class AccessAppsTests(TestCase):
         self.assertNotIn("session_duration", sent)
         self.assertTrue(result["changed"])
 
+    def test_change_to_proxy_endpoint_carries_only_fields_proxy_endpoints_store(self):
+        current = {
+            **stored(app_launcher_visible=True, auto_redirect_to_identity=True, session_duration="8h"),
+            "allowed_idps": ["idp"],
+            "eager_redirect_cookie_setting": True,
+            "options_preflight_bypass": False,
+            "policies": [{"id": "policy-id", "precedence": 1}],
+            "tags": ["tag"],
+        }
+        # The fields Cloudflare returns after a change to proxy_endpoint.
+        updated = {
+            **stored(type="proxy_endpoint", auto_redirect_to_identity=True, session_duration="8h"),
+            "allowed_idps": current["allowed_idps"],
+            "policies": current["policies"],
+            "tags": current["tags"],
+        }
+        client, api = client_with([current], updated=updated)
+
+        result = self.run_module(FakeModule(params(type="proxy_endpoint")), client)
+
+        sent = api.update.call_args.kwargs
+        for field in ("eager_redirect_cookie_setting", "options_preflight_bypass", "app_launcher_visible"):
+            self.assertNotIn(field, sent)
+
+        for field in ("allowed_idps", "auto_redirect_to_identity", "policies", "session_duration", "tags"):
+            self.assertEqual(sent[field], current[field])
+
+        self.assertTrue(result["changed"])
+
+        client, api = client_with([updated])
+        result = self.run_module(FakeModule(params(type="proxy_endpoint")), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_false_interstitial_and_401_redirect_match_omitted_settings(self):
+        false_options = {"service_auth_401_redirect": False, "skip_interstitial": False}
+        for app_type in ("self_hosted", "bookmark", "proxy_endpoint"):
+            with self.subTest(type=app_type):
+                client, api = client_with([stored(type=app_type)])
+
+                result = self.run_module(FakeModule(params(type=app_type, **false_options)), client)
+
+                api.update.assert_not_called()
+                self.assertFalse(result["changed"])
+
+        current = stored(service_auth_401_redirect=True, skip_interstitial=True)
+        client, api = client_with([current], updated=stored())
+
+        result = self.run_module(FakeModule(params(**false_options)), client)
+
+        for field in false_options:
+            self.assertIs(api.update.call_args.kwargs[field], False)
+
+        self.assertTrue(result["changed"])
+
     def test_change_to_mcp_portal_drops_launcher_visibility(self):
         current = stored(app_launcher_visible=False, auto_redirect_to_identity=True)
         updated = stored(type="mcp_portal", auto_redirect_to_identity=True)

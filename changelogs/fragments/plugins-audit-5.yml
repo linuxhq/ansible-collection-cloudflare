@@ -1,0 +1,30 @@
+---
+minor_changes:
+  - pages_projects - with O(state=absent), delete only the project instead of first deleting each listed custom
+    domain. Cloudflare detaches every custom domain when it deletes a project, so O(domains) no longer triggers
+    separate domain deletes.
+bugfixes:
+  - cfd_tunnel_configurations - fail before any request when O(config) or an ingress rule uses the SDK spelling
+    C(origin_request), naming the Cloudflare API key C(originRequest). The SDK renamed the key and its nested keys on
+    write, so the module wrote and then failed on every run.
+  - rules_lists - fail before any change when an O(elements) entry does not set the field for the list kind, such as
+    C(ip) for an V(ip) list. The list was created, or its description updated, before Cloudflare rejected the items.
+  - devices_policy - compare O(include) and O(exclude) routes on all of their fields, so removing a field such as
+    C(description) from a route is applied instead of reported as unchanged.
+  - access_apps - when changing an existing application to O(type=proxy_endpoint), carry over only the fields proxy
+    endpoints store (C(allowed_idps), C(auto_redirect_to_identity), C(policies), C(session_duration), and C(tags)).
+    Cloudflare dropped the others, so the type change wrote and then failed.
+  - access_apps - treat V(false) as Cloudflare's default for O(skip_interstitial) and O(service_auth_401_redirect),
+    which Cloudflare omits when false. An explicit V(false) wrote and then failed on every run, and was rejected for
+    types V(bookmark) and V(proxy_endpoint).
+  - access_policies, access_policies_info, and other modules that find or list resources by name - do not fail when an
+    unrelated resource's name has surrounding whitespace, which Cloudflare can store for Access policies. Identifiers
+    and the matched resource are still validated strictly, and malformed-data failures now include the resource's
+    C(resource_id).
+  - pagerules - fail before any change when O(priority) is below 1. Cloudflare stored priority 0 as 1, so the module
+    wrote on every run.
+  - pages_projects - document that O(build_config) C(web_analytics_token), like C(web_analytics_tag), can be set to
+    null to clear it.
+trivial:
+  - Molecule scenarios - reset devices_policy and devices_settings before converging so the write path runs every
+    time, and assert the values the devices_settings_info and zerotrust_connectivity_settings_info fixtures set.
