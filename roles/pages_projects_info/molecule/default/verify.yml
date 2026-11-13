@@ -12,11 +12,6 @@
           - _pages_projects_info_dict[_item].deployment_configs.preview | length > 0
           - _pages_projects_info_dict[_item].deployment_configs.production | length > 0
           - _pages_projects_info_dict[_item].domains.0 == _item ~ '.pages.dev'
-          - (pages_projects_list |
-             selectattr('name', '==', _item) |
-             map(attribute='domains') |
-             first |
-             map(attribute='name')) is subset(_pages_projects_info_dict[_item].domains)
           - _pages_projects_info_dict[_item].id is defined
           - _pages_projects_info_dict[_item].name is defined
           - _pages_projects_info_dict[_item].production_branch == 'main'
@@ -27,6 +22,24 @@
       loop_control:
         label: "{{ _item | d(none) }}"
         loop_var: _item
+
+    - name: Ensure custom domains are queried
+      linuxhq.cloudflare.pages_projects:
+        account_id: "{{ pages_projects_account_id }}"
+        api_token: "{{ pages_projects_api_token }}"
+        domains: "{{ _project.domains }}"
+        name: "{{ _project.name }}"
+      register: __pages_projects_info_domains
+      check_mode: true
+      loop: "{{ pages_projects_list }}"
+      loop_control:
+        label: "{{ _project.name | d(none) }}"
+        loop_var: _project
+
+    - name: Ensure custom domains are attached
+      ansible.builtin.assert:
+        that:
+          - __pages_projects_info_domains is not changed
 
     - name: Ensure inventory lists are formatted
       ansible.builtin.set_fact:
