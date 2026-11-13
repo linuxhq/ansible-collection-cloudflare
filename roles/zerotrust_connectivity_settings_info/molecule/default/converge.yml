@@ -2,6 +2,11 @@
 - name: Converge
   hosts: all
   roles:
+    - role: zerotrust_connectivity_settings
+      tags:
+        - molecule-idempotence-notest
+      check_mode: false
+
     - role: zerotrust_connectivity_settings_info
       zerotrust_connectivity_settings_info_account_id: null
       zerotrust_connectivity_settings_info_api_token: null

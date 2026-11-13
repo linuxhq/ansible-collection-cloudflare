@@ -8,5 +8,13 @@
       tags:
         - molecule-idempotence-notest
 
+    - role: devices_policy
+      devices_policy_auto_connect: 120
+      devices_policy_include:
+        - address: 100.64.0.0/10
+          description: molecule reset
+      tags:
+        - molecule-idempotence-notest
+
     - devices_policy
 ...
