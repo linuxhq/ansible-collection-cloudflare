@@ -151,8 +151,9 @@ def canonical_url(value):
     path keep their case.
     """
     scheme, separator, rest = value.partition("://")
-    if not separator:
-        scheme, rest = "", value
+    if not separator or "/" in scheme:
+        # A "://" after the first slash belongs to the path, not a scheme.
+        scheme, separator, rest = "", "", value
 
     host, slash, path = rest.partition("/")
     if not slash and host.endswith("*"):
