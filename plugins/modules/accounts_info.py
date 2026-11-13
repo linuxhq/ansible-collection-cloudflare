@@ -44,7 +44,26 @@ account:
       description: Cloudflare account name.
       returned: when the account exists
       type: str
-
+    type:
+      description: Cloudflare account type, such as V(standard) or V(enterprise).
+      returned: when the account exists
+      type: str
+    created_on:
+      description: Timestamp when the account was created.
+      returned: when provided by Cloudflare
+      type: str
+    legacy_flags:
+      description: Legacy account flags.
+      returned: when provided by Cloudflare
+      type: dict
+    managed_by:
+      description: Parent organization details.
+      returned: when provided by Cloudflare
+      type: dict
+    settings:
+      description: Account settings.
+      returned: when provided by Cloudflare
+      type: dict
 """
 
 from ansible.module_utils.basic import AnsibleModule

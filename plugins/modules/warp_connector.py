@@ -9,6 +9,8 @@ module: warp_connector
 short_description: Manage Cloudflare WARP Connectors
 description:
   - Create and delete Cloudflare WARP Connector tunnels by name.
+  - Results include sensitive values returned by Cloudflare, such as connector tokens and tunnel credentials; protect registered
+    results and task output, for example with C(no_log).
   - Tunnel secrets are sent when creating a connector, or when O(rotate_secrets) is
     enabled, because Cloudflare does not return the current secret for idempotent
     comparison.
