@@ -143,7 +143,7 @@ class PageRulesTests(TestCase):
         cases = (
             ("Example.COM/Path/*", "example.com/Path/*"),
             ("example.com", "example.com/"),
-            ("HTTPS://WWW.Example.com", "https://www.example.com/"),
+            ("HTTPS://WWW.Example.com", "HTTPS://www.example.com/"),
         )
         for requested, stored in cases:
             with self.subTest(requested=requested):

@@ -44,9 +44,7 @@ options:
         O(enable_binding_cookie), O(http_only_cookie_attribute),
         O(same_site_cookie_attribute), O(service_auth_401_redirect),
         O(session_duration), or O(skip_interstitial). Type V(mcp_portal) does not
-        support O(app_launcher_visible), O(cors_headers),
-        O(enable_binding_cookie), O(service_auth_401_redirect), or
-        O(skip_interstitial). Type V(proxy_endpoint) does not support
+        support O(app_launcher_visible). Type V(proxy_endpoint) does not support
         O(app_launcher_visible), O(cors_headers), O(custom_deny_message),
         O(destinations), O(enable_binding_cookie), O(http_only_cookie_attribute),
         O(logo_url), O(same_site_cookie_attribute), O(service_auth_401_redirect),
@@ -253,8 +251,9 @@ DEFAULT_FIELDS = {
 }
 
 # Cloudflare accepts these settings for the application types below but does
-# not store them, so a requested value could never converge. Derived from the
-# SDK application response models.
+# not store them, so a requested value could never converge. Verified against
+# the API; the SDK response models omit more fields for mcp_portal than
+# Cloudflare drops.
 UNSUPPORTED_FIELDS = {
     "bookmark": (
         "allowed_idps",
@@ -270,13 +269,7 @@ UNSUPPORTED_FIELDS = {
         "session_duration",
         "skip_interstitial",
     ),
-    "mcp_portal": (
-        "app_launcher_visible",
-        "cors_headers",
-        "enable_binding_cookie",
-        "service_auth_401_redirect",
-        "skip_interstitial",
-    ),
+    "mcp_portal": ("app_launcher_visible",),
     "proxy_endpoint": (
         "app_launcher_visible",
         "cors_headers",

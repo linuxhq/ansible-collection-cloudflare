@@ -125,7 +125,7 @@ class AccessAppsTests(TestCase):
             ("bookmark", {"enable_binding_cookie": True, "http_only_cookie_attribute": False}),
             ("proxy_endpoint", {"app_launcher_visible": False, "enable_binding_cookie": True}),
             ("proxy_endpoint", {"http_only_cookie_attribute": False}),
-            ("mcp_portal", {"app_launcher_visible": False, "enable_binding_cookie": True}),
+            ("mcp_portal", {"app_launcher_visible": False}),
         )
         for app_type, options in cases:
             with self.subTest(type=app_type, options=options):
@@ -137,6 +137,15 @@ class AccessAppsTests(TestCase):
                 self.assertIn(f"type {app_type} do not support", result["msg"])
                 api.list.assert_not_called()
                 api.create.assert_not_called()
+
+    def test_mcp_portal_accepts_cookie_and_interstitial_options(self):
+        options = {"enable_binding_cookie": True, "skip_interstitial": True, "service_auth_401_redirect": True}
+        client, api = client_with()
+
+        result = self.run_module(FakeModule(params(type="mcp_portal", **options), check_mode=True), client)
+
+        self.assertTrue(result["changed"])
+        api.list.assert_called_once()
 
     def test_type_accepts_defaults_for_unsupported_options(self):
         for app_type in ("bookmark", "mcp_portal", "proxy_endpoint"):
