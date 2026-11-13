@@ -156,6 +156,10 @@ def canonical_url(value):
         scheme, separator, rest = "", "", value
 
     host, slash, path = rest.partition("/")
+    if "?" in host or "#" in host:
+        # Leave a query or fragment without a path exactly as requested.
+        return value
+
     if not slash and host.endswith("*"):
         host, path = host[:-1], "*"
 
