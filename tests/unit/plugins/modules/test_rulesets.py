@@ -81,6 +81,47 @@ class RulesetsTests(TestCase):
 
             self.assertIn("malformed ruleset", result["msg"])
 
+    def test_rejects_sdk_cache_control_spellings_before_any_request(self):
+        for key in (
+            "max_age",
+            "must_revalidate",
+            "must_understand",
+            "no_cache",
+            "no_store",
+            "no_transform",
+            "proxy_revalidate",
+            "s_maxage",
+            "stale_if_error",
+            "stale_while_revalidate",
+        ):
+            api_key = key.replace("_", "-")
+            rules = [{"action": "set_cache_control", "expression": "true", "action_parameters": {key: {}}}]
+            client, api = make_client(CURRENT)
+            with self.subTest(key=key):
+                result = self.run_module(FakeModule(params(rules=rules)), client)
+
+            api.phases.get.assert_not_called()
+            api.phases.update.assert_not_called()
+            self.assertEqual(
+                result["msg"], f"action_parameters key {key!r} must use the Cloudflare API key {api_key!r}"
+            )
+
+    def test_accepts_api_cache_control_spellings(self):
+        rules = [
+            {
+                "action": "set_cache_control",
+                "expression": "true",
+                "enabled": True,
+                "action_parameters": {"max-age": {"operation": "set", "value": 60}},
+            }
+        ]
+        client, api = make_client(CURRENT, updated={**CURRENT, "rules": rules})
+
+        result = self.run_module(FakeModule(params(rules=rules)), client)
+
+        api.phases.update.assert_called_once_with(PHASE, zone_id="zone", rules=rules)
+        self.assertTrue(result["changed"])
+
     def test_create_requires_name(self):
         client, api = make_client()
 

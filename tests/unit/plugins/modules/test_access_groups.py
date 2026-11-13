@@ -1,7 +1,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import access_groups
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
@@ -20,7 +20,7 @@ def params(**updates):
         "include": INCLUDE,
         "exclude": None,
         "require": None,
-        "is_default": False,
+        "is_default": None,
         "state": "present",
     }
     values.update(updates)
@@ -70,9 +70,7 @@ class AccessGroupsTests(TestCase):
 
         result = self.run_module(FakeModule(params(include=include)), client)
 
-        api.update.assert_called_once_with(
-            "group", account_id="account", include=include, is_default=False, name="admins"
-        )
+        api.update.assert_called_once_with("group", account_id="account", include=include, name="admins")
         self.assertTrue(result["changed"])
 
     def test_rejects_sdk_selector_key_before_any_request(self):
@@ -92,7 +90,7 @@ class AccessGroupsTests(TestCase):
 
         result = self.run_module(FakeModule(params()), client)
 
-        api.create.assert_called_once_with(account_id="account", include=INCLUDE, is_default=False, name="admins")
+        api.create.assert_called_once_with(account_id="account", include=INCLUDE, name="admins")
         self.assertEqual(result["access_group"], created)
 
     def test_update_preserves_omitted_selectors(self):
@@ -105,9 +103,48 @@ class AccessGroupsTests(TestCase):
         result = self.run_module(FakeModule(params(include=include)), client)
 
         api.update.assert_called_once_with(
-            "group", account_id="account", exclude=exclude, include=include, is_default=False, name="admins"
+            "group", account_id="account", exclude=exclude, include=include, name="admins"
         )
         self.assertTrue(result["changed"])
+
+    def test_is_default_has_no_module_default(self):
+        with (
+            patch.object(access_groups, "AnsibleModule", side_effect=RuntimeError) as module,
+            self.assertRaises(RuntimeError),
+        ):
+            access_groups.main()
+
+        self.assertNotIn("default", module.call_args.kwargs["argument_spec"]["is_default"])
+
+    def test_update_preserves_omitted_default_status(self):
+        include = [{"email": {"email": "new@example.com"}}]
+        current = {"id": "group", "name": "admins", "include": INCLUDE, "is_default": True}
+        updated = {**current, "include": include}
+        client, api = client_with([current], updated=updated)
+
+        result = self.run_module(FakeModule(params(include=include)), client)
+
+        api.update.assert_called_once_with(
+            "group", account_id="account", include=include, is_default=True, name="admins"
+        )
+        self.assertTrue(result["changed"])
+
+    def test_explicit_is_default_is_compared(self):
+        current = {"id": "group", "name": "admins", "include": INCLUDE, "is_default": True}
+        client, api = client_with([current], updated={k: v for k, v in current.items() if k != "is_default"})
+
+        result = self.run_module(FakeModule(params(is_default=False)), client)
+
+        api.update.assert_called_once_with(
+            "group", account_id="account", include=INCLUDE, is_default=False, name="admins"
+        )
+        self.assertTrue(result["changed"])
+
+        client, api = client_with([{k: v for k, v in current.items() if k != "is_default"}])
+        result = self.run_module(FakeModule(params(is_default=False)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
 
     def test_rejects_update_response_for_wrong_group(self):
         current = {"id": "group", "name": "admins", "include": INCLUDE}

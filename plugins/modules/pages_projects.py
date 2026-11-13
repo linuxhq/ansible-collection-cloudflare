@@ -53,7 +53,9 @@ options:
       - Environment variables and bindings, such as C(kv_namespaces) entries, set
         to null are deleted from the project. An empty binding map changes nothing.
       - Cloudflare keeps the value of any other setting set to null, such as
-        C(compatibility_date), so the module fails before making changes.
+        C(compatibility_date), a whole C(env_vars) or binding map, or a field
+        inside an entry other than C(services) C(entrypoint) and C(r2_buckets)
+        C(jurisdiction), so the module fails before making changes.
   rotate_secrets:
     type: bool
     default: false
@@ -176,6 +178,8 @@ NULLABLE_DEPLOYMENT_SETTINGS = (
     "services",
     "vectorize_bindings",
 )
+# Cloudflare clears these fields of a binding entry when they are set to null.
+NULLABLE_BINDING_FIELDS = {"r2_buckets": ("jurisdiction",), "services": ("entrypoint",)}
 
 
 def contains_null(value):
@@ -203,11 +207,19 @@ def validate_null_settings(module):
 
             continue
 
-        unsupported.extend(
-            f"deployment_configs.{environment}.{key}"
-            for key, value in config.items()
-            if key not in NULLABLE_DEPLOYMENT_SETTINGS and contains_null(value)
-        )
+        for key, value in config.items():
+            path = f"deployment_configs.{environment}.{key}"
+            if key not in NULLABLE_DEPLOYMENT_SETTINGS or value is None:
+                if contains_null(value):
+                    unsupported.append(path)
+
+                continue
+
+            # Entries may be null, which deletes them, but not most of their fields.
+            for name, entry in value.items() if isinstance(value, dict) else ():
+                for field, item in entry.items() if isinstance(entry, dict) else ():
+                    if field not in NULLABLE_BINDING_FIELDS.get(key, ()) and contains_null(item):
+                        unsupported.append(f"{path}.{name}.{field}")
 
     if unsupported:
         module.fail_json(

@@ -8,6 +8,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleExit,
     ModuleFail,
+    status_error,
 )
 
 ZONES = [{"id": "zone", "name": "example.com"}, {"id": "other", "name": "example.net"}]
@@ -65,3 +66,28 @@ class PageRulesInfoTests(TestCase):
                     pagerules_info.run(FakeModule({}), client)
 
                 self.assertIn("malformed page rule", raised.exception.values["msg"])
+
+    def test_skips_zones_deleted_after_listing(self):
+        invalid_zone = {"success": False, "errors": [{"code": 1001, "message": "Invalid zone identifier"}]}
+        for error in (status_error(404), status_error(400, invalid_zone)):
+            with self.subTest(status_code=error.status_code):
+                client = client_with(ZONES, {})
+                client.page_rules.list.side_effect = [error, []]
+
+                with self.assertRaises(ModuleExit) as raised:
+                    pagerules_info.run(FakeModule({}), client)
+
+                self.assertEqual(
+                    raised.exception.values,
+                    {"changed": False, "pagerules": [{"id": "other", "name": "example.net", "pagerules": []}]},
+                )
+
+    def test_other_errors_still_fail(self):
+        other_error = {"success": False, "errors": [{"code": 1004, "message": "Bad request"}]}
+        for error in (status_error(400, other_error), status_error(403)):
+            with self.subTest(status_code=error.status_code):
+                client = client_with(ZONES, {})
+                client.page_rules.list.side_effect = error
+
+                with self.assertRaises(error.__class__):
+                    pagerules_info.run(FakeModule({}), client)

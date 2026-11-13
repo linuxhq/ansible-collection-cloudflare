@@ -6,6 +6,9 @@
     - name: Ensure roles are included
       ansible.builtin.include_role:
         name: "{{ _role }}"
+        apply:
+          diff: false
+          no_log: true
       loop:
         - access_groups_info
         - access_identity_providers_info

@@ -1,7 +1,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import access_policies
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
@@ -19,9 +19,9 @@ def params(**updates):
         "name": "admins",
         "decision": "allow",
         "include": INCLUDE,
-        "approval_required": False,
-        "isolation_required": False,
-        "purpose_justification_required": False,
+        "approval_required": None,
+        "isolation_required": None,
+        "purpose_justification_required": None,
         "state": "present",
     }
     values.update(updates)
@@ -66,15 +66,7 @@ class AccessPoliciesTests(TestCase):
 
         result = self.run_module(FakeModule(params()), client)
 
-        api.create.assert_called_once_with(
-            account_id="account",
-            approval_required=False,
-            decision="allow",
-            include=INCLUDE,
-            isolation_required=False,
-            name="admins",
-            purpose_justification_required=False,
-        )
+        api.create.assert_called_once_with(account_id="account", decision="allow", include=INCLUDE, name="admins")
         self.assertTrue(result["changed"])
 
     def test_update_preserves_omitted_fields(self):
@@ -85,6 +77,48 @@ class AccessPoliciesTests(TestCase):
 
         self.assertEqual(api.update.call_args.args, ("policy",))
         self.assertEqual(api.update.call_args.kwargs["exclude"], exclude)
+        self.assertTrue(result["changed"])
+
+    def test_required_flags_have_no_module_default(self):
+        with (
+            patch.object(access_policies, "AnsibleModule", side_effect=RuntimeError) as module,
+            self.assertRaises(RuntimeError),
+        ):
+            access_policies.main()
+
+        argument_spec = module.call_args.kwargs["argument_spec"]
+        for field in access_policies.FALSE_FIELDS:
+            self.assertNotIn("default", argument_spec[field])
+
+    def test_update_preserves_omitted_required_flags(self):
+        flags = dict.fromkeys(access_policies.FALSE_FIELDS, True)
+        client, api = client_with([policy(**flags)], updated=policy(decision="deny", **flags))
+
+        result = self.run_module(FakeModule(params(decision="deny")), client)
+
+        sent = api.update.call_args.kwargs
+        self.assertEqual({field: sent[field] for field in flags}, flags)
+        self.assertTrue(result["changed"])
+
+        client, api = client_with([policy(decision="deny", **flags)])
+        result = self.run_module(FakeModule(params(decision="deny")), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_explicit_required_flags_compare_with_cloudflare_defaults(self):
+        flags = dict.fromkeys(access_policies.FALSE_FIELDS, False)
+        client, api = client_with([policy()])
+
+        result = self.run_module(FakeModule(params(**flags)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+        client, api = client_with([policy(isolation_required=True)], updated=policy(isolation_required=False))
+        result = self.run_module(FakeModule(params(isolation_required=False)), client)
+
+        self.assertIs(api.update.call_args.kwargs["isolation_required"], False)
         self.assertTrue(result["changed"])
 
     def test_update_preserves_unmanaged_settings(self):

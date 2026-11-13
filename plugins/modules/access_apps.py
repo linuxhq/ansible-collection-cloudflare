@@ -11,9 +11,9 @@ description:
   - Create, update, and delete Cloudflare Access applications by name.
   - Results include sensitive values returned by Cloudflare, such as client secrets; protect registered
     results and task output, for example with C(no_log).
-  - Optional settings without a default are preserved on an existing application
-    when omitted, and so are settings this module does not manage, such as
-    C(tags) or C(custom_pages).
+  - Optional settings are preserved on an existing application when omitted,
+    and so are settings this module does not manage, such as C(tags) or
+    C(custom_pages).
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
@@ -37,8 +37,8 @@ options:
       - Only types that are reached through O(domain) and need no other required
         settings are supported.
       - Required when O(state=present).
-      - Settings that Cloudflare does not store for the chosen type must keep
-        their default or be omitted. Type V(bookmark) does not support
+      - Settings that Cloudflare does not store for the chosen type must be
+        omitted or set to Cloudflare's default. Type V(bookmark) does not support
         O(allowed_idps), O(auto_redirect_to_identity), O(cors_headers),
         O(custom_deny_message), O(custom_deny_url), O(destinations),
         O(enable_binding_cookie), O(http_only_cookie_attribute),
@@ -49,6 +49,8 @@ options:
         O(destinations), O(enable_binding_cookie), O(http_only_cookie_attribute),
         O(logo_url), O(same_site_cookie_attribute), O(service_auth_401_redirect),
         or O(skip_interstitial).
+      - Changing an existing application to type V(bookmark) keeps only its
+        O(app_launcher_visible), O(logo_url), O(policies), and tags.
     type: str
     choices:
       - bookmark
@@ -64,18 +66,21 @@ options:
       - Identity provider identifiers allowed for the application.
   app_launcher_visible:
     type: bool
-    default: true
     description:
       - Whether to show the application in the Access application launcher.
+      - When omitted, the current value is left unchanged; Cloudflare defaults
+        to V(true) on create.
   auto_redirect_to_identity:
     type: bool
-    default: false
     description:
       - Whether to redirect users to the identity provider automatically.
+      - When omitted, the current value is left unchanged; Cloudflare defaults
+        to V(false) on create.
   cors_headers:
     type: dict
     description:
       - Cross-origin resource sharing headers for the application.
+      - Compared exactly, so omitting a key removes it.
   custom_deny_message:
     type: str
     description:
@@ -93,14 +98,16 @@ options:
         in which case Cloudflare derives them from the new O(domain).
   enable_binding_cookie:
     type: bool
-    default: false
     description:
       - Whether to bind the Access cookie to the user session.
+      - When omitted, the current value is left unchanged; Cloudflare defaults
+        to V(false) on create.
   http_only_cookie_attribute:
     type: bool
-    default: true
     description:
       - Whether the Access cookie uses the HTTP-only attribute.
+      - When omitted, the current value is left unchanged; Cloudflare defaults
+        to V(true) on create.
   logo_url:
     type: str
     description:
@@ -121,9 +128,10 @@ options:
         Service Auth policy blocks a request.
   session_duration:
     type: str
-    default: 24h
     description:
       - Maximum duration of an authenticated Access session.
+      - When omitted, the current value is left unchanged; Cloudflare defaults
+        to V(24h) on create.
   skip_interstitial:
     type: bool
     description:
@@ -204,14 +212,19 @@ FIELDS = (
 
 PRESERVED_FIELDS = (
     "allowed_idps",
+    "app_launcher_visible",
+    "auto_redirect_to_identity",
     "cors_headers",
     "custom_deny_message",
     "custom_deny_url",
     "destinations",
+    "enable_binding_cookie",
+    "http_only_cookie_attribute",
     "logo_url",
     "policies",
     "same_site_cookie_attribute",
     "service_auth_401_redirect",
+    "session_duration",
     "skip_interstitial",
 )
 
@@ -284,6 +297,10 @@ UNSUPPORTED_FIELDS = {
     ),
 }
 
+# Cloudflare stores only these of the carried-over fields for the application
+# types below, so the others are dropped from the update.
+STORED_FIELDS = {"bookmark": ("app_launcher_visible", "logo_url", "policies", "tags")}
+
 
 def validate_type_fields(module):
     params = module.params
@@ -335,6 +352,14 @@ def run(module, client):
         # kept destinations would block every domain change.
         preserved_fields = tuple(field for field in preserved_fields if field != "destinations")
 
+    if params["type"] in STORED_FIELDS:
+        preserved_fields = tuple(field for field in preserved_fields if field in STORED_FIELDS[params["type"]])
+
+    # Cloudflare drops these on a change to the type, so carrying them over
+    # would fail the change.
+    unsupported = UNSUPPORTED_FIELDS.get(params["type"], ())
+    preserved_fields = tuple(field for field in preserved_fields if field not in unsupported)
+
     ensure_resource_present(
         module,
         "access_app",
@@ -346,6 +371,7 @@ def run(module, client):
         expected_name=params["name"],
         defaults=DEFAULT_FIELDS,
         preserved_fields=preserved_fields,
+        exact_values=("cors_headers",),
         context={"account_id": account_id},
     )
 
@@ -362,19 +388,19 @@ def main():
                 "choices": ["bookmark", "mcp_portal", "proxy_endpoint", "self_hosted", "ssh", "vnc"],
             },
             "allowed_idps": {"type": "list", "elements": "str"},
-            "app_launcher_visible": {"type": "bool", "default": True},
-            "auto_redirect_to_identity": {"type": "bool", "default": False},
+            "app_launcher_visible": {"type": "bool"},
+            "auto_redirect_to_identity": {"type": "bool"},
             "cors_headers": {"type": "dict"},
             "custom_deny_message": {"type": "str"},
             "custom_deny_url": {"type": "str"},
             "destinations": {"type": "list", "elements": "dict"},
-            "enable_binding_cookie": {"type": "bool", "default": False},
-            "http_only_cookie_attribute": {"type": "bool", "default": True},
+            "enable_binding_cookie": {"type": "bool"},
+            "http_only_cookie_attribute": {"type": "bool"},
             "logo_url": {"type": "str"},
             "policies": {"type": "list", "elements": "dict"},
             "same_site_cookie_attribute": {"type": "str"},
             "service_auth_401_redirect": {"type": "bool"},
-            "session_duration": {"type": "str", "default": "24h"},
+            "session_duration": {"type": "str"},
             "skip_interstitial": {"type": "bool"},
             "state": {
                 "type": "str",

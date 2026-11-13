@@ -37,14 +37,18 @@ def cloudflare_error_context(message, **context):
         raise
 
 
-@contextmanager
-def cloudflare_client(module):
+def require_cloudflare_sdk(module):
+    """Fail when the cloudflare SDK cannot be imported."""
     if Cloudflare is None:
         module.fail_json(
             msg=missing_required_lib("cloudflare"),
             missing_python_package="cloudflare",
         )
 
+
+@contextmanager
+def cloudflare_client(module):
+    require_cloudflare_sdk(module)
     api_token = validate_cloudflare_params(module)
     # Omit the other authentication headers so ambient credentials never apply,
     # including in client copies made by with_options(), which reload them from

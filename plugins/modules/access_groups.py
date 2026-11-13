@@ -44,9 +44,9 @@ options:
       - An existing group's requirements are preserved when omitted.
   is_default:
     type: bool
-    default: false
     description:
       - Whether this is the account's default Access group.
+      - An existing group's default status is preserved when omitted.
   state:
     type: str
     choices:
@@ -105,7 +105,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 FIELDS = ("exclude", "include", "is_default", "name", "require")
-PRESERVED_FIELDS = ("exclude", "require")
+PRESERVED_FIELDS = ("exclude", "is_default", "require")
 
 
 def run(module, client):
@@ -163,7 +163,7 @@ def main():
             "include": {"type": "list", "elements": "dict"},
             "exclude": {"type": "list", "elements": "dict"},
             "require": {"type": "list", "elements": "dict"},
-            "is_default": {"type": "bool", "default": False},
+            "is_default": {"type": "bool"},
             "state": {
                 "type": "str",
                 "choices": ["present", "absent"],

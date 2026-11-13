@@ -62,14 +62,16 @@ options:
       - An existing policy's value is preserved when omitted.
   approval_required:
     type: bool
-    default: false
     description:
       - Whether users must obtain approval before access is granted.
+      - When omitted, the current value is left unchanged; Cloudflare defaults
+        to V(false) on create.
   isolation_required:
     type: bool
-    default: false
     description:
       - Whether matching sessions require browser isolation.
+      - When omitted, the current value is left unchanged; Cloudflare defaults
+        to V(false) on create.
   purpose_justification_prompt:
     type: str
     description:
@@ -77,9 +79,10 @@ options:
       - An existing policy's value is preserved when omitted.
   purpose_justification_required:
     type: bool
-    default: false
     description:
       - Whether users must provide a justification for access.
+      - When omitted, the current value is left unchanged; Cloudflare defaults
+        to V(false) on create.
   state:
     type: str
     choices:
@@ -153,8 +156,11 @@ FIELDS = (
 
 PRESERVED_FIELDS = (
     "approval_groups",
+    "approval_required",
     "exclude",
+    "isolation_required",
     "purpose_justification_prompt",
+    "purpose_justification_required",
     "require",
 )
 
@@ -223,16 +229,16 @@ def main():
             "api_token": {"required": True, "type": "str", "no_log": True},
             "name": {"required": True, "type": "str"},
             "approval_groups": {"type": "list", "elements": "dict"},
-            "approval_required": {"type": "bool", "default": False},
+            "approval_required": {"type": "bool"},
             "decision": {
                 "type": "str",
                 "choices": ["allow", "deny", "non_identity", "bypass"],
             },
             "exclude": {"type": "list", "elements": "dict"},
             "include": {"type": "list", "elements": "dict"},
-            "isolation_required": {"type": "bool", "default": False},
+            "isolation_required": {"type": "bool"},
             "purpose_justification_prompt": {"type": "str"},
-            "purpose_justification_required": {"type": "bool", "default": False},
+            "purpose_justification_required": {"type": "bool"},
             "require": {"type": "list", "elements": "dict"},
             "state": {
                 "type": "str",

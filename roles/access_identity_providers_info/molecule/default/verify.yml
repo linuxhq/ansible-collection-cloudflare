@@ -3,7 +3,9 @@
   hosts: all
 
   roles:
-    - access_identity_providers_info
+    - role: access_identity_providers_info
+      diff: false
+      no_log: true
 
   post_tasks:
     - name: Ensure info is verified

@@ -5,7 +5,9 @@
   roles:
     - access_apps_info
     - access_groups_info
-    - access_identity_providers_info
+    - role: access_identity_providers_info
+      diff: false
+      no_log: true
     - access_policies_info
     - access_service_tokens_info
 

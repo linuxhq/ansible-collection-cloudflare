@@ -3,11 +3,15 @@
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
+from ansible.module_utils.basic import AnsibleModule
+
+from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudflare_utils
 from ansible_collections.linuxhq.cloudflare.plugins.modules import purge_cache
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
     ModuleFail,
+    patch_module_args,
 )
 
 
@@ -42,15 +46,57 @@ class PurgeCacheTests(TestCase):
         client.assert_not_called()
         self.assertEqual(result["msg"], "cache must not be empty")
 
+    def run_ansible_module(self, cache):
+        client = Mock()
+        client.cache.purge.return_value = {"id": "zone"}
+        context = Mock()
+        context.__enter__ = Mock(return_value=client)
+        context.__exit__ = Mock(return_value=False)
+
+        def exit_json(_module, **values):
+            raise ModuleExit(values)
+
+        def fail_json(_module, **values):
+            raise ModuleFail(values)
+
+        with (
+            patch_module_args(params(cache=cache)),
+            patch.object(AnsibleModule, "exit_json", exit_json),
+            patch.object(AnsibleModule, "fail_json", fail_json),
+            patch.object(purge_cache, "cloudflare_client", return_value=context),
+            self.assertRaises((ModuleExit, ModuleFail)) as raised,
+        ):
+            purge_cache.main()
+
+        return raised.exception.values, client.cache.purge
+
     def test_rejects_unsupported_keys_before_opening_a_client(self):
-        for check_mode in (False, True):
-            with self.subTest(check_mode=check_mode):
-                module = FakeModule(params(cache={"purge_everything": True, "everything": True}), check_mode)
+        result, purge = self.run_ansible_module({"purge_everything": True, "everything": True})
 
-                result, client = self.run_main(module)
+        purge.assert_not_called()
+        self.assertIn("Unsupported parameters", result["msg"])
+        self.assertIn("everything", result["msg"])
 
-                client.assert_not_called()
-                self.assertIn("Unsupported cache keys: everything", result["msg"])
+    def test_rejects_cache_without_values(self):
+        result, purge = self.run_ansible_module({"tags": None})
+
+        purge.assert_not_called()
+        self.assertEqual(result["msg"], "cache must not be empty")
+
+    def test_sends_only_set_cache_options_with_their_types(self):
+        files = ["https://example.com/a.css", {"url": "https://example.com/", "headers": {"Accept-Language": "en"}}]
+
+        result, purge = self.run_ansible_module({"purge_everything": "true", "files": files})
+
+        purge.assert_called_once_with(zone_id="zone", purge_everything=True, files=files)
+        self.assertTrue(result["changed"])
+
+    def test_check_mode_reports_missing_sdk(self):
+        with patch.object(cloudflare_utils, "Cloudflare", None):
+            result, client = self.run_main(FakeModule(params(), check_mode=True))
+
+        client.assert_not_called()
+        self.assertEqual(result["missing_python_package"], "cloudflare")
 
     def test_check_mode_does_not_purge(self):
         result, client = self.run_main(FakeModule(params(), check_mode=True))

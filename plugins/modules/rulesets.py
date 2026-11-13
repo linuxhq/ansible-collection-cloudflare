@@ -38,6 +38,8 @@ options:
         to keep a rule disabled.
       - A rule's C(action_parameters.headers) and C(action_parameters.rules) mappings
         are compared on their complete key sets, so omitting an entry removes it.
+      - Use the Cloudflare API names for C(set_cache_control) directives, such as
+        C(max-age) and C(no-cache); their snake_case spellings fail before any change.
       - When rules hold credentials, pass them from a vaulted variable and set
         C(no_log) on the task.
   phase:
@@ -123,6 +125,33 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     serialize_resource,
 )
 
+# The SDK renames these snake_case action parameters to their API spellings on
+# write, so Cloudflare would store and return keys that never match the request.
+ACTION_PARAMETER_API_KEYS = {
+    "max_age": "max-age",
+    "must_revalidate": "must-revalidate",
+    "must_understand": "must-understand",
+    "no_cache": "no-cache",
+    "no_store": "no-store",
+    "no_transform": "no-transform",
+    "proxy_revalidate": "proxy-revalidate",
+    "s_maxage": "s-maxage",
+    "stale_if_error": "stale-if-error",
+    "stale_while_revalidate": "stale-while-revalidate",
+}
+
+
+def validate_action_parameters(module):
+    """Fail when an action parameter uses an SDK spelling instead of its API key."""
+    for rule in module.params.get("rules") or ():
+        action_parameters = rule.get("action_parameters")
+        if not isinstance(action_parameters, dict):
+            continue
+
+        for key, api_key in ACTION_PARAMETER_API_KEYS.items():
+            if key in action_parameters:
+                module.fail_json(msg=f"action_parameters key {key!r} must use the Cloudflare API key {api_key!r}")
+
 
 def rules_from_resource(module, ruleset):
     rules = ruleset.get("rules")
@@ -152,6 +181,8 @@ def run(module, client):
     zone_id = params["zone_id"]
     phase = params["phase"]
     rulesets = client.rulesets
+    if params["state"] == "present":
+        validate_action_parameters(module)
 
     with cloudflare_error_context(
         "Cloudflare API request failed while gathering the ruleset entrypoint",
