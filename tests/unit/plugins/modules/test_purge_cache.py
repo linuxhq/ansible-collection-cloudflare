@@ -4,7 +4,6 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.testing import patch_module_args
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudflare_utils
 from ansible_collections.linuxhq.cloudflare.plugins.modules import purge_cache
@@ -12,6 +11,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleExit,
     ModuleFail,
+    patch_module_args,
 )
 
 
