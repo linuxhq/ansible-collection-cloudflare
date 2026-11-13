@@ -10,6 +10,7 @@ short_description: Gather information about cloudflared tunnel configurations
 description:
   - Gather configurations for cloudflared tunnels in an account that have not been
     deleted.
+  - A tunnel deleted while its configuration is being gathered is omitted.
   - Only remotely-managed tunnels are queried; locally-managed tunnel
     configurations are stored on the origin host.
 version_added: '2.0.0'
@@ -56,6 +57,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_error_context,
+    get_or_none,
     require_mapping,
     resource_list,
     serialize_resource,
@@ -86,7 +88,16 @@ def run(module, client):
             account_id=account_id,
             tunnel_id=tunnel["id"],
         ):
-            configuration = serialize_resource(tunnels.configurations.get(tunnel["id"], account_id=account_id)) or {}
+            # Skip a tunnel deleted after it was listed, which returns 404. A
+            # null configuration becomes an empty mapping, so None means 404.
+            configuration = get_or_none(
+                lambda tunnel_id: serialize_resource(tunnels.configurations.get(tunnel_id, account_id=account_id))
+                or {},
+                tunnel["id"],
+            )
+
+        if configuration is None:
+            continue
 
         require_mapping(module, configuration, "tunnel configuration")
         config = configuration.get("config")

@@ -6,6 +6,8 @@
       tags:
         - molecule-idempotence-notest
       check_mode: false
+      diff: false
+      no_log: true
 
     - role: cfd_tunnel_info
       cfd_tunnel_info_account_id: null
@@ -13,5 +15,7 @@
       tags:
         - molecule-idempotence-notest
 
-    - cfd_tunnel_info
+    - role: cfd_tunnel_info
+      diff: false
+      no_log: true
 ...

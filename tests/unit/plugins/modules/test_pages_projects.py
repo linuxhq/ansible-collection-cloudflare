@@ -183,6 +183,30 @@ class PagesProjectsTests(TestCase):
         api.edit.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_rejects_null_for_settings_cloudflare_keeps_before_any_request(self):
+        cases = (
+            ({"build_config": {"build_caching": None}}, ["build_config.build_caching"]),
+            (
+                {"deployment_configs": {"production": {"compatibility_date": None, "env_vars": {"A": None}}}},
+                ["deployment_configs.production.compatibility_date"],
+            ),
+            (
+                {"deployment_configs": {"preview": {"placement": {"mode": None}}}},
+                ["deployment_configs.preview.placement"],
+            ),
+            ({"deployment_configs": {"preview": None}}, ["deployment_configs.preview"]),
+        )
+        for options, unsupported in cases:
+            with self.subTest(options=options):
+                client, api = client_with([PROJECT])
+
+                result = self.run_module(FakeModule(params(**options)), client)
+
+                self.assertEqual(result["unsupported_settings"], unsupported)
+                self.assertIn("does not clear Pages project settings set to null", result["msg"])
+                api.get.assert_not_called()
+                api.edit.assert_not_called()
+
     def test_empty_string_build_setting_counts_as_cleared(self):
         current = {**PROJECT, "build_config": {"build_command": "make", "web_analytics_tag": ""}}
         client, api = client_with([current])
@@ -426,6 +450,33 @@ class PagesProjectsTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertEqual(result["pages_project"], refreshed)
         self.assertEqual(result["domains"], [{"name": "new.example.com"}])
+
+    def test_domain_names_compare_case_insensitively(self):
+        current = {**PROJECT, "domains": ["docs.example.com"]}
+        client, api = client_with([current], domains=[{"name": "docs.example.com"}])
+
+        result = self.run_module(FakeModule(params(domains=[{"name": "Docs.Example.com"}])), client)
+
+        api.domains.create.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_adds_mixed_case_domain_in_lowercase(self):
+        refreshed = {**PROJECT, "domains": ["new.example.com"]}
+        client, api = client_with([PROJECT, refreshed], created_domain={"name": "new.example.com"})
+
+        result = self.run_module(FakeModule(params(domains=[{"name": "New.Example.com"}])), client)
+
+        api.domains.create.assert_called_once_with(project_name="docs", account_id="account", name="new.example.com")
+        self.assertEqual(result["domains"], [{"name": "new.example.com"}])
+
+    def test_deletes_mixed_case_domain(self):
+        client, api = client_with([PROJECT], domains=[{"name": "a.example.com"}])
+
+        self.run_module(FakeModule(params(state="absent", domains=[{"name": "A.Example.com"}])), client)
+
+        api.domains.delete.assert_called_once_with(
+            domain_name="a.example.com", account_id="account", project_name="docs"
+        )
 
     def test_check_mode_does_not_add_domains(self):
         client, api = client_with([PROJECT])

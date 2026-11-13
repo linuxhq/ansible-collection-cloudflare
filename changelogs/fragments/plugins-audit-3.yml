@@ -1,0 +1,36 @@
+---
+breaking_changes:
+  - cfd_tunnel - fail before any change, including O(rotate_secrets), when O(config_src) differs from the existing
+    tunnel's configuration source, naming both values. The mismatch was previously ignored.
+  - dnssec role - stop sending C(status=active) for zones that omit C(status), so DNSSEC is left unchanged unless a
+    status is requested.
+bugfixes:
+  - access_policies - preserve C(policy_resolution_account_id) on update; the full-replacement update cleared it.
+  - access_groups, access_policies - fail before any change when an Access selector uses the SDK spelling
+    C(github_organization) or C(azure_ad), naming the Cloudflare API key (C(github-organization) or C(azureAD)).
+    Cloudflare stored the API key, so the module wrote and then failed on every run.
+  - access_groups, access_policies - compare O(include), O(exclude), and O(require) selectors exactly, so removing an
+    optional nested field, such as a device posture C(account_id), is applied instead of reported as unchanged.
+  - access_apps - fail before any change when an option the O(type) does not support is set to a non-default value,
+    such as O(session_duration) for V(bookmark), O(enable_binding_cookie) for V(proxy_endpoint), or
+    O(app_launcher_visible=false) for V(mcp_portal). Cloudflare accepted and dropped the value, so the module wrote
+    and then failed on every run.
+  - pages_projects - fail before any change when null is requested for a setting Cloudflare keeps, such as
+    C(build_caching) or C(compatibility_date); only C(web_analytics_tag), C(web_analytics_token), environment
+    variables, and bindings are cleared with null. The module previously updated the project and then failed.
+  - pages_projects - compare custom domain names case-insensitively, so a mixed-case O(domains[].name) converges
+    instead of failing after Cloudflare stores it in lowercase.
+  - pagerules - match target URL values as Cloudflare stores them, with a lowercase host and a slash after a bare host,
+    before any trailing wildcard, so such rules are found and converge instead of failing after creation.
+  - pagerules - compare O(actions) regardless of order; Cloudflare lists actions sorted by C(id), so other orders
+    reported a change and updated the rule on every run.
+  - cfd_tunnel_configurations_info - skip a tunnel deleted while its configuration is being gathered instead of failing.
+  - zones_info role - build C(_zones_info_dict) from non-internal zones only, so an internal zone never shadows a
+    public zone with the same name. C(_zones_info_list) still includes internal zones.
+trivial:
+  - plugins - document the minimum Cloudflare SDK as 5.10.0, matching requirements.txt.
+  - accounts_info - document the returned C(type), C(created_on), C(legacy_flags), C(managed_by), and C(settings).
+  - devices_policy - document that omitted options leave the current value unchanged.
+  - warp_connector - document that results include sensitive values to protect with C(no_log).
+  - Molecule - assert accounts_info, purge_cache, pages_projects_info custom domains, and dnssec omitted-status
+    behavior; use no_log for tunnel and connector credentials.

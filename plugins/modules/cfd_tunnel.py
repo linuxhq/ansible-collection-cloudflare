@@ -34,8 +34,8 @@ options:
     description:
       - Location from which the tunnel receives its configuration.
       - Required when creating a cloudflared tunnel.
-      - Only applied when creating a tunnel; an existing tunnel's configuration
-        source is not compared or changed.
+      - An existing tunnel's configuration source is not changed; the module
+        fails before making changes when it differs from the requested value.
   tunnel_secret:
     type: str
     description:
@@ -128,6 +128,16 @@ def ensure_present(module, tunnels, current):
 
     if current is not None:
         current_id = resource_id(module, current, "cloudflared tunnel")
+        current_config_src = current.get("config_src")
+        if params.get("config_src") is not None and current_config_src not in (None, params["config_src"]):
+            module.fail_json(
+                msg=f"Cannot change config_src of the existing cloudflared tunnel from "
+                f"{current_config_src} to {params['config_src']}",
+                cfd_tunnel_id=current_id,
+                current_config_src=current_config_src,
+                requested_config_src=params["config_src"],
+            )
+
         if not params["rotate_secrets"]:
             module.exit_json(changed=False, message="Cloudflared tunnel already present", cfd_tunnel=current)
 

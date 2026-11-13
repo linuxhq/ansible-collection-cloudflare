@@ -1,5 +1,32 @@
 ---
 - name: Verify
   hosts: all
-  tasks: []
+  roles:
+    - zones_info
+
+  tasks:
+    - name: Ensure cache purge is predicted in check mode
+      linuxhq.cloudflare.purge_cache:
+        api_token: "{{ purge_cache_api_token }}"
+        cache: "{{ purge_cache_list.0.cache }}"
+        zone_id: "{{ purge_cache_list.0.zone_id }}"
+      register: __purge_cache_check
+      check_mode: true
+
+    - name: Ensure cache purge is executed
+      linuxhq.cloudflare.purge_cache:
+        api_token: "{{ purge_cache_api_token }}"
+        cache:
+          files:
+            - "https://{{ zones_list.0.name }}/molecule-verify"
+        zone_id: "{{ purge_cache_list.0.zone_id }}"
+      register: __purge_cache_result
+
+    - name: Ensure cache purge is verified
+      ansible.builtin.assert:
+        that:
+          - __purge_cache_check is changed
+          - __purge_cache_check.purge_cache is not defined
+          - __purge_cache_result is changed
+          - __purge_cache_result.purge_cache.id == purge_cache_list.0.zone_id
 ...

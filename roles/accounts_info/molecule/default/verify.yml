@@ -8,8 +8,9 @@
     - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _accounts_info_id is defined
-          - _accounts_info_name is defined
-          - _accounts_info_settings is defined
-          - _accounts_info_type is defined
+          - _accounts_info_id is string
+          - _accounts_info_id | length > 0
+          - _accounts_info_name == accounts_info_name
+          - _accounts_info_settings is mapping
+          - _accounts_info_type in ['standard', 'enterprise']
 ...

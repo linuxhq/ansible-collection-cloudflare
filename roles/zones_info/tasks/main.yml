@@ -22,8 +22,13 @@
     - zones_info
   ansible.builtin.set_fact:
     _zones_info_dict:
-      "{{ (dict(_zones_info_list |
+      "{{ (dict(__zones_info_public_list |
                json_query('[].name') |
-               zip(_zones_info_list))) |
+               zip(__zones_info_public_list))) |
           d({}) }}"
+  vars:
+    __zones_info_public_list:
+      "{{ _zones_info_list |
+          rejectattr('type', '==', 'internal') |
+          list }}"
 ...

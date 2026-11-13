@@ -119,6 +119,44 @@ class AccessAppsTests(TestCase):
         self.assertNotIn("self_hosted_domains", api.update.call_args.kwargs)
         self.assertTrue(result["changed"])
 
+    def test_rejects_options_unsupported_by_type_before_any_request(self):
+        cases = (
+            ("bookmark", {"session_duration": "8h", "auto_redirect_to_identity": True}),
+            ("bookmark", {"enable_binding_cookie": True, "http_only_cookie_attribute": False}),
+            ("proxy_endpoint", {"app_launcher_visible": False, "enable_binding_cookie": True}),
+            ("proxy_endpoint", {"http_only_cookie_attribute": False}),
+            ("mcp_portal", {"app_launcher_visible": False}),
+        )
+        for app_type, options in cases:
+            with self.subTest(type=app_type, options=options):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(type=app_type, **options)), client)
+
+                self.assertEqual(result["unsupported_fields"], sorted(options))
+                self.assertIn(f"type {app_type} do not support", result["msg"])
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_mcp_portal_accepts_cookie_and_interstitial_options(self):
+        options = {"enable_binding_cookie": True, "skip_interstitial": True, "service_auth_401_redirect": True}
+        client, api = client_with()
+
+        result = self.run_module(FakeModule(params(type="mcp_portal", **options), check_mode=True), client)
+
+        self.assertTrue(result["changed"])
+        api.list.assert_called_once()
+
+    def test_type_accepts_defaults_for_unsupported_options(self):
+        for app_type in ("bookmark", "mcp_portal", "proxy_endpoint"):
+            with self.subTest(type=app_type):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(type=app_type), check_mode=True), client)
+
+                self.assertTrue(result["changed"])
+                api.create.assert_not_called()
+
     def test_check_mode_does_not_create(self):
         client, api = client_with()
 

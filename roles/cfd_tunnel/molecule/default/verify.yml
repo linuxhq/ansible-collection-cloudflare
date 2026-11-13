@@ -8,7 +8,11 @@
         cfd_tunnel_list:
           "{{ cfd_tunnel_list |
               map('combine', {'state': 'absent'}) }}"
+      diff: false
+      no_log: true
 
   roles:
-    - cfd_tunnel
+    - role: cfd_tunnel
+      diff: false
+      no_log: true
 ...

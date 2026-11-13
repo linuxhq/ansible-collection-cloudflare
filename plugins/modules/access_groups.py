@@ -9,6 +9,9 @@ module: access_groups
 short_description: Manage Cloudflare Access groups
 description:
   - Create, update, and delete Cloudflare Access groups by name.
+  - Access selectors in O(include), O(exclude), and O(require) use Cloudflare
+    API key names, such as C(github-organization) and C(azureAD), and are
+    compared exactly, including their nested fields.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
@@ -91,12 +94,14 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    ACCESS_SELECTOR_FIELDS,
     cloudflare_client,
     cloudflare_error_context,
     ensure_resource_absent,
     ensure_resource_present,
     find_resource,
     payload_from_params,
+    validate_access_selectors,
 )
 
 FIELDS = ("exclude", "include", "is_default", "name", "require")
@@ -107,6 +112,8 @@ def run(module, client):
     params = module.params
     account_id = params["account_id"]
     groups = client.zero_trust.access.groups
+    if params["state"] == "present":
+        validate_access_selectors(module)
 
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the Access group",
@@ -142,6 +149,7 @@ def run(module, client):
         expected_name=params["name"],
         defaults={"is_default": False},
         preserved_fields=PRESERVED_FIELDS,
+        exact_values=ACCESS_SELECTOR_FIELDS,
         context={"account_id": account_id},
     )
 

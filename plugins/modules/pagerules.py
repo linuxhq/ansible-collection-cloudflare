@@ -25,6 +25,7 @@ options:
     elements: dict
     description:
       - Actions applied when the page rule matches.
+      - Actions are compared by C(id), regardless of their order.
       - Required when O(state=present).
   targets:
     required: true
@@ -32,6 +33,8 @@ options:
     elements: dict
     description:
       - URL matching conditions that identify the page rule.
+      - URL values are matched as Cloudflare stores them, with the host in
+        lowercase and a slash after a bare host, before any trailing wildcard.
   priority:
     type: int
     description:
@@ -140,9 +143,60 @@ def pagerule_targets(module, pagerule):
     return targets
 
 
-def find_pagerule(module, client):
+def canonical_url(value):
+    """Return a URL pattern as Cloudflare stores it.
+
+    Cloudflare lowercases the host and adds a slash after a bare host, before
+    a trailing wildcard, so example.com* becomes example.com/*; the scheme and
+    path keep their case.
+    """
+    scheme, separator, rest = value.partition("://")
+    if not separator or "/" in scheme:
+        # A "://" after the first slash belongs to the path, not a scheme.
+        scheme, separator, rest = "", "", value
+
+    host, slash, path = rest.partition("/")
+    if "?" in host or "#" in host:
+        # Leave a query or fragment without a path exactly as requested.
+        return value
+
+    if not slash and host.endswith("*"):
+        host, path = host[:-1], "*"
+
+    return f"{scheme}{separator}{host.lower()}/{path}"
+
+
+def canonical_targets(targets):
+    canonical = []
+    for target in targets:
+        constraint = target.get("constraint")
+        if target.get("target") == "url" and isinstance(constraint, dict) and isinstance(constraint.get("value"), str):
+            target = {**target, "constraint": {**constraint, "value": canonical_url(constraint["value"])}}
+
+        canonical.append(target)
+
+    return canonical
+
+
+def ordered_actions(actions, current):
+    """Return actions in the order of current's action ids, then sorted by id.
+
+    Cloudflare lists a rule's actions sorted by id but echoes a write in request
+    order, so action order is not significant.
+    """
+    current_actions = (current or {}).get("actions")
+    order = [action.get("id") for action in current_actions or () if isinstance(action, dict)]
+    return sorted(
+        actions,
+        key=lambda action: (
+            order.index(action.get("id")) if action.get("id") in order else len(order),
+            str(action.get("id")),
+        ),
+    )
+
+
+def find_pagerule(module, client, targets):
     zone_id = module.params["zone_id"]
-    targets = module.params["targets"]
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the page rule",
         zone_id=zone_id,
@@ -165,7 +219,8 @@ def find_pagerule(module, client):
 def run(module, client):
     zone_id = module.params["zone_id"]
     page_rules = client.page_rules
-    current = find_pagerule(module, client)
+    targets = canonical_targets(module.params["targets"])
+    current = find_pagerule(module, client, targets)
 
     if module.params["state"] == "absent":
         ensure_resource_absent(
@@ -178,6 +233,8 @@ def run(module, client):
         )
 
     payload = payload_from_params(module.params, FIELDS)
+    payload["targets"] = targets
+    payload["actions"] = ordered_actions(payload["actions"], current)
     if current is None:
         payload.setdefault("status", "active")
 

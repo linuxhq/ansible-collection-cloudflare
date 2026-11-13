@@ -20,74 +20,91 @@ options:
     type: bool
     description:
       - Whether to allow the user to switch WARP between modes.
+      - When omitted, the current value is left unchanged.
   allow_updates:
     type: bool
     description:
       - Whether to receive WARP client update notifications.
+      - When omitted, the current value is left unchanged.
   allowed_to_leave:
     type: bool
     description:
       - Whether to allow devices to leave the organization.
+      - When omitted, the current value is left unchanged.
   auto_connect:
     type: float
     description:
       - Seconds before reconnecting after WARP has been disabled.
+      - When omitted, the current value is left unchanged.
   captive_portal:
     type: float
     description:
       - Seconds before turning on captive portal handling.
+      - When omitted, the current value is left unchanged.
   disable_auto_fallback:
     type: bool
     description:
       - Whether to disable automatic fallback DNS resolver selection.
+      - When omitted, the current value is left unchanged.
   exclude:
     type: list
     elements: dict
     description:
       - Split tunnel routes excluded from the WARP tunnel.
+      - When omitted, the current value is left unchanged.
       - Mutually exclusive with O(include).
   exclude_office_ips:
     type: bool
     description:
       - Whether to add Microsoft IPs to split tunnel exclusions.
+      - When omitted, the current value is left unchanged.
   include:
     type: list
     elements: dict
     description:
       - Split tunnel routes included in the WARP tunnel.
+      - When omitted, the current value is left unchanged.
       - Mutually exclusive with O(exclude).
   lan_allow_minutes:
     type: float
     description:
       - Minutes a user is allowed access to their LAN.
+      - When omitted, the current value is left unchanged.
   lan_allow_subnet_size:
     type: float
     description:
       - Subnet size for local access.
+      - When omitted, the current value is left unchanged.
   register_interface_ip_with_dns:
     type: bool
     description:
       - Whether the operating system registers WARP's local interface IP with DNS.
+      - When omitted, the current value is left unchanged.
   sccm_vpn_boundary_support:
     type: bool
     description:
       - Whether the WARP client indicates to SCCM that it is inside a VPN boundary.
+      - When omitted, the current value is left unchanged.
   service_mode_v2:
     type: dict
     description:
       - WARP client service mode configuration.
+      - When omitted, the current value is left unchanged.
   support_url:
     type: str
     description:
       - URL launched by the WARP client Send Feedback button.
+      - When omitted, the current value is left unchanged.
   switch_locked:
     type: bool
     description:
       - Whether to prevent users from turning off WARP and disconnecting the client.
+      - When omitted, the current value is left unchanged.
   tunnel_protocol:
     type: str
     description:
       - Tunnel protocol to use.
+      - When omitted, the current value is left unchanged.
 """
 
 EXAMPLES = r"""

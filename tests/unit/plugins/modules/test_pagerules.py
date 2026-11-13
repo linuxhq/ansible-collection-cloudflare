@@ -139,6 +139,61 @@ class PageRulesTests(TestCase):
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_matches_target_urls_as_cloudflare_stores_them(self):
+        cases = (
+            ("Example.COM/Path/*", "example.com/Path/*"),
+            ("example.com", "example.com/"),
+            ("HTTPS://WWW.Example.com", "HTTPS://www.example.com/"),
+            ("Example.com*", "example.com/*"),
+            ("*.Example.com", "*.example.com/"),
+            ("http://*.Example.com/Path*", "http://*.example.com/Path*"),
+            ("Example.com/to/https://Other.COM/Path", "example.com/to/https://Other.COM/Path"),
+            ("https://example.com?Token=ABC", "https://example.com?Token=ABC"),
+        )
+        for requested, stored in cases:
+            with self.subTest(requested=requested):
+                stored_targets = [{"target": "url", "constraint": {"operator": "matches", "value": stored}}]
+                targets = [{"target": "url", "constraint": {"operator": "matches", "value": requested}}]
+                current = {"id": "rule", "actions": ACTIONS, "status": "active", "targets": stored_targets}
+                client, api = client_with([current])
+
+                result = self.run_module(FakeModule(params(targets=targets)), client)
+
+                api.update.assert_not_called()
+                self.assertFalse(result["changed"])
+
+    def test_creates_rule_with_canonical_target_url(self):
+        stored_targets = [{"target": "url", "constraint": {"operator": "matches", "value": "example.com/"}}]
+        targets = [{"target": "url", "constraint": {"operator": "matches", "value": "Example.com"}}]
+        created = {"id": "rule", "actions": ACTIONS, "status": "active", "targets": stored_targets}
+        client, api = client_with(created=created)
+
+        result = self.run_module(FakeModule(params(targets=targets)), client)
+
+        self.assertEqual(api.create.call_args.kwargs["targets"], stored_targets)
+        self.assertTrue(result["changed"])
+
+    def test_action_order_is_not_significant(self):
+        actions = [{"id": "ssl", "value": "full"}, {"id": "browser_check", "value": "on"}]
+        listed = [{"id": "browser_check", "value": "on"}, {"id": "ssl", "value": "full"}]
+        current = {"id": "rule", "actions": listed, "status": "active", "targets": TARGETS}
+        client, api = client_with([current])
+
+        result = self.run_module(FakeModule(params(actions=actions)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_creates_actions_sorted_by_id(self):
+        actions = [{"id": "ssl", "value": "full"}, {"id": "browser_check", "value": "on"}]
+        listed = [{"id": "browser_check", "value": "on"}, {"id": "ssl", "value": "full"}]
+        client, api = client_with(created={"id": "rule", "actions": listed, "status": "active", "targets": TARGETS})
+
+        result = self.run_module(FakeModule(params(actions=actions)), client)
+
+        self.assertEqual(api.create.call_args.kwargs["actions"], listed)
+        self.assertTrue(result["changed"])
+
     def test_check_mode_does_not_delete_matching_rule(self):
         client, api = client_with([{"id": "rule", "targets": TARGETS}])
 

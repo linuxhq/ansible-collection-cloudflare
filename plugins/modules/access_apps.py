@@ -37,6 +37,18 @@ options:
       - Only types that are reached through O(domain) and need no other required
         settings are supported.
       - Required when O(state=present).
+      - Settings that Cloudflare does not store for the chosen type must keep
+        their default or be omitted. Type V(bookmark) does not support
+        O(allowed_idps), O(auto_redirect_to_identity), O(cors_headers),
+        O(custom_deny_message), O(custom_deny_url), O(destinations),
+        O(enable_binding_cookie), O(http_only_cookie_attribute),
+        O(same_site_cookie_attribute), O(service_auth_401_redirect),
+        O(session_duration), or O(skip_interstitial). Type V(mcp_portal) does not
+        support O(app_launcher_visible). Type V(proxy_endpoint) does not support
+        O(app_launcher_visible), O(cors_headers), O(custom_deny_message),
+        O(destinations), O(enable_binding_cookie), O(http_only_cookie_attribute),
+        O(logo_url), O(same_site_cookie_attribute), O(service_auth_401_redirect),
+        or O(skip_interstitial).
     type: str
     choices:
       - bookmark
@@ -238,11 +250,61 @@ DEFAULT_FIELDS = {
     "session_duration": "24h",
 }
 
+# Cloudflare accepts these settings for the application types below but does
+# not store them, so a requested value could never converge. Verified against
+# the API; the SDK response models omit more fields for mcp_portal than
+# Cloudflare drops.
+UNSUPPORTED_FIELDS = {
+    "bookmark": (
+        "allowed_idps",
+        "auto_redirect_to_identity",
+        "cors_headers",
+        "custom_deny_message",
+        "custom_deny_url",
+        "destinations",
+        "enable_binding_cookie",
+        "http_only_cookie_attribute",
+        "same_site_cookie_attribute",
+        "service_auth_401_redirect",
+        "session_duration",
+        "skip_interstitial",
+    ),
+    "mcp_portal": ("app_launcher_visible",),
+    "proxy_endpoint": (
+        "app_launcher_visible",
+        "cors_headers",
+        "custom_deny_message",
+        "destinations",
+        "enable_binding_cookie",
+        "http_only_cookie_attribute",
+        "logo_url",
+        "same_site_cookie_attribute",
+        "service_auth_401_redirect",
+        "skip_interstitial",
+    ),
+}
+
+
+def validate_type_fields(module):
+    params = module.params
+    unsupported = [
+        field
+        for field in UNSUPPORTED_FIELDS.get(params["type"], ())
+        if params.get(field) is not None and params[field] != DEFAULT_FIELDS.get(field)
+    ]
+    if unsupported:
+        module.fail_json(
+            msg=f"Access applications of type {params['type']} do not support {', '.join(unsupported)}",
+            unsupported_fields=unsupported,
+        )
+
 
 def run(module, client):
     params = module.params
     account_id = params["account_id"]
     applications = client.zero_trust.access.applications
+    if params["state"] == "present":
+        validate_type_fields(module)
 
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the Access application",
