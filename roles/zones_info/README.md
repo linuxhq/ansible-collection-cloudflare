@@ -22,10 +22,6 @@ None
     _zones_info_dict
     _zones_info_list
 
-`_zones_info_list` lists every zone, including internal zones.
-`_zones_info_dict` maps each non-internal zone name to its zone, so an
-internal zone never shadows a public zone with the same name.
-
 ## Example Playbook
 
     - hosts: cloudflare
