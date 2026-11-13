@@ -3,9 +3,6 @@
 from unittest import TestCase
 from unittest.mock import Mock
 
-from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
-    CloudflareResponseError,
-)
 from ansible_collections.linuxhq.cloudflare.plugins.modules import warp_connector
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
@@ -16,6 +13,8 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 
 SECRET = "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg="
 CREATED = {"id": "connector-id", "name": "connector"}
+APPLY_BODY = {"success": False, "errors": [{"code": 1001, "message": "invalid secret"}], "messages": []}
+ROLLBACK_BODY = {"success": False, "errors": [{"code": 1002, "message": "internal"}], "messages": []}
 
 
 def params(**updates):
@@ -82,40 +81,48 @@ class WarpConnectorTests(TestCase):
 
     def test_secret_failure_rolls_back_created_connector(self):
         client, api = client_with(created=CREATED)
-        error = status_error(400)
-        api.edit.side_effect = error
-
-        with self.assertRaises(type(error)) as raised:
-            warp_connector.run(FakeModule(params(tunnel_secret=SECRET)), client)
-
-        self.assertIs(raised.exception, error)
-        api.delete.assert_called_once_with("connector-id", account_id="account")
-
-    def test_reports_connector_id_when_rollback_fails(self):
-        client, api = client_with(created=CREATED)
-        api.edit.side_effect = status_error(400)
-        api.delete.side_effect = status_error(500)
+        api.edit.side_effect = status_error(400, APPLY_BODY)
 
         result = self.run_module(FakeModule(params(tunnel_secret=SECRET)), client)
 
+        api.delete.assert_called_once_with("connector-id", account_id="account")
+        self.assertEqual(result["msg"], "Failed to apply tunnel_secret; the created WARP Connector was rolled back")
         self.assertEqual(result["warp_connector_id"], "connector-id")
+        self.assertEqual(result["status_code"], 400)
+        self.assertEqual(result["response"], APPLY_BODY)
+
+    def test_reports_both_errors_when_rollback_fails(self):
+        client, api = client_with(created=CREATED)
+        api.edit.side_effect = status_error(400, APPLY_BODY)
+        api.delete.side_effect = status_error(500, ROLLBACK_BODY)
+
+        result = self.run_module(FakeModule(params(tunnel_secret=SECRET)), client)
+
+        self.assertIn("delete it manually", result["msg"])
+        self.assertEqual(result["warp_connector_id"], "connector-id")
+        self.assertEqual(result["apply_error"], {"status_code": 400, "response": APPLY_BODY})
+        self.assertEqual(result["rollback_error"], {"status_code": 500, "response": ROLLBACK_BODY})
 
     def test_reports_connector_id_when_rollback_response_is_wrong(self):
         client, api = client_with(created=CREATED)
-        api.edit.side_effect = status_error(400)
+        api.edit.side_effect = status_error(400, APPLY_BODY)
         api.delete.return_value = {"id": "other"}
 
         result = self.run_module(FakeModule(params(tunnel_secret=SECRET)), client)
 
         self.assertEqual(result["warp_connector_id"], "connector-id")
+        self.assertEqual(result["apply_error"], {"status_code": 400, "response": APPLY_BODY})
+        self.assertEqual(result["rollback_error"], {"error": "Cloudflare API returned the wrong WARP Connector"})
 
     def test_wrong_secret_response_rolls_back_created_connector(self):
         client, api = client_with(created=CREATED, edited={"id": "wrong", "name": "connector"})
 
-        with self.assertRaises(CloudflareResponseError):
-            warp_connector.run(FakeModule(params(tunnel_secret=SECRET)), client)
+        result = self.run_module(FakeModule(params(tunnel_secret=SECRET)), client)
 
         api.delete.assert_called_once_with("connector-id", account_id="account")
+        self.assertIn("rolled back", result["msg"])
+        self.assertEqual(result["warp_connector_id"], "connector-id")
+        self.assertEqual(result["error"], "Cloudflare API returned the wrong WARP Connector")
 
     def test_rotates_secret_on_existing_connector(self):
         client, api = client_with([CREATED], edited={**CREATED, "token": "secret"})

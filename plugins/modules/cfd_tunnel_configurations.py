@@ -71,6 +71,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_error_context,
     normalize_current_by_desired_fields,
     require_mapping,
+    resource_id,
     serialize_resource,
     values_differ,
 )
@@ -199,8 +200,24 @@ def validate_config(module, config):
 def run(module, client):
     params = module.params
     validate_config(module, params["config"])
-    configurations = client.zero_trust.tunnels.cloudflared.configurations
+    tunnels = client.zero_trust.tunnels.cloudflared
+    configurations = tunnels.configurations
     identifiers = {"account_id": params["account_id"], "tunnel_id": params["tunnel_id"]}
+
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering the cloudflared tunnel",
+        **identifiers,
+    ):
+        tunnel = serialize_resource(tunnels.get(params["tunnel_id"], account_id=params["account_id"]))
+
+    resource_id(module, tunnel, "cloudflared tunnel", expected=params["tunnel_id"])
+    # Cloudflare accepts a configuration for a locally managed tunnel and
+    # silently converts the tunnel to remote management, which is irreversible.
+    if tunnel.get("config_src") == "local" or tunnel.get("remote_config") is False:
+        module.fail_json(
+            msg=f"Cloudflared tunnel {params['tunnel_id']} is locally managed and cannot use a remote configuration",
+            **identifiers,
+        )
 
     with cloudflare_error_context(
         "Cloudflare API request failed while gathering the tunnel configuration",

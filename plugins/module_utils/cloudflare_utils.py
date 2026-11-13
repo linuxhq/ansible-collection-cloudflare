@@ -134,21 +134,26 @@ def error_response_body(exc):
         return None
 
 
-def fail_from_cloudflare_error(module, message, exc, **context):
+def cloudflare_error_details(exc):
+    """Return the status code and response body of a failure, or its message."""
     status_code = getattr(exc, "status_code", None)
     response_body = error_response_body(exc)
 
-    failure = {"msg": message, **context}
+    details = {}
     if getattr(exc, "response", None) is None:
-        failure["error"] = str(exc)
+        details["error"] = str(exc)
 
     if status_code is not None:
-        failure["status_code"] = status_code
+        details["status_code"] = status_code
 
     if response_body is not None:
-        failure["response"] = response_body
+        details["response"] = response_body
 
-    module.fail_json(**failure)
+    return details
+
+
+def fail_from_cloudflare_error(module, message, exc, **context):
+    module.fail_json(**{"msg": message, **context, **cloudflare_error_details(exc)})
 
 
 def serialize_resource(resource):
@@ -421,13 +426,16 @@ def ensure_resource_present(
     exact_fields=(),
     exact_values=(),
     context=None,
+    comparable=None,
 ):
     """Create the resource, or update it when the managed fields differ.
 
     The update replaces the resource, so preserved_fields omitted from payload
     are carried over from current. exact_values are compared exactly. context
-    names the resource's owner in failures.
+    names the resource's owner in failures. comparable optionally maps a
+    resource to its comparable form; the unmodified resource is returned.
     """
+    comparable = comparable or (lambda resource: resource)
     context = context or {}
     label = resource_name[0].upper() + resource_name[1:]
 
@@ -451,12 +459,12 @@ def ensure_resource_present(
         ):
             resource = checked(create(payload))
 
-        require_applied(module, resource, payload, resource_name, defaults, exact_fields, exact_values)
+        require_applied(module, comparable(resource), payload, resource_name, defaults, exact_fields, exact_values)
         module.exit_json(changed=True, message=f"{label} created", **{result_key: resource})
 
     current_id = resource_id(module, current, resource_name)
     payload = {**select_fields(current, preserved_fields), **payload}
-    if not differs(current, payload, defaults, exact_fields, exact_values):
+    if not differs(comparable(current), payload, defaults, exact_fields, exact_values):
         module.exit_json(
             changed=False,
             message=f"{label} already present",
@@ -477,7 +485,7 @@ def ensure_resource_present(
     ):
         resource = checked(update(current_id, payload), expected_id=current_id)
 
-    require_applied(module, resource, payload, resource_name, defaults, exact_fields, exact_values)
+    require_applied(module, comparable(resource), payload, resource_name, defaults, exact_fields, exact_values)
     module.exit_json(changed=True, message=f"{label} updated", **{result_key: resource})
 
 

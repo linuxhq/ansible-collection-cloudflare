@@ -21,6 +21,7 @@ options:
     description:
       - Fully qualified domain name of the zone.
       - Matched case-insensitively.
+      - A trailing dot is ignored, as Cloudflare stores the name without it.
   account_id:
     description:
       - Account identifier used when creating a zone.
@@ -47,6 +48,9 @@ options:
     elements: dict
     description:
       - Zone settings to manage.
+      - Every setting is read before any change. A differing setting that
+        Cloudflare reports as not editable, such as one the zone's plan does
+        not include, fails before the zone or any setting is changed.
     suboptions:
       id:
         description:
@@ -238,17 +242,7 @@ def create_zone(module, client):
         account_id=params["account_id"],
         name=params["name"],
     ):
-        zone = checked_zone(module, client.zones.create(**payload), payload)
-
-    if params.get("vanity_name_servers") is not None:
-        zone = edit_zone(
-            module,
-            client,
-            zone["id"],
-            {"vanity_name_servers": params["vanity_name_servers"]},
-        )
-
-    return zone
+        return checked_zone(module, client.zones.create(**payload), payload)
 
 
 def update_zone(module, client, zone):
@@ -280,9 +274,13 @@ def setting_field(setting):
     return None
 
 
-def update_settings(module, client, zone):
-    zone_id = zone["id"]
-    updated_settings = []
+def pending_settings(module, client, zone_id):
+    """Return the requested settings that differ, with their current field.
+
+    Every setting is read before any write, so a setting the zone's plan
+    cannot edit fails before the zone or another setting changes.
+    """
+    pending = []
     for setting in module.params.get("settings") or []:
         setting_id = setting["id"]
         with cloudflare_error_context(
@@ -300,6 +298,23 @@ def update_settings(module, client, zone):
         if setting_matches(existing[field], setting["value"]):
             continue
 
+        if existing.get("editable") is False:
+            module.fail_json(
+                msg=f"Zone setting {setting_id} is not editable on this zone",
+                zone_id=zone_id,
+                setting_id=setting_id,
+            )
+
+        pending.append((setting, field))
+
+    return pending
+
+
+def update_settings(module, client, zone, pending):
+    zone_id = zone["id"]
+    updated_settings = []
+    for setting, field in pending:
+        setting_id = setting["id"]
         if module.check_mode:
             module.exit_json(changed=True, message="Zone settings would be updated", zone=zone)
 
@@ -325,8 +340,13 @@ def update_settings(module, client, zone):
 
 
 def run(module, client):
-    # DNS names are case-insensitive and Cloudflare stores zone names in lowercase.
-    module.params["name"] = module.params["name"].lower()
+    # DNS names are case-insensitive, and Cloudflare stores zone names in
+    # lowercase without the root label's trailing dot.
+    name = module.params["name"].lower()
+    module.params["name"] = name.removesuffix(".")
+    if not module.params["name"]:
+        module.fail_json(msg="name must not be empty")
+
     if module.params["state"] == "present":
         validate_settings(module)
 
@@ -343,13 +363,14 @@ def run(module, client):
 
     if current is None:
         zone = create_zone(module, client)
-        changed = True
     else:
-        resource_id(module, current, "zone")
-        zone, changed = update_zone(module, client, current)
+        zone = current
+        resource_id(module, zone, "zone")
 
-    updated_settings = update_settings(module, client, zone)
-    if not changed and not updated_settings:
+    pending = pending_settings(module, client, zone["id"])
+    zone, changed = update_zone(module, client, zone)
+    updated_settings = update_settings(module, client, zone, pending)
+    if current is not None and not changed and not updated_settings:
         module.exit_json(changed=False, message="Zone already present", zone=zone)
 
     module.exit_json(

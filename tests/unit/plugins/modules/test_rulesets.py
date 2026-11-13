@@ -269,3 +269,93 @@ class RulesetHeaderTests(TestCase):
 
         self.assertEqual(api.phases.update.call_args.kwargs["rules"], [{"enabled": True, **requested}])
         self.assertTrue(result["changed"])
+
+
+ASSIGNED = {"id": "rule-id", "ref": "rule-id", "version": "1", "last_updated": "2026-11-13T00:00:00Z"}
+
+
+class RulesetRuleFieldTests(TestCase):
+    def run_module(self, module, client):
+        with self.assertRaises((ModuleExit, ModuleFail)) as raised:
+            rulesets.run(module, client)
+
+        return raised.exception.values
+
+    def test_removed_rule_field_is_a_change(self):
+        requested = {"action": "skip", "expression": "true", "action_parameters": {"ruleset": "current"}}
+        stored = {**ASSIGNED, **requested, "enabled": True, "logging": {"enabled": True}}
+        for field, value in (("description", "removed"), ("logging", {"enabled": False}), ("ratelimit", {})):
+            current = {**CURRENT, "rules": [{**stored, field: value}]}
+            for check_mode in (True, False):
+                with self.subTest(field=field, check_mode=check_mode):
+                    client, api = make_client(current, updated={**CURRENT, "rules": [stored]})
+
+                    result = self.run_module(FakeModule(params(rules=[requested]), check_mode=check_mode), client)
+
+                    self.assertTrue(result["changed"])
+                    self.assertNotIn("msg", result)
+                    if check_mode:
+                        api.phases.update.assert_not_called()
+                    else:
+                        api.phases.update.assert_called_once_with(
+                            PHASE, zone_id="zone", rules=[{"enabled": True, **requested}]
+                        )
+
+    def test_assigned_fields_and_action_defaults_are_unchanged(self):
+        for requested, stored in (
+            (
+                {"action": "skip", "expression": "true", "action_parameters": {"ruleset": "current"}},
+                {"enabled": True, "logging": {"enabled": True}},
+            ),
+            ({"action": "block", "expression": "true", "description": "kept"}, {"enabled": True}),
+        ):
+            current = {**CURRENT, "rules": [{**ASSIGNED, **requested, **stored}]}
+            with self.subTest(action=requested["action"]):
+                client, api = make_client(current)
+
+                result = self.run_module(FakeModule(params(rules=[requested])), client)
+
+                api.phases.update.assert_not_called()
+                self.assertFalse(result["changed"])
+                self.assertEqual(result["ruleset"], current)
+
+    def test_logging_default_applies_only_to_skip_rules(self):
+        requested = {"action": "block", "expression": "true"}
+        current = {**CURRENT, "rules": [{**ASSIGNED, **requested, "enabled": True, "logging": {"enabled": True}}]}
+        client, _ignored = make_client(current)
+
+        result = self.run_module(FakeModule(params(rules=[requested]), check_mode=True), client)
+
+        self.assertTrue(result["changed"])
+
+    def test_requested_assigned_field_is_compared(self):
+        requested = {"action": "block", "expression": "true", "ref": "mine"}
+        current = {**CURRENT, "rules": [{**ASSIGNED, "action": "block", "expression": "true", "enabled": True}]}
+        client, _ignored = make_client(current)
+
+        result = self.run_module(FakeModule(params(rules=[requested]), check_mode=True), client)
+
+        self.assertTrue(result["changed"])
+
+    def test_field_kept_after_update_fails_postcondition(self):
+        requested = {"action": "block", "expression": "true"}
+        kept = {**ASSIGNED, **requested, "enabled": True, "description": "kept"}
+        client, _ignored = make_client({**CURRENT, "rules": [kept]}, updated={**CURRENT, "rules": [kept]})
+
+        result = self.run_module(FakeModule(params(rules=[requested])), client)
+
+        self.assertEqual(result["msg"], "Cloudflare did not apply the requested ruleset")
+
+    def test_created_ruleset_with_assigned_fields_and_defaults_is_applied(self):
+        requested = {"action": "skip", "expression": "true", "action_parameters": {"ruleset": "current"}}
+        created = {
+            **CURRENT,
+            "rules": [{**ASSIGNED, **requested, "enabled": True, "logging": {"enabled": True}}],
+        }
+        client, api = make_client(created=created)
+
+        result = self.run_module(FakeModule(params(rules=[requested])), client)
+
+        api.create.assert_called_once()
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["ruleset"], created)

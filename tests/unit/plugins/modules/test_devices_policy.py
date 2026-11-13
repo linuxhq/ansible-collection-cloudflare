@@ -100,3 +100,54 @@ class DevicesPolicyTests(TestCase):
 
                 api.edit.assert_not_called()
                 self.assertFalse(result["changed"])
+
+    def test_empty_include_fails_before_any_request(self):
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                result, api = self.run_module(
+                    FakeModule({"account_id": "account", "include": []}, check_mode=check_mode),
+                    {"include": [{"address": "192.0.2.0/24"}]},
+                )
+
+                api.get.assert_not_called()
+                api.edit.assert_not_called()
+                self.assertIn("exclude: []", result["msg"])
+
+    def test_empty_exclude_is_sent(self):
+        result, api = self.run_module(
+            FakeModule({"account_id": "account", "exclude": []}),
+            {"exclude": [{"address": "192.0.2.0/24"}]},
+            {"exclude": []},
+        )
+
+        api.edit.assert_called_once_with(account_id="account", exclude=[])
+        self.assertTrue(result["changed"])
+
+    def test_bare_ip_addresses_match_stored_cidr(self):
+        requested = [
+            {"address": "192.0.2.1", "description": "v4"},
+            {"address": "2001:db8::1"},
+            {"address": "198.51.100.7/24"},
+            {"host": "Example.COM"},
+        ]
+        stored = [
+            {"address": "192.0.2.1/32", "description": "v4"},
+            {"address": "2001:db8::1/128"},
+            {"address": "198.51.100.7/24"},
+            {"host": "Example.COM"},
+        ]
+        for field in ("include", "exclude"):
+            with self.subTest(field=field, converged=True):
+                result, api = self.run_module(FakeModule({"account_id": "account", field: requested}), {field: stored})
+
+                api.edit.assert_not_called()
+                self.assertFalse(result["changed"])
+
+            with self.subTest(field=field, converged=False):
+                result, api = self.run_module(
+                    FakeModule({"account_id": "account", field: requested}), {field: []}, {field: stored}
+                )
+
+                api.edit.assert_called_once_with(account_id="account", **{field: stored})
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)

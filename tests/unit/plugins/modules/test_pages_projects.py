@@ -229,6 +229,28 @@ class PagesProjectsTests(TestCase):
                 api.get.assert_not_called()
                 api.edit.assert_not_called()
 
+    def test_rejects_build_image_major_version_before_any_request(self):
+        for value in (1, 3):
+            for check_mode in (False, True):
+                with self.subTest(value=value, check_mode=check_mode):
+                    client, api = client_with([PROJECT])
+
+                    result = self.run_module(
+                        FakeModule(
+                            params(build_config={"build_command": "true", "build_image_major_version": value}),
+                            check_mode=check_mode,
+                        ),
+                        client,
+                    )
+
+                    self.assertEqual(
+                        result["msg"],
+                        "Cloudflare does not store build_config.build_image_major_version; remove it",
+                    )
+                    api.get.assert_not_called()
+                    api.create.assert_not_called()
+                    api.edit.assert_not_called()
+
     def test_null_r2_jurisdiction_is_sent(self):
         current = {
             **PROJECT,
