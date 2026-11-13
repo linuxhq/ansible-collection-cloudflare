@@ -4,6 +4,19 @@ breaking_changes:
     carried over on update and nothing is sent on create; previously any update of the account's default group
     without O(is_default=true) cleared its default status.
   - access_groups role - pass C(is_default) only when the list item sets it, instead of forcing V(false).
+  - access_apps - O(app_launcher_visible), O(auto_redirect_to_identity), O(enable_binding_cookie),
+    O(http_only_cookie_attribute), and O(session_duration) no longer have defaults. When omitted, an existing
+    application's value is carried over on update and nothing is sent on create, where Cloudflare applies the same
+    defaults; previously any update reset values set outside Ansible. A change to a type that does not store a
+    setting does not carry it over.
+  - access_apps role - pass C(app_launcher_visible), C(auto_redirect_to_identity), C(enable_binding_cookie),
+    C(http_only_cookie_attribute), and C(session_duration) only when the list item sets them, instead of forcing
+    Cloudflare's defaults.
+  - access_policies - O(approval_required), O(isolation_required), and O(purpose_justification_required) no longer
+    default to V(false). When omitted, an existing policy's value is carried over on update and nothing is sent on
+    create, where Cloudflare also defaults to V(false); previously any update reset values set outside Ansible.
+  - access_policies role - pass C(approval_required), C(isolation_required), and C(purpose_justification_required)
+    only when the list item sets them, instead of forcing V(false).
 bugfixes:
   - purge_cache - fail in check mode, as in a real run, when the C(cloudflare) Python library is missing, instead of
     reporting C(changed).
@@ -17,7 +30,7 @@ bugfixes:
     Cloudflare kept the value, so the module wrote and then failed on every run.
   - access_apps - compare O(cors_headers) exactly, so removing a key is applied instead of reported as unchanged.
   - access_apps - when changing an existing application to O(type=bookmark), carry over only the fields bookmarks
-    store (C(logo_url), C(policies), and C(tags)). Cloudflare dropped the others, so the type change wrote and then
+    store (C(app_launcher_visible), C(logo_url), C(policies), and C(tags)). Cloudflare dropped the others, so the type change wrote and then
     failed.
   - pagerules - fail before any change when O(priority) exceeds the number of page rules in the zone after the
     change. Cloudflare stored the rule at the last position, so the module wrote and then failed on every run.
