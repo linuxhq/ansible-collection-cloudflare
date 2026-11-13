@@ -27,7 +27,7 @@ class AccessServiceTokensInfoTests(TestCase):
 
     def test_rejects_malformed_service_tokens(self):
         client = Mock()
-        client.zero_trust.access.service_tokens.list.return_value = [{"id": "one", "name": " padded"}]
+        client.zero_trust.access.service_tokens.list.return_value = [{"id": "one", "name": None}]
 
         with self.assertRaises(ModuleFail):
             access_service_tokens_info.run(FakeModule({"account_id": "account"}), client)

@@ -61,6 +61,15 @@ class AccessPoliciesTests(TestCase):
         self.assertFalse(result["changed"])
         self.assertEqual(result["access_policy"]["id"], "policy")
 
+    def test_policy_stored_with_a_padded_name_does_not_block_another(self):
+        padded = policy(id="padded", name="users ")
+        client, api = client_with([padded, policy()])
+
+        result = self.run_module(FakeModule(params()), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_creates_policy(self):
         client, api = client_with(created=policy())
 

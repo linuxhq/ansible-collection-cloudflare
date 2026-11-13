@@ -51,6 +51,9 @@ options:
         or O(skip_interstitial).
       - Changing an existing application to type V(bookmark) keeps only its
         O(app_launcher_visible), O(logo_url), O(policies), and tags.
+      - Changing an existing application to type V(proxy_endpoint) keeps only its
+        O(allowed_idps), O(auto_redirect_to_identity), O(policies),
+        O(session_duration), and tags.
     type: str
     choices:
       - bookmark
@@ -126,6 +129,8 @@ options:
     description:
       - Whether to return HTTP 401 instead of redirecting to the login page when a
         Service Auth policy blocks a request.
+      - Cloudflare omits V(false) from the application, so V(false) matches an
+        application that does not return this setting.
   session_duration:
     type: str
     description:
@@ -136,6 +141,8 @@ options:
     type: bool
     description:
       - Whether to skip the Access interstitial page.
+      - Cloudflare omits V(false) from the application, so V(false) matches an
+        application that does not return this setting.
   state:
     type: str
     choices:
@@ -260,7 +267,9 @@ DEFAULT_FIELDS = {
     "auto_redirect_to_identity": False,
     "enable_binding_cookie": False,
     "http_only_cookie_attribute": True,
+    "service_auth_401_redirect": False,
     "session_duration": "24h",
+    "skip_interstitial": False,
 }
 
 # Cloudflare accepts these settings for the application types below but does
@@ -299,7 +308,10 @@ UNSUPPORTED_FIELDS = {
 
 # Cloudflare stores only these of the carried-over fields for the application
 # types below, so the others are dropped from the update.
-STORED_FIELDS = {"bookmark": ("app_launcher_visible", "logo_url", "policies", "tags")}
+STORED_FIELDS = {
+    "bookmark": ("app_launcher_visible", "logo_url", "policies", "tags"),
+    "proxy_endpoint": ("allowed_idps", "auto_redirect_to_identity", "policies", "session_duration", "tags"),
+}
 
 
 def validate_type_fields(module):

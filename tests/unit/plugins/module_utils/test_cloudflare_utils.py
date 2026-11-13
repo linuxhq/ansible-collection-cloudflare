@@ -361,6 +361,35 @@ class ValueTests(TestCase):
         with self.assertRaises(cloudflare.PermissionDeniedError):
             get_or_none(Mock(side_effect=status_error(403)))
 
+    def test_unrelated_names_with_whitespace_do_not_fail_lookups(self):
+        module = FakeModule({})
+        items = [{"id": "one", "name": "One "}, {"id": "two", "name": ""}, {"id": "three", "name": "Three"}]
+
+        self.assertEqual(find_resource(module, iter(items), "resource", "name", "Three"), items[2])
+        self.assertIsNone(find_resource(module, iter(items), "resource", "name", "One"))
+        self.assertEqual(resource_list(module, iter(items), "resource", ("id", "name")), items)
+        with self.assertRaises(ModuleExit) as raised:
+            exit_resource_list(module, "things", iter(items), "thing")
+
+        self.assertEqual(raised.exception.values["things"], items)
+
+    def test_lookups_keep_strict_id_and_match_checks_and_name_the_item(self):
+        module = FakeModule({})
+        cases = (
+            (lambda items: resource_list(module, items, "resource", ("id", "name")), {"id": " one", "name": "One"}),
+            (lambda items: resource_list(module, items, "resource", ("id", "name")), {"id": "one", "name": 1}),
+            (lambda items: find_resource(module, items, "resource", "name", "One"), {"id": "one", "name": None}),
+            (lambda items: find_resource(module, items, "resource", "name", " One"), {"id": "one", "name": " One"}),
+        )
+        for lookup, item in cases:
+            with self.subTest(item=item), self.assertRaises(ModuleFail) as raised:
+                lookup([{"id": "other", "name": "Other"}, item])
+
+            self.assertEqual(
+                raised.exception.values,
+                {"msg": "Cloudflare API returned malformed resource data", "resource_id": item["id"]},
+            )
+
     def test_find_resource_fails_on_duplicate_names(self):
         items = [{"id": "one", "name": "One"}, {"id": "two", "name": "Two"}, {"id": "three", "name": "One"}]
 
@@ -394,7 +423,7 @@ class InfoTests(TestCase):
 
 
 class EnsureSettingsTests(TestCase):
-    def run_settings(self, current, payload, edited=None, check_mode=False, comparable=None):
+    def run_settings(self, current, payload, edited=None, check_mode=False, comparable=None, exact_values=()):
         edit = Mock(return_value=edited)
         with self.assertRaises((ModuleExit, ModuleFail)) as raised:
             ensure_settings(
@@ -405,9 +434,25 @@ class EnsureSettingsTests(TestCase):
                 payload,
                 edit,
                 comparable=comparable,
+                exact_values=exact_values,
             )
 
         return raised.exception, edit
+
+    def test_exact_values_compare_every_nested_key(self):
+        current = {"routes": [{"address": "192.0.2.0/24", "description": "old"}], "other": 1}
+        payload = {"routes": [{"address": "192.0.2.0/24"}]}
+
+        result, edit = self.run_settings(current, payload)
+        edit.assert_not_called()
+        self.assertFalse(result.values["changed"])
+
+        result, edit = self.run_settings(current, payload, edited={**current, **payload}, exact_values=("routes",))
+        edit.assert_called_once_with(payload)
+        self.assertTrue(result.values["changed"])
+
+        result, _ignored = self.run_settings(current, payload, edited=current, exact_values=("routes",))
+        self.assertIsInstance(result, ModuleFail)
 
     def test_unchanged_settings_skip_edit(self):
         result, edit = self.run_settings({"enabled": True, "other": 1}, {"enabled": True})

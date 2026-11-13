@@ -323,6 +323,25 @@ class RulesListsTests(TestCase):
 
         self.assertEqual(result["msg"], "An existing Rules list kind cannot be changed")
 
+    def test_elements_without_the_list_kind_fail_before_any_write(self):
+        elements = [{"ip": "192.0.2.1"}, {"hostname": {"url_hostname": "example.com"}}]
+        for lists, updates in (
+            ([], {}),
+            ([CURRENT], {"kind": None, "description": "desired"}),
+        ):
+            for check_mode in (False, True):
+                with self.subTest(existing=bool(lists), check_mode=check_mode):
+                    client, api = make_client(lists)
+
+                    result = self.run_module(
+                        FakeModule(params(elements=elements, **updates), check_mode=check_mode), client
+                    )
+
+                    self.assertEqual(result["msg"], "elements[1] must set 'ip' for a Rules list of kind 'ip'")
+                    api.create.assert_not_called()
+                    api.update.assert_not_called()
+                    api.items.update.assert_not_called()
+
     def test_generated_sdk_iterator_reads_all_current_items(self):
         current = {**CURRENT, "num_items": 2}
         client, api = make_client([current], items=[{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}])

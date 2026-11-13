@@ -40,8 +40,8 @@ options:
     description:
       - Evaluation priority of the page rule, as an ordinal position from 1 to
         the number of page rules in the zone, including a rule being created.
-      - A priority above that number fails before any change, because Cloudflare
-        would store the rule at the last position instead.
+      - A priority below 1 or above that number fails before any change, because
+        Cloudflare would store the rule at the first or last position instead.
       - An existing rule's priority is preserved when omitted.
   status:
     type: str
@@ -221,8 +221,11 @@ def find_pagerule(module, client, targets):
 
 
 def validate_priority(module, current, rule_count):
-    """Fail when priority exceeds the zone's rule count after this change."""
+    """Fail when priority is below 1 or exceeds the zone's rule count after this change."""
     priority = module.params.get("priority")
+    if priority is not None and priority < 1:
+        module.fail_json(msg=f"priority {priority} must be at least 1", zone_id=module.params["zone_id"])
+
     maximum = rule_count + (1 if current is None else 0)
     if priority is not None and priority > maximum:
         module.fail_json(

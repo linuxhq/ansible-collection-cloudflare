@@ -23,6 +23,16 @@ class AccessPoliciesInfoTests(TestCase):
         client.zero_trust.access.policies.list.assert_called_once_with(account_id="account")
         self.assertEqual(raised.exception.values, {"changed": False, "access_policies": policies})
 
+    def test_lists_policies_whose_names_cloudflare_stored_with_whitespace(self):
+        client = Mock()
+        policies = [{"id": "one", "name": "admins "}]
+        client.zero_trust.access.policies.list.return_value = iter(policies)
+
+        with self.assertRaises(ModuleExit) as raised:
+            access_policies_info.run(FakeModule({"account_id": "account"}), client)
+
+        self.assertEqual(raised.exception.values, {"changed": False, "access_policies": policies})
+
     def test_rejects_malformed_policies(self):
         client = Mock()
         client.zero_trust.access.policies.list.return_value = [{"name": "admins"}]

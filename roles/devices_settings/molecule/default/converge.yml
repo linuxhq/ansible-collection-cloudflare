@@ -8,5 +8,10 @@
       tags:
         - molecule-idempotence-notest
 
+    - role: devices_settings
+      devices_settings_gateway_udp_proxy_enabled: false
+      tags:
+        - molecule-idempotence-notest
+
     - devices_settings
 ...

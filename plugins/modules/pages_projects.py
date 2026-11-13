@@ -36,9 +36,9 @@ options:
     description:
       - Pages build command, output directory, and related settings.
       - An empty mapping leaves the existing build configuration unchanged.
-      - Set C(web_analytics_tag) to null to clear it. Cloudflare keeps the value of
-        any other build setting set to null, so the module fails before making
-        changes.
+      - Set C(web_analytics_tag) or C(web_analytics_token) to null to clear it.
+        Cloudflare keeps the value of any other build setting set to null, so the
+        module fails before making changes.
       - C(web_analytics_token) is treated as write-only; use O(rotate_secrets) to
         apply a new value to an existing project.
   deployment_configs:
@@ -75,8 +75,8 @@ options:
     elements: dict
     description:
       - Custom domains that must exist on the project.
-      - With O(state=absent), listed domains are removed from the project before
-        it is deleted.
+      - With O(state=absent), domains are not deleted separately; Cloudflare
+        detaches every custom domain when it deletes the project.
     suboptions:
       name:
         description:
@@ -536,7 +536,7 @@ def ensure_present(module, client, domain_names):
     )
 
 
-def ensure_absent(module, client, domain_names):
+def ensure_absent(module, client):
     params = module.params
     current = get_project(module, client)
     if current is None:
@@ -548,19 +548,6 @@ def ensure_absent(module, client, domain_names):
             message="Pages project would be deleted",
             pages_project=current,
         )
-
-    existing_names = existing_domain_names(module, client, current) if domain_names else set()
-    for domain_name in domain_names:
-        if domain_name in existing_names:
-            with cloudflare_error_context(
-                "Cloudflare API request failed while deleting the Pages project domain",
-                account_id=params["account_id"],
-                name=params["name"],
-                domain=domain_name,
-            ):
-                client.pages.projects.domains.delete(
-                    domain_name=domain_name, account_id=params["account_id"], project_name=params["name"]
-                )
 
     with cloudflare_error_context(
         "Cloudflare API request failed while deleting the Pages project",
@@ -582,7 +569,7 @@ def run(module, client):
         validate_null_settings(module)
         ensure_present(module, client, domain_names)
 
-    ensure_absent(module, client, domain_names)
+    ensure_absent(module, client)
 
 
 def main():

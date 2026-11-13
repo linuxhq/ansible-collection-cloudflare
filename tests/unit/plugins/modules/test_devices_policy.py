@@ -69,3 +69,34 @@ class DevicesPolicyTests(TestCase):
         )
 
         self.assertIn("did not apply", result["msg"])
+
+    def test_split_tunnel_entries_are_compared_exactly(self):
+        for field in ("include", "exclude"):
+            desired = [{"address": "192.0.2.0/24"}]
+            current = {field: [{"address": "192.0.2.0/24", "description": "removed"}]}
+            for check_mode in (True, False):
+                with self.subTest(field=field, check_mode=check_mode):
+                    result, api = self.run_module(
+                        FakeModule({"account_id": "account", field: desired}, check_mode=check_mode),
+                        current,
+                        {field: desired},
+                    )
+
+                    self.assertTrue(result["changed"])
+                    if check_mode:
+                        api.edit.assert_not_called()
+                    else:
+                        api.edit.assert_called_once_with(account_id="account", **{field: desired})
+
+            with self.subTest(field=field, applied=False):
+                result, _ignored = self.run_module(
+                    FakeModule({"account_id": "account", field: desired}), current, current
+                )
+
+                self.assertIn("did not apply", result["msg"])
+
+            with self.subTest(field=field, converged=True):
+                result, api = self.run_module(FakeModule({"account_id": "account", field: desired}), {field: desired})
+
+                api.edit.assert_not_called()
+                self.assertFalse(result["changed"])
