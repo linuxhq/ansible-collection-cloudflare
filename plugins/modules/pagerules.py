@@ -34,7 +34,7 @@ options:
     description:
       - URL matching conditions that identify the page rule.
       - URL values are matched as Cloudflare stores them, with the host in
-        lowercase and a trailing slash after a bare host.
+        lowercase and a slash after a bare host, before any trailing wildcard.
   priority:
     type: int
     description:
@@ -146,14 +146,18 @@ def pagerule_targets(module, pagerule):
 def canonical_url(value):
     """Return a URL pattern as Cloudflare stores it.
 
-    Cloudflare lowercases the host and adds a trailing slash to a bare host;
-    the scheme and path keep their case.
+    Cloudflare lowercases the host and adds a slash after a bare host, before
+    a trailing wildcard, so example.com* becomes example.com/*; the scheme and
+    path keep their case.
     """
     scheme, separator, rest = value.partition("://")
     if not separator:
         scheme, rest = "", value
 
-    host, _slash, path = rest.partition("/")
+    host, slash, path = rest.partition("/")
+    if not slash and host.endswith("*"):
+        host, path = host[:-1], "*"
+
     return f"{scheme}{separator}{host.lower()}/{path}"
 
 

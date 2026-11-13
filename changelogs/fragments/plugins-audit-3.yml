@@ -20,8 +20,8 @@ bugfixes:
     variables, and bindings are cleared with null. The module previously updated the project and then failed.
   - pages_projects - compare custom domain names case-insensitively, so a mixed-case O(domains[].name) converges
     instead of failing after Cloudflare stores it in lowercase.
-  - pagerules - match target URL values as Cloudflare stores them, with a lowercase host and a trailing slash after a
-    bare host, so such rules are found and converge instead of failing after creation.
+  - pagerules - match target URL values as Cloudflare stores them, with a lowercase host and a slash after a bare host,
+    before any trailing wildcard, so such rules are found and converge instead of failing after creation.
   - pagerules - compare O(actions) regardless of order; Cloudflare lists actions sorted by C(id), so other orders
     reported a change and updated the rule on every run.
   - cfd_tunnel_configurations_info - skip a tunnel deleted while its configuration is being gathered instead of failing.
