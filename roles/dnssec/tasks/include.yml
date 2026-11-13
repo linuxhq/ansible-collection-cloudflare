@@ -7,7 +7,7 @@
     dnssec_multi_signer: "{{ _dnssec.dnssec_multi_signer | d(omit) }}"
     dnssec_presigned: "{{ _dnssec.dnssec_presigned | d(omit) }}"
     dnssec_use_nsec3: "{{ _dnssec.dnssec_use_nsec3 | d(omit) }}"
-    status: "{{ _dnssec.status | d('active') }}"
+    status: "{{ _dnssec.status | d(omit) }}"
     zone_id: "{{ _dnssec.zone_id }}"
   register: __dnssec_result
   loop: "{{ __dnssec_list }}"
