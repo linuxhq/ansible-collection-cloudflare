@@ -99,6 +99,24 @@ class CfdTunnelTests(TestCase):
         api.edit.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_rejects_config_source_change_before_any_write(self):
+        for rotate in (False, True):
+            with self.subTest(rotate_secrets=rotate):
+                current = {"id": "tunnel-id", "name": "tunnel", "config_src": "local"}
+                client, api = client_with([current], edited=current)
+                options = {"rotate_secrets": True, "tunnel_secret": SECRET} if rotate else {}
+
+                result = self.run_module(FakeModule(params(config_src="cloudflare", **options)), client)
+
+                api.edit.assert_not_called()
+                api.create.assert_not_called()
+                self.assertEqual(
+                    result["msg"],
+                    "Cannot change config_src of the existing cloudflared tunnel from local to cloudflare",
+                )
+                self.assertEqual(result["current_config_src"], "local")
+                self.assertEqual(result["requested_config_src"], "cloudflare")
+
     def test_requires_config_source_only_when_creating(self):
         client, api = client_with()
 

@@ -292,23 +292,48 @@ def values_differ(current, desired):
     return not values_equal(serialize_resource(current), serialize_resource(desired))
 
 
-def differs(current, desired, defaults=None, exact_fields=()):
+def differs(current, desired, defaults=None, exact_fields=(), exact_values=()):
     """Return whether current differs from desired on the desired fields only.
 
     Fields the API omits are filled from defaults before comparing. Mappings
-    under exact_fields are compared on their complete key sets.
+    under exact_fields are compared on their complete key sets. Top-level
+    fields in exact_values are compared exactly, at every nesting level.
     """
     if not desired:
         return False
 
     current = {**(defaults or {}), **(serialize_resource(current) or {})}
-    return values_differ(normalize_current_by_desired_fields(current, desired, exact_fields), desired)
+    projected = normalize_current_by_desired_fields(current, desired, exact_fields)
+    for field in exact_values:
+        if field in desired:
+            projected[field] = current.get(field)
+
+    return values_differ(projected, desired)
 
 
-def require_applied(module, resource, desired, resource_name, defaults=None, exact_fields=()):
+def require_applied(module, resource, desired, resource_name, defaults=None, exact_fields=(), exact_values=()):
     require_mapping(module, resource, resource_name)
-    if differs(resource, desired, defaults, exact_fields):
+    if differs(resource, desired, defaults, exact_fields, exact_values):
         module.fail_json(msg=f"Cloudflare did not apply the requested {resource_name}")
+
+
+# The SDK renames these snake_case selector keys to their API spellings on
+# write, so Cloudflare would store and return keys that never match the request.
+ACCESS_SELECTOR_API_KEYS = {
+    "azure_ad": "azureAD",
+    "github_organization": "github-organization",
+}
+
+ACCESS_SELECTOR_FIELDS = ("exclude", "include", "require")
+
+
+def validate_access_selectors(module):
+    """Fail when an Access selector uses an SDK spelling instead of its API key."""
+    for field in ACCESS_SELECTOR_FIELDS:
+        for selector in module.params.get(field) or ():
+            for key, api_key in ACCESS_SELECTOR_API_KEYS.items():
+                if key in selector:
+                    module.fail_json(msg=f"{field} selector {key!r} must use the Cloudflare API key {api_key!r}")
 
 
 def validate_tunnel_secret(module, secret):
@@ -373,12 +398,14 @@ def ensure_resource_present(
     defaults=None,
     preserved_fields=(),
     exact_fields=(),
+    exact_values=(),
     context=None,
 ):
     """Create the resource, or update it when the managed fields differ.
 
     The update replaces the resource, so preserved_fields omitted from payload
-    are carried over from current. context names the resource's owner in failures.
+    are carried over from current. exact_values are compared exactly. context
+    names the resource's owner in failures.
     """
     context = context or {}
     label = resource_name[0].upper() + resource_name[1:]
@@ -403,12 +430,12 @@ def ensure_resource_present(
         ):
             resource = checked(create(payload))
 
-        require_applied(module, resource, payload, resource_name, defaults, exact_fields)
+        require_applied(module, resource, payload, resource_name, defaults, exact_fields, exact_values)
         module.exit_json(changed=True, message=f"{label} created", **{result_key: resource})
 
     current_id = resource_id(module, current, resource_name)
     payload = {**select_fields(current, preserved_fields), **payload}
-    if not differs(current, payload, defaults, exact_fields):
+    if not differs(current, payload, defaults, exact_fields, exact_values):
         module.exit_json(
             changed=False,
             message=f"{label} already present",
@@ -429,7 +456,7 @@ def ensure_resource_present(
     ):
         resource = checked(update(current_id, payload), expected_id=current_id)
 
-    require_applied(module, resource, payload, resource_name, defaults, exact_fields)
+    require_applied(module, resource, payload, resource_name, defaults, exact_fields, exact_values)
     module.exit_json(changed=True, message=f"{label} updated", **{result_key: resource})
 
 

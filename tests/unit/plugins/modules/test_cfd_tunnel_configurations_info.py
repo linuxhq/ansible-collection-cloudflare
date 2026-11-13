@@ -3,6 +3,8 @@
 from unittest import TestCase
 from unittest.mock import Mock
 
+import cloudflare
+
 from ansible_collections.linuxhq.cloudflare.plugins.modules import (
     cfd_tunnel_configurations_info,
 )
@@ -10,6 +12,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleExit,
     ModuleFail,
+    status_error,
 )
 
 
@@ -50,3 +53,29 @@ class CfdTunnelConfigurationsInfoTests(TestCase):
         result, _ignored = self.run_module([{"id": "remote", "name": "one"}], {"config": ["invalid"]})
 
         self.assertIn("malformed tunnel configuration", result["msg"])
+
+    def test_skips_tunnel_deleted_after_listing(self):
+        tunnels = [{"id": "deleted", "name": "one"}, {"id": "remote", "name": "two"}]
+        client = Mock()
+        api = client.zero_trust.tunnels.cloudflared
+        api.list.return_value = tunnels
+        api.configurations.get.side_effect = [status_error(404), {"config": {"ingress": []}}]
+
+        with self.assertRaises(ModuleExit) as raised:
+            cfd_tunnel_configurations_info.run(FakeModule({"account_id": "account"}), client)
+
+        self.assertEqual(
+            raised.exception.values["cfd_tunnel_configurations"],
+            [{"id": "remote", "name": "two", "config": {"ingress": []}}],
+        )
+
+    def test_other_configuration_errors_propagate(self):
+        client = Mock()
+        api = client.zero_trust.tunnels.cloudflared
+        api.list.return_value = [{"id": "remote", "name": "one"}]
+        api.configurations.get.side_effect = status_error(403)
+
+        with self.assertRaises(cloudflare.PermissionDeniedError) as raised:
+            cfd_tunnel_configurations_info.run(FakeModule({"account_id": "account"}), client)
+
+        self.assertEqual(raised.exception.status_code, 403)

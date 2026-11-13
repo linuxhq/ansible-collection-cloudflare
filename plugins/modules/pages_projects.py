@@ -36,7 +36,9 @@ options:
     description:
       - Pages build command, output directory, and related settings.
       - An empty mapping leaves the existing build configuration unchanged.
-      - Settings set to null, such as C(web_analytics_tag), are cleared.
+      - Set C(web_analytics_tag) to null to clear it. Cloudflare keeps the value of
+        any other build setting set to null, so the module fails before making
+        changes.
       - C(web_analytics_token) is treated as write-only; use O(rotate_secrets) to
         apply a new value to an existing project.
   deployment_configs:
@@ -50,6 +52,8 @@ options:
         project.
       - Environment variables and bindings, such as C(kv_namespaces) entries, set
         to null are deleted from the project. An empty binding map changes nothing.
+      - Cloudflare keeps the value of any other setting set to null, such as
+        C(compatibility_date), so the module fails before making changes.
   rotate_secrets:
     type: bool
     default: false
@@ -75,6 +79,7 @@ options:
       name:
         description:
           - Fully qualified custom domain name.
+          - Compared case-insensitively; Cloudflare stores domain names in lowercase.
         required: true
         type: str
   state:
@@ -152,6 +157,63 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 FIELDS = ("build_config", "deployment_configs", "name", "production_branch", "source")
+
+# Cloudflare clears these settings when they are set to null, but keeps the
+# current value of any other setting set to null.
+NULLABLE_BUILD_SETTINGS = ("web_analytics_tag", "web_analytics_token")
+NULLABLE_DEPLOYMENT_SETTINGS = (
+    "ai_bindings",
+    "analytics_engine_datasets",
+    "browsers",
+    "d1_databases",
+    "durable_object_namespaces",
+    "env_vars",
+    "hyperdrive_bindings",
+    "kv_namespaces",
+    "mtls_certificates",
+    "queue_producers",
+    "r2_buckets",
+    "services",
+    "vectorize_bindings",
+)
+
+
+def contains_null(value):
+    if isinstance(value, dict):
+        return any(contains_null(item) for item in value.values())
+
+    if isinstance(value, list):
+        return any(contains_null(item) for item in value)
+
+    return value is None
+
+
+def validate_null_settings(module):
+    """Fail when null is requested for a setting Cloudflare does not clear."""
+    params = module.params
+    unsupported = [
+        f"build_config.{key}"
+        for key, value in (params.get("build_config") or {}).items()
+        if key not in NULLABLE_BUILD_SETTINGS and contains_null(value)
+    ]
+    for environment, config in (params.get("deployment_configs") or {}).items():
+        if not isinstance(config, dict):
+            if config is None:
+                unsupported.append(f"deployment_configs.{environment}")
+
+            continue
+
+        unsupported.extend(
+            f"deployment_configs.{environment}.{key}"
+            for key, value in config.items()
+            if key not in NULLABLE_DEPLOYMENT_SETTINGS and contains_null(value)
+        )
+
+    if unsupported:
+        module.fail_json(
+            msg=f"Cloudflare does not clear Pages project settings set to null: {', '.join(unsupported)}",
+            unsupported_settings=unsupported,
+        )
 
 
 def without_secret_values(resource):
@@ -275,7 +337,8 @@ def current_domain_names(module, project, domains):
             module.fail_json(msg="Cloudflare API returned malformed Pages domain data")
 
     domain_names = [domain["name"] for domain in resource_list(module, domains, "Pages domain", ("name",))]
-    return set(project_domains) | set(domain_names)
+    # Domain names are case-insensitive, and Cloudflare stores them lowercased.
+    return {name.lower() for name in project_domains + domain_names}
 
 
 def desired_domain_names(module):
@@ -284,6 +347,8 @@ def desired_domain_names(module):
         domain_name = domain["name"]
         if not domain_name.strip() or domain_name != domain_name.strip():
             module.fail_json(msg="Each Pages project domain requires a valid name")
+
+        domain_name = domain_name.lower()
 
         if domain_name not in names:
             names.append(domain_name)
@@ -502,6 +567,7 @@ def ensure_absent(module, client, domain_names):
 def run(module, client):
     domain_names = desired_domain_names(module)
     if module.params["state"] == "present":
+        validate_null_settings(module)
         ensure_present(module, client, domain_names)
 
     ensure_absent(module, client, domain_names)

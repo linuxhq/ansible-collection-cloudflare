@@ -9,6 +9,9 @@ module: access_policies
 short_description: Manage Cloudflare Access policies
 description:
   - Create, update, and delete Cloudflare Access policies by name.
+  - Access selectors in O(include), O(exclude), and O(require) use Cloudflare
+    API key names, such as C(github-organization) and C(azureAD), and are
+    compared exactly, including their nested fields.
   - Settings this module does not manage, such as C(session_duration), are
     preserved on an existing policy.
 version_added: '2.0.0'
@@ -125,12 +128,14 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    ACCESS_SELECTOR_FIELDS,
     cloudflare_client,
     cloudflare_error_context,
     ensure_resource_absent,
     ensure_resource_present,
     find_resource,
     payload_from_params,
+    validate_access_selectors,
 )
 
 FIELDS = (
@@ -155,7 +160,7 @@ PRESERVED_FIELDS = (
 
 # The update replaces the policy, so settings this module does not manage are
 # carried over too.
-UNMANAGED_FIELDS = ("connection_rules", "mfa_config", "session_duration")
+UNMANAGED_FIELDS = ("connection_rules", "mfa_config", "policy_resolution_account_id", "session_duration")
 
 FALSE_FIELDS = (
     "approval_required",
@@ -168,6 +173,8 @@ def run(module, client):
     params = module.params
     account_id = params["account_id"]
     policies = client.zero_trust.access.policies
+    if params["state"] == "present":
+        validate_access_selectors(module)
 
     # The list endpoint has no name filter, so match the name locally.
     with cloudflare_error_context(
@@ -204,6 +211,7 @@ def run(module, client):
         expected_name=params["name"],
         defaults=dict.fromkeys(FALSE_FIELDS, False),
         preserved_fields=PRESERVED_FIELDS + UNMANAGED_FIELDS,
+        exact_values=ACCESS_SELECTOR_FIELDS,
         context={"account_id": account_id},
     )
 

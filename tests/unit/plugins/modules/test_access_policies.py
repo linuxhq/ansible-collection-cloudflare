@@ -96,14 +96,47 @@ class AccessPoliciesTests(TestCase):
         self.assertEqual(api.update.call_args.kwargs["session_duration"], "8h")
         self.assertTrue(result["changed"])
 
+    def test_update_preserves_policy_resolution_account_id(self):
+        current = policy(policy_resolution_account_id="trusted")
+        client, api = client_with([current], updated=policy(decision="deny", policy_resolution_account_id="trusted"))
+
+        result = self.run_module(FakeModule(params(decision="deny")), client)
+
+        self.assertEqual(api.update.call_args.kwargs["policy_resolution_account_id"], "trusted")
+        self.assertTrue(result["changed"])
+
     def test_equivalent_policy_is_unchanged(self):
-        current = policy(include=[{"email_domain": {"domain": "example.com", "provider_field": "ignored"}}])
-        client, api = client_with([current])
+        client, api = client_with([policy(purpose_justification_required=False)])
 
         result = self.run_module(FakeModule(params()), client)
 
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
+
+    def test_removed_nested_selector_field_is_updated(self):
+        include = [{"device_posture": {"integration_uid": "posture"}}]
+        current = policy(include=[{"device_posture": {"integration_uid": "posture", "account_id": "other"}}])
+        client, api = client_with([current], updated=policy(include=include))
+
+        result = self.run_module(FakeModule(params(include=include)), client)
+
+        self.assertEqual(api.update.call_args.kwargs["include"], include)
+        self.assertTrue(result["changed"])
+
+    def test_rejects_sdk_selector_key_before_any_request(self):
+        client, api = client_with()
+
+        result = self.run_module(
+            FakeModule(params(include=[{"github_organization": {"identity_provider_id": "idp", "name": "org"}}])),
+            client,
+        )
+
+        self.assertEqual(
+            result["msg"],
+            "include selector 'github_organization' must use the Cloudflare API key 'github-organization'",
+        )
+        api.list.assert_not_called()
+        api.create.assert_not_called()
 
     def test_updates_changed_policy(self):
         updated = policy()

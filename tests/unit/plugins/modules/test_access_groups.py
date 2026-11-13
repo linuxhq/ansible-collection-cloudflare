@@ -51,13 +51,40 @@ class AccessGroupsTests(TestCase):
         api.list.assert_called_once_with(account_id="account", name="admins")
 
     def test_equivalent_group_is_unchanged(self):
-        current = {"id": "group", "name": "admins", "include": [{"email": {"email": "admin@example.com", "x": 1}}]}
+        current = {"id": "group", "name": "admins", "include": INCLUDE}
         client, api = client_with([current])
 
         result = self.run_module(FakeModule(params()), client)
 
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
+
+    def test_removed_nested_selector_field_is_updated(self):
+        include = [{"github-organization": {"identity_provider_id": "idp", "name": "org"}}]
+        current = {
+            "id": "group",
+            "name": "admins",
+            "include": [{"github-organization": {"identity_provider_id": "idp", "name": "org", "team": "ops"}}],
+        }
+        client, api = client_with([current], updated={**current, "include": include})
+
+        result = self.run_module(FakeModule(params(include=include)), client)
+
+        api.update.assert_called_once_with(
+            "group", account_id="account", include=include, is_default=False, name="admins"
+        )
+        self.assertTrue(result["changed"])
+
+    def test_rejects_sdk_selector_key_before_any_request(self):
+        for key, api_key in (("github_organization", "github-organization"), ("azure_ad", "azureAD")):
+            with self.subTest(key=key):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(require=[{key: {"identity_provider_id": "idp"}}])), client)
+
+                self.assertEqual(result["msg"], f"require selector {key!r} must use the Cloudflare API key {api_key!r}")
+                api.list.assert_not_called()
+                api.create.assert_not_called()
 
     def test_creates_group(self):
         created = {"id": "group", "name": "admins", "include": INCLUDE}
