@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - rules_lists - fail before any request when a C(hostname) element is not a mapping with a non-empty string
+    C(url_hostname), or a C(redirect) element is not a mapping with non-empty strings C(source_url) and
+    C(target_url). The module wrote the list description and then Cloudflare rejected the items.
+  - rules_lists - fail before any request when an element sets keys other than the list kind field and C(comment),
+    naming the unexpected keys. A typo such as C(description) or a second kind field was sent to Cloudflare after the
+    description was written, or was ignored so every run rewrote the list and failed because Cloudflare did not apply
+    the items.

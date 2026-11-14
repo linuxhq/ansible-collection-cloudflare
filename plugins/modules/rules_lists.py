@@ -46,7 +46,11 @@ options:
     description:
       - Complete set of entries that the Rules list must contain.
       - Each entry must set the field named by the list kind, such as C(ip) or
-        C(hostname).
+        C(hostname), and may also set C(comment); no other keys are accepted.
+      - A C(hostname) entry must be a mapping with a non-empty string
+        C(url_hostname).
+      - A C(redirect) entry must be a mapping with non-empty strings
+        C(source_url) and C(target_url).
       - An C(ip) entry must be an IP address, or a CIDR with a prefix length of
         8 to 32 for IPv4 or 12 to 128 for IPv6.
       - A C(hostname.url_hostname) entry must not include a scheme or a path,
@@ -162,6 +166,12 @@ ITEM_META_FIELDS = (
 # Prefix lengths Cloudflare accepts in IP lists, by IP version:
 # https://developers.cloudflare.com/waf/tools/lists/custom-lists/
 IP_PREFIX_LENGTHS = {4: range(8, 33), 6: range(12, 129)}
+
+# Fields the SDK item models require inside each mapping-valued list kind.
+REQUIRED_STRING_FIELDS = {
+    "hostname": ("url_hostname",),
+    "redirect": ("source_url", "target_url"),
+}
 
 REDIRECT_DEFAULTS = {
     "include_subdomains": False,
@@ -405,10 +415,22 @@ def valid_hostname(value):
 
 
 def validate_elements(module, kind):
-    """Fail when an element lacks the field that stores the list kind, or holds an invalid value."""
+    """Fail when an element lacks the field that stores the list kind, has other keys, or holds an invalid value."""
     for index, element in enumerate(module.params.get("elements") or ()):
         if element.get(kind) is None:
             module.fail_json(msg=f"elements[{index}] must set {kind!r} for a Rules list of kind {kind!r}")
+
+        unexpected = sorted(key for key in element if key not in (kind, "comment"))
+        if unexpected:
+            module.fail_json(
+                msg=f"elements[{index}] supports only {kind!r} and 'comment' for a Rules list of kind {kind!r}",
+                unexpected_keys=unexpected,
+            )
+
+        for field in REQUIRED_STRING_FIELDS.get(kind, ()):
+            value = element[kind].get(field) if isinstance(element[kind], dict) else None
+            if not isinstance(value, str) or not value:
+                module.fail_json(msg=f"elements[{index}].{kind} must be a mapping with a non-empty string {field!r}")
 
         asn = element.get("asn")
         if kind == "asn" and (not isinstance(asn, int) or isinstance(asn, bool) or asn < 0):

@@ -399,6 +399,88 @@ class RulesListsTests(TestCase):
                         api.update.assert_not_called()
                         api.items.update.assert_not_called()
 
+    def assert_elements_fail_before_any_write(self, kind, elements, message, **expected):
+        for lists, updates in (
+            ([], {}),
+            ([{**CURRENT, "kind": kind}], {"kind": None, "description": "desired"}),
+        ):
+            for check_mode in (False, True):
+                with self.subTest(elements=elements, existing=bool(lists), check_mode=check_mode):
+                    client, api = make_client(lists)
+
+                    result = self.run_module(
+                        FakeModule(params(elements=elements, **{"kind": kind, **updates}), check_mode=check_mode),
+                        client,
+                    )
+
+                    self.assertEqual(result["msg"], message)
+                    for key, value in expected.items():
+                        self.assertEqual(result[key], value)
+
+                    api.create.assert_not_called()
+                    api.update.assert_not_called()
+                    api.items.update.assert_not_called()
+
+    def test_malformed_hostname_and_redirect_elements_fail_before_any_write(self):
+        valid = {
+            "hostname": {"hostname": {"url_hostname": "example.com"}},
+            "redirect": {"redirect": {"source_url": "example.com/a", "target_url": "https://example.net"}},
+        }
+        cases = [
+            ("hostname", value, "url_hostname")
+            for value in ({}, "example.com", {"url_hostname": None}, {"url_hostname": ""}, {"url_hostname": 1})
+        ] + [
+            ("redirect", value, field)
+            for value, field in (
+                ({"source_url": "example.com/a"}, "target_url"),
+                ({"target_url": "https://example.net"}, "source_url"),
+                ({"source_url": "example.com/a", "target_url": ""}, "target_url"),
+                ("example.com/a", "source_url"),
+            )
+        ]
+        for kind, value, field in cases:
+            self.assert_elements_fail_before_any_write(
+                kind,
+                [valid[kind], {kind: value}],
+                f"elements[1].{kind} must be a mapping with a non-empty string {field!r}",
+            )
+
+    def test_elements_with_unexpected_keys_fail_before_any_write(self):
+        for kind, element, unexpected in (
+            ("ip", {"ip": "192.0.2.1", "description": "office"}, ["description"]),
+            ("ip", {"ip": "192.0.2.1", "asn": 5, "comment": "office"}, ["asn"]),
+            ("asn", {"asn": 13335, "id": "item", "hostname": {"url_hostname": "example.com"}}, ["hostname", "id"]),
+        ):
+            self.assert_elements_fail_before_any_write(
+                kind,
+                [element],
+                f"elements[0] supports only {kind!r} and 'comment' for a Rules list of kind {kind!r}",
+                unexpected_keys=unexpected,
+            )
+
+    def test_valid_redirect_and_commented_elements_are_accepted(self):
+        for kind, element in (
+            ("ip", {"ip": "192.0.2.1", "comment": "office"}),
+            (
+                "redirect",
+                {
+                    "redirect": {
+                        "source_url": "example.com/a",
+                        "target_url": "https://example.net",
+                        "status_code": 302,
+                    },
+                    "comment": "moved",
+                },
+            ),
+            ("hostname", {"hostname": {"url_hostname": "example.com", "exclude_exact_hostname": False}}),
+        ):
+            with self.subTest(element=element):
+                client, _ignored = make_client()
+
+                result = self.run_module(FakeModule(params(kind=kind, elements=[element]), check_mode=True), client)
+
+                self.assertTrue(result["changed"])
+
     def test_valid_hostname_and_asn_elements_are_accepted(self):
         for kind, element in (
             ("hostname", {"hostname": {"url_hostname": "*.example.com"}}),
