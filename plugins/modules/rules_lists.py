@@ -40,6 +40,7 @@ options:
       - Human-readable purpose of the Rules list.
       - Defaults to O(name) when creating a Rules list; an existing list's
         description is preserved when omitted.
+      - V("") clears the description; Cloudflare then omits it from the list.
   elements:
     type: list
     elements: dict
@@ -52,10 +53,19 @@ options:
       - A C(redirect) entry must be a mapping with non-empty strings
         C(source_url) and C(target_url).
       - An C(ip) entry must be an IP address, or a CIDR with a prefix length of
-        8 to 32 for IPv4 or 12 to 128 for IPv6.
+        8 to 32 for IPv4 or 12 to 128 for IPv6 and no host bits set.
+        IPv4-mapped IPv6 addresses are not supported.
+      - A C(/32) IPv4 or C(/128) IPv6 entry is the same as the bare address,
+        which is how Cloudflare stores it.
       - A C(hostname.url_hostname) entry must not include a scheme or a path,
-        and a C(*) wildcard in it must be followed by a period.
-      - An C(asn) entry must be an integer from 0 to 4294967295.
+        and may use a C(*) wildcard only as a single leading C(*.) label.
+      - An C(asn) entry must be an integer from 1 to 4294967295.
+      - Entries must not repeat a value of the list kind field, such as the same
+        C(ip) with different C(comment) values; identical entries are merged.
+      - C(hostname) entries must not include both a wildcard such as
+        C(*.example.com) and its exact hostname C(example.com), whatever the
+        value of C(exclude_exact_hostname); Cloudflare treats them as
+        duplicates.
       - A C(redirect.status_code), when set, must be the integer 301, 302,
         307, or 308.
   operation_timeout:
@@ -138,7 +148,7 @@ message:
 
 import json
 import time
-from ipaddress import ip_address
+from ipaddress import ip_address, ip_network
 
 from ansible.module_utils.basic import AnsibleModule
 
@@ -180,6 +190,9 @@ MAX_ASN = 4294967295
 
 REDIRECT_STATUS_CODES = (301, 302, 307, 308)
 
+# Cloudflare omits an empty list description.
+LIST_DEFAULTS = {"description": ""}
+
 REDIRECT_DEFAULTS = {
     "include_subdomains": False,
     "preserve_path_suffix": True,
@@ -190,12 +203,18 @@ REDIRECT_DEFAULTS = {
 
 
 def canonical_ip(value):
-    # Cloudflare stores addresses in canonical form, such as compressed IPv6.
+    # Cloudflare stores addresses in canonical form, such as compressed IPv6,
+    # and stores a full-length prefix, such as /32, as the bare address.
     address, separator, prefix = value.partition("/")
     try:
-        return f"{ip_address(address)}{separator}{prefix}"
+        parsed = ip_address(address)
     except ValueError:
         return value
+
+    if prefix.isascii() and prefix.isdigit() and int(prefix) == parsed.max_prefixlen:
+        return str(parsed)
+
+    return f"{parsed}{separator}{prefix}"
 
 
 def canonical_item(item):
@@ -403,22 +422,33 @@ def valid_ip(value):
 
     address, separator, prefix = value.partition("/")
     try:
-        version = ip_address(address).version
+        parsed = ip_address(address)
     except ValueError:
+        return False
+
+    if parsed.version == 6 and parsed.ipv4_mapped is not None:
         return False
 
     if not separator:
         return True
 
-    return prefix.isascii() and prefix.isdigit() and int(prefix) in IP_PREFIX_LENGTHS[version]
+    if not (prefix.isascii() and prefix.isdigit() and int(prefix) in IP_PREFIX_LENGTHS[parsed.version]):
+        return False
+
+    try:
+        ip_network(f"{parsed}/{int(prefix)}")
+    except ValueError:
+        return False
+
+    return True
 
 
 def valid_hostname(value):
-    """Return whether value has no scheme or path, and each `*` is followed by a period."""
+    """Return whether value has no scheme or path, and `*` appears only as a single leading `*.` label."""
     if "/" in value:
         return False
 
-    return all(value[index + 1 : index + 2] == "." for index, char in enumerate(value) if char == "*")
+    return "*" not in value.removeprefix("*.")
 
 
 def validate_elements(module, kind):
@@ -440,8 +470,8 @@ def validate_elements(module, kind):
                 module.fail_json(msg=f"elements[{index}].{kind} must be a mapping with a non-empty string {field!r}")
 
         asn = element.get("asn")
-        if kind == "asn" and (not isinstance(asn, int) or isinstance(asn, bool) or not 0 <= asn <= MAX_ASN):
-            module.fail_json(msg=f"elements[{index}].asn must be an integer from 0 to {MAX_ASN}", asn=asn)
+        if kind == "asn" and (not isinstance(asn, int) or isinstance(asn, bool) or not 1 <= asn <= MAX_ASN):
+            module.fail_json(msg=f"elements[{index}].asn must be an integer from 1 to {MAX_ASN}", asn=asn)
 
         redirect = element.get("redirect") if kind == "redirect" else None
         status_code = redirect.get("status_code") if isinstance(redirect, dict) else None
@@ -461,7 +491,7 @@ def validate_elements(module, kind):
             module.fail_json(
                 msg=(
                     f"elements[{index}].hostname.url_hostname must not include a scheme or a path, "
-                    "and a '*' wildcard must be followed by '.'"
+                    "and may use a '*' wildcard only as a single leading '*.' label"
                 ),
                 url_hostname=url_hostname,
             )
@@ -470,10 +500,29 @@ def validate_elements(module, kind):
             module.fail_json(
                 msg=(
                     f"elements[{index}].ip must be an IP address, or a CIDR with a prefix length "
-                    "of 8 to 32 for IPv4 or 12 to 128 for IPv6"
+                    "of 8 to 32 for IPv4 or 12 to 128 for IPv6 and no host bits set, "
+                    "and must not be an IPv4-mapped IPv6 address"
                 ),
                 ip=element["ip"],
             )
+
+    values = set()
+    for item in normalize_items(module.params.get("elements")):
+        value = canonical_item(item[kind])
+        if value in values:
+            module.fail_json(msg=f"elements must not repeat the {kind!r} value {item[kind]!r}", **{kind: item[kind]})
+
+        values.add(value)
+
+    # Cloudflare rejects a wildcard hostname alongside its exact apex hostname.
+    if kind == "hostname":
+        hostnames = {element["hostname"]["url_hostname"] for element in module.params.get("elements") or ()}
+        for hostname in sorted(hostnames):
+            if f"*.{hostname}" in hostnames:
+                module.fail_json(
+                    msg=f"elements must not set both 'url_hostname' values {'*.' + hostname!r} and {hostname!r}",
+                    url_hostname=[f"*.{hostname}", hostname],
+                )
 
 
 def ensure_present(module, client, current):
@@ -520,13 +569,13 @@ def ensure_present(module, client, current):
                 module, lists.create(account_id=account_id, **payload), params["name"], params["kind"]
             )
 
-        require_applied(module, current, payload, "Rules list")
+        require_applied(module, current, payload, "Rules list", LIST_DEFAULTS)
         current_id = current["id"]
         changed = True
         created = True
     else:
         desired_description = params.get("description")
-        if desired_description is not None and current.get("description") != desired_description:
+        if desired_description is not None and current.get("description", "") != desired_description:
             if module.check_mode:
                 module.exit_json(
                     changed=True,
@@ -547,7 +596,7 @@ def ensure_present(module, client, current):
                     expected_id=current_id,
                 )
 
-            require_applied(module, current, {"description": desired_description}, "Rules list")
+            require_applied(module, current, {"description": desired_description}, "Rules list", LIST_DEFAULTS)
             changed = True
 
     if params.get("elements") is not None:

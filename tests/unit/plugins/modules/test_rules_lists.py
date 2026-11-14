@@ -312,6 +312,26 @@ class RulesListsTests(TestCase):
 
         self.assertIn("did not apply", result["msg"])
 
+    def test_empty_description_matches_list_without_description(self):
+        created = {"id": "list", "name": "addresses", "kind": "ip"}
+        for lists, updated, called in (
+            ([], None, False),
+            ([CURRENT], created, True),
+            ([created], None, False),
+        ):
+            with self.subTest(existing=bool(lists), stored=lists[0].get("description") if lists else None):
+                client, api = make_client(lists, created=created, updated=updated)
+
+                result = self.run_module(FakeModule(params(description="")), client)
+
+                self.assertNotIn("msg", result)
+                self.assertEqual(result["changed"], called or not lists)
+                self.assertEqual(api.update.called, called)
+                if not lists:
+                    api.create.assert_called_once_with(
+                        account_id="account", description="", kind="ip", name="addresses"
+                    )
+
     def test_metadata_update_omits_items_operation(self):
         client, api = make_client([CURRENT], updated={**CURRENT, "description": "desired"})
 
@@ -348,7 +368,19 @@ class RulesListsTests(TestCase):
                     api.items.update.assert_not_called()
 
     def test_invalid_ip_elements_fail_before_any_write(self):
-        for value in ("not-an-ip", "192.0.2.0/7", "192.0.2.0/33", "2001:db8::/11", "192.0.2.0/", "192.0.2.0/a", 1):
+        for value in (
+            "not-an-ip",
+            "192.0.2.0/7",
+            "192.0.2.0/33",
+            "2001:db8::/11",
+            "192.0.2.0/",
+            "192.0.2.0/a",
+            1,
+            "1.2.3.4/8",
+            "2001:db0::/12",
+            "::ffff:1.2.3.4",
+            "::ffff:0:0/96",
+        ):
             for lists, updates in (
                 ([], {}),
                 ([CURRENT], {"description": "desired"}),
@@ -369,17 +401,35 @@ class RulesListsTests(TestCase):
                         api.items.update.assert_not_called()
 
     def test_valid_ip_elements_are_accepted(self):
-        for value in ("192.0.2.1", "10.0.0.0/8", "192.0.2.1/32", "2001:db8::1", "2001:db8::/12", "2001:db8::1/128"):
+        for value in (
+            "192.0.2.1",
+            "10.0.0.0/8",
+            "192.0.2.1/32",
+            "2001:db8::1",
+            "2000::/12",
+            "1.2.3.0/24",
+            "2001:db8::1/128",
+            "2001:0DB8::1",
+        ):
             with self.subTest(value=value):
                 self.assertTrue(rules_lists.valid_ip(value))
 
     def test_invalid_hostname_and_asn_elements_fail_before_any_write(self):
         cases = [
             ("hostname", {"hostname": {"url_hostname": value}}, "elements[1].hostname.url_hostname", value)
-            for value in ("https://example.com", "example.com/path", "*example.com", "a.*", "*")
+            for value in (
+                "https://example.com",
+                "example.com/path",
+                "*example.com",
+                "a.*",
+                "*",
+                "ex*.example.com",
+                "a.*.example.com",
+                "*.*.example.com",
+            )
         ] + [
-            ("asn", {"asn": value}, "elements[1].asn must be an integer from 0 to 4294967295", value)
-            for value in (-1, 2**32, "13335", True, 1.0)
+            ("asn", {"asn": value}, "elements[1].asn must be an integer from 1 to 4294967295", value)
+            for value in (0, -1, 2**32, "13335", True, 1.0)
         ]
         valid = {"hostname": {"hostname": {"url_hostname": "*.example.com"}}, "asn": {"asn": 13335}}
         for kind, element, message, value in cases:
@@ -507,7 +557,7 @@ class RulesListsTests(TestCase):
         for kind, element in (
             ("hostname", {"hostname": {"url_hostname": "*.example.com"}}),
             ("hostname", {"hostname": {"url_hostname": "example.com"}}),
-            ("asn", {"asn": 0}),
+            ("asn", {"asn": 1}),
             ("asn", {"asn": 13335}),
             ("asn", {"asn": 4294967295}),
         ):
@@ -517,6 +567,63 @@ class RulesListsTests(TestCase):
                 result = self.run_module(FakeModule(params(kind=kind, elements=[element]), check_mode=True), client)
 
                 self.assertTrue(result["changed"])
+
+    def test_repeated_kind_values_fail_before_any_write(self):
+        for kind, elements, value in (
+            ("ip", [{"ip": "1.2.3.4", "comment": "a"}, {"ip": "1.2.3.4/32"}], "1.2.3.4"),
+            ("ip", [{"ip": "2001:DB8::1/128"}, {"ip": "2001:db8::1", "comment": "b"}], "2001:db8::1"),
+            ("asn", [{"asn": 13335}, {"asn": 13335, "comment": "b"}], 13335),
+        ):
+            self.assert_elements_fail_before_any_write(
+                kind,
+                elements,
+                f"elements must not repeat the {kind!r} value {value!r}",
+                **{kind: value},
+            )
+
+    def test_wildcard_with_its_exact_hostname_fails_before_any_write(self):
+        for wildcard in ({}, {"exclude_exact_hostname": True}, {"exclude_exact_hostname": False}):
+            self.assert_elements_fail_before_any_write(
+                "hostname",
+                [
+                    {"hostname": {"url_hostname": "example.com"}},
+                    {"hostname": {"url_hostname": "*.example.com", **wildcard}},
+                ],
+                "elements must not set both 'url_hostname' values '*.example.com' and 'example.com'",
+                url_hostname=["*.example.com", "example.com"],
+            )
+
+    def test_hostnames_cloudflare_accepts_together_are_accepted(self):
+        for hostnames in (
+            ("*.example.com", "a.example.com"),
+            ("*.example.com", "*.a.example.com"),
+            ("example.com", "EXAMPLE.com"),
+            ("*.example.com", "EXAMPLE.com"),
+        ):
+            with self.subTest(hostnames=hostnames):
+                client, _ignored = make_client()
+                elements = [{"hostname": {"url_hostname": hostname}} for hostname in hostnames]
+
+                result = self.run_module(
+                    FakeModule(params(kind="hostname", elements=elements), check_mode=True), client
+                )
+
+                self.assertTrue(result["changed"])
+
+    def test_full_length_prefixes_match_bare_addresses(self):
+        current = {**CURRENT, "num_items": 2}
+        items = [{"ip": "1.2.3.4"}, {"ip": "2001:db8::1"}]
+        for elements in (
+            [{"ip": "1.2.3.4/32"}, {"ip": "2001:db8::1/128"}],
+            [{"ip": "1.2.3.4/032"}, {"ip": "2001:DB8::1/128"}, {"ip": "1.2.3.4"}],
+        ):
+            with self.subTest(elements=elements):
+                client, api = make_client([current], items=items)
+
+                result = self.run_module(FakeModule(params(elements=elements)), client)
+
+                api.items.update.assert_not_called()
+                self.assertFalse(result["changed"])
 
     def test_generated_sdk_iterator_reads_all_current_items(self):
         current = {**CURRENT, "num_items": 2}
