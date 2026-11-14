@@ -52,8 +52,9 @@ options:
       - Changing an existing application to type V(bookmark) keeps only its
         O(app_launcher_visible), O(logo_url), O(policies), and tags.
       - Changing an existing application to type V(proxy_endpoint) keeps only its
-        O(allowed_idps), O(auto_redirect_to_identity), O(policies),
-        O(session_duration), and tags.
+        O(allowed_idps), O(auto_redirect_to_identity), O(custom_deny_url),
+        O(policies), O(session_duration), C(custom_non_identity_deny_url),
+        C(custom_pages), and tags.
     type: str
     choices:
       - bookmark
@@ -310,7 +311,16 @@ UNSUPPORTED_FIELDS = {
 # types below, so the others are dropped from the update.
 STORED_FIELDS = {
     "bookmark": ("app_launcher_visible", "logo_url", "policies", "tags"),
-    "proxy_endpoint": ("allowed_idps", "auto_redirect_to_identity", "policies", "session_duration", "tags"),
+    "proxy_endpoint": (
+        "allowed_idps",
+        "auto_redirect_to_identity",
+        "custom_deny_url",
+        "custom_non_identity_deny_url",
+        "custom_pages",
+        "policies",
+        "session_duration",
+        "tags",
+    ),
 }
 
 

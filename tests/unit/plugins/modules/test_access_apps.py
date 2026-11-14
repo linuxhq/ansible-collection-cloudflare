@@ -256,6 +256,36 @@ class AccessAppsTests(TestCase):
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_proxy_endpoint_update_keeps_deny_urls_and_custom_pages(self):
+        domain = "abc123.proxy.cloudflare-gateway.com"
+        kept = {
+            "custom_deny_url": "https://deny.example.com",
+            "custom_non_identity_deny_url": "https://deny2.example.com",
+            "custom_pages": ["page-id"],
+        }
+        # An application as Cloudflare returns it after creation with deny URLs.
+        current = {
+            **stored(type="proxy_endpoint", domain=domain, session_duration="24h"),
+            "aud": "aud-tag",
+            "created_at": "2026-11-14T02:00:00Z",
+            "policies": [],
+            "tags": [],
+            "updated_at": "2026-11-14T02:00:00Z",
+            **kept,
+        }
+        updated = {**current, "session_duration": "8h"}
+        client, api = client_with([current], updated=updated)
+
+        result = self.run_module(
+            FakeModule(params(type="proxy_endpoint", domain=domain, session_duration="8h")), client
+        )
+
+        sent = api.update.call_args.kwargs
+        for field, value in kept.items():
+            self.assertEqual(sent[field], value)
+
+        self.assertTrue(result["changed"])
+
     def test_false_interstitial_and_401_redirect_match_omitted_settings(self):
         false_options = {"service_auth_401_redirect": False, "skip_interstitial": False}
         for app_type in ("self_hosted", "bookmark", "proxy_endpoint"):

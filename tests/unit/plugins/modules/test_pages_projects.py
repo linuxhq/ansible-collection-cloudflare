@@ -229,27 +229,69 @@ class PagesProjectsTests(TestCase):
                 api.get.assert_not_called()
                 api.edit.assert_not_called()
 
-    def test_rejects_build_image_major_version_before_any_request(self):
-        for value in (1, 3):
-            for check_mode in (False, True):
-                with self.subTest(value=value, check_mode=check_mode):
-                    client, api = client_with([PROJECT])
+    def test_rejects_unstored_setting_names_before_any_request(self):
+        cases = (
+            (
+                {"build_config": {"build_command": "true", "build_image_major_version": 3}},
+                ["build_config.build_image_major_version"],
+            ),
+            ({"build_config": {"bogus_key": 1}}, ["build_config.bogus_key"]),
+            (
+                {"deployment_configs": {"production": {"compatibility_date": "2024-01-01", "bogus_key": 1}}},
+                ["deployment_configs.production.bogus_key"],
+            ),
+            (
+                {
+                    "build_config": {"bogus_key": 1},
+                    "deployment_configs": {"preview": {"bogus_key": 1}, "production": {"other": 2}},
+                },
+                [
+                    "build_config.bogus_key",
+                    "deployment_configs.preview.bogus_key",
+                    "deployment_configs.production.other",
+                ],
+            ),
+        )
+        for options, unsupported in cases:
+            for found, check_mode in (([PROJECT], False), ([PROJECT], True), ([None], False)):
+                with self.subTest(options=options, existing=found != [None], check_mode=check_mode):
+                    client, api = client_with(found, created=PROJECT, edited=PROJECT)
 
-                    result = self.run_module(
-                        FakeModule(
-                            params(build_config={"build_command": "true", "build_image_major_version": value}),
-                            check_mode=check_mode,
-                        ),
-                        client,
-                    )
+                    result = self.run_module(FakeModule(params(**options), check_mode=check_mode), client)
 
+                    self.assertEqual(result["unsupported_settings"], unsupported)
                     self.assertEqual(
                         result["msg"],
-                        "Cloudflare does not store build_config.build_image_major_version; remove it",
+                        f"Cloudflare does not store these Pages project settings: {', '.join(unsupported)}",
                     )
                     api.get.assert_not_called()
                     api.create.assert_not_called()
                     api.edit.assert_not_called()
+
+    def test_stored_setting_names_are_sent(self):
+        build_config = dict.fromkeys(pages_projects.BUILD_SETTINGS, "value")
+        build_config.pop("web_analytics_token")
+        deployment = {"build_image_major_version": 3, "compatibility_date": "2024-01-01"}
+        project = {
+            **PROJECT,
+            "build_config": build_config,
+            "deployment_configs": {"preview": deployment, "production": deployment},
+        }
+        client, api = client_with([{**PROJECT, "build_config": {}}], edited=project)
+
+        result = self.run_module(
+            FakeModule(
+                params(
+                    build_config=build_config,
+                    deployment_configs={"preview": deployment, "production": deployment},
+                )
+            ),
+            client,
+        )
+
+        self.assertNotIn("msg", result)
+        self.assertTrue(result["changed"])
+        api.edit.assert_called_once()
 
     def test_null_r2_jurisdiction_is_sent(self):
         current = {

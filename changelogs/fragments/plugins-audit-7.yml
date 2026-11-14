@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - access_apps - keep a C(proxy_endpoint) application's O(custom_deny_url) when it is omitted, and keep its
+    C(custom_non_identity_deny_url) and C(custom_pages), which the module does not manage. Any update of the
+    application silently removed them. Changing an application to type C(proxy_endpoint) now carries them over too.
+  - cfd_tunnel_configurations - fail before any change, naming the tunnel, when the tunnel was deleted. The module
+    reported that the tunnel was locally managed.

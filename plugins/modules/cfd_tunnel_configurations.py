@@ -21,6 +21,7 @@ options:
     type: str
     description:
       - Cloudflared tunnel identifier.
+      - The module fails before any change when the tunnel was deleted.
   config:
     required: true
     type: dict
@@ -211,6 +212,10 @@ def run(module, client):
         tunnel = serialize_resource(tunnels.get(params["tunnel_id"], account_id=params["account_id"]))
 
     resource_id(module, tunnel, "cloudflared tunnel", expected=params["tunnel_id"])
+    # Cloudflare still returns a deleted tunnel, with deleted_at set.
+    if tunnel.get("deleted_at") is not None:
+        module.fail_json(msg=f"Cloudflared tunnel {params['tunnel_id']} was deleted", **identifiers)
+
     # Cloudflare accepts a configuration for a locally managed tunnel and
     # silently converts the tunnel to remote management, which is irreversible.
     if tunnel.get("config_src") == "local" or tunnel.get("remote_config") is False:

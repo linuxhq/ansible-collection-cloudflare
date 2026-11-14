@@ -41,8 +41,10 @@ options:
         module fails before making changes.
       - C(web_analytics_token) is treated as write-only; use O(rotate_secrets) to
         apply a new value to an existing project.
-      - C(build_image_major_version) is not supported. Cloudflare accepts it but
-        does not store it, so the module fails before making changes.
+      - Only C(build_caching), C(build_command), C(destination_dir), C(root_dir),
+        C(web_analytics_tag), and C(web_analytics_token) are supported. Cloudflare
+        accepts any other key, such as C(build_image_major_version), but does not
+        store it, so the module fails before making changes.
   deployment_configs:
     type: dict
     description:
@@ -58,6 +60,10 @@ options:
         C(compatibility_date), a whole C(env_vars) or binding map, or a field
         inside an entry other than C(services) C(entrypoint) and C(r2_buckets)
         C(jurisdiction), so the module fails before making changes.
+      - Keys under C(preview) and C(production) must be Pages deployment
+        settings, such as C(compatibility_date), C(env_vars), or
+        C(build_image_major_version). Cloudflare accepts any other key but does
+        not store it, so the module fails before making changes.
   rotate_secrets:
     type: bool
     default: false
@@ -162,6 +168,42 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 
 FIELDS = ("build_config", "deployment_configs", "name", "production_branch", "source")
 
+# Cloudflare accepts other keys in build_config and in a preview or production
+# deployment config but does not store them. These match the cloudflare SDK
+# BuildConfig and DeploymentConfigsPreview/DeploymentConfigsProduction types.
+BUILD_SETTINGS = (
+    "build_caching",
+    "build_command",
+    "destination_dir",
+    "root_dir",
+    "web_analytics_tag",
+    "web_analytics_token",
+)
+DEPLOYMENT_SETTINGS = (
+    "ai_bindings",
+    "always_use_latest_compatibility_date",
+    "analytics_engine_datasets",
+    "browsers",
+    "build_image_major_version",
+    "compatibility_date",
+    "compatibility_flags",
+    "d1_databases",
+    "durable_object_namespaces",
+    "env_vars",
+    "fail_open",
+    "hyperdrive_bindings",
+    "kv_namespaces",
+    "limits",
+    "mtls_certificates",
+    "placement",
+    "queue_producers",
+    "r2_buckets",
+    "services",
+    "usage_model",
+    "vectorize_bindings",
+    "wrangler_config_hash",
+)
+
 # Cloudflare clears these settings when they are set to null, but keeps the
 # current value of any other setting set to null.
 NULLABLE_BUILD_SETTINGS = ("web_analytics_tag", "web_analytics_token")
@@ -194,10 +236,21 @@ def contains_null(value):
     return value is None
 
 
-def validate_build_config(module):
-    """Fail when build_config holds a setting Cloudflare accepts but never stores."""
-    if "build_image_major_version" in (module.params.get("build_config") or {}):
-        module.fail_json(msg="Cloudflare does not store build_config.build_image_major_version; remove it")
+def validate_setting_names(module):
+    """Fail when a setting Cloudflare accepts but never stores is requested."""
+    params = module.params
+    unknown = [f"build_config.{key}" for key in params.get("build_config") or {} if key not in BUILD_SETTINGS]
+    for environment in ("preview", "production"):
+        config = (params.get("deployment_configs") or {}).get(environment)
+        for key in config if isinstance(config, dict) else ():
+            if key not in DEPLOYMENT_SETTINGS:
+                unknown.append(f"deployment_configs.{environment}.{key}")
+
+    if unknown:
+        module.fail_json(
+            msg=f"Cloudflare does not store these Pages project settings: {', '.join(unknown)}",
+            unsupported_settings=unknown,
+        )
 
 
 def validate_null_settings(module):
@@ -574,7 +627,7 @@ def ensure_absent(module, client):
 def run(module, client):
     domain_names = desired_domain_names(module)
     if module.params["state"] == "present":
-        validate_build_config(module)
+        validate_setting_names(module)
         validate_null_settings(module)
         ensure_present(module, client, domain_names)
 
