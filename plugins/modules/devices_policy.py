@@ -97,6 +97,9 @@ options:
     type: dict
     description:
       - WARP client service mode configuration.
+      - Cloudflare replaces the whole configuration on every write. When
+        C(mode) equals the current mode, keys omitted here, such as C(port),
+        keep their current values.
       - When omitted, the current value is left unchanged.
   support_url:
     type: str
@@ -151,15 +154,15 @@ message:
 
 """
 
-from ipaddress import ip_address
-
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    cidr_from_address,
     cloudflare_client,
     cloudflare_error_context,
     ensure_settings,
     payload_from_params,
+    serialize_resource,
 )
 
 FIELDS = (
@@ -185,16 +188,23 @@ FIELDS = (
 
 def split_tunnel_route(route):
     """Return route with a bare IP address written as Cloudflare stores it."""
-    address = route.get("address")
-    if not isinstance(address, str) or "/" in address:
+    if "address" not in route:
         return route
 
-    try:
-        prefix_length = ip_address(address).max_prefixlen
-    except ValueError:
-        return route
+    return {**route, "address": cidr_from_address(route["address"])}
 
-    return {**route, "address": f"{address}/{prefix_length}"}
+
+def service_mode(requested, current):
+    """Return requested with the keys it omits carried over from current.
+
+    Cloudflare replaces service_mode_v2 as a whole, so a write that omits the
+    port of an unchanged mode would reset it. Keys are carried over only when
+    the mode is unchanged, since another mode stores different keys.
+    """
+    if not isinstance(current, dict) or current.get("mode") != requested.get("mode"):
+        return requested
+
+    return {**current, **requested}
 
 
 def run(module, client):
@@ -212,7 +222,10 @@ def run(module, client):
         "Cloudflare API request failed while gathering the device policy",
         account_id=account_id,
     ):
-        current = policy.get(account_id=account_id)
+        current = serialize_resource(policy.get(account_id=account_id))
+
+    if isinstance(payload.get("service_mode_v2"), dict) and isinstance(current, dict):
+        payload["service_mode_v2"] = service_mode(payload["service_mode_v2"], current.get("service_mode_v2"))
 
     ensure_settings(
         module,

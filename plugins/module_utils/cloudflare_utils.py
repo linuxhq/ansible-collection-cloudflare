@@ -5,6 +5,7 @@
 import os
 from base64 import b64decode
 from contextlib import contextmanager
+from ipaddress import ip_address
 
 from ansible.module_utils.basic import missing_required_lib
 
@@ -247,6 +248,17 @@ def find_resource(module, items, resource_name, field, value):
         )
 
     return matches[0] if matches else None
+
+
+def cidr_from_address(value):
+    """Return a bare IP address with its full-length prefix, as Cloudflare stores it."""
+    if not isinstance(value, str) or "/" in value:
+        return value
+
+    try:
+        return f"{value}/{ip_address(value).max_prefixlen}"
+    except ValueError:
+        return value
 
 
 def payload_from_params(params, fields):

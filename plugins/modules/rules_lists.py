@@ -47,6 +47,8 @@ options:
       - Complete set of entries that the Rules list must contain.
       - Each entry must set the field named by the list kind, such as C(ip) or
         C(hostname).
+      - An C(ip) entry must be an IP address, or a CIDR with a prefix length of
+        8 to 32 for IPv4 or 12 to 128 for IPv6.
   operation_timeout:
     type: int
     default: 240
@@ -153,6 +155,10 @@ ITEM_META_FIELDS = (
     "id",
     "modified_on",
 )
+
+# Prefix lengths Cloudflare accepts in IP lists, by IP version:
+# https://developers.cloudflare.com/waf/tools/lists/custom-lists/
+IP_PREFIX_LENGTHS = {4: range(8, 33), 6: range(12, 129)}
 
 REDIRECT_DEFAULTS = {
     "include_subdomains": False,
@@ -352,7 +358,7 @@ def normalize_items(items):
                 normalized_value = {
                     redirect_key: redirect_value
                     for redirect_key, redirect_value in normalized_value.items()
-                    if redirect_value is not None and redirect_value != REDIRECT_DEFAULTS.get(redirect_key)
+                    if redirect_value is not None and values_differ(redirect_value, REDIRECT_DEFAULTS.get(redirect_key))
                 }
 
             normalized[key] = normalized_value
@@ -370,11 +376,37 @@ def checked_list(module, rules_list, name, kind, expected_id=None):
     return rules_list
 
 
+def valid_ip(value):
+    """Return whether value is an IP address or a CIDR that Cloudflare accepts."""
+    if not isinstance(value, str):
+        return False
+
+    address, separator, prefix = value.partition("/")
+    try:
+        version = ip_address(address).version
+    except ValueError:
+        return False
+
+    if not separator:
+        return True
+
+    return prefix.isascii() and prefix.isdigit() and int(prefix) in IP_PREFIX_LENGTHS[version]
+
+
 def validate_elements(module, kind):
-    """Fail when an element lacks the field that stores the list kind."""
+    """Fail when an element lacks the field that stores the list kind, or holds an invalid IP."""
     for index, element in enumerate(module.params.get("elements") or ()):
         if element.get(kind) is None:
             module.fail_json(msg=f"elements[{index}] must set {kind!r} for a Rules list of kind {kind!r}")
+
+        if kind == "ip" and not valid_ip(element["ip"]):
+            module.fail_json(
+                msg=(
+                    f"elements[{index}].ip must be an IP address, or a CIDR with a prefix length "
+                    "of 8 to 32 for IPv4 or 12 to 128 for IPv6"
+                ),
+                ip=element["ip"],
+            )
 
 
 def ensure_present(module, client, current):

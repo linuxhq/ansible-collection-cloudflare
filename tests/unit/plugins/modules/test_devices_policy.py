@@ -151,3 +151,40 @@ class DevicesPolicyTests(TestCase):
                 api.edit.assert_called_once_with(account_id="account", **{field: stored})
                 self.assertTrue(result["changed"])
                 self.assertNotIn("msg", result)
+
+    def test_unrelated_write_keeps_service_mode_port(self):
+        current = {"auto_connect": 0.0, "service_mode_v2": {"mode": "proxy", "port": 3000}}
+        params = {"account_id": "account", "auto_connect": 5.0, "service_mode_v2": {"mode": "proxy"}}
+        edited = {"auto_connect": 5.0, "service_mode_v2": {"mode": "proxy", "port": 3000}}
+        result, api = self.run_module(FakeModule(params), current, edited)
+
+        api.edit.assert_called_once_with(
+            account_id="account", auto_connect=5.0, service_mode_v2={"mode": "proxy", "port": 3000}
+        )
+        self.assertTrue(result["changed"])
+        self.assertNotIn("msg", result)
+
+    def test_service_mode_port_and_mode_changes_are_sent(self):
+        cases = (
+            ({"mode": "proxy", "port": 4000}, {"mode": "proxy", "port": 4000}),
+            ({"mode": "warp"}, {"mode": "warp"}),
+        )
+        for requested, sent in cases:
+            with self.subTest(requested=requested):
+                result, api = self.run_module(
+                    FakeModule({"account_id": "account", "service_mode_v2": requested}),
+                    {"service_mode_v2": {"mode": "proxy", "port": 3000}},
+                    {"service_mode_v2": sent},
+                )
+
+                api.edit.assert_called_once_with(account_id="account", service_mode_v2=sent)
+                self.assertTrue(result["changed"])
+
+    def test_service_mode_without_port_matches_stored_port(self):
+        result, api = self.run_module(
+            FakeModule({"account_id": "account", "service_mode_v2": {"mode": "proxy"}}),
+            {"service_mode_v2": {"mode": "proxy", "port": 3000}},
+        )
+
+        api.edit.assert_not_called()
+        self.assertFalse(result["changed"])
