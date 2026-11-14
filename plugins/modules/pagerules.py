@@ -26,6 +26,9 @@ options:
     description:
       - Actions applied when the page rule matches.
       - Actions are compared by C(id), regardless of their order.
+      - The C(value) of a C(cache_ttl_by_status) action is compared on every
+        key, so a status code removed from it is removed from the rule. Other
+        action values are compared only on the keys given.
       - Required when O(state=present).
   targets:
     required: true
@@ -133,6 +136,9 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 FIELDS = ("actions", "priority", "status", "targets")
 PRESERVED_FIELDS = ("priority", "status")
 
+# Actions whose value mapping is compared on every key, not only those requested.
+EXACT_VALUE_ACTIONS = ("cache_ttl_by_status",)
+
 
 def pagerule_targets(module, pagerule):
     require_mapping(module, pagerule, "page rule")
@@ -196,6 +202,31 @@ def ordered_actions(actions, current):
             str(action.get("id")),
         ),
     )
+
+
+def comparable_pagerule(pagerule, actions):
+    """Return pagerule with EXACT_VALUE_ACTIONS values compared on every key.
+
+    The comparison projects a stored mapping onto the requested keys, which
+    would hide a key removed from the request. A stored value with a key the
+    request lacks is replaced by its sorted keys, which never match a mapping.
+    """
+    requested = {action.get("id"): action.get("value") for action in actions}
+    current_actions = pagerule.get("actions")
+    if not isinstance(current_actions, list):
+        return pagerule
+
+    comparable_actions = []
+    for action in current_actions:
+        if isinstance(action, dict) and action.get("id") in EXACT_VALUE_ACTIONS:
+            value = action.get("value")
+            wanted = requested.get(action["id"])
+            if isinstance(value, dict) and isinstance(wanted, dict) and not value.keys() <= wanted.keys():
+                action = {**action, "value": sorted(value)}
+
+        comparable_actions.append(action)
+
+    return {**pagerule, "actions": comparable_actions}
 
 
 def find_pagerule(module, client, targets):
@@ -267,6 +298,7 @@ def run(module, client):
         update=lambda pagerule_id, payload: page_rules.update(pagerule_id=pagerule_id, zone_id=zone_id, **payload),
         preserved_fields=PRESERVED_FIELDS,
         context={"zone_id": zone_id},
+        comparable=lambda pagerule: comparable_pagerule(pagerule, payload["actions"]),
     )
 
 

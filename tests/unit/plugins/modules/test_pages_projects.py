@@ -569,6 +569,16 @@ class PagesProjectsTests(TestCase):
         api.domains.create.assert_called_once_with(project_name="docs", account_id="account", name="new.example.com")
         self.assertEqual(result["domains"], [{"name": "new.example.com"}])
 
+    def test_project_deleted_while_adding_domains_fails_clearly(self):
+        client, api = client_with([PROJECT, None], created_domain={"name": "new.example.com"})
+
+        result = self.run_module(FakeModule(params(domains=[{"name": "new.example.com"}])), client)
+
+        api.domains.create.assert_called_once_with(project_name="docs", account_id="account", name="new.example.com")
+        self.assertEqual(result["msg"], "Pages project was deleted while its domains were being added")
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["name"], "docs")
+
     def test_check_mode_does_not_add_domains(self):
         client, api = client_with([PROJECT])
 

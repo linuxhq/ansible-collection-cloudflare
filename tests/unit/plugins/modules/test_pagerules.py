@@ -237,6 +237,44 @@ class PageRulesTests(TestCase):
         self.assertEqual(api.create.call_args.kwargs["actions"], listed)
         self.assertTrue(result["changed"])
 
+    def test_removed_cache_ttl_status_is_a_change(self):
+        actions = [{"id": "cache_ttl_by_status", "value": {"200": 3600}}]
+        listed = [{"id": "cache_ttl_by_status", "value": {"200": 3600, "404": 60}}]
+        current = {"id": "rule", "actions": listed, "status": "active", "targets": TARGETS}
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with([current], updated={**current, "actions": actions})
+
+                result = self.run_module(FakeModule(params(actions=actions), check_mode=check_mode), client)
+
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)
+                if check_mode:
+                    api.update.assert_not_called()
+                else:
+                    self.assertEqual(api.update.call_args.kwargs["actions"], actions)
+
+        client, api = client_with([current], updated=current)
+        result = self.run_module(FakeModule(params(actions=actions)), client)
+
+        self.assertIn("did not apply", result["msg"])
+
+        client, api = client_with([{**current, "actions": actions}])
+        result = self.run_module(FakeModule(params(actions=actions)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_other_action_values_compare_requested_keys(self):
+        actions = [{"id": "forwarding_url", "value": {"url": "https://example.com"}}]
+        listed = [{"id": "forwarding_url", "value": {"url": "https://example.com", "status_code": 301}}]
+        client, api = client_with([{"id": "rule", "actions": listed, "status": "active", "targets": TARGETS}])
+
+        result = self.run_module(FakeModule(params(actions=actions)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_check_mode_does_not_delete_matching_rule(self):
         client, api = client_with([{"id": "rule", "targets": TARGETS}])
 

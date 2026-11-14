@@ -98,6 +98,10 @@ options:
     elements: dict
     description:
       - Public destinations protected by the application.
+      - Each entry is compared exactly, so keys omitted from an entry are
+        removed from it.
+      - A bare IP address in C(cidr) is sent with its full-length prefix,
+        C(/32) for IPv4 or C(/128) for IPv6, as Cloudflare stores it.
       - When omitted, the current destinations are kept unless O(domain) changes,
         in which case Cloudflare derives them from the new O(domain).
   enable_binding_cookie:
@@ -189,6 +193,7 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    cidr_from_address,
     cloudflare_client,
     cloudflare_error_context,
     ensure_resource_absent,
@@ -382,18 +387,25 @@ def run(module, client):
     unsupported = UNSUPPORTED_FIELDS.get(params["type"], ())
     preserved_fields = tuple(field for field in preserved_fields if field not in unsupported)
 
+    payload = payload_from_params(params, FIELDS)
+    if "destinations" in payload:
+        payload["destinations"] = [
+            {**destination, "cidr": cidr_from_address(destination["cidr"])} if "cidr" in destination else destination
+            for destination in payload["destinations"]
+        ]
+
     ensure_resource_present(
         module,
         "access_app",
         "Access application",
         current,
-        payload_from_params(params, FIELDS),
+        payload,
         create=lambda payload: applications.create(account_id=account_id, **payload),
         update=lambda app_id, payload: applications.update(app_id, account_id=account_id, **payload),
         expected_name=params["name"],
         defaults=DEFAULT_FIELDS,
         preserved_fields=preserved_fields,
-        exact_values=("cors_headers",),
+        exact_values=("cors_headers", "destinations"),
         context={"account_id": account_id},
     )
 

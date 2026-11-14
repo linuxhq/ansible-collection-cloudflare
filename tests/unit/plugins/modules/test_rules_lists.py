@@ -79,6 +79,11 @@ class RulesListsTests(TestCase):
             [{"redirect": {"source_url": "example.com"}}],
         )
 
+    def test_redirect_numbers_are_not_dropped_as_boolean_defaults(self):
+        redirect = {"source_url": "example.com", "include_subdomains": 0, "subpath_matching": 1}
+
+        self.assertEqual(rules_lists.normalize_items([{"redirect": redirect}]), [{"redirect": redirect}])
+
     def test_rejects_operation_timeout_below_one_second(self):
         client, api = make_client()
 
@@ -341,6 +346,32 @@ class RulesListsTests(TestCase):
                     api.create.assert_not_called()
                     api.update.assert_not_called()
                     api.items.update.assert_not_called()
+
+    def test_invalid_ip_elements_fail_before_any_write(self):
+        for value in ("not-an-ip", "192.0.2.0/7", "192.0.2.0/33", "2001:db8::/11", "192.0.2.0/", "192.0.2.0/a", 1):
+            for lists, updates in (
+                ([], {}),
+                ([CURRENT], {"description": "desired"}),
+            ):
+                for check_mode in (False, True):
+                    with self.subTest(value=value, existing=bool(lists), check_mode=check_mode):
+                        client, api = make_client(lists)
+                        elements = [{"ip": "192.0.2.1"}, {"ip": value}]
+
+                        result = self.run_module(
+                            FakeModule(params(elements=elements, **updates), check_mode=check_mode), client
+                        )
+
+                        self.assertIn("elements[1].ip must be an IP address", result["msg"])
+                        self.assertEqual(result["ip"], value)
+                        api.create.assert_not_called()
+                        api.update.assert_not_called()
+                        api.items.update.assert_not_called()
+
+    def test_valid_ip_elements_are_accepted(self):
+        for value in ("192.0.2.1", "10.0.0.0/8", "192.0.2.1/32", "2001:db8::1", "2001:db8::/12", "2001:db8::1/128"):
+            with self.subTest(value=value):
+                self.assertTrue(rules_lists.valid_ip(value))
 
     def test_generated_sdk_iterator_reads_all_current_items(self):
         current = {**CURRENT, "num_items": 2}

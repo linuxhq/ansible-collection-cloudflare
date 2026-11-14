@@ -89,6 +89,50 @@ class AccessAppsTests(TestCase):
 
         self.assertIn("did not apply", result["msg"])
 
+    def test_bare_ip_destination_matches_stored_cidr(self):
+        public = {"type": "public", "uri": "app.example.com"}
+        cases = (
+            ("10.0.0.1", "10.0.0.1/32"),
+            ("2001:db8::1", "2001:db8::1/128"),
+            ("10.0.1.0/24", "10.0.1.0/24"),
+        )
+        for requested, cidr in cases:
+            destinations = [public, {"type": "private", "cidr": requested}]
+            current = stored(destinations=[public, {"type": "private", "cidr": cidr}])
+            with self.subTest(requested=requested, converged=True):
+                client, api = client_with([current])
+                result = self.run_module(FakeModule(params(destinations=destinations)), client)
+
+                api.update.assert_not_called()
+                self.assertFalse(result["changed"])
+
+            with self.subTest(requested=requested, created=True):
+                client, api = client_with(created=current)
+                result = self.run_module(FakeModule(params(destinations=destinations)), client)
+
+                self.assertEqual(api.create.call_args.kwargs["destinations"][1]["cidr"], cidr)
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)
+
+    def test_removed_destination_key_is_a_change(self):
+        private = {"type": "private", "cidr": "10.0.1.0/24"}
+        current = stored(destinations=[{**private, "l4_protocol": "tcp", "port_range": "22"}])
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with([current], updated=stored(destinations=[private]))
+                result = self.run_module(FakeModule(params(destinations=[private]), check_mode=check_mode), client)
+
+                self.assertTrue(result["changed"])
+                if check_mode:
+                    api.update.assert_not_called()
+                else:
+                    self.assertEqual(api.update.call_args.kwargs["destinations"], [private])
+
+        client, api = client_with([current], updated=current)
+        result = self.run_module(FakeModule(params(destinations=[private])), client)
+
+        self.assertIn("did not apply", result["msg"])
+
     def test_change_to_bookmark_carries_only_fields_bookmarks_store(self):
         current = {
             **stored(),

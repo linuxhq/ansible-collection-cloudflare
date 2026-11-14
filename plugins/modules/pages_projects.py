@@ -580,7 +580,11 @@ def ensure_present(module, client, domain_names):
     if added_domains:
         current = get_project(module, client)
         if current is None:
-            module.fail_json(msg="Cloudflare API returned malformed Pages project data")
+            module.fail_json(
+                msg="Pages project was deleted while its domains were being added",
+                account_id=params["account_id"],
+                name=params["name"],
+            )
 
     if not changed and not added_domains:
         module.exit_json(
