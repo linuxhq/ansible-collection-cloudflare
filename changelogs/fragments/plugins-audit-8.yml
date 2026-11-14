@@ -9,8 +9,6 @@ bugfixes:
     from a private destination is applied. The module reported no change while Cloudflare kept the restriction.
   - pagerules - compare the value of a C(cache_ttl_by_status) action on every status code, so a removed status code
     is removed from the rule. The module reported no change.
-  - pagerules role - manage a zone's page rules one at a time, in list order, when any of them sets C(priority).
-    Concurrent jobs checked each priority against a stale rule count, so two new rules with priorities failed.
   - rules_lists - reject an invalid IP address, or a CIDR prefix length outside 8 to 32 for IPv4 or 12 to 128 for IPv6,
     before creating the list or updating its description. Cloudflare rejected the items only after those writes.
   - rules_lists - keep redirect values such as C(0) or C(1) instead of dropping them as the C(false) and C(true)
