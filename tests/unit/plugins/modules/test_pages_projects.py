@@ -364,6 +364,22 @@ class PagesProjectsTests(TestCase):
         result = self.run_module(FakeModule(params(deployment_configs=desired)), client)
         self.assertIn("did not apply", result["msg"])
 
+    def test_binding_named_env_vars_keeps_omitted_fields(self):
+        for binding, stored in (
+            ("services", {"service": "worker", "environment": "production", "entrypoint": "Main"}),
+            ("r2_buckets", {"name": "bucket", "jurisdiction": "eu"}),
+        ):
+            with self.subTest(binding=binding):
+                current = {**PROJECT, "deployment_configs": {"production": {binding: {"env_vars": stored}}}}
+                name = "service" if binding == "services" else "name"
+                desired = {"production": {binding: {"env_vars": {name: stored[name]}}}}
+                client, api = client_with([current])
+
+                result = self.run_module(FakeModule(params(deployment_configs=desired)), client)
+
+                api.edit.assert_not_called()
+                self.assertFalse(result["changed"])
+
     def test_nested_deletion_only_request_ignores_unmanaged_fields(self):
         service = {"service": "worker", "environment": "production"}
         current = {
