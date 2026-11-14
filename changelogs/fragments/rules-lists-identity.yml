@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - rules_lists - fail before any request when two C(hostname) elements repeat a C(url_hostname), or two C(redirect)
+    elements repeat a C(source_url), with other fields that differ. Cloudflare rejects them as duplicates after the list
+    was created.
+  - rules_lists - fail before any request when a C(hostname) element sets C(exclude_exact_hostname=false) for a hostname
+    that is not a wildcard. Cloudflare rejects it after the list was created.
+  - rules_lists - match a C(redirect.source_url) element without a path, such as C(example.com), with the trailing slash
+    Cloudflare stores. Every run wrote the items again and then failed because Cloudflare did not apply them.

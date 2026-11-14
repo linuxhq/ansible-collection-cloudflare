@@ -76,11 +76,23 @@ class RulesListsTests(TestCase):
 
         self.assertEqual(
             rules_lists.normalize_items(items),
-            [{"redirect": {"source_url": "example.com"}}],
+            [{"redirect": {"source_url": "example.com/"}}],
         )
 
+    def test_canonical_source_url_adds_a_slash_only_without_a_path(self):
+        for value, expected in (
+            ("example.com", "example.com/"),
+            ("https://example.com", "https://example.com/"),
+            ("example.com/", "example.com/"),
+            ("example.com/a", "example.com/a"),
+            ("https://example.com/a", "https://example.com/a"),
+            ("example.com/https://example.net", "example.com/https://example.net"),
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(rules_lists.canonical_source_url(value), expected)
+
     def test_redirect_numbers_are_not_dropped_as_boolean_defaults(self):
-        redirect = {"source_url": "example.com", "include_subdomains": 0, "subpath_matching": 1}
+        redirect = {"source_url": "example.com/a", "include_subdomains": 0, "subpath_matching": 1}
 
         self.assertEqual(rules_lists.normalize_items([{"redirect": redirect}]), [{"redirect": redirect}])
 
@@ -544,7 +556,7 @@ class RulesListsTests(TestCase):
                     "comment": "moved",
                 },
             ),
-            ("hostname", {"hostname": {"url_hostname": "example.com", "exclude_exact_hostname": False}}),
+            ("hostname", {"hostname": {"url_hostname": "*.example.com", "exclude_exact_hostname": False}}),
         ):
             with self.subTest(element=element):
                 client, _ignored = make_client()
@@ -580,6 +592,153 @@ class RulesListsTests(TestCase):
                 f"elements must not repeat the {kind!r} value {value!r}",
                 **{kind: value},
             )
+
+    def test_repeated_identity_fields_fail_before_any_write(self):
+        redirect = {"source_url": "example.com/a", "target_url": "https://example.net/1"}
+        for kind, elements, field, value in (
+            (
+                "hostname",
+                [
+                    {"hostname": {"url_hostname": "*.example.com"}},
+                    {"hostname": {"url_hostname": "*.example.com", "exclude_exact_hostname": False}},
+                ],
+                "url_hostname",
+                "*.example.com",
+            ),
+            (
+                "hostname",
+                [
+                    {"hostname": {"url_hostname": "*.example.com", "exclude_exact_hostname": True}},
+                    {"hostname": {"url_hostname": "*.example.com", "exclude_exact_hostname": False}},
+                ],
+                "url_hostname",
+                "*.example.com",
+            ),
+            (
+                "redirect",
+                [{"redirect": redirect}, {"redirect": {**redirect, "target_url": "https://example.net/2"}}],
+                "source_url",
+                "example.com/a",
+            ),
+            (
+                "redirect",
+                [{"redirect": {**redirect, "status_code": 301}}, {"redirect": {**redirect, "status_code": 302}}],
+                "source_url",
+                "example.com/a",
+            ),
+            (
+                "redirect",
+                [{"redirect": redirect}, {"redirect": {**redirect, "include_subdomains": True}}],
+                "source_url",
+                "example.com/a",
+            ),
+            (
+                "redirect",
+                [
+                    {"redirect": {**redirect, "source_url": "example.com"}},
+                    {"redirect": {**redirect, "source_url": "example.com/", "target_url": "https://example.net/2"}},
+                ],
+                "source_url",
+                "example.com/",
+            ),
+            (
+                "redirect",
+                [
+                    {"redirect": {**redirect, "source_url": "https://example.com"}},
+                    {
+                        "redirect": {
+                            **redirect,
+                            "source_url": "https://example.com/",
+                            "target_url": "https://example.net/2",
+                        }
+                    },
+                ],
+                "source_url",
+                "https://example.com/",
+            ),
+        ):
+            self.assert_elements_fail_before_any_write(
+                kind,
+                elements,
+                f"elements must not repeat the '{kind}.{field}' value {value!r}",
+                **{field: value},
+            )
+
+    def test_identity_values_cloudflare_accepts_together_are_accepted(self):
+        for kind, values in (
+            ("hostname", ("example.com", "Example.com", "example.com.")),
+            (
+                "redirect",
+                (
+                    "example.com/a",
+                    "example.com/A",
+                    "Example.com/a",
+                    "example.com/a/",
+                    "https://example.com/a",
+                    "example.com",
+                    "example.com//",
+                ),
+            ),
+        ):
+            with self.subTest(kind=kind):
+                client, _ignored = make_client()
+                field = rules_lists.IDENTITY_FIELDS[kind]
+                elements = [
+                    {
+                        kind: (
+                            {field: value, "target_url": "https://example.net"}
+                            if kind == "redirect"
+                            else {field: value}
+                        )
+                    }
+                    for value in values
+                ]
+
+                result = self.run_module(FakeModule(params(kind=kind, elements=elements), check_mode=True), client)
+
+                self.assertTrue(result["changed"])
+
+    def test_exclude_exact_hostname_false_requires_a_wildcard_before_any_write(self):
+        self.assert_elements_fail_before_any_write(
+            "hostname",
+            [
+                {"hostname": {"url_hostname": "*.example.org", "exclude_exact_hostname": False}},
+                {"hostname": {"url_hostname": "example.com", "exclude_exact_hostname": False}},
+            ],
+            "elements[1].hostname.exclude_exact_hostname may be false only for a wildcard "
+            "url_hostname such as '*.example.com'",
+            url_hostname="example.com",
+        )
+
+    def test_exclude_exact_hostname_default_on_exact_hostname_is_accepted(self):
+        # The default, true, is omitted from the request, so Cloudflare accepts it.
+        for value in (None, True):
+            with self.subTest(exclude_exact_hostname=value):
+                current = {**CURRENT, "kind": "hostname", "num_items": 1}
+                client, api = make_client([current], items=[{"hostname": {"url_hostname": "example.com"}}])
+                elements = [{"hostname": {"url_hostname": "example.com", "exclude_exact_hostname": value}}]
+
+                result = self.run_module(FakeModule(params(kind="hostname", elements=elements)), client)
+
+                api.items.update.assert_not_called()
+                self.assertFalse(result["changed"])
+
+    def test_source_url_without_path_matches_stored_trailing_slash(self):
+        current = {**CURRENT, "kind": "redirect", "num_items": 2}
+        items = [
+            {"redirect": {"source_url": "example.com/", "target_url": "https://example.net/"}},
+            {"redirect": {"source_url": "https://example.org/", "target_url": "https://example.net/"}},
+        ]
+        elements = [
+            {"redirect": {"source_url": "example.com", "target_url": "https://example.net/"}},
+            {"redirect": {"source_url": "https://example.org", "target_url": "https://example.net/"}},
+        ]
+        client, api = make_client([current], items=items)
+
+        result = self.run_module(FakeModule(params(kind=None, elements=elements)), client)
+
+        api.items.update.assert_not_called()
+        self.assertFalse(result["changed"])
 
     def test_wildcard_with_its_exact_hostname_fails_before_any_write(self):
         for wildcard in ({}, {"exclude_exact_hostname": True}, {"exclude_exact_hostname": False}):

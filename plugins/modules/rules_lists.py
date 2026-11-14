@@ -59,9 +59,17 @@ options:
         which is how Cloudflare stores it.
       - A C(hostname.url_hostname) entry must not include a scheme or a path,
         and may use a C(*) wildcard only as a single leading C(*.) label.
+      - C(hostname.exclude_exact_hostname=false) may be set only when
+        C(hostname.url_hostname) is a wildcard such as C(*.example.com).
       - An C(asn) entry must be an integer from 1 to 4294967295.
       - Entries must not repeat a value of the list kind field, such as the same
         C(ip) with different C(comment) values; identical entries are merged.
+      - C(hostname) entries must not repeat a C(hostname.url_hostname), and
+        C(redirect) entries must not repeat a C(redirect.source_url), even when
+        their other fields differ.
+      - A C(redirect.source_url) without a path, such as C(example.com), is the
+        same as one with a trailing slash, such as C(example.com/), which is how
+        Cloudflare stores it.
       - C(hostname) entries must not include both a wildcard such as
         C(*.example.com) and its exact hostname C(example.com), whatever the
         value of C(exclude_exact_hostname); Cloudflare treats them as
@@ -179,6 +187,13 @@ ITEM_META_FIELDS = (
 # https://developers.cloudflare.com/waf/tools/lists/custom-lists/
 IP_PREFIX_LENGTHS = {4: range(8, 33), 6: range(12, 129)}
 
+# Field that identifies an item of each mapping-valued list kind; Cloudflare
+# rejects two items with the same value even when their other fields differ.
+IDENTITY_FIELDS = {
+    "hostname": "url_hostname",
+    "redirect": "source_url",
+}
+
 # Fields the SDK item models require inside each mapping-valued list kind.
 REQUIRED_STRING_FIELDS = {
     "hostname": ("url_hostname",),
@@ -215,6 +230,17 @@ def canonical_ip(value):
         return str(parsed)
 
     return f"{parsed}{separator}{prefix}"
+
+
+def canonical_source_url(value):
+    # Cloudflare stores a source URL without a path, such as example.com, with
+    # a trailing slash.
+    if not isinstance(value, str):
+        return value
+
+    scheme, separator, rest = value.partition("://")
+    host = rest if separator and "/" not in scheme else value
+    return value if "/" in host else f"{value}/"
 
 
 def canonical_item(item):
@@ -399,6 +425,8 @@ def normalize_items(items):
                     for redirect_key, redirect_value in normalized_value.items()
                     if redirect_value is not None and values_differ(redirect_value, REDIRECT_DEFAULTS.get(redirect_key))
                 }
+                if "source_url" in normalized_value:
+                    normalized_value["source_url"] = canonical_source_url(normalized_value["source_url"])
 
             normalized[key] = normalized_value
 
@@ -496,6 +524,19 @@ def validate_elements(module, kind):
                 url_hostname=url_hostname,
             )
 
+        if (
+            isinstance(url_hostname, str)
+            and not url_hostname.startswith("*.")
+            and hostname.get("exclude_exact_hostname") is False
+        ):
+            module.fail_json(
+                msg=(
+                    f"elements[{index}].hostname.exclude_exact_hostname may be false only for a wildcard "
+                    "url_hostname such as '*.example.com'"
+                ),
+                url_hostname=url_hostname,
+            )
+
         if kind == "ip" and not valid_ip(element["ip"]):
             module.fail_json(
                 msg=(
@@ -506,13 +547,15 @@ def validate_elements(module, kind):
                 ip=element["ip"],
             )
 
+    field = IDENTITY_FIELDS.get(kind)
     values = set()
     for item in normalize_items(module.params.get("elements")):
-        value = canonical_item(item[kind])
-        if value in values:
-            module.fail_json(msg=f"elements must not repeat the {kind!r} value {item[kind]!r}", **{kind: item[kind]})
+        value = item[kind][field] if field else item[kind]
+        if canonical_item(value) in values:
+            name = f"{kind}.{field}" if field else kind
+            module.fail_json(msg=f"elements must not repeat the {name!r} value {value!r}", **{field or kind: value})
 
-        values.add(value)
+        values.add(canonical_item(value))
 
     # Cloudflare rejects a wildcard hostname alongside its exact apex hostname.
     if kind == "hostname":
