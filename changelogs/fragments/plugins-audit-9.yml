@@ -1,4 +1,9 @@
 ---
+breaking_changes:
+  - pagerules role - apply page rules one at a time, in list order, instead of as concurrent asynchronous jobs.
+    Concurrent jobs for the same zone read a stale rule count, so rules that set C(priority) failed or landed in the
+    wrong order. Remove the C(pagerules_async), C(pagerules_batch), C(pagerules_delay), C(pagerules_poll), and
+    C(pagerules_retries) variables.
 bugfixes:
   - access_apps - fail before any change when O(policies) entries that set C(precedence) are not listed in ascending
     precedence order, naming the expected order. Cloudflare returns policies sorted by precedence, so every run wrote
