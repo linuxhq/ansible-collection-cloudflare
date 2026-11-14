@@ -256,6 +256,28 @@ class CfdTunnelConfigurationsTests(TestCase):
                     )
                     self.assertEqual(raised.exception.values["tunnel_id"], "tunnel")
 
+    def test_deleted_tunnel_fails_before_any_change(self):
+        # A deleted tunnel as Cloudflare returns it.
+        tunnel = {
+            "id": "tunnel",
+            "config_src": None,
+            "deleted_at": "2026-11-14T02:21:34.200536Z",
+            "remote_config": False,
+            "status": "inactive",
+        }
+        for check_mode in (False, True):
+            with self.subTest(check_mode=check_mode):
+                client = Mock()
+                tunnels = client.zero_trust.tunnels.cloudflared
+                tunnels.get.return_value = tunnel
+                with self.assertRaises(ModuleFail) as raised:
+                    cfd_tunnel_configurations.run(module_for({"warp": True}, check_mode), client)
+
+                tunnels.configurations.get.assert_not_called()
+                tunnels.configurations.update.assert_not_called()
+                self.assertEqual(raised.exception.values["msg"], "Cloudflared tunnel tunnel was deleted")
+                self.assertEqual(raised.exception.values["tunnel_id"], "tunnel")
+
     def test_rejects_wrong_tunnel(self):
         client = Mock()
         client.zero_trust.tunnels.cloudflared.get.return_value = {**REMOTE_TUNNEL, "id": "other"}

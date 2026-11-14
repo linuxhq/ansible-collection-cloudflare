@@ -307,6 +307,12 @@ class ZonesTests(TestCase):
                 self.assertEqual(result["msg"], "Zone setting polish is not editable on this zone")
                 self.assertEqual(result["setting_id"], "polish")
                 self.assertEqual(result["zone_id"], "zone")
+                # Settings of a new zone can only be read after it is created.
+                if found:
+                    client.zones.create.assert_not_called()
+                else:
+                    client.zones.create.assert_called_once()
+
                 client.zones.edit.assert_not_called()
                 client.zones.settings.edit.assert_not_called()
 

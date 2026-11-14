@@ -48,9 +48,13 @@ options:
     elements: dict
     description:
       - Zone settings to manage.
-      - Every setting is read before any change. A differing setting that
-        Cloudflare reports as not editable, such as one the zone's plan does
-        not include, fails before the zone or any setting is changed.
+      - Every setting is read before the zone or any setting is changed. A
+        differing setting that Cloudflare reports as not editable, such as one
+        the zone's plan does not include, fails at that point.
+      - Settings cannot be read before a zone exists, so a new zone is created
+        first. Such a failure then leaves the new zone in place without its
+        O(vanity_name_servers) or settings applied, and check mode cannot
+        predict it.
     suboptions:
       id:
         description:
@@ -277,8 +281,9 @@ def setting_field(setting):
 def pending_settings(module, client, zone_id):
     """Return the requested settings that differ, with their current field.
 
-    Every setting is read before any write, so a setting the zone's plan
-    cannot edit fails before the zone or another setting changes.
+    Every setting is read before the zone or any setting is updated, so a
+    setting the zone's plan cannot edit fails first. A new zone has to be
+    created before its settings can be read.
     """
     pending = []
     for setting in module.params.get("settings") or []:
