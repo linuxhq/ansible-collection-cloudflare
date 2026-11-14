@@ -378,8 +378,8 @@ class RulesListsTests(TestCase):
             ("hostname", {"hostname": {"url_hostname": value}}, "elements[1].hostname.url_hostname", value)
             for value in ("https://example.com", "example.com/path", "*example.com", "a.*", "*")
         ] + [
-            ("asn", {"asn": value}, "elements[1].asn must be a non-negative integer", value)
-            for value in (-1, "13335", True, 1.0)
+            ("asn", {"asn": value}, "elements[1].asn must be an integer from 0 to 4294967295", value)
+            for value in (-1, 2**32, "13335", True, 1.0)
         ]
         valid = {"hostname": {"hostname": {"url_hostname": "*.example.com"}}, "asn": {"asn": 13335}}
         for kind, element, message, value in cases:
@@ -445,6 +445,28 @@ class RulesListsTests(TestCase):
                 f"elements[1].{kind} must be a mapping with a non-empty string {field!r}",
             )
 
+    def test_invalid_redirect_status_codes_fail_before_any_write(self):
+        redirect = {"source_url": "example.com/a", "target_url": "https://example.net"}
+        for value in (303, 200, "301", True, 301.0):
+            self.assert_elements_fail_before_any_write(
+                "redirect",
+                [{"redirect": {**redirect, "status_code": value}}],
+                "elements[0].redirect.status_code must be one of 301, 302, 307, or 308",
+                status_code=value,
+            )
+
+    def test_valid_redirect_status_codes_are_accepted(self):
+        for value in (301, 302, 307, 308, None):
+            with self.subTest(status_code=value):
+                client, _ignored = make_client()
+                redirect = {"source_url": "example.com/a", "target_url": "https://example.net", "status_code": value}
+
+                result = self.run_module(
+                    FakeModule(params(kind="redirect", elements=[{"redirect": redirect}]), check_mode=True), client
+                )
+
+                self.assertTrue(result["changed"])
+
     def test_elements_with_unexpected_keys_fail_before_any_write(self):
         for kind, element, unexpected in (
             ("ip", {"ip": "192.0.2.1", "description": "office"}, ["description"]),
@@ -487,6 +509,7 @@ class RulesListsTests(TestCase):
             ("hostname", {"hostname": {"url_hostname": "example.com"}}),
             ("asn", {"asn": 0}),
             ("asn", {"asn": 13335}),
+            ("asn", {"asn": 4294967295}),
         ):
             with self.subTest(element=element):
                 client, _ignored = make_client()

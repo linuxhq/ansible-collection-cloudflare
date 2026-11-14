@@ -363,7 +363,9 @@ def payload_with_removals(payload, current):
         if not isinstance(desired, dict) or not isinstance(existing, dict):
             return
 
-        if path[-1:] == ("env_vars",):
+        # Only deployment_configs.<environment>.env_vars holds environment
+        # variables; a binding can also be named env_vars.
+        if len(path) == 3 and path[0] == "deployment_configs" and path[2] == "env_vars":
             for name in existing:
                 desired.setdefault(name, None)
 
