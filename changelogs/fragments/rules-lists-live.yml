@@ -9,3 +9,6 @@ bugfixes:
     other than a single leading label, an C(ip) element is a CIDR with host bits set or an IPv4-mapped IPv6
     address, or two elements repeat a list kind value, such as the same C(ip) with different C(comment) values.
     Cloudflare rejected these items after the module had created the list or written its description.
+  - rules_lists - fail before any request when C(hostname) elements include both a wildcard hostname and the same
+    hostname without its leading wildcard label, naming both values. Cloudflare rejected the pair as duplicates after
+    the module had created the list or written its description.

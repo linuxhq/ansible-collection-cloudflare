@@ -581,6 +581,35 @@ class RulesListsTests(TestCase):
                 **{kind: value},
             )
 
+    def test_wildcard_with_its_exact_hostname_fails_before_any_write(self):
+        for wildcard in ({}, {"exclude_exact_hostname": True}, {"exclude_exact_hostname": False}):
+            self.assert_elements_fail_before_any_write(
+                "hostname",
+                [
+                    {"hostname": {"url_hostname": "example.com"}},
+                    {"hostname": {"url_hostname": "*.example.com", **wildcard}},
+                ],
+                "elements must not set both 'url_hostname' values '*.example.com' and 'example.com'",
+                url_hostname=["*.example.com", "example.com"],
+            )
+
+    def test_hostnames_cloudflare_accepts_together_are_accepted(self):
+        for hostnames in (
+            ("*.example.com", "a.example.com"),
+            ("*.example.com", "*.a.example.com"),
+            ("example.com", "EXAMPLE.com"),
+            ("*.example.com", "EXAMPLE.com"),
+        ):
+            with self.subTest(hostnames=hostnames):
+                client, _ignored = make_client()
+                elements = [{"hostname": {"url_hostname": hostname}} for hostname in hostnames]
+
+                result = self.run_module(
+                    FakeModule(params(kind="hostname", elements=elements), check_mode=True), client
+                )
+
+                self.assertTrue(result["changed"])
+
     def test_full_length_prefixes_match_bare_addresses(self):
         current = {**CURRENT, "num_items": 2}
         items = [{"ip": "1.2.3.4"}, {"ip": "2001:db8::1"}]

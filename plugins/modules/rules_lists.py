@@ -62,6 +62,10 @@ options:
       - An C(asn) entry must be an integer from 1 to 4294967295.
       - Entries must not repeat a value of the list kind field, such as the same
         C(ip) with different C(comment) values; identical entries are merged.
+      - C(hostname) entries must not include both a wildcard such as
+        C(*.example.com) and its exact hostname C(example.com), whatever the
+        value of C(exclude_exact_hostname); Cloudflare treats them as
+        duplicates.
       - A C(redirect.status_code), when set, must be the integer 301, 302,
         307, or 308.
   operation_timeout:
@@ -509,6 +513,16 @@ def validate_elements(module, kind):
             module.fail_json(msg=f"elements must not repeat the {kind!r} value {item[kind]!r}", **{kind: item[kind]})
 
         values.add(value)
+
+    # Cloudflare rejects a wildcard hostname alongside its exact apex hostname.
+    if kind == "hostname":
+        hostnames = {element["hostname"]["url_hostname"] for element in module.params.get("elements") or ()}
+        for hostname in sorted(hostnames):
+            if f"*.{hostname}" in hostnames:
+                module.fail_json(
+                    msg=f"elements must not set both 'url_hostname' values {'*.' + hostname!r} and {hostname!r}",
+                    url_hostname=[f"*.{hostname}", hostname],
+                )
 
 
 def ensure_present(module, client, current):
