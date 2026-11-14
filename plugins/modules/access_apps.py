@@ -69,6 +69,8 @@ options:
     elements: str
     description:
       - Identity provider identifiers allowed for the application.
+      - Order is not significant. Cloudflare stores identity providers in its
+        own order, so the same identifiers in any order match.
   app_launcher_visible:
     type: bool
     description:
@@ -212,6 +214,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_present,
     find_resource,
     payload_from_params,
+    serialize_resource,
 )
 
 FIELDS = (
@@ -376,6 +379,25 @@ def validate_policy_order(module):
         )
 
 
+def comparable_app(app, allowed_idps):
+    """Return app with stored identity providers in the requested order when they match it.
+
+    Cloudflare ignores the order of allowed_idps and stores identity providers
+    in its own order.
+    """
+    app = serialize_resource(app)
+    stored = app.get("allowed_idps") if isinstance(app, dict) else None
+    if (
+        isinstance(allowed_idps, list)
+        and isinstance(stored, list)
+        and all(isinstance(idp, str) for idp in stored)
+        and sorted(stored) == sorted(allowed_idps)
+    ):
+        return {**app, "allowed_idps": allowed_idps}
+
+    return app
+
+
 def run(module, client):
     params = module.params
     account_id = params["account_id"]
@@ -441,6 +463,7 @@ def run(module, client):
         preserved_fields=preserved_fields,
         exact_values=("cors_headers", "destinations"),
         context={"account_id": account_id},
+        comparable=lambda app: comparable_app(app, params.get("allowed_idps")),
     )
 
 

@@ -133,6 +133,42 @@ class AccessAppsTests(TestCase):
 
         self.assertIn("did not apply", result["msg"])
 
+    def test_allowed_idps_match_in_any_order(self):
+        requested = ["idp-b", "idp-a"]
+        current = stored(allowed_idps=["idp-a", "idp-b"])
+        client, api = client_with([current])
+        result = self.run_module(FakeModule(params(allowed_idps=requested)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+        self.assertEqual(result["access_app"]["allowed_idps"], current["allowed_idps"])
+
+        client, api = client_with(created=current)
+        result = self.run_module(FakeModule(params(allowed_idps=requested)), client)
+
+        self.assertEqual(api.create.call_args.kwargs["allowed_idps"], requested)
+        self.assertTrue(result["changed"])
+        self.assertNotIn("msg", result)
+
+        current = stored(allowed_idps=["idp-a"])
+        updated = stored(allowed_idps=["idp-a", "idp-b"])
+        client, api = client_with([current], updated=updated)
+        result = self.run_module(FakeModule(params(allowed_idps=requested)), client)
+
+        self.assertEqual(api.update.call_args.kwargs["allowed_idps"], requested)
+        self.assertTrue(result["changed"])
+        self.assertNotIn("msg", result)
+
+    def test_changed_allowed_idps_are_a_change(self):
+        current = stored(allowed_idps=["idp-a", "idp-b"])
+        for requested in (["idp-a"], ["idp-a", "idp-b", "idp-c"], ["idp-a", "idp-a"]):
+            with self.subTest(requested=requested):
+                client, api = client_with([current], updated=current)
+                result = self.run_module(FakeModule(params(allowed_idps=requested)), client)
+
+                self.assertEqual(api.update.call_args.kwargs["allowed_idps"], requested)
+                self.assertIn("did not apply", result["msg"])
+
     def test_change_to_bookmark_carries_only_fields_bookmarks_store(self):
         current = {
             **stored(),
