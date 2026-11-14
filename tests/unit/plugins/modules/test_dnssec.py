@@ -63,6 +63,22 @@ class DnssecTests(TestCase):
         api.edit.assert_called_once_with(zone_id="zone", dnssec_presigned=True, status="active")
         self.assertTrue(result["changed"])
 
+    def test_false_matches_settings_omitted_while_disabled(self):
+        false_options = {"dnssec_multi_signer": False, "dnssec_presigned": False, "dnssec_use_nsec3": False}
+        result, api = self.run_module(FakeModule(params(status="disabled", **false_options)), {"status": "disabled"})
+
+        api.edit.assert_not_called()
+        self.assertFalse(result["changed"])
+        self.assertEqual(result["dnssec"], {"status": "disabled"})
+
+        current = {"status": "active", "dnssec_use_nsec3": True}
+        result, api = self.run_module(
+            FakeModule(params(status="disabled", dnssec_use_nsec3=False)), current, {"status": "pending-disabled"}
+        )
+
+        api.edit.assert_called_once_with(zone_id="zone", dnssec_use_nsec3=False, status="disabled")
+        self.assertTrue(result["changed"])
+
     def test_rejects_settings_without_status(self):
         result, api = self.run_module(FakeModule(params(status=None)), {"dnssec_presigned": False})
 

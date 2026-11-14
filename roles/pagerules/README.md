@@ -11,12 +11,7 @@ Manage cloudflare pagerules
 ## Role Variables
 
     pagerules_api_token: null
-    pagerules_async: 300
-    pagerules_batch: 10
-    pagerules_delay: 3
     pagerules_list: []
-    pagerules_poll: 0
-    pagerules_retries: 100
 
 ## Dependencies
 

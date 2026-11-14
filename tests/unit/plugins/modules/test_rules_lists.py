@@ -373,6 +373,46 @@ class RulesListsTests(TestCase):
             with self.subTest(value=value):
                 self.assertTrue(rules_lists.valid_ip(value))
 
+    def test_invalid_hostname_and_asn_elements_fail_before_any_write(self):
+        cases = [
+            ("hostname", {"hostname": {"url_hostname": value}}, "elements[1].hostname.url_hostname", value)
+            for value in ("https://example.com", "example.com/path", "*example.com", "a.*", "*")
+        ] + [
+            ("asn", {"asn": value}, "elements[1].asn must be a non-negative integer", value)
+            for value in (-1, "13335", True, 1.0)
+        ]
+        valid = {"hostname": {"hostname": {"url_hostname": "*.example.com"}}, "asn": {"asn": 13335}}
+        for kind, element, message, value in cases:
+            for lists in ([], [{**CURRENT, "kind": kind}]):
+                for check_mode in (False, True):
+                    with self.subTest(kind=kind, value=value, existing=bool(lists), check_mode=check_mode):
+                        client, api = make_client(lists)
+                        elements = [valid[kind], element]
+
+                        result = self.run_module(
+                            FakeModule(params(kind=kind, elements=elements), check_mode=check_mode), client
+                        )
+
+                        self.assertIn(message, result["msg"])
+                        self.assertEqual(result["url_hostname" if kind == "hostname" else "asn"], value)
+                        api.create.assert_not_called()
+                        api.update.assert_not_called()
+                        api.items.update.assert_not_called()
+
+    def test_valid_hostname_and_asn_elements_are_accepted(self):
+        for kind, element in (
+            ("hostname", {"hostname": {"url_hostname": "*.example.com"}}),
+            ("hostname", {"hostname": {"url_hostname": "example.com"}}),
+            ("asn", {"asn": 0}),
+            ("asn", {"asn": 13335}),
+        ):
+            with self.subTest(element=element):
+                client, _ignored = make_client()
+
+                result = self.run_module(FakeModule(params(kind=kind, elements=[element]), check_mode=True), client)
+
+                self.assertTrue(result["changed"])
+
     def test_generated_sdk_iterator_reads_all_current_items(self):
         current = {**CURRENT, "num_items": 2}
         client, api = make_client([current], items=[{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}])

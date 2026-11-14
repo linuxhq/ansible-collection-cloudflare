@@ -27,6 +27,7 @@ options:
     description:
       - Ruleset name.
       - Required when creating the ruleset; an existing ruleset cannot be renamed.
+      - An existing ruleset's description is preserved.
   rules:
     type: list
     elements: dict
@@ -278,6 +279,10 @@ def run(module, client):
 
         # Omitted rules preserve the current rules, so there is nothing to compare.
         payload = {} if rules is None else {"rules": rules}
+        # The update replaces the entrypoint and clears a description it omits,
+        # so carry the current description, which this module does not manage.
+        if payload and current.get("description"):
+            payload["description"] = current["description"]
 
     ensure_resource_present(
         module,

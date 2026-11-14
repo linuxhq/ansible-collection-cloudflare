@@ -77,6 +77,8 @@ options:
     description:
       - Prompt shown when requesting an access justification.
       - An existing policy's value is preserved when omitted.
+      - V("") clears the prompt; Cloudflare then omits it, so V("") matches a
+        policy without a prompt.
   purpose_justification_required:
     type: bool
     description:
@@ -215,7 +217,8 @@ def run(module, client):
         create=lambda payload: policies.create(account_id=account_id, **payload),
         update=lambda policy_id, payload: policies.update(policy_id, account_id=account_id, **payload),
         expected_name=params["name"],
-        defaults=dict.fromkeys(FALSE_FIELDS, False),
+        # Cloudflare omits a prompt cleared with "".
+        defaults={**dict.fromkeys(FALSE_FIELDS, False), "purpose_justification_prompt": ""},
         preserved_fields=PRESERVED_FIELDS + UNMANAGED_FIELDS,
         exact_values=ACCESS_SELECTOR_FIELDS,
         context={"account_id": account_id},

@@ -1,16 +1,25 @@
 ---
-- name: Ensure cloudflare pagerules are batched
+- name: Ensure cloudflare pagerules are managed
   tags:
     - pagerules
-  ansible.builtin.include_tasks:
-    apply:
-      tags:
-        - pagerules
-    file: include.yml
+  linuxhq.cloudflare.pagerules:
+    actions: "{{ _pagerule.1.actions | d(omit) }}"
+    api_token: "{{ pagerules_api_token }}"
+    priority: "{{ _pagerule.1.priority | d(omit) }}"
+    state: "{{ _pagerule.0.state | d('present') }}"
+    status: "{{ _pagerule.1.status | d(omit) }}"
+    targets: "{{ _pagerule.1.targets }}"
+    zone_id: "{{ _pagerule.0.zone_id }}"
   loop:
-    "{{ pagerules_list |
-        batch(pagerules_batch) }}"
+    "{{ q('ansible.builtin.subelements',
+          pagerules_list,
+          'pagerules',
+          {'skip_missing': true}) }}"
   loop_control:
-    label: "{{ __pagerules_list | length }}"
-    loop_var: __pagerules_list
+    label: "{{ _pagerule.0.zone_id | d(none) }}"
+    loop_var: _pagerule
+  when:
+    - pagerules_api_token is not none
+    - _pagerule.0.zone_id is defined
+    - _pagerule.1.targets is defined
 ...
