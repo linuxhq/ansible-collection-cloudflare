@@ -1,0 +1,19 @@
+---
+bugfixes:
+  - access_apps - fail before any change when O(policies) entries that set C(precedence) are not listed in ascending
+    precedence order, naming the expected order. Cloudflare returns policies sorted by precedence, so every run wrote
+    the policies again and then failed because Cloudflare did not apply them.
+  - access_apps - treat V("") in O(custom_deny_message), O(custom_deny_url), O(logo_url), and
+    O(same_site_cookie_attribute) as matching an application without that setting. Cloudflare clears the setting and
+    omits it, so every run wrote it again and then failed because Cloudflare did not apply it.
+  - access_policies - treat V("") in O(purpose_justification_prompt) as matching a policy without a prompt. Cloudflare
+    clears the prompt and omits it, so every run wrote it again and then failed because Cloudflare did not apply it.
+  - rulesets - keep the current description of the entrypoint ruleset when updating its rules. The update replaces
+    the entrypoint, so every rules change cleared the description.
+  - dnssec - treat V(false) in O(dnssec_multi_signer), O(dnssec_presigned), and O(dnssec_use_nsec3) as matching a
+    zone that does not return the setting. Cloudflare omits these settings while DNSSEC is disabled, so every run
+    wrote the setting again and then failed because Cloudflare did not apply it.
+  - rules_lists - reject a C(hostname.url_hostname) element with a scheme, a path, or a C(*) wildcard not followed
+    by a period, and an C(asn) element that is not a non-negative integer, before creating the list or updating its
+    description.
+  - cfd_tunnel_configurations - document that O(tunnel_id) must not name a locally managed tunnel.

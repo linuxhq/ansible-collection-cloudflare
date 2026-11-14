@@ -89,10 +89,14 @@ options:
     type: str
     description:
       - Message displayed when Access denies a request.
+      - V("") clears the message; Cloudflare then omits it, so V("") matches an
+        application without a message.
   custom_deny_url:
     type: str
     description:
       - URL used when Access denies a request.
+      - V("") clears the URL; Cloudflare then omits it, so V("") matches an
+        application without a URL.
   destinations:
     type: list
     elements: dict
@@ -120,15 +124,22 @@ options:
     type: str
     description:
       - URL of the application logo.
+      - V("") clears the URL; Cloudflare then omits it, so V("") matches an
+        application without a logo.
   policies:
     type: list
     elements: dict
     description:
       - Access policies attached to the application.
+      - Cloudflare returns the policies in ascending C(precedence) order, so
+        entries that set C(precedence) must be listed in that order; otherwise
+        the module fails before any change.
   same_site_cookie_attribute:
     type: str
     description:
       - SameSite attribute for the Access cookie.
+      - V("") clears the attribute; Cloudflare then omits it, so V("") matches an
+        application without this setting.
   service_auth_401_redirect:
     type: bool
     description:
@@ -278,6 +289,10 @@ DEFAULT_FIELDS = {
     "skip_interstitial": False,
 }
 
+# Cloudflare clears these settings when they are set to "" and then omits them,
+# so an omitted setting matches "".
+EMPTY_STRING_FIELDS = ("custom_deny_message", "custom_deny_url", "logo_url", "same_site_cookie_attribute")
+
 # Cloudflare accepts these settings for the application types below but does
 # not store them, so a requested value could never converge. Verified against
 # the API; the SDK response models omit more fields for mcp_portal than
@@ -343,12 +358,28 @@ def validate_type_fields(module):
         )
 
 
+def validate_policy_order(module):
+    """Fail when policies that set precedence are not in the order Cloudflare returns them."""
+    ordered = [
+        policy
+        for policy in module.params.get("policies") or ()
+        if isinstance(policy.get("precedence"), int) and not isinstance(policy["precedence"], bool)
+    ]
+    expected = sorted(ordered, key=lambda policy: policy["precedence"])
+    if ordered != expected:
+        module.fail_json(
+            msg="policies must be listed in ascending precedence order, as Cloudflare returns them",
+            expected_order=[{"id": policy.get("id"), "precedence": policy["precedence"]} for policy in expected],
+        )
+
+
 def run(module, client):
     params = module.params
     account_id = params["account_id"]
     applications = client.zero_trust.access.applications
     if params["state"] == "present":
         validate_type_fields(module)
+        validate_policy_order(module)
 
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the Access application",
@@ -403,7 +434,7 @@ def run(module, client):
         create=lambda payload: applications.create(account_id=account_id, **payload),
         update=lambda app_id, payload: applications.update(app_id, account_id=account_id, **payload),
         expected_name=params["name"],
-        defaults=DEFAULT_FIELDS,
+        defaults={**DEFAULT_FIELDS, **dict.fromkeys(EMPTY_STRING_FIELDS, "")},
         preserved_fields=preserved_fields,
         exact_values=("cors_headers", "destinations"),
         context={"account_id": account_id},

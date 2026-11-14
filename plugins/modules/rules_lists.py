@@ -49,6 +49,9 @@ options:
         C(hostname).
       - An C(ip) entry must be an IP address, or a CIDR with a prefix length of
         8 to 32 for IPv4 or 12 to 128 for IPv6.
+      - A C(hostname.url_hostname) entry must not include a scheme or a path,
+        and a C(*) wildcard in it must be followed by a period.
+      - An C(asn) entry must be a non-negative integer.
   operation_timeout:
     type: int
     default: 240
@@ -393,11 +396,34 @@ def valid_ip(value):
     return prefix.isascii() and prefix.isdigit() and int(prefix) in IP_PREFIX_LENGTHS[version]
 
 
+def valid_hostname(value):
+    """Return whether value has no scheme or path, and each `*` is followed by a period."""
+    if "/" in value:
+        return False
+
+    return all(value[index + 1 : index + 2] == "." for index, char in enumerate(value) if char == "*")
+
+
 def validate_elements(module, kind):
-    """Fail when an element lacks the field that stores the list kind, or holds an invalid IP."""
+    """Fail when an element lacks the field that stores the list kind, or holds an invalid value."""
     for index, element in enumerate(module.params.get("elements") or ()):
         if element.get(kind) is None:
             module.fail_json(msg=f"elements[{index}] must set {kind!r} for a Rules list of kind {kind!r}")
+
+        asn = element.get("asn")
+        if kind == "asn" and (not isinstance(asn, int) or isinstance(asn, bool) or asn < 0):
+            module.fail_json(msg=f"elements[{index}].asn must be a non-negative integer", asn=asn)
+
+        hostname = element.get("hostname") if kind == "hostname" else None
+        url_hostname = hostname.get("url_hostname") if isinstance(hostname, dict) else None
+        if isinstance(url_hostname, str) and not valid_hostname(url_hostname):
+            module.fail_json(
+                msg=(
+                    f"elements[{index}].hostname.url_hostname must not include a scheme or a path, "
+                    "and a '*' wildcard must be followed by '.'"
+                ),
+                url_hostname=url_hostname,
+            )
 
         if kind == "ip" and not valid_ip(element["ip"]):
             module.fail_json(

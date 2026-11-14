@@ -156,6 +156,22 @@ class AccessPoliciesTests(TestCase):
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_empty_prompt_matches_cleared_prompt(self):
+        client, api = client_with([policy()])
+
+        result = self.run_module(FakeModule(params(purpose_justification_prompt="")), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+        client, api = client_with([policy(purpose_justification_prompt="why")], updated=policy())
+
+        result = self.run_module(FakeModule(params(purpose_justification_prompt="")), client)
+
+        self.assertEqual(api.update.call_args.kwargs["purpose_justification_prompt"], "")
+        self.assertEqual(result["message"], "Access policy updated")
+        self.assertTrue(result["changed"])
+
     def test_removed_nested_selector_field_is_updated(self):
         include = [{"device_posture": {"integration_uid": "posture"}}]
         current = policy(include=[{"device_posture": {"integration_uid": "posture", "account_id": "other"}}])

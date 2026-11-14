@@ -23,14 +23,20 @@ options:
   dnssec_multi_signer:
     description:
       - Whether multi-signer DNSSEC is enabled.
+      - Cloudflare omits this setting while DNSSEC is disabled, so V(false)
+        matches a zone that does not return it.
     type: bool
   dnssec_presigned:
     description:
       - Whether presigned DNSSEC is enabled.
+      - Cloudflare omits this setting while DNSSEC is disabled, so V(false)
+        matches a zone that does not return it.
     type: bool
   dnssec_use_nsec3:
     description:
       - Whether NSEC3 is enabled.
+      - Cloudflare omits this setting while DNSSEC is disabled, so V(false)
+        matches a zone that does not return it.
     type: bool
   status:
     description:
@@ -136,13 +142,20 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     resource_field,
 )
 
-FIELDS = ("dnssec_multi_signer", "dnssec_presigned", "dnssec_use_nsec3", "status")
+BOOLEAN_FIELDS = ("dnssec_multi_signer", "dnssec_presigned", "dnssec_use_nsec3")
+FIELDS = BOOLEAN_FIELDS + ("status",)
 PENDING_STATUSES = {"pending": "active", "pending-disabled": "disabled"}
 
 
 def comparable_settings(module, settings):
     status = resource_field(module, settings, "status", "DNSSEC settings")
-    return {**settings, "status": PENDING_STATUSES.get(status, status)}
+    # Cloudflare omits these settings while DNSSEC is disabled, so an omitted
+    # setting matches false.
+    return {
+        **dict.fromkeys(BOOLEAN_FIELDS, False),
+        **settings,
+        "status": PENDING_STATUSES.get(status, status),
+    }
 
 
 def run(module, client):

@@ -22,6 +22,7 @@ options:
     description:
       - Cloudflared tunnel identifier.
       - The module fails before any change when the tunnel was deleted.
+      - The module fails before any change when the tunnel is locally managed.
   config:
     required: true
     type: dict

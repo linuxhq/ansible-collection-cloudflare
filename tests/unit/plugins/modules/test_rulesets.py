@@ -173,6 +173,22 @@ class RulesetsTests(TestCase):
         api.phases.update.assert_called_once_with(PHASE, zone_id="zone", rules=[])
         self.assertEqual(result["message"], "Ruleset updated")
 
+    def test_rules_update_keeps_current_description(self):
+        current = {**CURRENT, "description": "kept"}
+        client, api = make_client(current, updated={**current, "rules": []})
+
+        result = self.run_module(FakeModule(params(name=None, rules=[])), client)
+
+        api.phases.update.assert_called_once_with(PHASE, zone_id="zone", rules=[], description="kept")
+        self.assertEqual(result["message"], "Ruleset updated")
+
+        client, api = make_client(current)
+
+        result = self.run_module(FakeModule(params(rules=RULES)), client)
+
+        api.phases.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_deletes_entrypoint_ruleset_by_id(self):
         client, api = make_client(CURRENT)
 

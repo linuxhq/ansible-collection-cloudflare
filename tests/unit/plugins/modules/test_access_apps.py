@@ -351,6 +351,52 @@ class AccessAppsTests(TestCase):
 
         self.assertTrue(result["changed"])
 
+    def test_empty_string_matches_cleared_settings(self):
+        cleared = dict.fromkeys(
+            ("custom_deny_message", "custom_deny_url", "logo_url", "same_site_cookie_attribute"), ""
+        )
+        client, api = client_with([stored()])
+
+        result = self.run_module(FakeModule(params(**cleared)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+        current = stored(
+            custom_deny_message="x",
+            custom_deny_url="https://deny.example.com",
+            logo_url="https://example.com/logo.png",
+            same_site_cookie_attribute="lax",
+        )
+        client, api = client_with([current], updated=stored())
+
+        result = self.run_module(FakeModule(params(**cleared)), client)
+
+        for field in cleared:
+            self.assertEqual(api.update.call_args.kwargs[field], "")
+
+        self.assertEqual(result["message"], "Access application updated")
+        self.assertTrue(result["changed"])
+
+    def test_policies_out_of_precedence_order_fail_before_any_request(self):
+        policies = [{"id": "a", "precedence": 2}, {"id": "b"}, {"id": "c", "precedence": 1}]
+        client, api = client_with()
+
+        result = self.run_module(FakeModule(params(policies=policies)), client)
+
+        self.assertIn("ascending precedence order", result["msg"])
+        self.assertEqual(result["expected_order"], [{"id": "c", "precedence": 1}, {"id": "a", "precedence": 2}])
+        api.list.assert_not_called()
+
+    def test_policies_in_precedence_order_match_stored_order(self):
+        policies = [{"id": "b", "precedence": 1}, {"id": "a", "precedence": 2}]
+        client, api = client_with([stored(policies=policies)])
+
+        result = self.run_module(FakeModule(params(policies=policies)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_change_to_mcp_portal_drops_launcher_visibility(self):
         current = stored(app_launcher_visible=False, auto_redirect_to_identity=True)
         updated = stored(type="mcp_portal", auto_redirect_to_identity=True)
