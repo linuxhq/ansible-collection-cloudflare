@@ -55,7 +55,9 @@ options:
         8 to 32 for IPv4 or 12 to 128 for IPv6.
       - A C(hostname.url_hostname) entry must not include a scheme or a path,
         and a C(*) wildcard in it must be followed by a period.
-      - An C(asn) entry must be a non-negative integer.
+      - An C(asn) entry must be an integer from 0 to 4294967295.
+      - A C(redirect.status_code), when set, must be the integer 301, 302,
+        307, or 308.
   operation_timeout:
     type: int
     default: 240
@@ -172,6 +174,11 @@ REQUIRED_STRING_FIELDS = {
     "hostname": ("url_hostname",),
     "redirect": ("source_url", "target_url"),
 }
+
+# The SDK documents asn as a non-negative 32-bit integer.
+MAX_ASN = 4294967295
+
+REDIRECT_STATUS_CODES = (301, 302, 307, 308)
 
 REDIRECT_DEFAULTS = {
     "include_subdomains": False,
@@ -433,8 +440,20 @@ def validate_elements(module, kind):
                 module.fail_json(msg=f"elements[{index}].{kind} must be a mapping with a non-empty string {field!r}")
 
         asn = element.get("asn")
-        if kind == "asn" and (not isinstance(asn, int) or isinstance(asn, bool) or asn < 0):
-            module.fail_json(msg=f"elements[{index}].asn must be a non-negative integer", asn=asn)
+        if kind == "asn" and (not isinstance(asn, int) or isinstance(asn, bool) or not 0 <= asn <= MAX_ASN):
+            module.fail_json(msg=f"elements[{index}].asn must be an integer from 0 to {MAX_ASN}", asn=asn)
+
+        redirect = element.get("redirect") if kind == "redirect" else None
+        status_code = redirect.get("status_code") if isinstance(redirect, dict) else None
+        if status_code is not None and (
+            not isinstance(status_code, int)
+            or isinstance(status_code, bool)
+            or status_code not in REDIRECT_STATUS_CODES
+        ):
+            module.fail_json(
+                msg=f"elements[{index}].redirect.status_code must be one of 301, 302, 307, or 308",
+                status_code=status_code,
+            )
 
         hostname = element.get("hostname") if kind == "hostname" else None
         url_hostname = hostname.get("url_hostname") if isinstance(hostname, dict) else None
