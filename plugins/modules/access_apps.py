@@ -38,7 +38,8 @@ options:
         settings are supported.
       - Required when O(state=present).
       - Settings that Cloudflare does not store for the chosen type must be
-        omitted or set to Cloudflare's default. Type V(bookmark) does not support
+        omitted or set to Cloudflare's default, which is V("") for settings
+        that V("") clears. Type V(bookmark) does not support
         O(allowed_idps), O(auto_redirect_to_identity), O(cors_headers),
         O(custom_deny_message), O(custom_deny_url), O(destinations),
         O(enable_binding_cookie), O(http_only_cookie_attribute),
@@ -293,6 +294,8 @@ DEFAULT_FIELDS = {
 # so an omitted setting matches "".
 EMPTY_STRING_FIELDS = ("custom_deny_message", "custom_deny_url", "logo_url", "same_site_cookie_attribute")
 
+FIELD_DEFAULTS = {**DEFAULT_FIELDS, **dict.fromkeys(EMPTY_STRING_FIELDS, "")}
+
 # Cloudflare accepts these settings for the application types below but does
 # not store them, so a requested value could never converge. Verified against
 # the API; the SDK response models omit more fields for mcp_portal than
@@ -349,7 +352,7 @@ def validate_type_fields(module):
     unsupported = [
         field
         for field in UNSUPPORTED_FIELDS.get(params["type"], ())
-        if params.get(field) is not None and params[field] != DEFAULT_FIELDS.get(field)
+        if params.get(field) is not None and params[field] != FIELD_DEFAULTS.get(field)
     ]
     if unsupported:
         module.fail_json(
@@ -434,7 +437,7 @@ def run(module, client):
         create=lambda payload: applications.create(account_id=account_id, **payload),
         update=lambda app_id, payload: applications.update(app_id, account_id=account_id, **payload),
         expected_name=params["name"],
-        defaults={**DEFAULT_FIELDS, **dict.fromkeys(EMPTY_STRING_FIELDS, "")},
+        defaults=FIELD_DEFAULTS,
         preserved_fields=preserved_fields,
         exact_values=("cors_headers", "destinations"),
         context={"account_id": account_id},

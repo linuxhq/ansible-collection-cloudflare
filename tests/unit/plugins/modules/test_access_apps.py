@@ -482,6 +482,21 @@ class AccessAppsTests(TestCase):
                 self.assertTrue(result["changed"])
                 api.create.assert_not_called()
 
+    def test_type_accepts_empty_strings_for_unsupported_options(self):
+        cases = (
+            ("bookmark", ("custom_deny_message", "custom_deny_url", "same_site_cookie_attribute")),
+            ("proxy_endpoint", ("custom_deny_message", "logo_url", "same_site_cookie_attribute")),
+        )
+        for app_type, fields in cases:
+            for field in fields:
+                with self.subTest(type=app_type, field=field):
+                    client, api = client_with([stored(type=app_type)])
+
+                    result = self.run_module(FakeModule(params(type=app_type, **{field: ""})), client)
+
+                    api.update.assert_not_called()
+                    self.assertFalse(result["changed"])
+
     def test_check_mode_does_not_create(self):
         client, api = client_with()
 

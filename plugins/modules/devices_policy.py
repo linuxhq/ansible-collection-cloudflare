@@ -52,6 +52,8 @@ options:
     description:
       - Split tunnel routes excluded from the WARP tunnel.
       - Replaces the current routes; each route is compared on all of its fields.
+      - A route C(description) of V("") matches a route without a description,
+        since Cloudflare drops an empty description.
       - A bare IP address in a route's C(address) is compared and sent as a
         single-host CIDR, such as C(192.0.2.1/32), as Cloudflare stores it.
       - When omitted, the current value is left unchanged.
@@ -67,6 +69,8 @@ options:
     description:
       - Split tunnel routes included in the WARP tunnel.
       - Replaces the current routes; each route is compared on all of its fields.
+      - A route C(description) of V("") matches a route without a description,
+        since Cloudflare drops an empty description.
       - A bare IP address in a route's C(address) is compared and sent as a
         single-host CIDR, such as C(192.0.2.1/32), as Cloudflare stores it.
       - Must not be empty; Cloudflare stores an empty include list as exclude
@@ -194,6 +198,30 @@ def split_tunnel_route(route):
     return {**route, "address": cidr_from_address(route["address"])}
 
 
+def comparable_policy(policy, payload):
+    """Return policy with each route stored without a description matching a requested empty description.
+
+    Cloudflare drops a split tunnel route description set to "" and returns
+    the route without it.
+    """
+    policy = dict(policy)
+    for field in ("exclude", "include"):
+        requested, routes = payload.get(field), policy.get(field)
+        if isinstance(requested, list) and isinstance(routes, list):
+            policy[field] = [
+                (
+                    {**route, "description": ""}
+                    if isinstance(route, dict)
+                    and route.get("description") is None
+                    and {**route, "description": ""} in requested
+                    else route
+                )
+                for route in routes
+            ]
+
+    return policy
+
+
 def service_mode(requested, current):
     """Return requested with the keys it omits carried over from current.
 
@@ -234,6 +262,7 @@ def run(module, client):
         current,
         payload,
         edit=lambda payload: policy.edit(account_id=account_id, **payload),
+        comparable=lambda settings: comparable_policy(settings, payload),
         context={"account_id": account_id},
         exact_values=("exclude", "include"),
     )

@@ -39,8 +39,6 @@ options:
       - Set C(web_analytics_tag) or C(web_analytics_token) to null to clear it.
         Cloudflare keeps the value of any other build setting set to null, so the
         module fails before making changes.
-      - C(web_analytics_token) is treated as write-only; use O(rotate_secrets) to
-        apply a new value to an existing project.
       - Only C(build_caching), C(build_command), C(destination_dir), C(root_dir),
         C(web_analytics_tag), and C(web_analytics_token) are supported. Cloudflare
         accepts any other key, such as C(build_image_major_version), but does not
@@ -70,6 +68,8 @@ options:
     description:
       - Force an update that resends provided C(secret_text) values or
         C(web_analytics_token), even when no other change is detected.
+      - Cloudflare returns C(web_analytics_token), so a changed token is
+        detected and applied without O(rotate_secrets).
       - The module reports C(changed) when enabled with either credential input.
       - Requires a C(secret_text) value under O(deployment_configs) or
         C(build_config.web_analytics_token).
@@ -292,14 +292,9 @@ def validate_null_settings(module):
 def without_secret_values(resource):
     """Return a serialized copy without write-only secrets, which are never compared.
 
-    Only build_config.web_analytics_token and the values of secret_text
-    environment variables are write-only.
+    Only the values of secret_text environment variables are write-only.
     """
     resource = serialize_resource(resource)
-    build_config = resource.get("build_config")
-    if isinstance(build_config, dict):
-        build_config.pop("web_analytics_token", None)
-
     for config in (resource.get("deployment_configs") or {}).values():
         env_vars = config.get("env_vars") if isinstance(config, dict) else None
         for variable in (env_vars or {}).values() if isinstance(env_vars, dict) else ():
@@ -548,8 +543,9 @@ def ensure_present(module, client, domain_names):
     else:
         payload.pop("deployment_configs", None)
 
-    secrets_requested = params["rotate_secrets"] and values_differ(
-        without_secret_values(payload), serialize_resource(payload)
+    secrets_requested = params["rotate_secrets"] and (
+        (payload.get("build_config") or {}).get("web_analytics_token") is not None
+        or values_differ(without_secret_values(payload), serialize_resource(payload))
     )
     if params["rotate_secrets"] and not secrets_requested:
         module.fail_json(msg="rotate_secrets requires a secret_text value or build_config.web_analytics_token")
