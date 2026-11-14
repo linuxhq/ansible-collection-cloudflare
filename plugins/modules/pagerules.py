@@ -45,6 +45,8 @@ options:
         the number of page rules in the zone, including a rule being created.
       - A priority below 1 or above that number fails before any change, because
         Cloudflare would store the rule at the first or last position instead.
+      - In check mode, only the lower bound is checked, because page rules that
+        earlier tasks in the same run would create are not counted.
       - An existing rule's priority is preserved when omitted.
   status:
     type: str
@@ -252,10 +254,17 @@ def find_pagerule(module, client, targets):
 
 
 def validate_priority(module, current, rule_count):
-    """Fail when priority is below 1 or exceeds the zone's rule count after this change."""
+    """Fail when priority is below 1 or exceeds the zone's rule count after this change.
+
+    Check mode skips the upper bound: rules that earlier tasks would create are
+    not in the current count, so a valid batch would fail.
+    """
     priority = module.params.get("priority")
     if priority is not None and priority < 1:
         module.fail_json(msg=f"priority {priority} must be at least 1", zone_id=module.params["zone_id"])
+
+    if module.check_mode:
+        return
 
     maximum = rule_count + (1 if current is None else 0)
     if priority is not None and priority > maximum:

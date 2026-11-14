@@ -41,6 +41,7 @@ provisioner:
                     value:
                       status_code: 301
                       url: https://docs.ansible.com/projects/molecule
+                priority: 1
                 status: active
                 targets:
                   - constraint:
@@ -52,6 +53,7 @@ provisioner:
                     value:
                       status_code: 301
                       url: https://docs.ansible.com/projects/molecule
+                priority: 2
                 status: active
                 targets:
                   - constraint:
