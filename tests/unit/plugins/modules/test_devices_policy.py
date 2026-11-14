@@ -152,6 +152,36 @@ class DevicesPolicyTests(TestCase):
                 self.assertTrue(result["changed"])
                 self.assertNotIn("msg", result)
 
+    def test_empty_route_description_matches_dropped_description(self):
+        requested = [{"address": "192.0.2.0/24", "description": ""}, {"host": "example.com", "description": "kept"}]
+        stored = [{"address": "192.0.2.0/24"}, {"host": "example.com", "description": "kept"}]
+        for field in ("include", "exclude"):
+            with self.subTest(field=field, converged=True):
+                result, api = self.run_module(FakeModule({"account_id": "account", field: requested}), {field: stored})
+
+                api.edit.assert_not_called()
+                self.assertFalse(result["changed"])
+
+            with self.subTest(field=field, converged=False):
+                result, api = self.run_module(
+                    FakeModule({"account_id": "account", field: requested}), {field: []}, {field: stored}
+                )
+
+                api.edit.assert_called_once_with(account_id="account", **{field: requested})
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)
+                self.assertEqual(result["devices_policy"], {field: stored})
+
+            with self.subTest(field=field, described=True):
+                result, api = self.run_module(
+                    FakeModule({"account_id": "account", field: requested}),
+                    {field: [{"address": "192.0.2.0/24", "description": "old"}, stored[1]]},
+                    {field: stored},
+                )
+
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)
+
     def test_unrelated_write_keeps_service_mode_port(self):
         current = {"auto_connect": 0.0, "service_mode_v2": {"mode": "proxy", "port": 3000}}
         params = {"account_id": "account", "auto_connect": 5.0, "service_mode_v2": {"mode": "proxy"}}

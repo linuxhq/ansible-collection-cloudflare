@@ -67,6 +67,7 @@ class PagesProjectsTests(TestCase):
         self.assertEqual(
             comparable,
             {
+                "build_config": {"web_analytics_token": "analytics-secret"},
                 "deployment_configs": {
                     "production": {
                         "env_vars": {
@@ -74,7 +75,7 @@ class PagesProjectsTests(TestCase):
                             "MODE": {"type": "plain_text", "value": "prod"},
                         }
                     }
-                }
+                },
             },
         )
         self.assertEqual(payload["deployment_configs"]["production"]["env_vars"]["TOKEN"]["value"], "secret")
@@ -410,7 +411,7 @@ class PagesProjectsTests(TestCase):
         self.assertEqual(result["message"], "Pages project created")
 
     def test_rotates_web_analytics_token(self):
-        client, api = client_with([PROJECT], edited=PROJECT)
+        client, api = client_with([PROJECT], edited={**PROJECT, "build_config": {"web_analytics_token": "new-secret"}})
 
         result = self.run_module(
             FakeModule(params(build_config={"web_analytics_token": "new-secret"}, rotate_secrets=True)),
@@ -426,14 +427,42 @@ class PagesProjectsTests(TestCase):
         )
         self.assertTrue(result["changed"])
 
-    def test_write_only_analytics_token_does_not_force_rotation(self):
-        current = {**PROJECT, "build_config": {"build_command": "npm run build"}}
-        client, api = client_with([current])
+    def test_changed_analytics_token_is_applied(self):
+        current = {**PROJECT, "build_config": {"build_command": "make", "web_analytics_token": "old-token"}}
+        desired = {"web_analytics_token": "new-token"}
+        updated = {**PROJECT, "build_config": {"build_command": "make", **desired}}
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with([current], edited=updated)
 
-        result = self.run_module(FakeModule(params(build_config={"web_analytics_token": "write-only"})), client)
+                result = self.run_module(FakeModule(params(build_config=desired), check_mode=check_mode), client)
+
+                self.assertTrue(result["changed"])
+                if check_mode:
+                    api.edit.assert_not_called()
+                else:
+                    self.assertEqual(api.edit.call_args.kwargs["build_config"], desired)
+
+        client, api = client_with([updated])
+        result = self.run_module(FakeModule(params(build_config=desired)), client)
 
         api.edit.assert_not_called()
         self.assertFalse(result["changed"])
+
+        client, api = client_with([current], edited=current)
+        result = self.run_module(FakeModule(params(build_config=desired)), client)
+
+        self.assertIn("did not apply", result["msg"])
+
+    def test_cleared_analytics_token_matches_null(self):
+        for stored in (None, ""):
+            with self.subTest(stored=stored):
+                client, api = client_with([{**PROJECT, "build_config": {"web_analytics_token": stored}}])
+
+                result = self.run_module(FakeModule(params(build_config={"web_analytics_token": None})), client)
+
+                api.edit.assert_not_called()
+                self.assertFalse(result["changed"])
 
     def test_empty_build_config_is_unchanged(self):
         client, api = client_with([{**PROJECT, "build_config": {"build_command": "make"}}])

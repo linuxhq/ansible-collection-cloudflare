@@ -1,0 +1,11 @@
+---
+bugfixes:
+  - access_apps - accept V("") for C(custom_deny_message), C(custom_deny_url), C(logo_url), and
+    C(same_site_cookie_attribute) on application types that do not store them, such as V(bookmark) and
+    V(proxy_endpoint). Cloudflare accepts V("") and drops the setting, but the module failed before any request.
+  - devices_policy - match a split tunnel route C(description) of V("") with the same route stored without a
+    description. Cloudflare drops an empty description, so every run wrote the routes again and then failed because
+    Cloudflare did not apply them.
+  - pages_projects - compare C(build_config.web_analytics_token) with the stored value. Cloudflare returns the token,
+    but the module treated it as write-only, so a changed token reported no change and was never applied unless
+    O(rotate_secrets) was set.
