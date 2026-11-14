@@ -1,0 +1,11 @@
+---
+bugfixes:
+  - rules_lists - match a C(/32) IPv4 or C(/128) IPv6 C(ip) element with the bare address. Cloudflare stores the bare
+    address, so every run wrote the items again and then failed because Cloudflare did not apply them.
+  - rules_lists - accept O(description=""). Cloudflare drops an empty description, so creating a list failed after the
+    list was created, and every run on an existing list wrote the description again and then failed because
+    Cloudflare did not apply it.
+  - rules_lists - fail before any request when an C(asn) element is 0, a C(hostname.url_hostname) element uses a wildcard
+    other than a single leading label, an C(ip) element is a CIDR with host bits set or an IPv4-mapped IPv6
+    address, or two elements repeat a list kind value, such as the same C(ip) with different C(comment) values.
+    Cloudflare rejected these items after the module had created the list or written its description.
