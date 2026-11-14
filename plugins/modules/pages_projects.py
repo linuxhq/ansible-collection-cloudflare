@@ -41,6 +41,8 @@ options:
         module fails before making changes.
       - C(web_analytics_token) is treated as write-only; use O(rotate_secrets) to
         apply a new value to an existing project.
+      - C(build_image_major_version) is not supported. Cloudflare accepts it but
+        does not store it, so the module fails before making changes.
   deployment_configs:
     type: dict
     description:
@@ -190,6 +192,12 @@ def contains_null(value):
         return any(contains_null(item) for item in value)
 
     return value is None
+
+
+def validate_build_config(module):
+    """Fail when build_config holds a setting Cloudflare accepts but never stores."""
+    if "build_image_major_version" in (module.params.get("build_config") or {}):
+        module.fail_json(msg="Cloudflare does not store build_config.build_image_major_version; remove it")
 
 
 def validate_null_settings(module):
@@ -566,6 +574,7 @@ def ensure_absent(module, client):
 def run(module, client):
     domain_names = desired_domain_names(module)
     if module.params["state"] == "present":
+        validate_build_config(module)
         validate_null_settings(module)
         ensure_present(module, client, domain_names)
 

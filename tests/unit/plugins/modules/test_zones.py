@@ -260,3 +260,60 @@ class ZonesTests(TestCase):
         client.zones.delete.assert_called_once_with(zone_id="zone")
         self.assertTrue(result["changed"])
         self.assertEqual(result["zone"], ZONE)
+
+    def test_strips_trailing_dot_from_name(self):
+        created = {**ZONE, "account": {"id": "account"}}
+        for found in ([], [ZONE]):
+            with self.subTest(found=bool(found)):
+                client = client_with(found, created=created)
+
+                result = self.run_module(FakeModule(params(name="Example.COM.")), client)
+
+                client.zones.list.assert_called_once_with(name="example.com", account={"id": "account"})
+                self.assertNotIn("msg", result)
+                self.assertEqual(result["changed"], not found)
+                if not found:
+                    client.zones.create.assert_called_once_with(
+                        account={"id": "account"}, name="example.com", type="full"
+                    )
+
+    def test_rejects_root_label_name(self):
+        client = client_with()
+
+        result = self.run_module(FakeModule(params(name=".")), client)
+
+        client.zones.list.assert_not_called()
+        self.assertEqual(result["msg"], "name must not be empty")
+
+    def test_non_editable_setting_fails_before_any_write(self):
+        settings = {
+            "ssl": {"id": "ssl", "value": "strict", "editable": True},
+            "polish": {"id": "polish", "value": "off", "editable": False},
+        }
+        requested = [{"id": "ssl", "value": "full"}, {"id": "polish", "value": "lossless"}]
+        for found, check_mode in (([ZONE], False), ([ZONE], True), ([], False)):
+            with self.subTest(existing=bool(found), check_mode=check_mode):
+                client = client_with(found, created={**ZONE, "type": "partial", "account": {"id": "account"}})
+                client.zones.settings.get.side_effect = lambda setting_id, zone_id: settings[setting_id]
+
+                result = self.run_module(
+                    FakeModule(
+                        params(type="partial", vanity_name_servers=["ns1.example.com"], settings=requested),
+                        check_mode=check_mode,
+                    ),
+                    client,
+                )
+
+                self.assertEqual(result["msg"], "Zone setting polish is not editable on this zone")
+                self.assertEqual(result["setting_id"], "polish")
+                self.assertEqual(result["zone_id"], "zone")
+                client.zones.edit.assert_not_called()
+                client.zones.settings.edit.assert_not_called()
+
+    def test_non_editable_setting_already_matching_is_unchanged(self):
+        client = client_with([ZONE], setting={"id": "polish", "value": "off", "editable": False})
+
+        result = self.run_module(FakeModule(params(settings=[{"id": "polish", "value": "off"}])), client)
+
+        client.zones.settings.edit.assert_not_called()
+        self.assertFalse(result["changed"])

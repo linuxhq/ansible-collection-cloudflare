@@ -89,6 +89,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
+    cloudflare_error_details,
     ensure_resource_absent,
     find_resource,
     resource_field,
@@ -109,34 +110,35 @@ def apply_secret_or_roll_back(module, connectors, connector_id):
     params = module.params
     account_id = params["account_id"]
     try:
-        with cloudflare_error_context(
-            "Cloudflare API request failed while applying the WARP Connector tunnel_secret",
-            account_id=account_id,
-            resource_id=connector_id,
-        ):
-            connector = serialize_resource(
-                connectors.edit(connector_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
-            )
-
+        connector = serialize_resource(
+            connectors.edit(connector_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
+        )
         if (
             not isinstance(connector, dict)
             or connector.get("id") != connector_id
             or connector.get("name") != params["name"]
         ):
             raise CloudflareResponseError("Cloudflare API returned the wrong WARP Connector")
-    except (cloudflare.APIError, CloudflareResponseError):
+    except (cloudflare.APIError, CloudflareResponseError) as apply_error:
         try:
             deleted = serialize_resource(connectors.delete(connector_id, account_id=account_id))
             if isinstance(deleted, dict) and "id" in deleted and deleted["id"] != connector_id:
                 raise CloudflareResponseError("Cloudflare API returned the wrong WARP Connector")
-        except (cloudflare.APIError, CloudflareResponseError):
+        except (cloudflare.APIError, CloudflareResponseError) as rollback_error:
             module.fail_json(
-                msg="Failed to apply tunnel_secret and to roll back the created WARP Connector; "
-                "delete it manually and retry",
+                msg="Failed to apply tunnel_secret and to roll back the created WARP Connector; delete it manually",
+                account_id=account_id,
                 warp_connector_id=connector_id,
+                apply_error=cloudflare_error_details(apply_error),
+                rollback_error=cloudflare_error_details(rollback_error),
             )
 
-        raise
+        module.fail_json(
+            msg="Failed to apply tunnel_secret; the created WARP Connector was rolled back",
+            account_id=account_id,
+            warp_connector_id=connector_id,
+            **cloudflare_error_details(apply_error),
+        )
 
     return connector
 

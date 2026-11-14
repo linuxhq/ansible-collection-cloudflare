@@ -1,0 +1,27 @@
+---
+breaking_changes:
+  - rulesets - compare each rule in O(rules) on all of its top-level fields, so a field omitted from a rule, such as
+    C(description) or C(action_parameters), is removed instead of kept until an unrelated update silently dropped it.
+    Fields Cloudflare assigns (C(id), C(ref), C(version), and C(last_updated)) are ignored unless set, and a C(skip)
+    rule without C(logging) matches Cloudflare's default C(logging.enabled=true).
+  - cfd_tunnel_configurations - fail before any change, including in check mode, when the tunnel is locally managed
+    (C(config_src=local)). Cloudflare accepted the configuration and irreversibly converted the tunnel to remote
+    management, which cfd_tunnel then refused.
+bugfixes:
+  - devices_policy - fail before any request when O(include) is an empty list. Cloudflare stores it as exclude mode
+    with no routes, so the module wrote and then failed on every run; use O(exclude=[]) instead.
+  - devices_policy - compare and send a bare IP address in an O(include) or O(exclude) route's C(address) as the
+    single-host CIDR Cloudflare stores, such as C(192.0.2.1/32) or C(2001:db8::1/128). The module wrote and then failed
+    on every run.
+  - zones - read every requested O(settings) entry before any change and fail, naming the setting, when a differing
+    setting is not editable on the zone, such as C(polish) on a Free plan. Earlier settings, O(type), and
+    O(vanity_name_servers) were written before Cloudflare rejected it. Check mode predicts the failure.
+  - zones - ignore a trailing dot in O(name), which Cloudflare stores without it. The module created the zone and then
+    failed on every run.
+  - warp_connector - when applying O(tunnel_secret) to a new connector fails, report the connector ID, that it was
+    rolled back, and the error's status code and response. When the rollback also fails, report both errors.
+  - pages_projects - fail before any change when O(build_config) sets C(build_image_major_version). Cloudflare accepts
+    the setting but never stores it, so the module wrote and then failed on every run.
+trivial:
+  - rules_lists and rules_lists_info Molecule scenarios - use the list name C(molecule_monitoring), so the scenarios
+    cannot modify or delete an account's own C(monitoring) list.

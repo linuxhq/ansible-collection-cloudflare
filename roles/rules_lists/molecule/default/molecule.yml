@@ -48,13 +48,13 @@ provisioner:
 
         rules_lists_list_create:
           - kind: ip
-            name: monitoring
+            name: molecule_monitoring
             elements:
               "{{ rules_lists_hetrixtools }}"
 
         rules_lists_list_update:
           - kind: ip
-            name: monitoring
+            name: molecule_monitoring
             elements:
               "{{ rules_lists_hetrixtools +
                   rules_lists_uptimerobot }}"

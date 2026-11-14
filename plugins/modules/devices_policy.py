@@ -52,6 +52,8 @@ options:
     description:
       - Split tunnel routes excluded from the WARP tunnel.
       - Replaces the current routes; each route is compared on all of its fields.
+      - A bare IP address in a route's C(address) is compared and sent as a
+        single-host CIDR, such as C(192.0.2.1/32), as Cloudflare stores it.
       - When omitted, the current value is left unchanged.
       - Mutually exclusive with O(include).
   exclude_office_ips:
@@ -65,6 +67,10 @@ options:
     description:
       - Split tunnel routes included in the WARP tunnel.
       - Replaces the current routes; each route is compared on all of its fields.
+      - A bare IP address in a route's C(address) is compared and sent as a
+        single-host CIDR, such as C(192.0.2.1/32), as Cloudflare stores it.
+      - Must not be empty; Cloudflare stores an empty include list as exclude
+        mode with no routes, so use O(exclude=[]) instead.
       - When omitted, the current value is left unchanged.
       - Mutually exclusive with O(exclude).
   lan_allow_minutes:
@@ -145,6 +151,8 @@ message:
 
 """
 
+from ipaddress import ip_address
+
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
@@ -175,9 +183,30 @@ FIELDS = (
 )
 
 
+def split_tunnel_route(route):
+    """Return route with a bare IP address written as Cloudflare stores it."""
+    address = route.get("address")
+    if not isinstance(address, str) or "/" in address:
+        return route
+
+    try:
+        prefix_length = ip_address(address).max_prefixlen
+    except ValueError:
+        return route
+
+    return {**route, "address": f"{address}/{prefix_length}"}
+
+
 def run(module, client):
     account_id = module.params["account_id"]
+    if module.params.get("include") == []:
+        module.fail_json(msg="include must not be empty; Cloudflare stores it as exclude mode, use exclude: [] instead")
+
     payload = payload_from_params(module.params, FIELDS)
+    for field in ("exclude", "include"):
+        if field in payload:
+            payload[field] = [split_tunnel_route(route) for route in payload[field]]
+
     policy = client.zero_trust.devices.policies.default
     with cloudflare_error_context(
         "Cloudflare API request failed while gathering the device policy",

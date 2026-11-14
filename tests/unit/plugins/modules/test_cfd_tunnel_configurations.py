@@ -13,6 +13,8 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     ModuleFail,
 )
 
+REMOTE_TUNNEL = {"id": "tunnel", "config_src": "cloudflare", "remote_config": True}
+
 
 def module_for(config, check_mode=False):
     return FakeModule({"account_id": "account", "tunnel_id": "tunnel", "config": config}, check_mode)
@@ -21,6 +23,7 @@ def module_for(config, check_mode=False):
 class CfdTunnelConfigurationsTests(TestCase):
     def run_module(self, module, current, updated=None):
         client = Mock()
+        client.zero_trust.tunnels.cloudflared.get.return_value = REMOTE_TUNNEL
         api = client.zero_trust.tunnels.cloudflared.configurations
         api.get.return_value = current
         api.update.return_value = updated
@@ -229,3 +232,35 @@ class CfdTunnelConfigurationsTests(TestCase):
         )
 
         self.assertEqual(raised.values["msg"], "Cloudflare did not apply the tunnel configuration")
+
+    def test_locally_managed_tunnel_fails_before_any_change(self):
+        for tunnel in (
+            {"id": "tunnel", "config_src": "local", "remote_config": False},
+            {"id": "tunnel", "config_src": "local"},
+            {"id": "tunnel", "remote_config": False},
+        ):
+            for check_mode in (False, True):
+                with self.subTest(tunnel=tunnel, check_mode=check_mode):
+                    client = Mock()
+                    tunnels = client.zero_trust.tunnels.cloudflared
+                    tunnels.get.return_value = tunnel
+                    with self.assertRaises(ModuleFail) as raised:
+                        cfd_tunnel_configurations.run(module_for({"warp": True}, check_mode), client)
+
+                    tunnels.get.assert_called_once_with("tunnel", account_id="account")
+                    tunnels.configurations.get.assert_not_called()
+                    tunnels.configurations.update.assert_not_called()
+                    self.assertEqual(
+                        raised.exception.values["msg"],
+                        "Cloudflared tunnel tunnel is locally managed and cannot use a remote configuration",
+                    )
+                    self.assertEqual(raised.exception.values["tunnel_id"], "tunnel")
+
+    def test_rejects_wrong_tunnel(self):
+        client = Mock()
+        client.zero_trust.tunnels.cloudflared.get.return_value = {**REMOTE_TUNNEL, "id": "other"}
+        with self.assertRaises(ModuleFail) as raised:
+            cfd_tunnel_configurations.run(module_for({"warp": True}), client)
+
+        client.zero_trust.tunnels.cloudflared.configurations.update.assert_not_called()
+        self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned the wrong cloudflared tunnel")
