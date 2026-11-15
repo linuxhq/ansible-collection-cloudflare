@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - cfd_tunnel_configurations - compare C(originRequest) values with their defaults and inherited values without
+    treating Booleans and numbers as equal. A number such as C(0) for C(noTLSVerify) matched the C(false) default, so
+    the module reported no change and never sent it; it is now sent, and Cloudflare's rejection is reported.
