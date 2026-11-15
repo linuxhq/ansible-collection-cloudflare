@@ -1,0 +1,10 @@
+---
+bugfixes:
+  - rules_lists - fail before any change when a C(hostname.url_hostname) has a character other than ASCII letters,
+    digits, C(.), C(-), C(_), and C(*), such as a port, a space, or a non-ASCII letter. Cloudflare rejected these
+    only after the module had created the list.
+  - rules_lists - fail before any change when an C(ip) entry is a scoped IPv6 address such as C(fe80::1%eth0).
+    Cloudflare rejected it only after the module had created the list.
+  - rules_lists - match an C(ip) prefix length with leading zeros such as C(10.0.0.0/08) with the form Cloudflare
+    stores, C(10.0.0.0/8). The module wrote the items and then failed because Cloudflare did not apply them as
+    written.

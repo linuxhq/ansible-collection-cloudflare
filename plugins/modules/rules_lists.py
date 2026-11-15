@@ -54,11 +54,17 @@ options:
         C(source_url) and C(target_url).
       - An C(ip) entry must be an IP address, or a CIDR with a prefix length of
         8 to 32 for IPv4 or 12 to 128 for IPv6 and no host bits set.
-        IPv4-mapped IPv6 addresses are not supported.
+        IPv4-mapped IPv6 addresses and scoped IPv6 addresses such as
+        C(fe80::1%eth0) are not supported.
       - A C(/32) IPv4 or C(/128) IPv6 entry is the same as the bare address,
-        which is how Cloudflare stores it.
-      - A C(hostname.url_hostname) entry must not include a scheme or a path,
-        and may use a C(*) wildcard only as a single leading C(*.) label.
+        which is how Cloudflare stores it, and a prefix length with leading
+        zeros such as C(/08) is the same as C(/8).
+      - A C(hostname.url_hostname) entry may contain only ASCII letters,
+        digits, C(.), C(-), C(_), and a C(*) wildcard, so it must not include a
+        scheme, a path, or a port. Write internationalized names in their
+        C(xn--) form.
+      - A C(hostname.url_hostname) entry may use a C(*) wildcard only as a
+        single leading C(*.) label.
       - C(hostname.exclude_exact_hostname=false) may be set only when
         C(hostname.url_hostname) is a wildcard such as C(*.example.com).
       - An C(asn) entry must be an integer from 1 to 4294967295.
@@ -169,6 +175,7 @@ message:
 """
 
 import json
+import string
 import time
 from difflib import SequenceMatcher
 from ipaddress import ip_address, ip_network
@@ -215,6 +222,11 @@ IDENTITY_FIELDS = {
 
 SOURCE_URL_SCHEMES = ("http", "https")
 
+# Characters the SDK documents for a hostname url_hostname (ASCII letters,
+# digits, '*', and '-'), plus '.', '_', and uppercase letters, which
+# Cloudflare also accepts.
+HOSTNAME_CHARACTERS = frozenset(string.ascii_letters + string.digits + "*-._")
+
 # Fields the SDK item models require inside each mapping-valued list kind.
 REQUIRED_STRING_FIELDS = {
     "hostname": ("url_hostname",),
@@ -249,6 +261,9 @@ def canonical_ip(value):
 
     if prefix.isascii() and prefix.isdigit() and int(prefix) == parsed.max_prefixlen:
         return str(parsed)
+
+    if prefix.isascii() and prefix.isdigit():
+        prefix = str(int(prefix))
 
     return f"{parsed}{separator}{prefix}"
 
@@ -453,7 +468,7 @@ def checked_list(module, rules_list, name, kind, expected_id=None):
 
 def valid_ip(value):
     """Return whether value is an IP address or a CIDR that Cloudflare accepts."""
-    if not isinstance(value, str):
+    if not isinstance(value, str) or "%" in value:
         return False
 
     address, separator, prefix = value.partition("/")
@@ -480,8 +495,8 @@ def valid_ip(value):
 
 
 def valid_hostname(value):
-    """Return whether value has no scheme or path, and `*` appears only as a single leading `*.` label."""
-    if "/" in value:
+    """Return whether value has only supported characters, and `*` appears only as a single leading `*.` label."""
+    if not set(value) <= HOSTNAME_CHARACTERS:
         return False
 
     return "*" not in value.removeprefix("*.")
@@ -565,8 +580,8 @@ def validate_elements(module, kind):
         if isinstance(url_hostname, str) and not valid_hostname(url_hostname):
             module.fail_json(
                 msg=(
-                    f"elements[{index}].hostname.url_hostname must not include a scheme or a path, "
-                    "and may use a '*' wildcard only as a single leading '*.' label"
+                    f"elements[{index}].hostname.url_hostname may contain only ASCII letters, digits, "
+                    "'.', '-', '_', and a '*' wildcard only as a single leading '*.' label"
                 ),
                 url_hostname=url_hostname,
             )
@@ -589,7 +604,7 @@ def validate_elements(module, kind):
                 msg=(
                     f"elements[{index}].ip must be an IP address, or a CIDR with a prefix length "
                     "of 8 to 32 for IPv4 or 12 to 128 for IPv6 and no host bits set, "
-                    "and must not be an IPv4-mapped IPv6 address"
+                    "and must not be an IPv4-mapped or scoped IPv6 address"
                 ),
                 ip=element["ip"],
             )

@@ -380,6 +380,8 @@ class RulesListsTests(TestCase):
             "2001:db0::/12",
             "::ffff:1.2.3.4",
             "::ffff:0:0/96",
+            "fe80::1%eth0",
+            "fe80::%1/64",
         ):
             for lists, updates in (
                 ([], {}),
@@ -410,6 +412,7 @@ class RulesListsTests(TestCase):
             "1.2.3.0/24",
             "2001:db8::1/128",
             "2001:0DB8::1",
+            "10.0.0.0/08",
         ):
             with self.subTest(value=value):
                 self.assertTrue(rules_lists.valid_ip(value))
@@ -426,6 +429,9 @@ class RulesListsTests(TestCase):
                 "ex*.example.com",
                 "a.*.example.com",
                 "*.*.example.com",
+                "example.com:443",
+                "exa mple.com",
+                "bücher.example",
             )
         ] + [
             ("asn", {"asn": value}, "elements[1].asn must be an integer from 1 to 4294967295", value)
@@ -601,6 +607,10 @@ class RulesListsTests(TestCase):
         for kind, element in (
             ("hostname", {"hostname": {"url_hostname": "*.example.com"}}),
             ("hostname", {"hostname": {"url_hostname": "example.com"}}),
+            ("hostname", {"hostname": {"url_hostname": "a_b.example.com"}}),
+            ("hostname", {"hostname": {"url_hostname": "example.com."}}),
+            ("hostname", {"hostname": {"url_hostname": "Example.COM"}}),
+            ("hostname", {"hostname": {"url_hostname": "xn--bcher-kva.example"}}),
             ("asn", {"asn": 1}),
             ("asn", {"asn": 13335}),
             ("asn", {"asn": 4294967295}),
@@ -774,6 +784,16 @@ class RulesListsTests(TestCase):
 
                 api.items.update.assert_not_called()
                 self.assertFalse(result["changed"])
+
+    def test_prefix_lengths_with_leading_zeros_match_stored_prefixes(self):
+        current = {**CURRENT, "num_items": 2}
+        items = [{"ip": "10.0.0.0/8"}, {"ip": "2001:db8::/32"}]
+        client, api = make_client([current], items=items)
+
+        result = self.run_module(FakeModule(params(elements=[{"ip": "10.0.0.0/08"}, {"ip": "2001:db8::/032"}])), client)
+
+        api.items.update.assert_not_called()
+        self.assertFalse(result["changed"])
 
     def test_generated_sdk_iterator_reads_all_current_items(self):
         current = {**CURRENT, "num_items": 2}
