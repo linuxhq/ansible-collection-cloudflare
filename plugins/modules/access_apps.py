@@ -137,6 +137,10 @@ options:
       - Cloudflare returns the policies in ascending C(precedence) order, so
         entries that set C(precedence) must be listed in that order; otherwise
         the module fails before any change.
+      - Inline policy selectors in C(include), C(exclude), and C(require) use
+        Cloudflare API key names, such as C(github-organization) and
+        C(azureAD); the SDK spellings C(github_organization) and C(azure_ad)
+        fail before any change.
   same_site_cookie_attribute:
     type: str
     description:
@@ -215,6 +219,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     find_resource,
     payload_from_params,
     serialize_resource,
+    validate_access_selectors,
 )
 
 FIELDS = (
@@ -405,6 +410,8 @@ def run(module, client):
     if params["state"] == "present":
         validate_type_fields(module)
         validate_policy_order(module)
+        for index, policy in enumerate(params.get("policies") or ()):
+            validate_access_selectors(module, policy, f"policies[{index}].")
 
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the Access application",

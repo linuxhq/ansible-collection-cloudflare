@@ -362,13 +362,20 @@ ACCESS_SELECTOR_API_KEYS = {
 ACCESS_SELECTOR_FIELDS = ("exclude", "include", "require")
 
 
-def validate_access_selectors(module):
-    """Fail when an Access selector uses an SDK spelling instead of its API key."""
+def validate_access_selectors(module, rules=None, prefix=""):
+    """Fail when an Access selector uses an SDK spelling instead of its API key.
+
+    rules defaults to the module parameters; prefix names their location in
+    failure messages, such as "policies[0].".
+    """
+    rules = module.params if rules is None else rules
     for field in ACCESS_SELECTOR_FIELDS:
-        for selector in module.params.get(field) or ():
+        for selector in rules.get(field) or ():
             for key, api_key in ACCESS_SELECTOR_API_KEYS.items():
                 if key in selector:
-                    module.fail_json(msg=f"{field} selector {key!r} must use the Cloudflare API key {api_key!r}")
+                    module.fail_json(
+                        msg=f"{prefix}{field} selector {key!r} must use the Cloudflare API key {api_key!r}"
+                    )
 
 
 def validate_tunnel_secret(module, secret):

@@ -424,6 +424,33 @@ class AccessAppsTests(TestCase):
         self.assertEqual(result["expected_order"], [{"id": "c", "precedence": 1}, {"id": "a", "precedence": 2}])
         api.list.assert_not_called()
 
+    def test_inline_policy_sdk_selector_keys_fail_before_any_request(self):
+        cases = (
+            ("include", "github_organization", "github-organization"),
+            ("exclude", "azure_ad", "azureAD"),
+            ("require", "github_organization", "github-organization"),
+        )
+        for field, key, api_key in cases:
+            policies = [{"id": "a"}, {"name": "inline", "decision": "allow", field: [{key: {"id": "x"}}]}]
+            client, api = client_with()
+            with self.subTest(field=field, key=key):
+                result = self.run_module(FakeModule(params(policies=policies)), client)
+
+                self.assertEqual(
+                    result["msg"], f"policies[1].{field} selector {key!r} must use the Cloudflare API key {api_key!r}"
+                )
+                api.list.assert_not_called()
+
+    def test_inline_policy_api_selector_keys_are_accepted(self):
+        include = [{"github-organization": {"identity_provider_id": "idp", "name": "org"}}]
+        policies = [{"name": "inline", "decision": "allow", "include": include}]
+        client, api = client_with([stored(policies=policies)])
+
+        result = self.run_module(FakeModule(params(policies=policies)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_policies_in_precedence_order_match_stored_order(self):
         policies = [{"id": "b", "precedence": 1}, {"id": "a", "precedence": 2}]
         client, api = client_with([stored(policies=policies)])
