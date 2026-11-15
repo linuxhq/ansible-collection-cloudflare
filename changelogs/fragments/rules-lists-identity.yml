@@ -7,3 +7,5 @@ bugfixes:
     that is not a wildcard. Cloudflare rejects it after the list was created.
   - rules_lists - match a C(redirect.source_url) element without a path, such as C(example.com), with the trailing slash
     Cloudflare stores. Every run wrote the items again and then failed because Cloudflare did not apply them.
+  - rules_lists - fail before any request when a C(redirect.source_url) element includes a query string, a fragment, or
+    a port. Cloudflare rejects it after the list was created.

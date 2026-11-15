@@ -74,6 +74,8 @@ options:
         C(*.example.com) and its exact hostname C(example.com), whatever the
         value of C(exclude_exact_hostname); Cloudflare treats them as
         duplicates.
+      - A C(redirect.source_url) must not include a query string such as
+        C(?x=1), a fragment such as C(#top), or a port such as C(:8080).
       - A C(redirect.status_code), when set, must be the integer 301, 302,
         307, or 308.
   operation_timeout:
@@ -232,15 +234,19 @@ def canonical_ip(value):
     return f"{parsed}{separator}{prefix}"
 
 
+def source_url_location(value):
+    """Return value without a leading scheme such as https://."""
+    scheme, separator, rest = value.partition("://")
+    return rest if separator and "/" not in scheme else value
+
+
 def canonical_source_url(value):
     # Cloudflare stores a source URL without a path, such as example.com, with
     # a trailing slash.
     if not isinstance(value, str):
         return value
 
-    scheme, separator, rest = value.partition("://")
-    host = rest if separator and "/" not in scheme else value
-    return value if "/" in host else f"{value}/"
+    return value if "/" in source_url_location(value) else f"{value}/"
 
 
 def canonical_item(item):
@@ -479,6 +485,16 @@ def valid_hostname(value):
     return "*" not in value.removeprefix("*.")
 
 
+def valid_source_url(value):
+    """Return whether value has no query string, fragment, or port, which Cloudflare rejects."""
+    if "?" in value or "#" in value:
+        return False
+
+    authority = source_url_location(value).partition("/")[0]
+    host, separator, port = authority.rpartition(":")
+    return not (separator and host and ":" not in host and "[" not in authority and port.isascii() and port.isdigit())
+
+
 def validate_elements(module, kind):
     """Fail when an element lacks the field that stores the list kind, has other keys, or holds an invalid value."""
     for index, element in enumerate(module.params.get("elements") or ()):
@@ -511,6 +527,13 @@ def validate_elements(module, kind):
             module.fail_json(
                 msg=f"elements[{index}].redirect.status_code must be one of 301, 302, 307, or 308",
                 status_code=status_code,
+            )
+
+        source_url = redirect.get("source_url") if isinstance(redirect, dict) else None
+        if isinstance(source_url, str) and not valid_source_url(source_url):
+            module.fail_json(
+                msg=f"elements[{index}].redirect.source_url must not include a query string, a fragment, or a port",
+                source_url=source_url,
             )
 
         hostname = element.get("hostname") if kind == "hostname" else None

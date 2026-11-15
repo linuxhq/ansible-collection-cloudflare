@@ -517,6 +517,43 @@ class RulesListsTests(TestCase):
                 status_code=value,
             )
 
+    def test_source_urls_with_a_query_fragment_or_port_fail_before_any_write(self):
+        for value in (
+            "example.com/a?x=1",
+            "example.com/?x=1",
+            "example.com/a?",
+            "example.com?x=1",
+            "https://example.com/a?x=1",
+            "example.com/a#frag",
+            "example.com#f",
+            "example.com:8080/a",
+            "localhost:80/a",
+            "https://example.com:8080/a",
+            "https://example.com:443",
+        ):
+            self.assert_elements_fail_before_any_write(
+                "redirect",
+                [
+                    {"redirect": {"source_url": "example.com/b", "target_url": "https://example.net"}},
+                    {"redirect": {"source_url": value, "target_url": "https://example.net"}},
+                ],
+                "elements[1].redirect.source_url must not include a query string, a fragment, or a port",
+                source_url=value,
+            )
+
+    def test_source_urls_cloudflare_accepts_are_accepted(self):
+        for value in (
+            "example.com/a",
+            "http://example.com/a",
+            "example.com/a:b",
+            "example.com/a%3Fx",
+            "[2001:db8::1]/a",
+            "https://[2001:db8::1]/a",
+            "https://example.com:/a",
+        ):
+            with self.subTest(source_url=value):
+                self.assertTrue(rules_lists.valid_source_url(value))
+
     def test_valid_redirect_status_codes_are_accepted(self):
         for value in (301, 302, 307, 308, None):
             with self.subTest(status_code=value):
