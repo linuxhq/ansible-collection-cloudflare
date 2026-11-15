@@ -434,6 +434,22 @@ class ValueTests(TestCase):
             },
         )
 
+    def test_access_selectors_reject_several_rules_in_one_selector(self):
+        for field in ("include", "exclude", "require"):
+            with self.subTest(field=field):
+                rules = {field: [{"everyone": {}}, {"ip": {"ip": "192.0.2.0/24"}, "unknown_type": {}}]}
+
+                with self.assertRaises(ModuleFail) as raised:
+                    validate_access_selectors(FakeModule({}), rules, "policies[0].")
+
+                self.assertEqual(
+                    raised.exception.values,
+                    {
+                        "msg": f"policies[0].{field}[1] sets the selectors 'ip', 'unknown_type', which Cloudflare "
+                        f"splits into separate {field} entries; list each selector as its own entry"
+                    },
+                )
+
     def test_access_selectors_accept_stored_fields_and_unknown_selector_types(self):
         rules = {
             "include": [

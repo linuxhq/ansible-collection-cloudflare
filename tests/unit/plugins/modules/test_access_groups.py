@@ -124,6 +124,22 @@ class AccessGroupsTests(TestCase):
                 api.list.assert_not_called()
                 api.create.assert_not_called()
 
+    def test_rejects_selector_with_several_rules_before_any_request(self):
+        include = [{"email": {"email": "a@example.com"}}, {"email": {"email": "b@example.com"}, "everyone": {}}]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(include=include), check_mode=check_mode), client)
+
+                self.assertEqual(
+                    result["msg"],
+                    "include[1] sets the selectors 'email', 'everyone', which Cloudflare splits into separate include "
+                    "entries; list each selector as its own entry",
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
     def test_stored_selector_fields_are_sent(self):
         include = [{"email": {"email": "a@example.com"}}, {"everyone": {}}, {"ip": {"ip": "192.0.2.0/24"}}]
         created = {"id": "group", "name": "admins", "include": include}

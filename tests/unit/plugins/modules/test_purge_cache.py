@@ -91,6 +91,23 @@ class PurgeCacheTests(TestCase):
         purge.assert_called_once_with(zone_id="zone", purge_everything=True, files=files)
         self.assertTrue(result["changed"])
 
+    def test_rejects_unused_file_fields_before_any_request(self):
+        files = [
+            "https://example.com/a.css",
+            {"url": "https://example.com/", "headrs": {"Accept-Language": "en"}},
+            {"url": "https://example.com/b", "headers": {}, "bogus": 1},
+        ]
+        unsupported = ["cache.files[1].headrs", "cache.files[2].bogus"]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                result, client = self.run_main(FakeModule(params(cache={"files": files}), check_mode=check_mode))
+
+                client.assert_not_called()
+                self.assertEqual(result["unsupported_fields"], unsupported)
+                self.assertEqual(
+                    result["msg"], f"Cloudflare does not use these cache purge fields: {', '.join(unsupported)}"
+                )
+
     def test_check_mode_reports_missing_sdk(self):
         with patch.object(cloudflare_utils, "Cloudflare", None):
             result, client = self.run_main(FakeModule(params(), check_mode=True))
