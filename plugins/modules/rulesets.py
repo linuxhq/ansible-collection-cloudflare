@@ -215,7 +215,14 @@ def comparable_rules(rules, desired_rules):
     comparable = []
     for index, rule in enumerate(rules):
         desired = desired_rules[index] if index < len(desired_rules) else {}
-        rule = {**{key: value for key, value in EMPTY_RULE_FIELDS.items() if key in desired}, **rule}
+        # A null request field is omitted from the comparison, so only an
+        # empty request value stands for the field Cloudflare dropped.
+        empty = {
+            key: value
+            for key, value in EMPTY_RULE_FIELDS.items()
+            if key in desired and not values_differ(desired[key], value)
+        }
+        rule = {**empty, **rule}
         comparable.append(
             {
                 key: (
