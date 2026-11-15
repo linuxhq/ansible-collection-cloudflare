@@ -1,0 +1,11 @@
+---
+bugfixes:
+  - access_apps - compare C(include), C(exclude), and C(require) of an inline policy in O(policies) exactly. A selector
+    key or a whole selector list removed from an inline policy reported no change and was never applied. An omitted
+    selector list matches an empty one; links to reusable policies are still compared only on the keys they set.
+  - access_groups, access_policies - match the C(id) Cloudflare adds to a C(github-organization) selector against a
+    selector that omits it. A C(github-organization) selector was written on every run and then failed because
+    Cloudflare did not apply it.
+  - rules_lists - bound the rollback delete of a newly created Rules list to a single 30 second request, so it no longer
+    runs up to three minutes with the default retries after O(operation_timeout) is spent, and roll the list back
+    when the item operation status names the wrong operation.

@@ -182,6 +182,24 @@ class AccessPoliciesTests(TestCase):
         self.assertEqual(api.update.call_args.kwargs["include"], include)
         self.assertTrue(result["changed"])
 
+    def test_assigned_github_organization_id_matches_request(self):
+        include = [{"github-organization": {"identity_provider_id": "idp", "name": "org"}}]
+        created = policy(
+            include=[{"github-organization": {"identity_provider_id": "idp", "id": "314135", "name": "org"}}]
+        )
+        client, api = client_with(created=created)
+
+        result = self.run_module(FakeModule(params(include=include)), client)
+
+        self.assertEqual(result["message"], "Access policy created")
+
+        client, api = client_with([created])
+
+        result = self.run_module(FakeModule(params(include=include)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_rejects_sdk_selector_key_before_any_request(self):
         client, api = client_with()
 

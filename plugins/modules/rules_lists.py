@@ -101,7 +101,11 @@ options:
       - The budget bounds each request's timeout rather than enforcing a hard
         wall-clock limit, so a single slow request can briefly exceed it.
       - Must be at least 1 second.
-      - When executed asynchronously, the async budget must exceed this value.
+      - When the items of a Rules list this run created are rejected, the list
+        is deleted again in one more request of up to 30 seconds, which can
+        extend past this budget.
+      - When executed asynchronously, the async budget must exceed this value
+        by at least that rollback time.
   state:
     type: str
     choices:
@@ -202,6 +206,9 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 
 ITEMS_PER_PAGE = 500
 OPERATION_POLL_SECONDS = 2
+# The rollback delete runs after the operation budget may be spent, so it is
+# bounded on its own.
+ROLLBACK_TIMEOUT_SECONDS = 30
 
 # Missing items the failure message pairs with a stored value; the rest are
 # only returned in missing_items and unexpected_items.
@@ -400,7 +407,12 @@ def wait_for_operation(module, client, account_id, operation, deadline, fail=Non
                 operation_id=operation_id,
             )
 
-        resource_id(module, status, "Rules list operation", expected=operation_id)
+        if status.get("id") != operation_id:
+            fail(
+                msg="Cloudflare API returned the wrong Rules list operation",
+                operation_id=operation_id,
+                operation=status,
+            )
 
         operation_status = status["status"]
         if operation_status == "completed":
@@ -667,12 +679,14 @@ def fail_not_applied(module, kind, desired_items, stored_items):
     )
 
 
-def created_list_rollback(module, lists, account_id, list_id):
+def created_list_rollback(module, client, account_id, list_id):
     """Return a failure callback that deletes the Rules list this run created before failing."""
 
     def fail(**failure):
         try:
-            lists.delete(list_id, account_id=account_id)
+            client.with_options(timeout=ROLLBACK_TIMEOUT_SECONDS, max_retries=0).rules.lists.delete(
+                list_id, account_id=account_id
+            )
         except cloudflare.APIError as rollback_error:
             module.fail_json(
                 **{
@@ -794,7 +808,7 @@ def ensure_present(module, client, current):
         if items_changed:
             deadline = time.monotonic() + params["operation_timeout"]
             # A list this run created is deleted again when its items are rejected.
-            fail = created_list_rollback(module, lists, account_id, current_id) if created else module.fail_json
+            fail = created_list_rollback(module, client, account_id, current_id) if created else module.fail_json
             try:
                 items_operation = wait_for_operation(
                     module,
