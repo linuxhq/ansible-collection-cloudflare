@@ -41,6 +41,8 @@ options:
         such as C(description), removes it. Fields Cloudflare assigns, C(id), C(ref),
         C(version), and C(last_updated), are ignored unless set. A C(skip) rule
         without C(logging) uses Cloudflare's default, C(logging.enabled=true).
+        Cloudflare drops an empty C(description) or C(action_parameters), so either
+        matches a rule without that field.
       - A rule's C(action_parameters.headers) and C(action_parameters.rules) mappings
         are compared on their complete key sets, so omitting an entry removes it.
       - Use the Cloudflare API names for C(set_cache_control) directives, such as
@@ -180,6 +182,9 @@ ASSIGNED_RULE_FIELDS = ("id", "last_updated", "ref", "version")
 # Rule fields Cloudflare fills in when a rule with this action omits them.
 RULE_DEFAULTS = {"skip": {"logging": {"enabled": True}}}
 
+# Cloudflare drops these rule fields when they are empty.
+EMPTY_RULE_FIELDS = {"action_parameters": {}, "description": ""}
+
 # Header and skip-rule maps are compared whole, so removed entries count.
 EXACT_RULE_FIELDS = ("headers", "rules")
 
@@ -210,6 +215,7 @@ def comparable_rules(rules, desired_rules):
     comparable = []
     for index, rule in enumerate(rules):
         desired = desired_rules[index] if index < len(desired_rules) else {}
+        rule = {**{key: value for key, value in EMPTY_RULE_FIELDS.items() if key in desired}, **rule}
         comparable.append(
             {
                 key: (
