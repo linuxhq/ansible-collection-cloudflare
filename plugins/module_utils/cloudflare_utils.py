@@ -275,26 +275,6 @@ def select_fields(value, fields):
     return {field: value[field] for field in fields if field in value}
 
 
-def unsupported_fields(value, fields, path):
-    """Return the path of each key of the mapping value that fields does not list.
-
-    fields lists the allowed keys, or maps each allowed key to the fields of
-    its own mapping value, or to None when that value is not checked. Values
-    that are not mappings are not checked.
-    """
-    if not isinstance(value, dict):
-        return []
-
-    unknown = []
-    for key, item in value.items():
-        if key not in fields:
-            unknown.append(f"{path}.{key}")
-        elif isinstance(fields, dict) and fields[key] is not None:
-            unknown.extend(unsupported_fields(item, fields[key], f"{path}.{key}"))
-
-    return unknown
-
-
 def normalize_current_by_desired_fields(current, desired, exact_fields=()):
     """Project current onto the fields of desired.
 
@@ -430,54 +410,11 @@ def require_applied(module, resource, desired, resource_name, defaults=None, exa
         fail_not_applied(module, resource_name, applied_differences(projected, desired))
 
 
-# The SDK renames these snake_case selector keys to their API spellings on
-# write, so Cloudflare would store and return keys that never match the request.
-ACCESS_SELECTOR_API_KEYS = {
-    "azure_ad": "azureAD",
-    "github_organization": "github-organization",
-}
-
 ACCESS_SELECTOR_FIELDS = ("exclude", "include", "require")
 
 # Cloudflare adds these keys to the selectors below, such as the GitHub
 # organization's id, so a stored selector matches a request that omits them.
 ACCESS_SELECTOR_ASSIGNED_KEYS = {"github-organization": ("id",)}
-
-# Fields of each Access selector, by its API key, from the cloudflare SDK
-# AccessRuleParam types. Cloudflare accepts any other field but drops it.
-ACCESS_SELECTOR_KEYS = {
-    "any_valid_service_token": (),
-    "auth_context": ("ac_id", "id", "identity_provider_id"),
-    "auth_method": ("auth_method",),
-    "azureAD": ("id", "identity_provider_id"),
-    "certificate": (),
-    "cloudflare_account_member": ("account_id",),
-    "common_name": ("common_name",),
-    "device_posture": ("account_id", "integration_uid"),
-    "email": ("email",),
-    "email_domain": ("domain",),
-    "email_list": ("id",),
-    "everyone": (),
-    "external_evaluation": ("evaluate_url", "keys_url"),
-    "geo": ("country_code",),
-    "github-organization": ("identity_provider_id", "name", "team"),
-    "group": ("id",),
-    "gsuite": ("email", "identity_provider_id"),
-    "ip": ("ip",),
-    "ip_list": ("id",),
-    "linked_app_token": ("app_uid",),
-    "login_method": ("id",),
-    "oidc": ("claim_name", "claim_value", "identity_provider_id"),
-    "okta": ("identity_provider_id", "name"),
-    "saml": ("attribute_name", "attribute_value", "identity_provider_id"),
-    "service_token": ("token_id",),
-    "service_token_tag": ("key", "value"),
-    "user_risk_score": ("user_risk_score",),
-}
-
-# Fields of an Access policy approval group, from the cloudflare SDK
-# ApprovalGroupParam type. Cloudflare accepts any other field but drops it.
-ACCESS_APPROVAL_GROUP_FIELDS = ("approvals_needed", "email_addresses", "email_list_uuid")
 
 
 def comparable_access_selector(selector, desired):
@@ -514,51 +451,6 @@ def comparable_access_rules(rules, desired):
             comparable[field] = [comparable_access_selector(*pair) for pair in zip(stored, requested)]
 
     return comparable
-
-
-def validate_access_selectors(module, rules=None, prefix=""):
-    """Fail when an Access selector uses an SDK spelling, several rules, a null value, or a field Cloudflare drops.
-
-    SDK spellings must use their API keys instead. Each selector sets one rule, as every SDK AccessRuleParam type has
-    one key; Cloudflare splits a selector with several rules into separate selectors. A known selector's value must be
-    a mapping, as in the SDK AccessRuleParam types; Cloudflare stores a null value as {}. Unknown selector keys are left
-    to Cloudflare, which rejects them. rules defaults to the module parameters; prefix names their location in failure
-    messages, such as "policies[0].".
-    """
-    rules = module.params if rules is None else rules
-    unknown = []
-    for field in ACCESS_SELECTOR_FIELDS:
-        for index, selector in enumerate(rules.get(field) or ()):
-            for key, api_key in ACCESS_SELECTOR_API_KEYS.items():
-                if key in selector:
-                    module.fail_json(
-                        msg=f"{prefix}{field} selector {key!r} must use the Cloudflare API key {api_key!r}"
-                    )
-
-            if isinstance(selector, dict) and len(selector) > 1:
-                module.fail_json(
-                    msg=f"{prefix}{field}[{index}] sets the selectors {', '.join(repr(key) for key in selector)}, which "
-                    f"Cloudflare splits into separate {field} entries; list each selector as its own entry"
-                )
-
-            for key, config in selector.items() if isinstance(selector, dict) else ():
-                if key not in ACCESS_SELECTOR_KEYS:
-                    continue
-
-                if not isinstance(config, dict):
-                    module.fail_json(
-                        msg=f"{prefix}{field}[{index}].{key} must be a mapping; use {{}} for a selector without "
-                        "fields, as Cloudflare stores a null selector as {}"
-                    )
-
-                fields = ACCESS_SELECTOR_KEYS[key] + ACCESS_SELECTOR_ASSIGNED_KEYS.get(key, ())
-                unknown.extend(unsupported_fields(config, fields, f"{prefix}{field}[{index}].{key}"))
-
-    if unknown:
-        module.fail_json(
-            msg=f"Cloudflare does not store these Access selector fields: {', '.join(unknown)}",
-            unsupported_fields=unknown,
-        )
 
 
 def validate_tunnel_secret(module, secret):

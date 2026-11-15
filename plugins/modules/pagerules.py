@@ -29,14 +29,6 @@ options:
     elements: dict
     description:
       - Actions applied when the page rule matches.
-      - Each action accepts only C(id) and C(value), and the
-        C(always_use_https), C(disable_apps), C(disable_performance),
-        C(disable_security), and C(disable_zaraz) actions accept only C(id).
-        The C(value) of a C(forwarding_url) action accepts only C(url) and
-        C(status_code), and that of a C(cache_key_fields) action only
-        C(cookie), C(header), C(host), C(query_string), and C(user), each with
-        the fields Cloudflare stores for it. Cloudflare accepts any other key
-        but does not store it, so the module fails before making changes.
       - Actions are compared by C(id), regardless of their order.
       - The C(value) of a C(cache_ttl_by_status) action is compared on every
         key, so a status code removed from it is removed from the rule. Other
@@ -48,10 +40,9 @@ options:
     elements: dict
     description:
       - URL matching conditions that identify the page rule.
-      - Each target accepts only C(target) and C(constraint), whose
-        C(operator) and C(value) are its only keys. Cloudflare accepts any
-        other key but does not store it, so the module fails before making
-        changes.
+      - The page rule is identified by each target's C(target) and its
+        C(constraint) C(operator) and C(value); other keys are compared with
+        the stored rule like any other setting.
       - URL values are matched as Cloudflare stores them, with the host in
         lowercase and a slash after a bare host, before any trailing wildcard.
   priority:
@@ -148,7 +139,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     require_mapping,
     serialize_resource,
-    unsupported_fields,
     values_differ,
 )
 
@@ -157,48 +147,6 @@ PRESERVED_FIELDS = ("priority", "status")
 
 # Actions whose value mapping is compared on every key, not only those requested.
 EXACT_VALUE_ACTIONS = ("cache_ttl_by_status",)
-
-# Fields Cloudflare stores, from the cloudflare SDK page rule create types; it
-# accepts any other field but drops it. Action values typed as mappings are
-# keyed by action id; other values are not checked.
-TARGET_FIELDS = {"constraint": ("operator", "value"), "target": None}
-ACTION_FIELDS = ("id", "value")
-# Actions whose SDK type has only an id; Cloudflare drops their value.
-ID_ONLY_ACTIONS = ("always_use_https", "disable_apps", "disable_performance", "disable_security", "disable_zaraz")
-ACTION_VALUE_FIELDS = {
-    "cache_key_fields": {
-        "cookie": ("check_presence", "include"),
-        "header": ("check_presence", "exclude", "include"),
-        "host": ("resolved",),
-        "query_string": ("exclude", "include"),
-        "user": ("device_type", "geo", "lang"),
-    },
-    "forwarding_url": ("status_code", "url"),
-}
-
-
-def validate_field_names(module):
-    """Fail when a target or action field Cloudflare accepts but never stores is requested."""
-    params = module.params
-    unknown = []
-    for index, target in enumerate(params["targets"]):
-        unknown.extend(unsupported_fields(target, TARGET_FIELDS, f"targets[{index}]"))
-
-    # Actions are not sent when removing a page rule.
-    actions = params.get("actions") if params["state"] == "present" else None
-    for index, action in enumerate(actions or ()):
-        path = f"actions[{index}]"
-        action_id = action.get("id")
-        fields = ("id",) if action_id in ID_ONLY_ACTIONS else ACTION_FIELDS
-        unknown.extend(unsupported_fields(action, fields, path))
-        if isinstance(action_id, str) and action_id in ACTION_VALUE_FIELDS:
-            unknown.extend(unsupported_fields(action.get("value"), ACTION_VALUE_FIELDS[action_id], f"{path}.value"))
-
-    if unknown:
-        module.fail_json(
-            msg=f"Cloudflare does not store these page rule fields: {', '.join(unknown)}",
-            unsupported_fields=unknown,
-        )
 
 
 def pagerule_targets(module, pagerule):
@@ -290,6 +238,25 @@ def comparable_pagerule(pagerule, actions):
     return {**pagerule, "actions": comparable_actions}
 
 
+def target_identity(targets):
+    """Return targets with only the target and constraint operator and value, which identify a page rule.
+
+    Other keys are compared as part of the rule, so a rule whose targets differ
+    only in them is updated rather than created again.
+    """
+    identity = []
+    for target in targets:
+        if isinstance(target, dict):
+            target = {key: value for key, value in target.items() if key in ("constraint", "target")}
+            constraint = target.get("constraint")
+            if isinstance(constraint, dict):
+                target["constraint"] = {key: value for key, value in constraint.items() if key in ("operator", "value")}
+
+        identity.append(target)
+
+    return identity
+
+
 def find_pagerule(module, client, targets):
     """Return the page rule matching targets, or None, and the zone's rule count."""
     zone_id = module.params["zone_id"]
@@ -300,10 +267,12 @@ def find_pagerule(module, client, targets):
         # The SDK types this response as optional; treat null as no rules.
         pagerules = client.page_rules.list(zone_id=zone_id) or []
 
+    identity = target_identity(targets)
     found = None
     for pagerule in pagerules:
         pagerule = serialize_resource(pagerule)
-        if not values_differ(normalize_current_by_desired_fields(pagerule_targets(module, pagerule), targets), targets):
+        stored = target_identity(pagerule_targets(module, pagerule))
+        if not values_differ(normalize_current_by_desired_fields(stored, identity), identity):
             if found is not None:
                 module.fail_json(msg="Multiple page rules match the requested target constraints")
 
@@ -336,7 +305,6 @@ def validate_priority(module, current, rule_count):
 def run(module, client):
     zone_id = module.params["zone_id"]
     page_rules = client.page_rules
-    validate_field_names(module)
     targets = canonical_targets(module.params["targets"])
     current, rule_count = find_pagerule(module, client, targets)
 

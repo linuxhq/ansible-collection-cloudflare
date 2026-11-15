@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - pagerules - identify a page rule by each target's C(target) and C(constraint) C(operator) and C(value) only. A
+    target with another key, which Cloudflare does not store, never matched the stored rule, so every run created
+    another page rule.

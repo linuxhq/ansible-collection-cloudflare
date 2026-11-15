@@ -43,10 +43,6 @@ options:
       - Set C(web_analytics_tag) or C(web_analytics_token) to null to clear it.
         Cloudflare keeps the value of any other build setting set to null, so the
         module fails before making changes.
-      - Only C(build_caching), C(build_command), C(destination_dir), C(root_dir),
-        C(web_analytics_tag), and C(web_analytics_token) are supported. Cloudflare
-        accepts any other key, such as C(build_image_major_version), but does not
-        store it, so the module fails before making changes.
   deployment_configs:
     type: dict
     description:
@@ -62,13 +58,6 @@ options:
         C(compatibility_date), a whole C(env_vars) or binding map, or a field
         inside an entry other than C(services) C(entrypoint) and C(r2_buckets)
         C(jurisdiction), so the module fails before making changes.
-      - Keys under C(preview) and C(production) must be Pages deployment
-        settings, such as C(compatibility_date), C(env_vars), or
-        C(build_image_major_version). Cloudflare accepts any other key but does
-        not store it, so the module fails before making changes.
-      - The same applies to fields of C(limits), C(placement), and each
-        C(env_vars) or binding entry, such as C(type) and C(value) of an
-        environment variable or C(namespace_id) of a C(kv_namespaces) entry.
   rotate_secrets:
     type: bool
     default: false
@@ -176,60 +165,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 
 FIELDS = ("build_config", "deployment_configs", "name", "production_branch", "source")
 
-# Cloudflare accepts other keys in build_config and in a preview or production
-# deployment config but does not store them. These match the cloudflare SDK
-# BuildConfig and DeploymentConfigsPreview/DeploymentConfigsProduction types.
-BUILD_SETTINGS = (
-    "build_caching",
-    "build_command",
-    "destination_dir",
-    "root_dir",
-    "web_analytics_tag",
-    "web_analytics_token",
-)
-DEPLOYMENT_SETTINGS = (
-    "ai_bindings",
-    "always_use_latest_compatibility_date",
-    "analytics_engine_datasets",
-    "browsers",
-    "build_image_major_version",
-    "compatibility_date",
-    "compatibility_flags",
-    "d1_databases",
-    "durable_object_namespaces",
-    "env_vars",
-    "fail_open",
-    "hyperdrive_bindings",
-    "kv_namespaces",
-    "limits",
-    "mtls_certificates",
-    "placement",
-    "queue_producers",
-    "r2_buckets",
-    "services",
-    "usage_model",
-    "vectorize_bindings",
-    "wrangler_config_hash",
-)
-# Fields of each entry in a deployment env_vars or binding map, and of each
-# deployment setting object, from the same cloudflare SDK types.
-DEPLOYMENT_ENTRY_FIELDS = {
-    "ai_bindings": ("project_id",),
-    "analytics_engine_datasets": ("dataset",),
-    "browsers": (),
-    "d1_databases": ("id",),
-    "durable_object_namespaces": ("namespace_id",),
-    "env_vars": ("type", "value"),
-    "hyperdrive_bindings": ("id",),
-    "kv_namespaces": ("namespace_id",),
-    "mtls_certificates": ("certificate_id",),
-    "queue_producers": ("name",),
-    "r2_buckets": ("name", "jurisdiction"),
-    "services": ("service", "entrypoint", "environment"),
-    "vectorize_bindings": ("index_name",),
-}
-DEPLOYMENT_OBJECT_FIELDS = {"limits": ("cpu_ms",), "placement": ("mode",)}
-
 # Cloudflare clears these settings when they are set to null, but keeps the
 # current value of any other setting set to null.
 NULLABLE_BUILD_SETTINGS = ("web_analytics_tag", "web_analytics_token")
@@ -260,33 +195,6 @@ def contains_null(value):
         return any(contains_null(item) for item in value)
 
     return value is None
-
-
-def validate_setting_names(module):
-    """Fail when a setting Cloudflare accepts but never stores is requested."""
-    params = module.params
-    unknown = [f"build_config.{key}" for key in params.get("build_config") or {} if key not in BUILD_SETTINGS]
-    for environment in ("preview", "production"):
-        config = (params.get("deployment_configs") or {}).get(environment)
-        for key, value in config.items() if isinstance(config, dict) else ():
-            path = f"deployment_configs.{environment}.{key}"
-            if key not in DEPLOYMENT_SETTINGS:
-                unknown.append(path)
-
-            if key in DEPLOYMENT_OBJECT_FIELDS and isinstance(value, dict):
-                unknown.extend(f"{path}.{field}" for field in value if field not in DEPLOYMENT_OBJECT_FIELDS[key])
-
-            # Entries may be null, which deletes them.
-            for name, entry in value.items() if key in DEPLOYMENT_ENTRY_FIELDS and isinstance(value, dict) else ():
-                for field in entry if isinstance(entry, dict) else ():
-                    if field not in DEPLOYMENT_ENTRY_FIELDS[key]:
-                        unknown.append(f"{path}.{name}.{field}")
-
-    if unknown:
-        module.fail_json(
-            msg=f"Cloudflare does not store these Pages project settings: {', '.join(unknown)}",
-            unsupported_settings=unknown,
-        )
 
 
 def validate_null_settings(module):
@@ -667,7 +575,6 @@ def ensure_absent(module, client):
 def run(module, client):
     domain_names = desired_domain_names(module)
     if module.params["state"] == "present":
-        validate_setting_names(module)
         validate_null_settings(module)
         ensure_present(module, client, domain_names)
 

@@ -21,11 +21,6 @@ bugfixes:
     failed on every run.
   - warp_connector - when applying O(tunnel_secret) to a new connector fails, report the connector ID, that it was
     rolled back, and the error's status code and response. When the rollback also fails, report both errors.
-  - pages_projects - fail before any request when O(build_config) holds a key other than C(build_caching),
-    C(build_command), C(destination_dir), C(root_dir), C(web_analytics_tag), or C(web_analytics_token), such as
-    C(build_image_major_version), or when O(deployment_configs) C(preview) or C(production) holds a key that is not a
-    Pages deployment setting. Cloudflare accepts these keys but never stores them, so the module wrote and then failed
-    on every run. C(build_image_major_version) under O(deployment_configs) C(preview) or C(production) is supported.
 trivial:
   - rules_lists and rules_lists_info Molecule scenarios - use the list name C(molecule_monitoring), so the scenarios
     cannot modify or delete an account's own C(monitoring) list.
