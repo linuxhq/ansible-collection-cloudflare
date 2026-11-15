@@ -105,6 +105,35 @@ class AccessGroupsTests(TestCase):
                 api.list.assert_not_called()
                 api.create.assert_not_called()
 
+    def test_rejects_unstored_selector_fields_before_any_request(self):
+        include = [{"email": {"email": "a@example.com", "bogus": "x"}}, {"everyone": {"bogus": 1}}]
+        require = [{"github-organization": {"identity_provider_id": "idp", "name": "org", "id": "1", "extra": 1}}]
+        unsupported = ["include[0].email.bogus", "include[1].everyone.bogus", "require[0].github-organization.extra"]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(
+                    FakeModule(params(include=include, require=require), check_mode=check_mode), client
+                )
+
+                self.assertEqual(result["unsupported_fields"], unsupported)
+                self.assertEqual(
+                    result["msg"], f"Cloudflare does not store these Access selector fields: {', '.join(unsupported)}"
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_stored_selector_fields_are_sent(self):
+        include = [{"email": {"email": "a@example.com"}}, {"everyone": {}}, {"ip": {"ip": "192.0.2.0/24"}}]
+        created = {"id": "group", "name": "admins", "include": include}
+        client, api = client_with(created=created)
+
+        result = self.run_module(FakeModule(params(include=include)), client)
+
+        self.assertNotIn("msg", result)
+        api.create.assert_called_once_with(account_id="account", include=include, name="admins")
+
     def test_creates_group(self):
         created = {"id": "group", "name": "admins", "include": INCLUDE}
         client, api = client_with(created=created)

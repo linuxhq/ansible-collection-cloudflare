@@ -14,6 +14,10 @@ description:
     compared exactly, including their nested fields, except that the C(id)
     Cloudflare adds to a C(github-organization) selector matches a selector
     that omits it.
+  - A selector of a known type accepts only the nested fields Cloudflare
+    stores for it, such as C(email) of an C(email) selector. Cloudflare
+    accepts any other field but does not store it, so the module fails before
+    making changes.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)

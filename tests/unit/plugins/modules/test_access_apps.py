@@ -441,6 +441,82 @@ class AccessAppsTests(TestCase):
                 )
                 api.list.assert_not_called()
 
+    def test_unstored_fields_fail_before_any_request(self):
+        cases = (
+            ({"cors_headers": {"allowed_methods": ["GET"], "foo": 1}}, ["cors_headers.foo"]),
+            ({"destinations": [{"type": "public", "uri": "app.example.com", "foo": 1}]}, ["destinations[0].foo"]),
+            ({"destinations": [{"type": "public", "cidr": "192.0.2.1"}]}, ["destinations[0].cidr"]),
+            ({"destinations": [{"uri": "app.example.com", "foo": 1}]}, ["destinations[0].foo"]),
+            ({"policies": [{"id": "a", "precedence": 1, "foo": 1}]}, ["policies[0].foo"]),
+            (
+                {"policies": [{"name": "inline", "decision": "allow", "include": [{"everyone": {}}], "foo": 1}]},
+                ["policies[0].foo"],
+            ),
+            (
+                {
+                    "policies": [
+                        {
+                            "name": "inline",
+                            "decision": "allow",
+                            "include": [{"everyone": {}}],
+                            "approval_groups": [{"approvals_needed": 1, "email_addresses": ["a@example.com"], "x": 1}],
+                        }
+                    ]
+                },
+                ["policies[0].approval_groups[0].x"],
+            ),
+        )
+        for updates, unsupported in cases:
+            for check_mode in (True, False):
+                with self.subTest(updates=updates, check_mode=check_mode):
+                    client, api = client_with()
+
+                    result = self.run_module(FakeModule(params(**updates), check_mode=check_mode), client)
+
+                    self.assertEqual(result["unsupported_fields"], unsupported)
+                    self.assertEqual(
+                        result["msg"],
+                        f"Cloudflare does not store these Access application fields: {', '.join(unsupported)}",
+                    )
+                    api.list.assert_not_called()
+                    api.create.assert_not_called()
+
+    def test_inline_policy_unstored_selector_fields_fail_before_any_request(self):
+        policies = [{"name": "inline", "decision": "allow", "include": [{"email": {"email": "a@example.com", "x": 1}}]}]
+        client, api = client_with()
+
+        result = self.run_module(FakeModule(params(policies=policies)), client)
+
+        self.assertEqual(result["unsupported_fields"], ["policies[0].include[0].email.x"])
+        api.list.assert_not_called()
+
+    def test_stored_fields_are_sent(self):
+        cors = dict.fromkeys(access_apps.CORS_HEADERS_FIELDS, True)
+        destinations = [
+            {"type": "public", "uri": "app.example.com", "overrides": [{"behavior": "public", "path_pattern": "/a"}]},
+            {"type": "private", "cidr": "192.0.2.0/24", "l4_protocol": "tcp", "port_range": "22", "vnet_id": "v"},
+            {"uri": "app.example.com/b"},
+        ]
+        policies = [
+            {"id": "a", "precedence": 1},
+            {
+                "name": "inline",
+                "decision": "allow",
+                "include": [{"email": {"email": "a@example.com"}}],
+                "approval_groups": [{"approvals_needed": 1, "email_list_uuid": "list"}],
+                "precedence": 2,
+            },
+        ]
+        updates = {"cors_headers": cors, "destinations": destinations, "policies": policies}
+        client, api = client_with(created=stored(**updates))
+
+        result = self.run_module(FakeModule(params(**updates)), client)
+
+        self.assertNotIn("msg", result)
+        self.assertEqual(api.create.call_args.kwargs["cors_headers"], cors)
+        self.assertEqual(api.create.call_args.kwargs["destinations"], destinations)
+        self.assertEqual(api.create.call_args.kwargs["policies"], policies)
+
     def test_inline_policy_api_selector_keys_are_accepted(self):
         include = [{"github-organization": {"identity_provider_id": "idp", "name": "org"}}]
         policies = [{"name": "inline", "decision": "allow", "include": include}]

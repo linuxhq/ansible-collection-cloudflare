@@ -106,6 +106,51 @@ class ZonesTests(TestCase):
 
         client.zones.list.assert_not_called()
 
+    def test_unstored_setting_value_fields_fail_before_any_request(self):
+        hsts = {"enabled": True, "max_age": 0, "foo": 1}
+        settings = [
+            {"id": "security_header", "value": {"strict_transport_security": hsts, "bar": 1}},
+            {"id": "nel", "value": {"enabled": True, "foo": 1}},
+            {"id": "aegis", "value": {"enabled": False, "pool_id": "p", "foo": 1}},
+            {"id": "automatic_platform_optimization", "value": {"enabled": False, "foo": 1}},
+            {"id": "ciphers", "value": ["ECDHE-RSA-AES128-GCM-SHA256"]},
+            {"id": "other_object", "value": {"foo": 1}},
+        ]
+        unsupported = [
+            "settings[0].value.strict_transport_security.foo",
+            "settings[0].value.bar",
+            "settings[1].value.foo",
+            "settings[2].value.foo",
+            "settings[3].value.foo",
+        ]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client = client_with([ZONE])
+
+                result = self.run_module(FakeModule(params(settings=settings), check_mode=check_mode), client)
+
+                self.assertEqual(result["unsupported_fields"], unsupported)
+                self.assertEqual(
+                    result["msg"], f"Cloudflare does not store these zone setting fields: {', '.join(unsupported)}"
+                )
+                client.zones.list.assert_not_called()
+                client.zones.settings.get.assert_not_called()
+                client.zones.settings.edit.assert_not_called()
+
+    def test_stored_setting_value_fields_are_sent(self):
+        value = {
+            "strict_transport_security": dict.fromkeys(
+                ("enabled", "include_subdomains", "max_age", "nosniff", "preload"), True
+            )
+        }
+        updated = {"id": "security_header", "value": value}
+        client = client_with([ZONE], setting={"id": "security_header", "value": {}}, edited_setting=updated)
+
+        result = self.run_module(FakeModule(params(settings=[{"id": "security_header", "value": value}])), client)
+
+        self.assertNotIn("msg", result)
+        client.zones.settings.edit.assert_called_once_with(setting_id="security_header", zone_id="zone", value=value)
+
     def test_check_mode_does_not_create(self):
         client = client_with()
 

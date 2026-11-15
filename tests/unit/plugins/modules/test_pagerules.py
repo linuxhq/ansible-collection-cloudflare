@@ -304,3 +304,67 @@ class PageRulesTests(TestCase):
 
         api.delete.assert_called_once_with(pagerule_id="rule", zone_id="zone")
         self.assertTrue(result["changed"])
+
+    def test_unstored_fields_fail_before_any_request(self):
+        constraint = {"operator": "matches", "value": "example.com/*"}
+        forwarding = {"url": "https://example.com", "status_code": 301, "bar": 1}
+        cases = (
+            ({"targets": [{"target": "url", "constraint": constraint, "foo": 1}]}, ["targets[0].foo"]),
+            ({"targets": [{"target": "url", "constraint": {**constraint, "qux": 1}}]}, ["targets[0].constraint.qux"]),
+            ({"actions": [{"id": "always_use_https", "baz": 1}]}, ["actions[0].baz"]),
+            ({"actions": [{"id": "forwarding_url", "value": forwarding}]}, ["actions[0].value.bar"]),
+            (
+                {
+                    "actions": [
+                        {"id": "cache_key_fields", "value": {"host": {"resolved": True, "x": 1}, "y": {}}},
+                        {"id": "ssl", "value": "strict"},
+                    ]
+                },
+                ["actions[0].value.host.x", "actions[0].value.y"],
+            ),
+        )
+        for updates, unsupported in cases:
+            for check_mode in (True, False):
+                with self.subTest(updates=updates, check_mode=check_mode):
+                    client, api = client_with()
+
+                    result = self.run_module(FakeModule(params(**updates), check_mode=check_mode), client)
+
+                    self.assertEqual(result["unsupported_fields"], unsupported)
+                    self.assertEqual(
+                        result["msg"], f"Cloudflare does not store these page rule fields: {', '.join(unsupported)}"
+                    )
+                    api.list.assert_not_called()
+                    api.create.assert_not_called()
+
+    def test_unstored_target_fields_fail_before_delete(self):
+        targets = [{"target": "url", "constraint": {"value": "example.com/*"}, "foo": 1}]
+        client, api = client_with([{"id": "rule", "targets": TARGETS}])
+
+        result = self.run_module(FakeModule(params(state="absent", targets=targets)), client)
+
+        self.assertEqual(result["unsupported_fields"], ["targets[0].foo"])
+        api.list.assert_not_called()
+        api.delete.assert_not_called()
+
+    def test_stored_fields_are_sent(self):
+        targets = [{"target": "url", "constraint": {"operator": "matches", "value": "example.com/*"}}]
+        cache_key = {
+            "cookie": {"check_presence": ["a"], "include": ["b"]},
+            "header": {"check_presence": ["a"], "exclude": ["b"], "include": ["c"]},
+            "host": {"resolved": True},
+            "query_string": {"exclude": "*", "include": []},
+            "user": {"device_type": True, "geo": False, "lang": True},
+        }
+        actions = [
+            {"id": "cache_key_fields", "value": cache_key},
+            {"id": "cache_ttl_by_status", "value": {"404": 30}},
+            {"id": "forwarding_url", "value": {"url": "https://example.com", "status_code": 301}},
+        ]
+        created = {"id": "rule", "actions": actions, "status": "active", "targets": targets}
+        client, api = client_with(created=created)
+
+        result = self.run_module(FakeModule(params(actions=actions, targets=targets)), client)
+
+        self.assertNotIn("msg", result)
+        api.create.assert_called_once_with(zone_id="zone", actions=actions, status="active", targets=targets)
