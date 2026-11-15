@@ -59,13 +59,25 @@ options:
         which is how Cloudflare stores it.
       - A C(hostname.url_hostname) entry must not include a scheme or a path,
         and may use a C(*) wildcard only as a single leading C(*.) label.
+      - C(hostname.exclude_exact_hostname=false) may be set only when
+        C(hostname.url_hostname) is a wildcard such as C(*.example.com).
       - An C(asn) entry must be an integer from 1 to 4294967295.
       - Entries must not repeat a value of the list kind field, such as the same
         C(ip) with different C(comment) values; identical entries are merged.
+      - C(hostname) entries must not repeat a C(hostname.url_hostname), and
+        C(redirect) entries must not repeat a C(redirect.source_url), even when
+        their other fields differ.
+      - Write C(redirect.source_url) as Cloudflare stores it, such as
+        C(example.com/) rather than C(example.com); values are compared exactly
+        as written. When Cloudflare stores a different form, the module fails
+        and its message names each requested value next to the stored one.
       - C(hostname) entries must not include both a wildcard such as
         C(*.example.com) and its exact hostname C(example.com), whatever the
         value of C(exclude_exact_hostname); Cloudflare treats them as
         duplicates.
+      - A C(redirect.source_url) must not include a query string such as
+        C(?x=1), a fragment such as C(#top), userinfo such as C(user@), or a port
+        such as C(:8080), and may use only the C(http) or C(https) scheme.
       - A C(redirect.status_code), when set, must be the integer 301, 302,
         307, or 308.
   operation_timeout:
@@ -138,6 +150,16 @@ items_operation:
       description: Final bulk operation status.
       returned: always
       type: str
+missing_items:
+  description: Requested items that Cloudflare did not store.
+  returned: when Cloudflare did not apply the requested items
+  type: list
+  elements: dict
+unexpected_items:
+  description: Stored items that were not requested, such as the form Cloudflare stored a requested item in.
+  returned: when Cloudflare did not apply the requested items
+  type: list
+  elements: dict
 message:
   returned: always
   type: str
@@ -148,6 +170,7 @@ message:
 
 import json
 import time
+from difflib import SequenceMatcher
 from ipaddress import ip_address, ip_network
 
 from ansible.module_utils.basic import AnsibleModule
@@ -169,6 +192,10 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 ITEMS_PER_PAGE = 500
 OPERATION_POLL_SECONDS = 2
 
+# Missing items the failure message pairs with a stored value; the rest are
+# only returned in missing_items and unexpected_items.
+MESSAGE_ITEMS = 10
+
 ITEM_META_FIELDS = (
     "created_on",
     "id",
@@ -178,6 +205,15 @@ ITEM_META_FIELDS = (
 # Prefix lengths Cloudflare accepts in IP lists, by IP version:
 # https://developers.cloudflare.com/waf/tools/lists/custom-lists/
 IP_PREFIX_LENGTHS = {4: range(8, 33), 6: range(12, 129)}
+
+# Field that identifies an item of each mapping-valued list kind; Cloudflare
+# rejects two items with the same value even when their other fields differ.
+IDENTITY_FIELDS = {
+    "hostname": "url_hostname",
+    "redirect": "source_url",
+}
+
+SOURCE_URL_SCHEMES = ("http", "https")
 
 # Fields the SDK item models require inside each mapping-valued list kind.
 REQUIRED_STRING_FIELDS = {
@@ -451,6 +487,40 @@ def valid_hostname(value):
     return "*" not in value.removeprefix("*.")
 
 
+def source_url_error(value):
+    """Return why a redirect source URL includes a component Cloudflare does not support, or None."""
+    if "?" in value:
+        return "must not include a query string"
+
+    if "#" in value:
+        return "must not include a fragment"
+
+    scheme, separator, rest = value.partition("://")
+    if not separator or "/" in scheme:
+        scheme, rest = None, value
+
+    if scheme is not None and scheme.lower() not in SOURCE_URL_SCHEMES:
+        return "must use the http or https scheme, or none"
+
+    authority = rest.partition("/")[0]
+    if "@" in authority:
+        return "must not include userinfo"
+
+    host_port = authority.rpartition("]")[2] if authority.startswith("[") else authority
+    port = host_port.rpartition(":")[2]
+    if host_port.count(":") == 1 and port.isascii() and port.isdigit():
+        return "must not include a port"
+
+    return None
+
+
+def item_value(item, kind):
+    """Return the value that identifies an item of the list kind."""
+    value = item.get(kind)
+    field = IDENTITY_FIELDS.get(kind)
+    return value.get(field) if field and isinstance(value, dict) else value
+
+
 def validate_elements(module, kind):
     """Fail when an element lacks the field that stores the list kind, has other keys, or holds an invalid value."""
     for index, element in enumerate(module.params.get("elements") or ()):
@@ -485,6 +555,11 @@ def validate_elements(module, kind):
                 status_code=status_code,
             )
 
+        source_url = redirect.get("source_url") if isinstance(redirect, dict) else None
+        source_url_problem = source_url_error(source_url) if isinstance(source_url, str) else None
+        if source_url_problem:
+            module.fail_json(msg=f"elements[{index}].redirect.source_url {source_url_problem}", source_url=source_url)
+
         hostname = element.get("hostname") if kind == "hostname" else None
         url_hostname = hostname.get("url_hostname") if isinstance(hostname, dict) else None
         if isinstance(url_hostname, str) and not valid_hostname(url_hostname):
@@ -492,6 +567,19 @@ def validate_elements(module, kind):
                 msg=(
                     f"elements[{index}].hostname.url_hostname must not include a scheme or a path, "
                     "and may use a '*' wildcard only as a single leading '*.' label"
+                ),
+                url_hostname=url_hostname,
+            )
+
+        if (
+            isinstance(url_hostname, str)
+            and not url_hostname.startswith("*.")
+            and hostname.get("exclude_exact_hostname") is False
+        ):
+            module.fail_json(
+                msg=(
+                    f"elements[{index}].hostname.exclude_exact_hostname may be false only for a wildcard "
+                    "url_hostname such as '*.example.com'"
                 ),
                 url_hostname=url_hostname,
             )
@@ -506,13 +594,15 @@ def validate_elements(module, kind):
                 ip=element["ip"],
             )
 
+    field = IDENTITY_FIELDS.get(kind)
     values = set()
     for item in normalize_items(module.params.get("elements")):
-        value = canonical_item(item[kind])
-        if value in values:
-            module.fail_json(msg=f"elements must not repeat the {kind!r} value {item[kind]!r}", **{kind: item[kind]})
+        value = item_value(item, kind)
+        if canonical_item(value) in values:
+            name = f"{kind}.{field}" if field else kind
+            module.fail_json(msg=f"elements must not repeat the {name!r} value {value!r}", **{field or kind: value})
 
-        values.add(value)
+        values.add(canonical_item(value))
 
     # Cloudflare rejects a wildcard hostname alongside its exact apex hostname.
     if kind == "hostname":
@@ -523,6 +613,37 @@ def validate_elements(module, kind):
                     msg=f"elements must not set both 'url_hostname' values {'*.' + hostname!r} and {hostname!r}",
                     url_hostname=[f"*.{hostname}", hostname],
                 )
+
+
+def fail_not_applied(module, kind, desired_items, stored_items):
+    """Fail, naming each requested value Cloudflare did not store next to the most similar stored value."""
+    desired = {canonical_item(item) for item in desired_items}
+    stored = {canonical_item(item) for item in stored_items}
+    missing = [item for item in desired_items if canonical_item(item) not in stored]
+    unexpected = [item for item in stored_items if canonical_item(item) not in desired]
+
+    pairs = []
+    remaining = [item_value(item, kind) for item in unexpected]
+    for item in missing[:MESSAGE_ITEMS]:
+        requested = item_value(item, kind)
+        found = max(
+            remaining, key=lambda value: SequenceMatcher(None, str(requested), str(value)).ratio(), default=None
+        )
+        if found is not None:
+            remaining.remove(found)
+
+        pairs.append(f"requested {requested!r}, stored {found!r}")
+
+    if len(missing) > MESSAGE_ITEMS:
+        pairs.append(f"{len(missing) - MESSAGE_ITEMS} more requested items are listed in missing_items")
+    else:
+        pairs.extend(f"stored {value!r}, not requested" for value in remaining[:MESSAGE_ITEMS])
+
+    module.fail_json(
+        msg=f"Cloudflare did not apply the requested Rules list items: {'; '.join(pairs)}",
+        missing_items=missing,
+        unexpected_items=unexpected,
+    )
 
 
 def ensure_present(module, client, current):
@@ -649,11 +770,9 @@ def ensure_present(module, client, current):
                     expected_id=current_id,
                 )
 
-            if values_differ(
-                normalize_items(list_items(module, client, account_id, current_id)),
-                desired_items,
-            ):
-                module.fail_json(msg="Cloudflare did not apply the requested Rules list items")
+            stored_items = normalize_items(list_items(module, client, account_id, current_id))
+            if values_differ(stored_items, desired_items):
+                fail_not_applied(module, current_kind, desired_items, stored_items)
 
     if not changed and not items_changed:
         module.exit_json(

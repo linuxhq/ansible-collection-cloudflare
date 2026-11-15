@@ -1,0 +1,15 @@
+---
+minor_changes:
+  - rules_lists - when Cloudflare stores items that differ from the requested ones, name each requested value next to the
+    stored value in the failure message, and return them as RV(missing_items) and RV(unexpected_items), so that an
+    element such as C(redirect.source_url=example.com), stored as C(example.com/), can be written as Cloudflare stores
+    it.
+bugfixes:
+  - rules_lists - fail before any request when two C(hostname) elements repeat a C(url_hostname), or two C(redirect)
+    elements repeat a C(source_url), with other fields that differ. Cloudflare rejects them as duplicates after the list
+    was created.
+  - rules_lists - fail before any request when a C(hostname) element sets C(exclude_exact_hostname=false) for a hostname
+    that is not a wildcard. Cloudflare rejects it after the list was created.
+  - rules_lists - fail before any request when a C(redirect.source_url) element includes a query string, a fragment,
+    userinfo, or a port, or uses a scheme other than C(http) or C(https). Cloudflare documents these as unsupported in
+    a source URL and rejects them after the list was created.

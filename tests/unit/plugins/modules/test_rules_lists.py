@@ -80,7 +80,7 @@ class RulesListsTests(TestCase):
         )
 
     def test_redirect_numbers_are_not_dropped_as_boolean_defaults(self):
-        redirect = {"source_url": "example.com", "include_subdomains": 0, "subpath_matching": 1}
+        redirect = {"source_url": "example.com/a", "include_subdomains": 0, "subpath_matching": 1}
 
         self.assertEqual(rules_lists.normalize_items([{"redirect": redirect}]), [{"redirect": redirect}])
 
@@ -505,6 +505,50 @@ class RulesListsTests(TestCase):
                 status_code=value,
             )
 
+    def test_source_urls_with_unsupported_components_fail_before_any_write(self):
+        for value, problem in (
+            ("example.com/a?x=1", "must not include a query string"),
+            ("example.com/?x=1", "must not include a query string"),
+            ("example.com/a?", "must not include a query string"),
+            ("https://example.com/a?x=1", "must not include a query string"),
+            ("example.com/a#frag", "must not include a fragment"),
+            ("example.com#f", "must not include a fragment"),
+            ("https://user@example.com/a", "must not include userinfo"),
+            ("https://user:pass@example.com/a", "must not include userinfo"),
+            ("user:pass@example.com/a", "must not include userinfo"),
+            ("example.com:8080/a", "must not include a port"),
+            ("localhost:80/a", "must not include a port"),
+            ("https://example.com:8080/a", "must not include a port"),
+            ("https://example.com:443", "must not include a port"),
+            ("https://[2001:db8::1]:8080/a", "must not include a port"),
+            ("ftp://example.com/a", "must use the http or https scheme, or none"),
+            ("a+b://example.com/a", "must use the http or https scheme, or none"),
+        ):
+            self.assert_elements_fail_before_any_write(
+                "redirect",
+                [
+                    {"redirect": {"source_url": "example.com/b", "target_url": "https://example.net"}},
+                    {"redirect": {"source_url": value, "target_url": "https://example.net"}},
+                ],
+                f"elements[1].redirect.source_url {problem}",
+                source_url=value,
+            )
+
+    def test_source_urls_cloudflare_stores_as_written_are_accepted(self):
+        for value in (
+            "example.com/",
+            "example.com/a",
+            "https://example.com/a",
+            "http://example.com/a",
+            "example.com/a:b",
+            "example.com/a@b",
+            "example.com/a%2Fb",
+            "example.com/https://example.net",
+            "https://2001:db8::1/a",
+        ):
+            with self.subTest(source_url=value):
+                self.assertIsNone(rules_lists.source_url_error(value))
+
     def test_valid_redirect_status_codes_are_accepted(self):
         for value in (301, 302, 307, 308, None):
             with self.subTest(status_code=value):
@@ -544,7 +588,7 @@ class RulesListsTests(TestCase):
                     "comment": "moved",
                 },
             ),
-            ("hostname", {"hostname": {"url_hostname": "example.com", "exclude_exact_hostname": False}}),
+            ("hostname", {"hostname": {"url_hostname": "*.example.com", "exclude_exact_hostname": False}}),
         ):
             with self.subTest(element=element):
                 client, _ignored = make_client()
@@ -580,6 +624,112 @@ class RulesListsTests(TestCase):
                 f"elements must not repeat the {kind!r} value {value!r}",
                 **{kind: value},
             )
+
+    def test_repeated_identity_fields_fail_before_any_write(self):
+        redirect = {"source_url": "example.com/a", "target_url": "https://example.net/1"}
+        for kind, elements, field, value in (
+            (
+                "hostname",
+                [
+                    {"hostname": {"url_hostname": "*.example.com"}},
+                    {"hostname": {"url_hostname": "*.example.com", "exclude_exact_hostname": False}},
+                ],
+                "url_hostname",
+                "*.example.com",
+            ),
+            (
+                "hostname",
+                [
+                    {"hostname": {"url_hostname": "*.example.com", "exclude_exact_hostname": True}},
+                    {"hostname": {"url_hostname": "*.example.com", "exclude_exact_hostname": False}},
+                ],
+                "url_hostname",
+                "*.example.com",
+            ),
+            (
+                "redirect",
+                [{"redirect": redirect}, {"redirect": {**redirect, "target_url": "https://example.net/2"}}],
+                "source_url",
+                "example.com/a",
+            ),
+            (
+                "redirect",
+                [{"redirect": {**redirect, "status_code": 301}}, {"redirect": {**redirect, "status_code": 302}}],
+                "source_url",
+                "example.com/a",
+            ),
+            (
+                "redirect",
+                [{"redirect": redirect}, {"redirect": {**redirect, "include_subdomains": True}}],
+                "source_url",
+                "example.com/a",
+            ),
+        ):
+            self.assert_elements_fail_before_any_write(
+                kind,
+                elements,
+                f"elements must not repeat the '{kind}.{field}' value {value!r}",
+                **{field: value},
+            )
+
+    def test_identity_values_cloudflare_accepts_together_are_accepted(self):
+        for kind, values in (
+            ("hostname", ("example.com", "Example.com", "example.com.")),
+            (
+                "redirect",
+                (
+                    "example.com/a",
+                    "example.com/A",
+                    "Example.com/a",
+                    "example.com/a/",
+                    "https://example.com/a",
+                    "example.com/",
+                    "example.com//",
+                ),
+            ),
+        ):
+            with self.subTest(kind=kind):
+                client, _ignored = make_client()
+                field = rules_lists.IDENTITY_FIELDS[kind]
+                elements = [
+                    {
+                        kind: (
+                            {field: value, "target_url": "https://example.net"}
+                            if kind == "redirect"
+                            else {field: value}
+                        )
+                    }
+                    for value in values
+                ]
+
+                result = self.run_module(FakeModule(params(kind=kind, elements=elements), check_mode=True), client)
+
+                self.assertTrue(result["changed"])
+
+    def test_exclude_exact_hostname_false_requires_a_wildcard_before_any_write(self):
+        self.assert_elements_fail_before_any_write(
+            "hostname",
+            [
+                {"hostname": {"url_hostname": "*.example.org", "exclude_exact_hostname": False}},
+                {"hostname": {"url_hostname": "example.com", "exclude_exact_hostname": False}},
+            ],
+            "elements[1].hostname.exclude_exact_hostname may be false only for a wildcard "
+            "url_hostname such as '*.example.com'",
+            url_hostname="example.com",
+        )
+
+    def test_exclude_exact_hostname_default_on_exact_hostname_is_accepted(self):
+        # The default, true, is omitted from the request, so Cloudflare accepts it.
+        for value in (None, True):
+            with self.subTest(exclude_exact_hostname=value):
+                current = {**CURRENT, "kind": "hostname", "num_items": 1}
+                client, api = make_client([current], items=[{"hostname": {"url_hostname": "example.com"}}])
+                elements = [{"hostname": {"url_hostname": "example.com", "exclude_exact_hostname": value}}]
+
+                result = self.run_module(FakeModule(params(kind="hostname", elements=elements)), client)
+
+                api.items.update.assert_not_called()
+                self.assertFalse(result["changed"])
 
     def test_wildcard_with_its_exact_hostname_fails_before_any_write(self):
         for wildcard in ({}, {"exclude_exact_hostname": True}, {"exclude_exact_hostname": False}):
@@ -667,7 +817,66 @@ class RulesListsTests(TestCase):
         with patch.object(rules_lists.time, "monotonic", return_value=1):
             result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
 
-        self.assertIn("did not apply", result["msg"])
+        self.assertEqual(
+            result["msg"], "Cloudflare did not apply the requested Rules list items: requested '192.0.2.1', stored None"
+        )
+        self.assertEqual(result["missing_items"], [{"ip": "192.0.2.1"}])
+        self.assertEqual(result["unexpected_items"], [])
+
+    def test_not_applied_failure_message_pairs_a_bounded_number_of_items(self):
+        current = {**CURRENT, "num_items": 0}
+        elements = [{"ip": f"192.0.2.{index}"} for index in range(1, 13)]
+        stored = [{"ip": f"198.51.100.{index}"} for index in range(1, 13)]
+        client, _ignored = make_client([current], items=stored, fetched=current)
+
+        with patch.object(rules_lists.time, "monotonic", return_value=1):
+            result = self.run_module(FakeModule(params(elements=elements)), client)
+
+        self.assertEqual(result["msg"].count("requested '"), rules_lists.MESSAGE_ITEMS)
+        self.assertTrue(result["msg"].endswith("; 2 more requested items are listed in missing_items"))
+        self.assertEqual(len(result["missing_items"]), 12)
+        self.assertEqual(len(result["unexpected_items"]), 12)
+
+    def test_not_applied_failure_names_unrequested_stored_values(self):
+        current = {**CURRENT, "num_items": 0}
+        client, _ignored = make_client([current], items=[{"ip": "192.0.2.1"}, {"ip": "192.0.2.9"}], fetched=current)
+
+        with patch.object(rules_lists.time, "monotonic", return_value=1):
+            result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
+
+        self.assertEqual(
+            result["msg"],
+            "Cloudflare did not apply the requested Rules list items: stored '192.0.2.9', not requested",
+        )
+        self.assertEqual(result["missing_items"], [])
+        self.assertEqual(result["unexpected_items"], [{"ip": "192.0.2.9"}])
+
+    def test_not_applied_failure_names_requested_and_stored_values(self):
+        redirect = {"target_url": "https://example.net/"}
+        current = {**CURRENT, "kind": "redirect", "num_items": 0}
+        stored = [
+            {"redirect": {**redirect, "source_url": "example.com/"}},
+            {"redirect": {**redirect, "source_url": "example.com/b"}},
+            {"redirect": {**redirect, "source_url": "https://example.com/c"}},
+        ]
+        elements = [
+            {"redirect": {**redirect, "source_url": "example.com"}},
+            {"redirect": {**redirect, "source_url": "example.com/b"}},
+            {"redirect": {**redirect, "source_url": "HTTPS://example.com/c"}},
+        ]
+        client, _ignored = make_client([current], items=stored, fetched=current)
+
+        with patch.object(rules_lists.time, "monotonic", return_value=1):
+            result = self.run_module(FakeModule(params(kind=None, elements=elements)), client)
+
+        self.assertEqual(
+            result["msg"],
+            "Cloudflare did not apply the requested Rules list items: "
+            "requested 'HTTPS://example.com/c', stored 'https://example.com/c'; "
+            "requested 'example.com', stored 'example.com/'",
+        )
+        self.assertEqual(result["missing_items"], [elements[2], elements[0]])
+        self.assertEqual(result["unexpected_items"], [stored[0], stored[2]])
 
     def test_deletes_list(self):
         client, api = make_client([CURRENT], deleted={"id": "list"})
