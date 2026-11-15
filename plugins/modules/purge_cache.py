@@ -37,6 +37,9 @@ options:
           - URLs to purge.
           - Each item is a URL string, or a mapping with C(url) and the
             C(headers) the content was cached with.
+          - A mapping accepts only C(url) and C(headers). Cloudflare accepts
+            any other key but ignores it, so the module fails before any
+            request.
         type: list
         elements: raw
       tags:
@@ -128,14 +131,32 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     require_cloudflare_sdk,
     resource_id,
     serialize_resource,
+    unsupported_fields,
     validate_cloudflare_params,
 )
 
 CACHE_KEYS = ("files", "hosts", "prefixes", "purge_everything", "tags")
+# Fields of a file mapping, from the cloudflare SDK
+# CachePurgeSingleFileWithURLAndHeadersFile type. Cloudflare accepts any other
+# field but ignores it.
+FILE_FIELDS = ("headers", "url")
 
 
 def cache_payload(module):
     return payload_from_params(module.params["cache"], CACHE_KEYS)
+
+
+def validate_field_names(module):
+    """Fail when a file mapping sets a field Cloudflare accepts but ignores."""
+    unknown = []
+    for index, item in enumerate(module.params["cache"].get("files") or ()):
+        unknown.extend(unsupported_fields(item, FILE_FIELDS, f"cache.files[{index}]"))
+
+    if unknown:
+        module.fail_json(
+            msg=f"Cloudflare does not use these cache purge fields: {', '.join(unknown)}",
+            unsupported_fields=unknown,
+        )
 
 
 def run(module, client):
@@ -169,6 +190,8 @@ def main():
 
     if not cache_payload(module):
         module.fail_json(msg="cache must not be empty")
+
+    validate_field_names(module)
 
     if module.check_mode:
         require_cloudflare_sdk(module)

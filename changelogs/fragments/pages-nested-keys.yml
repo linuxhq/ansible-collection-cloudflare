@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - pages_projects - reject unknown fields in C(limits), C(placement), and C(env_vars) or binding entries under
+    C(deployment_configs) before any request. Cloudflare accepted and dropped them, so the module wrote the project
+    and then failed because Cloudflare did not apply the requested settings, on every run.

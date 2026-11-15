@@ -91,6 +91,11 @@ options:
     type: dict
     description:
       - Cross-origin resource sharing headers for the application.
+      - Accepts only C(allow_all_headers), C(allow_all_methods),
+        C(allow_all_origins), C(allow_credentials), C(allowed_headers),
+        C(allowed_methods), C(allowed_origins), and C(max_age). Cloudflare
+        accepts any other key but does not store it, so the module fails before
+        making changes.
       - Compared exactly, so omitting a key removes it.
   custom_deny_message:
     type: str
@@ -109,6 +114,17 @@ options:
     elements: dict
     description:
       - Public destinations protected by the application.
+      - Each entry must set C(type), such as C(public); Cloudflare stores an
+        entry without one as a C(public) destination, so the module fails
+        before making changes.
+      - Each entry accepts only the fields Cloudflare stores for its C(type),
+        such as C(type), C(uri), and C(overrides) of a C(public) destination.
+        Each C(overrides) entry accepts only C(behavior) and C(path_pattern).
+        Cloudflare accepts any other field but does not store it, so the
+        module fails before making changes.
+      - An empty C(overrides) list fails before making changes, because
+        Cloudflare stores the destination without C(overrides); omit
+        C(overrides) instead.
       - Each entry is compared exactly, so keys omitted from an entry are
         removed from it.
       - A bare IP address in C(cidr) is sent with its full-length prefix,
@@ -138,12 +154,38 @@ options:
     elements: dict
     description:
       - Access policies attached to the application.
+      - Each entry accepts only the fields of a reusable policy link, C(id),
+        C(precedence), and C(account_id), or of an inline policy, such as
+        C(name), C(decision), C(include), C(exclude), C(require), and
+        C(approval_groups), whose entries accept only C(approvals_needed),
+        C(email_addresses), and C(email_list_uuid). C(connection_rules)
+        accepts only C(rdp), whose value accepts only
+        C(allowed_clipboard_local_to_remote_formats) and
+        C(allowed_clipboard_remote_to_local_formats), and C(mfa_config) accepts
+        only C(allowed_authenticators), C(mfa_disabled), and
+        C(session_duration). The same applies to the
+        nested fields of a known inline policy selector. Cloudflare accepts
+        any other field but does not store it, so the module fails before
+        making changes.
       - Cloudflare returns the policies in ascending C(precedence) order, so
         entries that set C(precedence) must be listed in that order; otherwise
         the module fails before any change.
       - Inline policy selectors in C(include), C(exclude), and C(require) use
         Cloudflare API key names, such as C(github-organization) and
-        C(azureAD).
+        C(azureAD); the SDK spellings C(github_organization) and C(azure_ad)
+        fail before any change.
+      - Each inline policy selector is a mapping that sets one rule, such as
+        C(email) or C(everyone). Cloudflare drops an empty selector V({}) and
+        splits a selector with several rules into separate selectors, so such
+        a selector fails before any change.
+      - The value of an inline policy selector of a known type must be a
+        mapping, such as V({}) for C(everyone) or C(any_valid_service_token).
+        Cloudflare stores a null value as V({}), so such a selector fails
+        before any change.
+      - A nested field of an inline policy selector of a known type must not
+        be V(""), such as the C(account_id) of a C(device_posture) selector.
+        Cloudflare does not store an empty value, so such a selector fails
+        before any change; omit the field instead.
       - Stored policies are compared with the entries at the same position.
         An entry that sets a selector or has no C(id) is an inline policy whose
         C(include), C(exclude), and C(require) are compared exactly, so a
@@ -224,6 +266,7 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    ACCESS_APPROVAL_GROUP_FIELDS,
     ACCESS_SELECTOR_FIELDS,
     cidr_from_address,
     cloudflare_client,
@@ -235,6 +278,8 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     normalize_current_by_desired_fields,
     payload_from_params,
     serialize_resource,
+    unsupported_fields,
+    validate_access_selectors,
 )
 
 FIELDS = (
@@ -369,6 +414,57 @@ STORED_FIELDS = {
     ),
 }
 
+# Fields Cloudflare stores, from the cloudflare SDK application create types;
+# it accepts any other field but drops it. Destinations are keyed by type, and
+# an entry with an unknown type may use the fields of any destination type.
+CORS_HEADERS_FIELDS = (
+    "allow_all_headers",
+    "allow_all_methods",
+    "allow_all_origins",
+    "allow_credentials",
+    "allowed_headers",
+    "allowed_methods",
+    "allowed_origins",
+    "max_age",
+)
+DESTINATION_FIELDS = {
+    "all_preview_workers": ("overrides", "type"),
+    "all_workers": ("overrides", "type"),
+    "preview_worker": ("overrides", "type", "worker_id"),
+    "private": ("cidr", "hostname", "l4_protocol", "port_range", "type", "vnet_id"),
+    "public": ("overrides", "type", "uri"),
+    "via_mcp_server_portal": ("mcp_server_id", "type"),
+    "worker": ("overrides", "type", "worker_id"),
+}
+ANY_DESTINATION_FIELDS = tuple(sorted({field for fields in DESTINATION_FIELDS.values() for field in fields}))
+# DestinationOverrideParam.
+DESTINATION_OVERRIDE_FIELDS = ("behavior", "path_pattern")
+# A policy entry is a reusable policy link or an inline policy; the SDK inline
+# policy type omits the fields shared with Access policies, such as name.
+POLICY_FIELDS = (
+    "account_id",
+    "approval_groups",
+    "approval_required",
+    "connection_rules",
+    "decision",
+    "exclude",
+    "id",
+    "include",
+    "isolation_required",
+    "mfa_config",
+    "name",
+    "precedence",
+    "purpose_justification_prompt",
+    "purpose_justification_required",
+    "require",
+    "session_duration",
+)
+# The inline policy ConnectionRules and MfaConfig types.
+POLICY_CONNECTION_RULES_FIELDS = {
+    "rdp": ("allowed_clipboard_local_to_remote_formats", "allowed_clipboard_remote_to_local_formats"),
+}
+POLICY_MFA_CONFIG_FIELDS = ("allowed_authenticators", "mfa_disabled", "session_duration")
+
 
 def validate_type_fields(module):
     params = module.params
@@ -396,6 +492,63 @@ def validate_policy_order(module):
         module.fail_json(
             msg="policies must be listed in ascending precedence order, as Cloudflare returns them",
             expected_order=[{"id": policy.get("id"), "precedence": policy["precedence"]} for policy in expected],
+        )
+
+
+def validate_field_names(module):
+    """Fail when an application field Cloudflare accepts but never stores is requested."""
+    params = module.params
+    destinations = params.get("destinations") or ()
+    untyped = [
+        f"destinations[{index}]" for index, destination in enumerate(destinations) if destination.get("type") is None
+    ]
+    if untyped:
+        module.fail_json(
+            msg=f"{', '.join(untyped)} must set type; Cloudflare stores a destination without one as type public"
+        )
+
+    empty_overrides = [
+        f"destinations[{index}].overrides"
+        for index, destination in enumerate(destinations)
+        if destination.get("overrides") == []
+    ]
+    if empty_overrides:
+        module.fail_json(
+            msg=f"{', '.join(empty_overrides)} must be omitted instead of an empty list; Cloudflare stores a "
+            "destination with empty overrides without them"
+        )
+
+    unknown = unsupported_fields(params.get("cors_headers"), CORS_HEADERS_FIELDS, "cors_headers")
+    for index, destination in enumerate(destinations):
+        kind = destination["type"]
+        fields = DESTINATION_FIELDS.get(kind if isinstance(kind, str) else None, ANY_DESTINATION_FIELDS)
+        unknown.extend(unsupported_fields(destination, fields, f"destinations[{index}]"))
+        overrides = destination.get("overrides")
+        for position, override in enumerate(overrides if isinstance(overrides, list) else ()):
+            path = f"destinations[{index}].overrides[{position}]"
+            unknown.extend(unsupported_fields(override, DESTINATION_OVERRIDE_FIELDS, path))
+
+    for index, policy in enumerate(params.get("policies") or ()):
+        unknown.extend(unsupported_fields(policy, POLICY_FIELDS, f"policies[{index}]"))
+        unknown.extend(
+            unsupported_fields(
+                policy.get("connection_rules"),
+                POLICY_CONNECTION_RULES_FIELDS,
+                f"policies[{index}].connection_rules",
+            )
+        )
+        unknown.extend(
+            unsupported_fields(policy.get("mfa_config"), POLICY_MFA_CONFIG_FIELDS, f"policies[{index}].mfa_config")
+        )
+        approval_groups = policy.get("approval_groups")
+        for position, group in enumerate(approval_groups if isinstance(approval_groups, list) else ()):
+            path = f"policies[{index}].approval_groups[{position}]"
+            unknown.extend(unsupported_fields(group, ACCESS_APPROVAL_GROUP_FIELDS, path))
+
+    if unknown:
+        module.fail_json(
+            msg=f"Cloudflare does not store these Access application fields: {', '.join(unknown)}",
+            unsupported_fields=unknown,
         )
 
 
@@ -465,6 +618,9 @@ def run(module, client):
     if params["state"] == "present":
         validate_type_fields(module)
         validate_policy_order(module)
+        validate_field_names(module)
+        for index, policy in enumerate(params.get("policies") or ()):
+            validate_access_selectors(module, policy, f"policies[{index}].")
 
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the Access application",

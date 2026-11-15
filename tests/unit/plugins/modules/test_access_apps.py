@@ -424,6 +424,275 @@ class AccessAppsTests(TestCase):
         self.assertEqual(result["expected_order"], [{"id": "c", "precedence": 1}, {"id": "a", "precedence": 2}])
         api.list.assert_not_called()
 
+    def test_inline_policy_sdk_selector_keys_fail_before_any_request(self):
+        cases = (
+            ("include", "github_organization", "github-organization"),
+            ("exclude", "azure_ad", "azureAD"),
+            ("require", "github_organization", "github-organization"),
+        )
+        for field, key, api_key in cases:
+            policies = [{"id": "a"}, {"name": "inline", "decision": "allow", field: [{key: {"id": "x"}}]}]
+            client, api = client_with()
+            with self.subTest(field=field, key=key):
+                result = self.run_module(FakeModule(params(policies=policies)), client)
+
+                self.assertEqual(
+                    result["msg"], f"policies[1].{field} selector {key!r} must use the Cloudflare API key {api_key!r}"
+                )
+                api.list.assert_not_called()
+
+    def test_unstored_fields_fail_before_any_request(self):
+        cases = (
+            ({"cors_headers": {"allowed_methods": ["GET"], "foo": 1}}, ["cors_headers.foo"]),
+            ({"destinations": [{"type": "public", "uri": "app.example.com", "foo": 1}]}, ["destinations[0].foo"]),
+            ({"destinations": [{"type": "public", "cidr": "192.0.2.1"}]}, ["destinations[0].cidr"]),
+            ({"destinations": [{"type": "unknown", "uri": "app.example.com", "foo": 1}]}, ["destinations[0].foo"]),
+            ({"policies": [{"id": "a", "precedence": 1, "foo": 1}]}, ["policies[0].foo"]),
+            (
+                {"policies": [{"name": "inline", "decision": "allow", "include": [{"everyone": {}}], "foo": 1}]},
+                ["policies[0].foo"],
+            ),
+            (
+                {
+                    "policies": [
+                        {
+                            "name": "inline",
+                            "decision": "allow",
+                            "include": [{"everyone": {}}],
+                            "approval_groups": [{"approvals_needed": 1, "email_addresses": ["a@example.com"], "x": 1}],
+                        }
+                    ]
+                },
+                ["policies[0].approval_groups[0].x"],
+            ),
+        )
+        for updates, unsupported in cases:
+            for check_mode in (True, False):
+                with self.subTest(updates=updates, check_mode=check_mode):
+                    client, api = client_with()
+
+                    result = self.run_module(FakeModule(params(**updates), check_mode=check_mode), client)
+
+                    self.assertEqual(result["unsupported_fields"], unsupported)
+                    self.assertEqual(
+                        result["msg"],
+                        f"Cloudflare does not store these Access application fields: {', '.join(unsupported)}",
+                    )
+                    api.list.assert_not_called()
+                    api.create.assert_not_called()
+
+    def test_unstored_nested_fields_fail_before_any_request(self):
+        inline = {"name": "inline", "decision": "allow", "include": [{"everyone": {}}]}
+        override = {"behavior": "public", "path_pattern": "/a"}
+        cases = (
+            (
+                {
+                    "destinations": [
+                        {"type": "public", "uri": "app.example.com", "overrides": [override, {**override, "foo": 1}]}
+                    ]
+                },
+                ["destinations[0].overrides[1].foo"],
+            ),
+            (
+                {
+                    "policies": [
+                        {
+                            **inline,
+                            "connection_rules": {"rdp": {"allowed_clipboard_local_to_remote_formats": [], "foo": 1}},
+                        }
+                    ]
+                },
+                ["policies[0].connection_rules.rdp.foo"],
+            ),
+            ({"policies": [{**inline, "connection_rules": {"foo": {}}}]}, ["policies[0].connection_rules.foo"]),
+            (
+                {"policies": [{**inline, "mfa_config": {"mfa_disabled": True, "foo": 1}}]},
+                ["policies[0].mfa_config.foo"],
+            ),
+        )
+        for updates, unsupported in cases:
+            for check_mode in (True, False):
+                with self.subTest(updates=updates, check_mode=check_mode):
+                    client, api = client_with()
+
+                    result = self.run_module(FakeModule(params(**updates), check_mode=check_mode), client)
+
+                    self.assertEqual(result["unsupported_fields"], unsupported)
+                    api.list.assert_not_called()
+                    api.create.assert_not_called()
+
+    def test_destination_without_type_fails_before_any_request(self):
+        destinations = [{"type": "public", "uri": "app.example.com"}, {"uri": "app.example.com/a"}, {"type": None}]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(destinations=destinations), check_mode=check_mode), client)
+
+                self.assertEqual(
+                    result["msg"],
+                    "destinations[1], destinations[2] must set type; Cloudflare stores a destination without one as "
+                    "type public",
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_inline_policy_selector_with_several_rules_fails_before_any_request(self):
+        include = [{"email": {"email": "a@example.com"}, "everyone": {}}]
+        policies = [{"name": "inline", "decision": "allow", "include": include}]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(policies=policies), check_mode=check_mode), client)
+
+                self.assertEqual(
+                    result["msg"],
+                    "policies[0].include[0] sets the selectors 'email', 'everyone', which Cloudflare splits into "
+                    "separate include entries; list each selector as its own entry",
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_inline_policy_null_selector_fails_before_any_request(self):
+        policies = [{"name": "inline", "decision": "allow", "include": [{"everyone": None}]}]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(policies=policies), check_mode=check_mode), client)
+
+                self.assertEqual(
+                    result["msg"],
+                    "policies[0].include[0].everyone must be a mapping; use {} for a selector without fields, as "
+                    "Cloudflare stores a null selector as {}",
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_null_inline_policy_selector_list_counts_as_omitted(self):
+        include = [{"email": {"email": "admin@example.com"}}]
+        requested = {"name": "inline", "decision": "allow", "include": include, "exclude": None}
+        sent = {"name": "inline", "decision": "allow", "include": include}
+        stored_policy = {"id": "a", "precedence": 1, **sent, "exclude": [], "require": []}
+        app = stored(policies=[stored_policy])
+        client, api = client_with(created=app)
+
+        result = self.run_module(FakeModule(params(policies=[requested])), client)
+
+        self.assertNotIn("msg", result)
+        self.assertTrue(result["changed"])
+        self.assertEqual(api.create.call_args.kwargs["policies"], [sent])
+
+        client, api = client_with([app])
+        result = self.run_module(FakeModule(params(policies=[requested])), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_non_mapping_inline_policy_selector_fails_before_any_request(self):
+        for selector in (None, "everyone", ["everyone"]):
+            for check_mode in (True, False):
+                with self.subTest(selector=selector, check_mode=check_mode):
+                    policies = [{"name": "inline", "decision": "allow", "include": [selector]}]
+                    client, api = client_with()
+
+                    result = self.run_module(FakeModule(params(policies=policies), check_mode=check_mode), client)
+
+                    self.assertEqual(
+                        result["msg"],
+                        "policies[0].include[0] must be a mapping that sets one selector, such as {'everyone': {}}",
+                    )
+                    api.list.assert_not_called()
+                    api.create.assert_not_called()
+
+    def test_inline_policy_empty_selector_fails_before_any_request(self):
+        policies = [{"name": "inline", "decision": "allow", "include": [{"everyone": {}}], "exclude": [{}]}]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(policies=policies), check_mode=check_mode), client)
+
+                self.assertEqual(
+                    result["msg"], "policies[0].exclude[0] must set one selector; Cloudflare drops an empty selector"
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_inline_policy_empty_selector_value_fails_before_any_request(self):
+        include = [{"device_posture": {"integration_uid": "posture", "account_id": ""}}]
+        policies = [{"name": "inline", "decision": "allow", "include": include}]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(policies=policies), check_mode=check_mode), client)
+
+                self.assertEqual(result["empty_fields"], ["policies[0].include[0].device_posture.account_id"])
+                self.assertIn("Cloudflare does not store an empty value", result["msg"])
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_empty_destination_overrides_fail_before_any_request(self):
+        destinations = [
+            {"type": "public", "uri": "app.example.com", "overrides": []},
+            {"type": "public", "uri": "app.example.com/a"},
+            {"type": "public", "uri": "app.example.com/b", "overrides": []},
+        ]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(destinations=destinations), check_mode=check_mode), client)
+
+                self.assertEqual(
+                    result["msg"],
+                    "destinations[0].overrides, destinations[2].overrides must be omitted instead of an empty list; "
+                    "Cloudflare stores a destination with empty overrides without them",
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_inline_policy_unstored_selector_fields_fail_before_any_request(self):
+        policies = [{"name": "inline", "decision": "allow", "include": [{"email": {"email": "a@example.com", "x": 1}}]}]
+        client, api = client_with()
+
+        result = self.run_module(FakeModule(params(policies=policies)), client)
+
+        self.assertEqual(result["unsupported_fields"], ["policies[0].include[0].email.x"])
+        api.list.assert_not_called()
+
+    def test_stored_fields_are_sent(self):
+        cors = dict.fromkeys(access_apps.CORS_HEADERS_FIELDS, True)
+        destinations = [
+            {"type": "public", "uri": "app.example.com", "overrides": [{"behavior": "public", "path_pattern": "/a"}]},
+            {"type": "private", "cidr": "192.0.2.0/24", "l4_protocol": "tcp", "port_range": "22", "vnet_id": "v"},
+            {"type": "public", "uri": "app.example.com/b"},
+        ]
+        rdp = {field: ["text"] for field in access_apps.POLICY_CONNECTION_RULES_FIELDS["rdp"]}
+        policies = [
+            {"id": "a", "precedence": 1},
+            {
+                "name": "inline",
+                "decision": "allow",
+                "include": [{"email": {"email": "a@example.com"}}],
+                "approval_groups": [{"approvals_needed": 1, "email_list_uuid": "list"}],
+                "connection_rules": {"rdp": rdp},
+                "mfa_config": {"allowed_authenticators": ["totp"], "mfa_disabled": False, "session_duration": "24h"},
+                "precedence": 2,
+            },
+        ]
+        updates = {"cors_headers": cors, "destinations": destinations, "policies": policies}
+        client, api = client_with(created=stored(**updates))
+
+        result = self.run_module(FakeModule(params(**updates)), client)
+
+        self.assertNotIn("msg", result)
+        self.assertEqual(api.create.call_args.kwargs["cors_headers"], cors)
+        self.assertEqual(api.create.call_args.kwargs["destinations"], destinations)
+        self.assertEqual(api.create.call_args.kwargs["policies"], policies)
+
     def test_inline_policy_api_selector_keys_are_accepted(self):
         include = [{"github-organization": {"identity_provider_id": "idp", "name": "org"}}]
         policies = [{"name": "inline", "decision": "allow", "include": include}]
@@ -485,41 +754,6 @@ class AccessAppsTests(TestCase):
 
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
-
-    def test_null_inline_policy_selector_list_counts_as_omitted(self):
-        include = [{"email": {"email": "admin@example.com"}}]
-        requested = {"name": "inline", "decision": "allow", "include": include, "exclude": None}
-        sent = {"name": "inline", "decision": "allow", "include": include}
-        stored_policy = {"id": "a", "precedence": 1, **sent, "exclude": [], "require": []}
-        app = stored(policies=[stored_policy])
-        client, api = client_with(created=app)
-
-        result = self.run_module(FakeModule(params(policies=[requested])), client)
-
-        self.assertNotIn("msg", result)
-        self.assertTrue(result["changed"])
-        self.assertEqual(api.create.call_args.kwargs["policies"], [sent])
-
-        client, api = client_with([app])
-        result = self.run_module(FakeModule(params(policies=[requested])), client)
-
-        api.update.assert_not_called()
-        self.assertFalse(result["changed"])
-
-    def test_non_mapping_inline_policy_selector_fails_cleanly(self):
-        include = [{"email": {"email": "admin@example.com"}}]
-        current = stored(
-            policies=[{"id": "a", "precedence": 1, "name": "inline", "decision": "allow", "include": include}]
-        )
-        for selector in (None, "everyone", ["everyone"]):
-            with self.subTest(selector=selector):
-                requested = {"name": "inline", "decision": "allow", "include": [selector]}
-                client, api = client_with([current], updated=current)
-
-                result = self.run_module(FakeModule(params(policies=[requested])), client)
-
-                self.assertEqual(api.update.call_args.kwargs["policies"], [requested])
-                self.assertIn("Cloudflare did not apply the requested Access application", result["msg"])
 
     def test_reusable_policy_link_ignores_stored_selectors(self):
         stored_policy = {

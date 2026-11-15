@@ -230,6 +230,141 @@ class PagesProjectsTests(TestCase):
                 api.get.assert_not_called()
                 api.edit.assert_not_called()
 
+    def test_rejects_unstored_setting_names_before_any_request(self):
+        cases = (
+            (
+                {"build_config": {"build_command": "true", "build_image_major_version": 3}},
+                ["build_config.build_image_major_version"],
+            ),
+            ({"build_config": {"bogus_key": 1}}, ["build_config.bogus_key"]),
+            (
+                {"deployment_configs": {"production": {"compatibility_date": "2024-01-01", "bogus_key": 1}}},
+                ["deployment_configs.production.bogus_key"],
+            ),
+            (
+                {
+                    "build_config": {"bogus_key": 1},
+                    "deployment_configs": {"preview": {"bogus_key": 1}, "production": {"other": 2}},
+                },
+                [
+                    "build_config.bogus_key",
+                    "deployment_configs.preview.bogus_key",
+                    "deployment_configs.production.other",
+                ],
+            ),
+        )
+        for options, unsupported in cases:
+            for found, check_mode in (([PROJECT], False), ([PROJECT], True), ([None], False)):
+                with self.subTest(options=options, existing=found != [None], check_mode=check_mode):
+                    client, api = client_with(found, created=PROJECT, edited=PROJECT)
+
+                    result = self.run_module(FakeModule(params(**options), check_mode=check_mode), client)
+
+                    self.assertEqual(result["unsupported_settings"], unsupported)
+                    self.assertEqual(
+                        result["msg"],
+                        f"Cloudflare does not store these Pages project settings: {', '.join(unsupported)}",
+                    )
+                    api.get.assert_not_called()
+                    api.create.assert_not_called()
+                    api.edit.assert_not_called()
+
+    def test_stored_setting_names_are_sent(self):
+        build_config = dict.fromkeys(pages_projects.BUILD_SETTINGS, "value")
+        build_config.pop("web_analytics_token")
+        deployment = {"build_image_major_version": 3, "compatibility_date": "2024-01-01"}
+        project = {
+            **PROJECT,
+            "build_config": build_config,
+            "deployment_configs": {"preview": deployment, "production": deployment},
+        }
+        client, api = client_with([{**PROJECT, "build_config": {}}], edited=project)
+
+        result = self.run_module(
+            FakeModule(
+                params(
+                    build_config=build_config,
+                    deployment_configs={"preview": deployment, "production": deployment},
+                )
+            ),
+            client,
+        )
+
+        self.assertNotIn("msg", result)
+        self.assertTrue(result["changed"])
+        api.edit.assert_called_once()
+
+    def test_rejects_unstored_nested_setting_names_before_any_request(self):
+        cases = (
+            (
+                {"production": {"env_vars": {"A": {"type": "plain_text", "value": "x", "extra": 1}}}},
+                ["deployment_configs.production.env_vars.A.extra"],
+            ),
+            (
+                {"preview": {"kv_namespaces": {"KV": {"namespace_id": "id", "bogus": 1}}}},
+                ["deployment_configs.preview.kv_namespaces.KV.bogus"],
+            ),
+            (
+                {"production": {"services": {"S": {"service": "api", "environment": "production", "bogus": 1}}}},
+                ["deployment_configs.production.services.S.bogus"],
+            ),
+            ({"production": {"browsers": {"B": {"bogus": 1}}}}, ["deployment_configs.production.browsers.B.bogus"]),
+            (
+                {"production": {"placement": {"mode": "smart", "bogus": 1}}},
+                ["deployment_configs.production.placement.bogus"],
+            ),
+            ({"preview": {"limits": {"cpu_ms": 50, "bogus": 1}}}, ["deployment_configs.preview.limits.bogus"]),
+            (
+                {
+                    "preview": {"bogus_key": {"extra": 1}, "env_vars": {"A": None, "B": {"extra": 1}}},
+                    "production": {"r2_buckets": {"R": {"name": "bucket", "jurisdiction": None, "bogus": None}}},
+                },
+                [
+                    "deployment_configs.preview.bogus_key",
+                    "deployment_configs.preview.env_vars.B.extra",
+                    "deployment_configs.production.r2_buckets.R.bogus",
+                ],
+            ),
+        )
+        for deployment_configs, unsupported in cases:
+            for found, check_mode in (([PROJECT], False), ([PROJECT], True), ([None], False)):
+                with self.subTest(
+                    deployment_configs=deployment_configs, existing=found != [None], check_mode=check_mode
+                ):
+                    client, api = client_with(found, created=PROJECT, edited=PROJECT)
+
+                    result = self.run_module(
+                        FakeModule(params(deployment_configs=deployment_configs), check_mode=check_mode), client
+                    )
+
+                    self.assertEqual(result["unsupported_settings"], unsupported)
+                    self.assertEqual(
+                        result["msg"],
+                        f"Cloudflare does not store these Pages project settings: {', '.join(unsupported)}",
+                    )
+                    api.get.assert_not_called()
+                    api.create.assert_not_called()
+                    api.edit.assert_not_called()
+
+    def test_stored_nested_setting_names_are_sent(self):
+        entries = {
+            key: {"X": dict.fromkeys(fields, "value"), "GONE": None}
+            for key, fields in pages_projects.DEPLOYMENT_ENTRY_FIELDS.items()
+        }
+        deployment = {**entries, "limits": {"cpu_ms": 50}, "placement": {"mode": "smart"}}
+        stored = {
+            **{key: {"X": entry["X"]} for key, entry in entries.items()},
+            "limits": {"cpu_ms": 50},
+            "placement": {"mode": "smart"},
+        }
+        client, api = client_with([PROJECT], edited={**PROJECT, "deployment_configs": {"production": stored}})
+
+        result = self.run_module(FakeModule(params(deployment_configs={"production": deployment})), client)
+
+        self.assertNotIn("msg", result)
+        self.assertTrue(result["changed"])
+        self.assertEqual(api.edit.call_args.kwargs["deployment_configs"], {"production": deployment})
+
     def test_null_r2_jurisdiction_is_sent(self):
         current = {
             **PROJECT,

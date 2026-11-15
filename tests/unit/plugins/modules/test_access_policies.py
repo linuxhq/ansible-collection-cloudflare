@@ -200,6 +200,52 @@ class AccessPoliciesTests(TestCase):
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_rejects_sdk_selector_key_before_any_request(self):
+        client, api = client_with()
+
+        result = self.run_module(
+            FakeModule(params(include=[{"github_organization": {"identity_provider_id": "idp", "name": "org"}}])),
+            client,
+        )
+
+        self.assertEqual(
+            result["msg"],
+            "include selector 'github_organization' must use the Cloudflare API key 'github-organization'",
+        )
+        api.list.assert_not_called()
+        api.create.assert_not_called()
+
+    def test_rejects_unstored_approval_group_fields_before_any_request(self):
+        approval_groups = [
+            {"approvals_needed": 1, "email_addresses": ["a@example.com"]},
+            {"approvals_needed": 1, "email_list_uuid": "list", "foo": 1},
+        ]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with([policy()])
+
+                result = self.run_module(
+                    FakeModule(params(approval_groups=approval_groups), check_mode=check_mode), client
+                )
+
+                self.assertEqual(result["unsupported_fields"], ["approval_groups[1].foo"])
+                self.assertEqual(
+                    result["msg"], "Cloudflare does not store these Access policy fields: approval_groups[1].foo"
+                )
+                api.list.assert_not_called()
+                api.update.assert_not_called()
+
+    def test_rejects_unstored_selector_fields_before_any_request(self):
+        client, api = client_with()
+
+        result = self.run_module(
+            FakeModule(params(exclude=[{"email_domain": {"domain": "x.com", "bogus": 1}}])), client
+        )
+
+        self.assertEqual(result["unsupported_fields"], ["exclude[0].email_domain.bogus"])
+        api.list.assert_not_called()
+        api.create.assert_not_called()
+
     def test_stored_approval_group_fields_are_sent(self):
         approval_groups = [{"approvals_needed": 1, "email_addresses": ["a@example.com"], "email_list_uuid": "list"}]
         client, api = client_with(created=policy(approval_groups=approval_groups))

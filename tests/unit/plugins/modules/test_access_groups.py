@@ -50,17 +50,6 @@ class AccessGroupsTests(TestCase):
 
         api.list.assert_called_once_with(account_id="account", name="admins")
 
-    def test_non_mapping_selector_fails_cleanly(self):
-        current = {"id": "group", "name": "admins", "include": INCLUDE}
-        for selector in (None, "everyone", ["everyone"]):
-            with self.subTest(selector=selector):
-                client, api = client_with([current], updated=current)
-
-                result = self.run_module(FakeModule(params(include=[selector])), client)
-
-                self.assertEqual(api.update.call_args.kwargs["include"], [selector])
-                self.assertIn("Cloudflare did not apply the requested Access group", result["msg"])
-
     def test_equivalent_group_is_unchanged(self):
         current = {"id": "group", "name": "admins", "include": INCLUDE}
         client, api = client_with([current])
@@ -104,6 +93,111 @@ class AccessGroupsTests(TestCase):
         result = self.run_module(FakeModule(params(include=changed)), client)
 
         self.assertTrue(result["changed"])
+
+    def test_rejects_sdk_selector_key_before_any_request(self):
+        for key, api_key in (("github_organization", "github-organization"), ("azure_ad", "azureAD")):
+            with self.subTest(key=key):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(require=[{key: {"identity_provider_id": "idp"}}])), client)
+
+                self.assertEqual(result["msg"], f"require selector {key!r} must use the Cloudflare API key {api_key!r}")
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_rejects_unstored_selector_fields_before_any_request(self):
+        include = [{"email": {"email": "a@example.com", "bogus": "x"}}, {"everyone": {"bogus": 1}}]
+        require = [{"github-organization": {"identity_provider_id": "idp", "name": "org", "id": "1", "extra": 1}}]
+        unsupported = ["include[0].email.bogus", "include[1].everyone.bogus", "require[0].github-organization.extra"]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(
+                    FakeModule(params(include=include, require=require), check_mode=check_mode), client
+                )
+
+                self.assertEqual(result["unsupported_fields"], unsupported)
+                self.assertEqual(
+                    result["msg"], f"Cloudflare does not store these Access selector fields: {', '.join(unsupported)}"
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_rejects_selector_with_several_rules_before_any_request(self):
+        include = [{"email": {"email": "a@example.com"}}, {"email": {"email": "b@example.com"}, "everyone": {}}]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(include=include), check_mode=check_mode), client)
+
+                self.assertEqual(
+                    result["msg"],
+                    "include[1] sets the selectors 'email', 'everyone', which Cloudflare splits into separate include "
+                    "entries; list each selector as its own entry",
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_rejects_null_selector_before_any_request(self):
+        include = [{"email": {"email": "a@example.com"}}, {"any_valid_service_token": None}]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(include=include), check_mode=check_mode), client)
+
+                self.assertEqual(
+                    result["msg"],
+                    "include[1].any_valid_service_token must be a mapping; use {} for a selector without fields, as "
+                    "Cloudflare stores a null selector as {}",
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_non_mapping_selector_fails_before_any_request(self):
+        for selector in (None, "everyone", ["everyone"]):
+            for check_mode in (True, False):
+                with self.subTest(selector=selector, check_mode=check_mode):
+                    client, api = client_with()
+
+                    result = self.run_module(FakeModule(params(include=[selector]), check_mode=check_mode), client)
+
+                    self.assertEqual(
+                        result["msg"], "include[0] must be a mapping that sets one selector, such as {'everyone': {}}"
+                    )
+                    api.list.assert_not_called()
+                    api.create.assert_not_called()
+
+    def test_empty_selector_fails_before_any_request(self):
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(exclude=[{}]), check_mode=check_mode), client)
+
+                self.assertEqual(result["msg"], "exclude[0] must set one selector; Cloudflare drops an empty selector")
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_empty_selector_value_fails_before_any_request(self):
+        include = [{"device_posture": {"integration_uid": "posture", "account_id": ""}}, {"email": {"email": ""}}]
+        empty = ["include[0].device_posture.account_id", "include[1].email.email"]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(include=include), check_mode=check_mode), client)
+
+                self.assertEqual(result["empty_fields"], empty)
+                self.assertEqual(
+                    result["msg"],
+                    f"Cloudflare does not store an empty value for these Access selector fields: {', '.join(empty)}; "
+                    "omit them instead",
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
 
     def test_empty_mapping_selector_is_unchanged(self):
         include = [{"any_valid_service_token": {}}]

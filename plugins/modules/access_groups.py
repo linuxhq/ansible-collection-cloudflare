@@ -14,6 +14,21 @@ description:
     compared exactly, including their nested fields, except that the C(id)
     Cloudflare adds to a C(github-organization) selector matches a selector
     that omits it.
+  - A selector of a known type accepts only the nested fields Cloudflare
+    stores for it, such as C(email) of an C(email) selector. Cloudflare
+    accepts any other field but does not store it, so the module fails before
+    making changes.
+  - Each selector is a mapping that sets one rule, such as C(email) or
+    C(everyone). Cloudflare drops an empty selector V({}) and splits a
+    selector with several rules into separate selectors, so such a selector
+    fails before any change.
+  - The value of a selector of a known type must be a mapping, such as
+    V({}) for C(everyone) or C(any_valid_service_token). Cloudflare stores a
+    null value as V({}), so such a selector fails before any change.
+  - A nested field of a selector of a known type must not be V(""), such as
+    the C(account_id) of a C(device_posture) selector. Cloudflare does not
+    store an empty value, so such a selector fails before any change; omit
+    the field instead.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
@@ -108,6 +123,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_present,
     find_resource,
     payload_from_params,
+    validate_access_selectors,
 )
 
 FIELDS = ("exclude", "include", "is_default", "name", "require")
@@ -118,6 +134,8 @@ def run(module, client):
     params = module.params
     account_id = params["account_id"]
     groups = client.zero_trust.access.groups
+    if params["state"] == "present":
+        validate_access_selectors(module)
 
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the Access group",

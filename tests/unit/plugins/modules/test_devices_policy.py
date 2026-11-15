@@ -219,6 +219,67 @@ class DevicesPolicyTests(TestCase):
         api.edit.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_unknown_route_fields_fail_before_any_request(self):
+        routes = [{"address": "192.0.2.0/24", "description": None}, {"host": "example.com", "foo": "x"}]
+        for field in ("include", "exclude"):
+            for check_mode in (True, False):
+                with self.subTest(field=field, check_mode=check_mode):
+                    result, api = self.run_module(
+                        FakeModule({"account_id": "account", field: routes}, check_mode=check_mode), {field: []}
+                    )
+
+                    api.get.assert_not_called()
+                    api.edit.assert_not_called()
+                    self.assertIn(f"{field}[1].foo", result["msg"])
+                    self.assertEqual(result["unsupported_fields"], [f"{field}[1].foo"])
+
+    def test_unknown_service_mode_field_fails_before_any_request(self):
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                result, api = self.run_module(
+                    FakeModule(
+                        {"account_id": "account", "service_mode_v2": {"mode": "warp", "foo": 1}}, check_mode=check_mode
+                    ),
+                    {"service_mode_v2": {"mode": "warp"}},
+                )
+
+                api.get.assert_not_called()
+                api.edit.assert_not_called()
+                self.assertIn("service_mode_v2.foo", result["msg"])
+                self.assertEqual(result["unsupported_fields"], ["service_mode_v2.foo"])
+
+    def test_service_mode_port_without_proxy_mode_fails_before_any_request(self):
+        for requested in (
+            {"mode": "warp", "port": 3000},
+            {"mode": "warp_tunnel_only", "port": 3000},
+            {"mode": "posture_only", "port": 3000},
+            {"port": 3000},
+        ):
+            for check_mode in (True, False):
+                with self.subTest(requested=requested, check_mode=check_mode):
+                    result, api = self.run_module(
+                        FakeModule({"account_id": "account", "service_mode_v2": requested}, check_mode=check_mode),
+                        {"service_mode_v2": {"mode": "warp"}},
+                    )
+
+                    api.get.assert_not_called()
+                    api.edit.assert_not_called()
+                    self.assertEqual(
+                        result["msg"],
+                        "service_mode_v2.port requires mode proxy; Cloudflare does not store a port for another mode",
+                    )
+
+    def test_service_mode_does_not_carry_port_into_another_mode(self):
+        result, api = self.run_module(
+            FakeModule({"account_id": "account", "auto_connect": 5.0, "service_mode_v2": {"mode": "warp"}}),
+            {"auto_connect": 0.0, "service_mode_v2": {"mode": "warp", "port": 3000}},
+            {"auto_connect": 5.0, "service_mode_v2": {"mode": "warp"}},
+        )
+
+        api.edit.assert_called_once_with(account_id="account", auto_connect=5.0, service_mode_v2={"mode": "warp"})
+        self.assertTrue(result["changed"])
+        self.assertNotIn("msg", result)
+
     def test_known_route_and_service_mode_fields_are_sent(self):
         routes = [{"address": "192.0.2.0/24", "description": None}, {"host": "example.com", "description": "kept"}]
         sent = {"exclude": routes, "service_mode_v2": {"mode": "proxy", "port": 3000}}

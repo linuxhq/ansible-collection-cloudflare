@@ -47,6 +47,9 @@ options:
         without C(logging) uses Cloudflare's default, C(logging.enabled=true).
         Cloudflare drops an empty C(description) or C(action_parameters), so either
         matches a rule without that field.
+      - An empty C(action_parameters.phases), C(action_parameters.products), or
+        C(action_parameters.rules) of a C(skip) rule fails before any change,
+        because Cloudflare does not store it; omit the parameter instead.
       - A rule's C(action_parameters.headers) and C(action_parameters.rules) mappings
         are compared on their complete key sets, so omitting an entry removes it.
       - Use the Cloudflare API names for C(set_cache_control) directives, such as
@@ -153,10 +156,18 @@ ACTION_PARAMETER_API_KEYS = {
     "stale_while_revalidate": "stale-while-revalidate",
 }
 
+# Skip rule action parameters Cloudflare drops when they hold these empty values.
+EMPTY_SKIP_PARAMETERS = {"phases": [], "products": [], "rules": {}}
+
 
 def validate_action_parameters(module):
-    """Fail when an action parameter uses an SDK spelling instead of its API key."""
-    for rule in module.params.get("rules") or ():
+    """Fail when an action parameter uses an SDK spelling or a skip rule parameter is empty.
+
+    Cloudflare drops an empty skip rule phases, products, or rules value, so
+    the rule would never match the request.
+    """
+    empty = []
+    for index, rule in enumerate(module.params.get("rules") or ()):
         action_parameters = rule.get("action_parameters")
         if not isinstance(action_parameters, dict):
             continue
@@ -164,6 +175,18 @@ def validate_action_parameters(module):
         for key, api_key in ACTION_PARAMETER_API_KEYS.items():
             if key in action_parameters:
                 module.fail_json(msg=f"action_parameters key {key!r} must use the Cloudflare API key {api_key!r}")
+
+        empty.extend(
+            f"rules[{index}].action_parameters.{key}"
+            for key, value in EMPTY_SKIP_PARAMETERS.items()
+            if key in action_parameters and action_parameters[key] == value
+        )
+
+    if empty:
+        module.fail_json(
+            msg=f"Cloudflare does not store these empty action parameters: {', '.join(empty)}; omit them instead",
+            empty_fields=empty,
+        )
 
 
 def rules_from_resource(module, ruleset):
