@@ -62,6 +62,9 @@ options:
         settings, such as C(compatibility_date), C(env_vars), or
         C(build_image_major_version). Cloudflare accepts any other key but does
         not store it, so the module fails before making changes.
+      - The same applies to fields of C(limits), C(placement), and each
+        C(env_vars) or binding entry, such as C(type) and C(value) of an
+        environment variable or C(namespace_id) of a C(kv_namespaces) entry.
   rotate_secrets:
     type: bool
     default: false
@@ -203,6 +206,24 @@ DEPLOYMENT_SETTINGS = (
     "vectorize_bindings",
     "wrangler_config_hash",
 )
+# Fields of each entry in a deployment env_vars or binding map, and of each
+# deployment setting object, from the same cloudflare SDK types.
+DEPLOYMENT_ENTRY_FIELDS = {
+    "ai_bindings": ("project_id",),
+    "analytics_engine_datasets": ("dataset",),
+    "browsers": (),
+    "d1_databases": ("id",),
+    "durable_object_namespaces": ("namespace_id",),
+    "env_vars": ("type", "value"),
+    "hyperdrive_bindings": ("id",),
+    "kv_namespaces": ("namespace_id",),
+    "mtls_certificates": ("certificate_id",),
+    "queue_producers": ("name",),
+    "r2_buckets": ("name", "jurisdiction"),
+    "services": ("service", "entrypoint", "environment"),
+    "vectorize_bindings": ("index_name",),
+}
+DEPLOYMENT_OBJECT_FIELDS = {"limits": ("cpu_ms",), "placement": ("mode",)}
 
 # Cloudflare clears these settings when they are set to null, but keeps the
 # current value of any other setting set to null.
@@ -242,9 +263,19 @@ def validate_setting_names(module):
     unknown = [f"build_config.{key}" for key in params.get("build_config") or {} if key not in BUILD_SETTINGS]
     for environment in ("preview", "production"):
         config = (params.get("deployment_configs") or {}).get(environment)
-        for key in config if isinstance(config, dict) else ():
+        for key, value in config.items() if isinstance(config, dict) else ():
+            path = f"deployment_configs.{environment}.{key}"
             if key not in DEPLOYMENT_SETTINGS:
-                unknown.append(f"deployment_configs.{environment}.{key}")
+                unknown.append(path)
+
+            if key in DEPLOYMENT_OBJECT_FIELDS and isinstance(value, dict):
+                unknown.extend(f"{path}.{field}" for field in value if field not in DEPLOYMENT_OBJECT_FIELDS[key])
+
+            # Entries may be null, which deletes them.
+            for name, entry in value.items() if key in DEPLOYMENT_ENTRY_FIELDS and isinstance(value, dict) else ():
+                for field in entry if isinstance(entry, dict) else ():
+                    if field not in DEPLOYMENT_ENTRY_FIELDS[key]:
+                        unknown.append(f"{path}.{name}.{field}")
 
     if unknown:
         module.fail_json(
