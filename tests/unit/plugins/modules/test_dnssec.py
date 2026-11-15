@@ -89,4 +89,7 @@ class DnssecTests(TestCase):
         settings = {"status": "active", "dnssec_presigned": False}
         result, _ignored = self.run_module(FakeModule(params(dnssec_presigned=True)), settings, settings)
 
-        self.assertEqual(result["msg"], "Cloudflare did not apply the requested DNSSEC settings")
+        self.assertEqual(
+            result["msg"],
+            "Cloudflare did not apply the requested DNSSEC settings: dnssec_presigned requested true, stored false",
+        )

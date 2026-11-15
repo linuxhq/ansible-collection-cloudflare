@@ -184,6 +184,20 @@ class AccessGroupsTests(TestCase):
         api.create.assert_called_once_with(account_id="account", include=INCLUDE, name="admins")
         self.assertEqual(result["access_group"], created)
 
+    def test_rewritten_selector_names_requested_and_stored_values(self):
+        include = [{"ip": {"ip": "192.0.2.1"}}]
+        stored = [{"ip": {"ip": "192.0.2.1/32"}}]
+        client, _ignored = client_with(created={"id": "group", "name": "admins", "include": stored})
+
+        result = self.run_module(FakeModule(params(include=include)), client)
+
+        self.assertEqual(
+            result["msg"],
+            "Cloudflare did not apply the requested Access group: "
+            'include requested [{"ip": {"ip": "192.0.2.1"}}], stored [{"ip": {"ip": "192.0.2.1/32"}}]',
+        )
+        self.assertEqual(result["differences"], [{"field": "include", "requested": include, "stored": stored}])
+
     def test_update_preserves_omitted_selectors(self):
         exclude = [{"email": {"email": "blocked@example.com"}}]
         include = [{"email": {"email": "new@example.com"}}]

@@ -1,0 +1,7 @@
+---
+minor_changes:
+  - access_apps, access_groups, access_policies, access_service_tokens, cfd_tunnel_configurations, devices_policy,
+    devices_settings, dnssec, pagerules, pages_projects, rules_lists, rulesets, zerotrust_connectivity_settings, zones -
+    when Cloudflare stores a value that differs from the requested one, such as an Access C(ip) selector C(192.0.2.1)
+    stored as C(192.0.2.1/32), name the requested and stored value of each differing field in the failure message, and
+    return them in C(differences), so that the value can be written as Cloudflare stores it.

@@ -17,6 +17,10 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+notes:
+  - Cloudflare may store a requested value in a canonical form that differs from the request. The module then
+    fails after the write, naming the requested and stored value of each differing field in the message and in
+    C(differences), so the stored form can be requested instead.
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
   - linuxhq.cloudflare.cloudflare.account
@@ -163,6 +167,24 @@ items_operation:
       description: Final bulk operation status.
       returned: always
       type: str
+differences:
+  description: Each Rules list field that Cloudflare stored differently from the request.
+  returned: when Cloudflare did not apply the requested Rules list fields
+  type: list
+  elements: dict
+  contains:
+    field:
+      description: Name of the field.
+      returned: always
+      type: str
+    requested:
+      description: Requested value of the field.
+      returned: always
+      type: raw
+    stored:
+      description: Value Cloudflare stored for the field.
+      returned: always
+      type: raw
 missing_items:
   description: Requested items that Cloudflare did not store.
   returned: when Cloudflare did not apply the requested items

@@ -279,7 +279,11 @@ class ZonesTests(TestCase):
 
         result = self.run_module(FakeModule(params(settings=[{"id": "min_tls_version", "value": 1.3}])), client)
 
-        self.assertEqual(result["msg"], "Cloudflare did not apply the requested zone setting")
+        self.assertEqual(
+            result["msg"],
+            'Cloudflare did not apply the requested zone setting: min_tls_version requested 1.3, stored "1.2"',
+        )
+        self.assertEqual(result["differences"], [{"field": "min_tls_version", "requested": 1.3, "stored": "1.2"}])
 
     def test_matches_zone_names_case_insensitively(self):
         client = client_with([ZONE], deleted={"id": "zone"})

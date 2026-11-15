@@ -2,6 +2,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
+import json
 import os
 from base64 import b64decode
 from contextlib import contextmanager
@@ -21,6 +22,10 @@ except ImportError:
 else:
     # The SDK supports Pydantic v1, whose to_dict() rejects the warnings argument.
     PYDANTIC_V2 = int(pydantic.VERSION.split(".", 1)[0]) >= 2
+
+
+# Differing fields named in a "did not apply" failure message.
+MESSAGE_FIELDS = 10
 
 
 class CloudflareResponseError(Exception):
@@ -347,6 +352,17 @@ def values_differ(current, desired):
     return not values_equal(serialize_resource(current), serialize_resource(desired))
 
 
+def projected_current(current, desired, defaults=None, exact_fields=(), exact_values=()):
+    """Return current in the form differs compares with desired."""
+    current = {**(defaults or {}), **(serialize_resource(current) or {})}
+    projected = normalize_current_by_desired_fields(current, desired, exact_fields)
+    for field in exact_values:
+        if field in desired:
+            projected[field] = current.get(field)
+
+    return projected
+
+
 def differs(current, desired, defaults=None, exact_fields=(), exact_values=()):
     """Return whether current differs from desired on the desired fields only.
 
@@ -357,19 +373,61 @@ def differs(current, desired, defaults=None, exact_fields=(), exact_values=()):
     if not desired:
         return False
 
-    current = {**(defaults or {}), **(serialize_resource(current) or {})}
-    projected = normalize_current_by_desired_fields(current, desired, exact_fields)
-    for field in exact_values:
-        if field in desired:
-            projected[field] = current.get(field)
+    return values_differ(projected_current(current, desired, defaults, exact_fields, exact_values), desired)
 
-    return values_differ(projected, desired)
+
+def applied_differences(stored, requested):
+    """List each top-level field whose stored value differs from the requested value.
+
+    Like values_differ, a null field matches a missing one.
+    """
+    stored = serialize_resource(stored) or {}
+    requested = serialize_resource(requested) or {}
+    fields = [*requested, *(field for field in stored if field not in requested)]
+    return [
+        {"field": field, "requested": requested.get(field), "stored": stored.get(field)}
+        for field in fields
+        if not values_equal(stored.get(field), requested.get(field))
+    ]
+
+
+def message_value(module, value):
+    """Render value as JSON for a failure message.
+
+    Ansible masks no_log values in the result, but not their JSON-escaped
+    forms, so those are masked here.
+    """
+    text = json.dumps(value, ensure_ascii=False)
+    for secret in getattr(module, "no_log_values", ()):
+        escaped = json.dumps(secret, ensure_ascii=False)[1:-1]
+        if escaped != secret:
+            text = text.replace(escaped, "********")
+
+    return text
+
+
+def fail_not_applied(module, resource_name, differences):
+    """Fail, naming the requested and stored value of each field Cloudflare did not apply."""
+    pairs = [
+        f"{difference['field']} requested {message_value(module, difference['requested'])}, "
+        f"stored {message_value(module, difference['stored'])}"
+        for difference in differences[:MESSAGE_FIELDS]
+    ]
+    if len(differences) > MESSAGE_FIELDS:
+        pairs.append(f"{len(differences) - MESSAGE_FIELDS} more fields are listed in differences")
+
+    details = f": {'; '.join(pairs)}" if pairs else ""
+    module.fail_json(
+        msg=f"Cloudflare did not apply the requested {resource_name}{details}",
+        differences=differences,
+    )
 
 
 def require_applied(module, resource, desired, resource_name, defaults=None, exact_fields=(), exact_values=()):
     require_mapping(module, resource, resource_name)
     if differs(resource, desired, defaults, exact_fields, exact_values):
-        module.fail_json(msg=f"Cloudflare did not apply the requested {resource_name}")
+        projected = projected_current(resource, desired, defaults, exact_fields, exact_values)
+        fail_not_applied(module, resource_name, applied_differences(projected, desired))
 
 
 # The SDK renames these snake_case selector keys to their API spellings on

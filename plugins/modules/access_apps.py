@@ -17,6 +17,10 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+notes:
+  - Cloudflare may store a requested value in a canonical form that differs from the request. The module then
+    fails after the write, naming the requested and stored value of each differing field in the message and in
+    C(differences), so the stored form can be requested instead.
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
   - linuxhq.cloudflare.cloudflare.account

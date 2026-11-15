@@ -75,7 +75,10 @@ class AccessServiceTokensTests(TestCase):
 
         result = self.run_module(FakeModule(params()), client)
 
-        self.assertIn("did not apply", result["msg"])
+        self.assertEqual(
+            result["msg"], 'Cloudflare did not apply the requested service token: duration requested "1y", stored "1h"'
+        )
+        self.assertEqual(result["differences"], [{"field": "duration", "requested": "1y", "stored": "1h"}])
 
     def test_forever_token_without_expiry_is_unchanged(self):
         client, api = client_with([{"id": "token", "name": "automation", "expires_at": None}])
