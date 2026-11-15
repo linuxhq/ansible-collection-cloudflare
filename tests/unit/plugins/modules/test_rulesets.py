@@ -375,3 +375,33 @@ class RulesetRuleFieldTests(TestCase):
         api.create.assert_called_once()
         self.assertTrue(result["changed"])
         self.assertEqual(result["ruleset"], created)
+
+    def test_empty_fields_match_rules_cloudflare_stored_without_them(self):
+        stored = {**ASSIGNED, "action": "block", "expression": "true", "enabled": True}
+        for field, value in (("description", ""), ("action_parameters", {})):
+            requested = {"action": "block", "expression": "true", field: value}
+            with self.subTest(field=field, state="created"):
+                client, api = make_client(created={**CURRENT, "rules": [stored]})
+
+                result = self.run_module(FakeModule(params(rules=[requested])), client)
+
+                api.create.assert_called_once()
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)
+
+            with self.subTest(field=field, state="current"):
+                client, api = make_client({**CURRENT, "rules": [stored]})
+
+                result = self.run_module(FakeModule(params(rules=[requested])), client)
+
+                api.phases.update.assert_not_called()
+                self.assertFalse(result["changed"])
+
+    def test_description_on_rule_without_one_is_a_change(self):
+        requested = {"action": "block", "expression": "true", "description": "new"}
+        current = {**CURRENT, "rules": [{**ASSIGNED, "action": "block", "expression": "true", "enabled": True}]}
+        client, _ignored = make_client(current)
+
+        result = self.run_module(FakeModule(params(rules=[requested]), check_mode=True), client)
+
+        self.assertTrue(result["changed"])
