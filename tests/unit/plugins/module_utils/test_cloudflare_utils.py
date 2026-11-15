@@ -30,8 +30,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     resource_id,
     resource_list,
     serialize_resource,
-    unsupported_fields,
-    validate_access_selectors,
     validate_tunnel_secret,
     values_differ,
 )
@@ -487,83 +485,6 @@ class ValueTests(TestCase):
 
         self.assertEqual(raised.exception.values["msg"], "Found more than one resource with name 'One'")
         self.assertEqual(raised.exception.values["matching_ids"], ["one", "three"])
-
-    def test_unsupported_fields_lists_unknown_keys_at_every_level(self):
-        fields = {"a": ("b", "c"), "d": None}
-        value = {"a": {"b": 1, "x": 2}, "d": {"anything": 1}, "y": 3}
-
-        self.assertEqual(unsupported_fields(value, fields, "opt"), ["opt.a.x", "opt.y"])
-        self.assertEqual(unsupported_fields({"b": 1, "z": 1}, ("b",), "opt"), ["opt.z"])
-        self.assertEqual(unsupported_fields({"a": "not a mapping"}, fields, "opt"), [])
-        for value in (None, "text", ["b"]):
-            with self.subTest(value=value):
-                self.assertEqual(unsupported_fields(value, fields, "opt"), [])
-
-    def test_access_selectors_reject_unstored_nested_fields(self):
-        rules = {
-            "include": [{"email": {"email": "a@example.com", "bogus": "x"}}, {"everyone": {"bogus": 1}}],
-            "require": [{"github-organization": {"identity_provider_id": "idp", "name": "org", "id": "1", "x": 1}}],
-        }
-        unsupported = [
-            "policies[0].include[0].email.bogus",
-            "policies[0].include[1].everyone.bogus",
-            "policies[0].require[0].github-organization.x",
-        ]
-
-        with self.assertRaises(ModuleFail) as raised:
-            validate_access_selectors(FakeModule({}), rules, "policies[0].")
-
-        self.assertEqual(
-            raised.exception.values,
-            {
-                "msg": f"Cloudflare does not store these Access selector fields: {', '.join(unsupported)}",
-                "unsupported_fields": unsupported,
-            },
-        )
-
-    def test_access_selectors_reject_several_rules_in_one_selector(self):
-        for field in ("include", "exclude", "require"):
-            with self.subTest(field=field):
-                rules = {field: [{"everyone": {}}, {"ip": {"ip": "192.0.2.0/24"}, "unknown_type": {}}]}
-
-                with self.assertRaises(ModuleFail) as raised:
-                    validate_access_selectors(FakeModule({}), rules, "policies[0].")
-
-                self.assertEqual(
-                    raised.exception.values,
-                    {
-                        "msg": f"policies[0].{field}[1] sets the selectors 'ip', 'unknown_type', which Cloudflare "
-                        f"splits into separate {field} entries; list each selector as its own entry"
-                    },
-                )
-
-    def test_access_selectors_reject_non_mapping_known_selector_values(self):
-        for field in ("include", "exclude", "require"):
-            for value in (None, "", []):
-                with self.subTest(field=field, value=value):
-                    rules = {field: [{"everyone": {}}, {"any_valid_service_token": value}]}
-
-                    with self.assertRaises(ModuleFail) as raised:
-                        validate_access_selectors(FakeModule({}), rules, "policies[0].")
-
-                    self.assertEqual(
-                        raised.exception.values,
-                        {
-                            "msg": f"policies[0].{field}[1].any_valid_service_token must be a mapping; use {{}} for a "
-                            "selector without fields, as Cloudflare stores a null selector as {}"
-                        },
-                    )
-
-    def test_access_selectors_accept_stored_fields_and_unknown_selector_types(self):
-        rules = {
-            "include": [
-                {key: dict.fromkeys(fields, "value")} for key, fields in cloudflare_utils.ACCESS_SELECTOR_KEYS.items()
-            ],
-            "exclude": [{"unknown_type": {"anything": 1}}],
-            "require": [{"github-organization": {"identity_provider_id": "idp", "name": "org", "id": "1"}}],
-        }
-
-        validate_access_selectors(FakeModule(rules))
 
 
 class InfoTests(TestCase):

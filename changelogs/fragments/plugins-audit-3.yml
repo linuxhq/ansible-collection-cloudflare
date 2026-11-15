@@ -6,9 +6,6 @@ breaking_changes:
     status is requested.
 bugfixes:
   - access_policies - preserve C(policy_resolution_account_id) on update; the full-replacement update cleared it.
-  - access_groups, access_policies - fail before any change when an Access selector uses the SDK spelling
-    C(github_organization) or C(azure_ad), naming the Cloudflare API key (C(github-organization) or C(azureAD)).
-    Cloudflare stored the API key, so the module wrote and then failed on every run.
   - access_groups, access_policies - compare O(include), O(exclude), and O(require) selectors exactly, so removing an
     optional nested field, such as a device posture C(account_id), is applied instead of reported as unchanged.
   - access_apps - fail before any change when an option the O(type) does not support is set to a non-default value,

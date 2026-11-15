@@ -1,5 +1,0 @@
----
-bugfixes:
-  - devices_policy - reject unknown fields in C(include) or C(exclude) routes and in C(service_mode_v2) before any
-    request. Cloudflare accepted and dropped them, so the module wrote the policy and then failed because Cloudflare
-    did not apply the requested device policy, on every run.

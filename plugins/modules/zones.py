@@ -69,11 +69,6 @@ options:
         description:
           - Desired zone setting value.
           - For object values, only the provided nested fields are compared.
-          - The object values of C(aegis), C(automatic_platform_optimization),
-            C(nel), and C(security_header) accept only the fields Cloudflare
-            stores for them, such as C(enabled) of C(nel). Cloudflare accepts
-            any other field but does not store it, so the module fails before
-            making changes. Other values are not checked.
           - For settings Cloudflare exposes as an C(enabled) flag, such as
             C(ssl_recommender), the value sets that flag.
         required: true
@@ -160,27 +155,8 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     resource_id,
     select_fields,
     serialize_resource,
-    unsupported_fields,
     values_differ,
 )
-
-# Fields of the setting values the cloudflare SDK types as objects, by setting
-# id. Cloudflare accepts any other field but drops it.
-SETTING_VALUE_FIELDS = {
-    "aegis": ("enabled", "pool_id"),
-    "automatic_platform_optimization": (
-        "cache_by_device_type",
-        "cf",
-        "enabled",
-        "hostnames",
-        "wordpress",
-        "wp_plugin",
-    ),
-    "nel": ("enabled",),
-    "security_header": {
-        "strict_transport_security": ("enabled", "include_subdomains", "max_age", "nosniff", "preload"),
-    },
-}
 
 
 def setting_value_forms(value):
@@ -221,21 +197,11 @@ def setting_matches(current_value, desired_value):
 
 def validate_settings(module):
     setting_ids = set()
-    unknown = []
-    for index, setting in enumerate(module.params.get("settings") or []):
+    for setting in module.params.get("settings") or []:
         if not setting["id"].strip() or setting["id"] != setting["id"].strip() or setting["id"] in setting_ids:
             module.fail_json(msg="Each zone setting requires a unique valid id")
 
         setting_ids.add(setting["id"])
-        if setting["id"] in SETTING_VALUE_FIELDS:
-            fields = SETTING_VALUE_FIELDS[setting["id"]]
-            unknown.extend(unsupported_fields(setting["value"], fields, f"settings[{index}].value"))
-
-    if unknown:
-        module.fail_json(
-            msg=f"Cloudflare does not store these zone setting fields: {', '.join(unknown)}",
-            unsupported_fields=unknown,
-        )
 
 
 def find_zone(module, client):
