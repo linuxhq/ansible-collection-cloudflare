@@ -56,6 +56,9 @@ options:
     description:
       - Split tunnel routes excluded from the WARP tunnel.
       - Replaces the current routes; each route is compared on all of its fields.
+      - Each route accepts only C(address), C(host), and C(description).
+        Cloudflare accepts any other field but does not store it, so the
+        module fails before making changes.
       - A route C(description) of V("") matches a route without a description,
         since Cloudflare drops an empty description.
       - A bare IP address in a route's C(address) is compared and sent as a
@@ -73,6 +76,9 @@ options:
     description:
       - Split tunnel routes included in the WARP tunnel.
       - Replaces the current routes; each route is compared on all of its fields.
+      - Each route accepts only C(address), C(host), and C(description).
+        Cloudflare accepts any other field but does not store it, so the
+        module fails before making changes.
       - A route C(description) of V("") matches a route without a description,
         since Cloudflare drops an empty description.
       - A bare IP address in a route's C(address) is compared and sent as a
@@ -105,6 +111,10 @@ options:
     type: dict
     description:
       - WARP client service mode configuration.
+      - Accepts only C(mode) and C(port). Cloudflare accepts any other key but
+        does not store it, so the module fails before making changes.
+      - C(port) requires a C(mode) of C(proxy). Cloudflare does not store a
+        port for another mode, so the module fails before making changes.
       - Cloudflare replaces the whole configuration on every write. When
         C(mode) equals the current mode, keys omitted here, such as C(port),
         keep their current values.
@@ -192,6 +202,34 @@ FIELDS = (
     "switch_locked",
     "tunnel_protocol",
 )
+# Fields Cloudflare stores, from the cloudflare SDK split tunnel route and
+# service mode types; it accepts any other field but drops it.
+ROUTE_FIELDS = ("address", "description", "host")
+SERVICE_MODE_FIELDS = ("mode", "port")
+
+
+def validate_field_names(module):
+    """Fail when a route or service mode field Cloudflare accepts but never stores is requested."""
+    params = module.params
+    unknown = []
+    for option in ("exclude", "include"):
+        for index, route in enumerate(params.get(option) or ()):
+            unknown.extend(f"{option}[{index}].{field}" for field in route if field not in ROUTE_FIELDS)
+
+    unknown.extend(
+        f"service_mode_v2.{field}" for field in params.get("service_mode_v2") or {} if field not in SERVICE_MODE_FIELDS
+    )
+    if unknown:
+        module.fail_json(
+            msg=f"Cloudflare does not store these device policy fields: {', '.join(unknown)}",
+            unsupported_fields=unknown,
+        )
+
+    service_mode_v2 = params.get("service_mode_v2") or {}
+    if "port" in service_mode_v2 and service_mode_v2.get("mode") != "proxy":
+        module.fail_json(
+            msg="service_mode_v2.port requires mode proxy; Cloudflare does not store a port for another mode"
+        )
 
 
 def split_tunnel_route(route):
@@ -231,10 +269,14 @@ def service_mode(requested, current):
 
     Cloudflare replaces service_mode_v2 as a whole, so a write that omits the
     port of an unchanged mode would reset it. Keys are carried over only when
-    the mode is unchanged, since another mode stores different keys.
+    the mode is unchanged, since another mode stores different keys, and the
+    port only for mode proxy, the only mode that stores one.
     """
     if not isinstance(current, dict) or current.get("mode") != requested.get("mode"):
         return requested
+
+    if requested.get("mode") != "proxy":
+        current = {key: value for key, value in current.items() if key != "port"}
 
     return {**current, **requested}
 
@@ -243,6 +285,8 @@ def run(module, client):
     account_id = module.params["account_id"]
     if module.params.get("include") == []:
         module.fail_json(msg="include must not be empty; Cloudflare stores it as exclude mode, use exclude: [] instead")
+
+    validate_field_names(module)
 
     payload = payload_from_params(module.params, FIELDS)
     for field in ("exclude", "include"):

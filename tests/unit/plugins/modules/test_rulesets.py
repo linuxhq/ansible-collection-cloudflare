@@ -106,6 +106,48 @@ class RulesetsTests(TestCase):
                 result["msg"], f"action_parameters key {key!r} must use the Cloudflare API key {api_key!r}"
             )
 
+    def test_rejects_empty_skip_parameters_before_any_request(self):
+        rules = [
+            {"action": "skip", "expression": "true", "action_parameters": {"ruleset": "current"}},
+            {"action": "skip", "expression": "true", "action_parameters": {"phases": [], "products": []}},
+            {"action": "skip", "expression": "true", "action_parameters": {"rules": {}}},
+        ]
+        empty = [
+            "rules[1].action_parameters.phases",
+            "rules[1].action_parameters.products",
+            "rules[2].action_parameters.rules",
+        ]
+        for check_mode in (True, False):
+            client, api = make_client(CURRENT)
+            with self.subTest(check_mode=check_mode):
+                result = self.run_module(FakeModule(params(rules=rules), check_mode=check_mode), client)
+
+            api.phases.get.assert_not_called()
+            api.phases.update.assert_not_called()
+            self.assertEqual(result["empty_fields"], empty)
+            self.assertEqual(
+                result["msg"],
+                f"Cloudflare does not store these empty action parameters: {', '.join(empty)}; omit them instead",
+            )
+
+    def test_accepts_non_empty_skip_parameters(self):
+        action_parameters = {"phases": ["http_ratelimit"], "products": ["waf"], "rules": {"ruleset": ["rule"]}}
+        rules = [
+            {
+                "action": "skip",
+                "expression": "true",
+                "enabled": True,
+                "action_parameters": action_parameters,
+                "logging": {"enabled": True},
+            }
+        ]
+        client, api = make_client(CURRENT, updated={**CURRENT, "rules": rules})
+
+        result = self.run_module(FakeModule(params(rules=rules)), client)
+
+        api.phases.update.assert_called_once_with(PHASE, zone_id="zone", rules=rules)
+        self.assertTrue(result["changed"])
+
     def test_accepts_api_cache_control_spellings(self):
         rules = [
             {

@@ -1,0 +1,14 @@
+---
+bugfixes:
+  - access_groups, access_policies, access_apps - reject an Access selector that sets more than one rule, such as
+    C(email) and C(everyone) in one C(include) entry, before any request. Cloudflare split it into separate selectors,
+    so the module wrote the group, policy, or application and then failed because Cloudflare did not apply it, on every
+    run.
+  - access_apps - reject a C(destinations) entry without C(type) before any request. Cloudflare stored it as a
+    C(public) destination, so the module wrote the application and then failed on every run.
+  - access_apps - reject unknown fields in C(destinations) C(overrides) entries and in inline policy
+    C(connection_rules), C(connection_rules.rdp), and C(mfa_config) before any request. Cloudflare accepted and dropped
+    them, so the module wrote the application and then failed on every run.
+  - purge_cache - reject unknown fields in C(cache.files) mappings, such as a misspelled C(headers), before any request,
+    including in check mode. Cloudflare accepted and ignored them, so the module reported a purge of content cached
+    with different headers.

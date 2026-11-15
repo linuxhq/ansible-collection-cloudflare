@@ -14,6 +14,21 @@ description:
     compared exactly, including their nested fields, except that the C(id)
     Cloudflare adds to a C(github-organization) selector matches a selector
     that omits it.
+  - A selector of a known type accepts only the nested fields Cloudflare
+    stores for it, such as C(email) of an C(email) selector. Cloudflare
+    accepts any other field but does not store it, so the module fails before
+    making changes.
+  - Each selector is a mapping that sets one rule, such as C(email) or
+    C(everyone). Cloudflare drops an empty selector V({}) and splits a
+    selector with several rules into separate selectors, so such a selector
+    fails before any change.
+  - The value of a selector of a known type must be a mapping, such as
+    V({}) for C(everyone) or C(any_valid_service_token). Cloudflare stores a
+    null value as V({}), so such a selector fails before any change.
+  - A nested field of a selector of a known type must not be V(""), such as
+    the C(account_id) of a C(device_posture) selector. Cloudflare does not
+    store an empty value, so such a selector fails before any change; omit
+    the field instead.
   - Settings this module does not manage, such as C(session_duration), are
     preserved on an existing policy.
 version_added: '2.0.0'
@@ -65,6 +80,9 @@ options:
     elements: dict
     description:
       - Approval groups authorized to approve access requests.
+      - Each group accepts only C(approvals_needed), C(email_addresses), and
+        C(email_list_uuid). Cloudflare accepts any other field but does not
+        store it, so the module fails before making changes.
       - An existing policy's value is preserved when omitted.
   approval_required:
     type: bool
@@ -139,6 +157,7 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    ACCESS_APPROVAL_GROUP_FIELDS,
     ACCESS_SELECTOR_FIELDS,
     cloudflare_client,
     cloudflare_error_context,
@@ -147,6 +166,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_present,
     find_resource,
     payload_from_params,
+    validate_access_selectors,
 )
 
 FIELDS = (
@@ -183,10 +203,28 @@ FALSE_FIELDS = (
 )
 
 
+def validate_field_names(module):
+    """Fail when an approval group field Cloudflare accepts but never stores is requested."""
+    unknown = [
+        f"approval_groups[{index}].{field}"
+        for index, group in enumerate(module.params.get("approval_groups") or ())
+        for field in group
+        if field not in ACCESS_APPROVAL_GROUP_FIELDS
+    ]
+    if unknown:
+        module.fail_json(
+            msg=f"Cloudflare does not store these Access policy fields: {', '.join(unknown)}",
+            unsupported_fields=unknown,
+        )
+
+
 def run(module, client):
     params = module.params
     account_id = params["account_id"]
     policies = client.zero_trust.access.policies
+    if params["state"] == "present":
+        validate_field_names(module)
+        validate_access_selectors(module)
 
     # The list endpoint has no name filter, so match the name locally.
     with cloudflare_error_context(
