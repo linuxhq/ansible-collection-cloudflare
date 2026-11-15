@@ -625,7 +625,21 @@ class PagesProjectsTests(TestCase):
 
         result = self.run_module(FakeModule(params(deployment_configs={"production": {"env_vars": {}}})), client)
 
-        self.assertIn("did not apply", result["msg"])
+        self.assertEqual(
+            result["msg"],
+            "Cloudflare did not apply the requested Pages project: deployment_configs.production.env_vars.REMOVE "
+            'requested null, stored {"type": "plain_text", "value": "old"}',
+        )
+        self.assertEqual(
+            result["differences"],
+            [
+                {
+                    "field": "deployment_configs.production.env_vars.REMOVE",
+                    "requested": None,
+                    "stored": {"type": "plain_text", "value": "old"},
+                }
+            ],
+        )
 
     def test_check_mode_does_not_update(self):
         client, api = client_with([PROJECT])

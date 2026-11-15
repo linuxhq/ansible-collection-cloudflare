@@ -17,6 +17,10 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+notes:
+  - Cloudflare may store a requested value in a canonical form that differs from the request. The module then
+    fails after the write, naming the requested and stored value of each differing field in the message and in
+    C(differences), so the stored form can be requested instead.
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
   - linuxhq.cloudflare.cloudflare.account
@@ -160,6 +164,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     cloudflare_error_context,
     differs,
+    fail_not_applied,
     get_or_none,
     payload_from_params,
     require_applied,
@@ -413,17 +418,18 @@ def payload_with_removals(payload, current):
     return merged, removed
 
 
-def removals_remain(project, removed):
-    """Return whether any removed key path is still set in the project."""
+def remaining_removals(project, removed):
+    """List each removed key path that is still set in the project, with its stored value."""
+    remaining = []
     for path in removed:
         value = project
         for key in path:
             value = value.get(key) if isinstance(value, dict) else None
 
         if not cleared(value):
-            return True
+            remaining.append({"field": ".".join(path), "requested": None, "stored": value})
 
-    return False
+    return remaining
 
 
 def current_domain_names(module, project, domains):
@@ -515,8 +521,9 @@ def update_project(module, client, current, payload, secrets_requested):
         )
 
     require_applied(module, comparable_project(project, comparable_payload), comparable_payload, "Pages project")
-    if removals_remain(project, removed):
-        module.fail_json(msg="Cloudflare did not apply the requested Pages project")
+    remaining = remaining_removals(project, removed)
+    if remaining:
+        fail_not_applied(module, "Pages project", remaining)
 
     return project, True
 

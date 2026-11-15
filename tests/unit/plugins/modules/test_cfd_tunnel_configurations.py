@@ -274,7 +274,11 @@ class CfdTunnelConfigurationsTests(TestCase):
             module_for({"warp": True}), {"config": {"warp": False}}, {"config": {"warp": False}}
         )
 
-        self.assertEqual(raised.values["msg"], "Cloudflare did not apply the tunnel configuration")
+        self.assertEqual(
+            raised.values["msg"],
+            "Cloudflare did not apply the requested tunnel configuration: warp requested true, stored false",
+        )
+        self.assertEqual(raised.values["differences"], [{"field": "warp", "requested": True, "stored": False}])
 
     def test_locally_managed_tunnel_fails_before_any_change(self):
         for tunnel in (

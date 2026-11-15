@@ -12,6 +12,10 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+notes:
+  - Cloudflare may store a requested value in a canonical form that differs from the request. The module then
+    fails after the write, naming the requested and stored value of each differing field in the message and in
+    C(differences), so the stored form can be requested instead.
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
   - linuxhq.cloudflare.cloudflare.account
@@ -69,8 +73,10 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    applied_differences,
     cloudflare_client,
     cloudflare_error_context,
+    fail_not_applied,
     normalize_current_by_desired_fields,
     require_mapping,
     resource_id,
@@ -267,11 +273,12 @@ def run(module, client):
     require_mapping(module, configuration, "tunnel configuration")
     returned_config = configuration.get("config")
     require_mapping(module, returned_config, "tunnel configuration")
-    if values_differ(
+    differences = applied_differences(
         comparable_config(returned_config, params["config"]),
         comparable_config(params["config"]),
-    ):
-        module.fail_json(msg="Cloudflare did not apply the tunnel configuration")
+    )
+    if differences:
+        fail_not_applied(module, "tunnel configuration", differences)
 
     module.exit_json(
         changed=True,

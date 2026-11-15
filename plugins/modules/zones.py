@@ -12,6 +12,10 @@ description:
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
+notes:
+  - Cloudflare may store a requested value in a canonical form that differs from the request. The module then
+    fails after the write, naming the requested and stored value of each differing field in the message and in
+    C(differences), so the stored form can be requested instead.
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
 options:
@@ -148,6 +152,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     cloudflare_error_context,
     ensure_resource_absent,
+    fail_not_applied,
     find_resource,
     normalize_current_by_desired_fields,
     require_applied,
@@ -371,7 +376,17 @@ def update_settings(module, client, zone, pending):
             module.fail_json(msg="Cloudflare API returned malformed zone setting data")
 
         if not setting_matches(updated[field], setting["value"]):
-            module.fail_json(msg="Cloudflare did not apply the requested zone setting")
+            fail_not_applied(
+                module,
+                "zone setting",
+                [
+                    {
+                        "field": setting_id,
+                        "requested": setting["value"],
+                        "stored": normalize_current_by_desired_fields(updated[field], setting["value"]),
+                    }
+                ],
+            )
 
         updated_settings.append(updated)
 

@@ -10,6 +10,7 @@ import httpx
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudflare_utils
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    applied_differences,
     cloudflare_client,
     cloudflare_error_context,
     differs,
@@ -18,6 +19,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_settings,
     exit_resource_list,
     exit_settings,
+    fail_not_applied,
     find_resource,
     get_or_none,
     normalize_current_by_desired_fields,
@@ -325,7 +327,92 @@ class ValueTests(TestCase):
         with self.assertRaises(ModuleFail) as raised:
             require_applied(FakeModule({}), {"a": {"b": 2}}, {"a": {"b": 1}}, "resource")
 
-        self.assertEqual(raised.exception.values["msg"], "Cloudflare did not apply the requested resource")
+        self.assertEqual(
+            raised.exception.values["msg"],
+            'Cloudflare did not apply the requested resource: a requested {"b": 1}, stored {"b": 2}',
+        )
+        self.assertEqual(
+            raised.exception.values["differences"], [{"field": "a", "requested": {"b": 1}, "stored": {"b": 2}}]
+        )
+
+    def test_require_applied_names_requested_and_stored_values(self):
+        stored = {"id": "group", "name": "example", "include": [{"ip": {"ip": "192.0.2.1/32"}}]}
+        requested = {"name": "example", "include": [{"ip": {"ip": "192.0.2.1"}}]}
+
+        with self.assertRaises(ModuleFail) as raised:
+            require_applied(FakeModule({}), stored, requested, "Access group")
+
+        self.assertEqual(
+            raised.exception.values["msg"],
+            "Cloudflare did not apply the requested Access group: "
+            'include requested [{"ip": {"ip": "192.0.2.1"}}], stored [{"ip": {"ip": "192.0.2.1/32"}}]',
+        )
+        self.assertEqual(
+            raised.exception.values["differences"],
+            [
+                {
+                    "field": "include",
+                    "requested": [{"ip": {"ip": "192.0.2.1"}}],
+                    "stored": [{"ip": {"ip": "192.0.2.1/32"}}],
+                }
+            ],
+        )
+
+    def test_require_applied_names_compared_stored_values(self):
+        with self.assertRaises(ModuleFail) as raised:
+            require_applied(
+                FakeModule({}),
+                {"a": {"b": 1, "c": 2}, "d": 1},
+                {"a": {"b": 1}, "d": 1, "e": True},
+                "resource",
+                defaults={"e": False},
+                exact_values=("a",),
+            )
+
+        self.assertEqual(
+            raised.exception.values["differences"],
+            [
+                {"field": "a", "requested": {"b": 1}, "stored": {"b": 1, "c": 2}},
+                {"field": "e", "requested": True, "stored": False},
+            ],
+        )
+
+    def test_applied_differences_lists_only_differing_fields(self):
+        self.assertEqual(
+            applied_differences({"a": 1, "b": None, "c": 1, "e": 2}, {"a": 1, "c": True, "d": 3}),
+            [
+                {"field": "c", "requested": True, "stored": 1},
+                {"field": "d", "requested": 3, "stored": None},
+                {"field": "e", "requested": None, "stored": 2},
+            ],
+        )
+        self.assertEqual(applied_differences({"a": [1]}, {"a": [1]}), [])
+
+    def test_fail_not_applied_limits_the_message(self):
+        differences = [{"field": f"f{index}", "requested": index, "stored": None} for index in range(12)]
+
+        with self.assertRaises(ModuleFail) as raised:
+            fail_not_applied(FakeModule({}), "resource", differences)
+
+        self.assertTrue(
+            raised.exception.values["msg"].endswith(
+                "f9 requested 9, stored null; 2 more fields are listed in differences"
+            )
+        )
+        self.assertEqual(raised.exception.values["differences"], differences)
+
+    def test_fail_not_applied_masks_escaped_no_log_values(self):
+        module = FakeModule({})
+        module.no_log_values = {'se"cret', "plain"}
+
+        with self.assertRaises(ModuleFail) as raised:
+            fail_not_applied(module, "resource", [{"field": "a", "requested": 'se"cret', "stored": "plain"}])
+
+        self.assertNotIn('se\\"cret', raised.exception.values["msg"])
+        self.assertEqual(
+            raised.exception.values["msg"],
+            'Cloudflare did not apply the requested resource: a requested "********", stored "plain"',
+        )
 
     def test_validates_required_resource_fields(self):
         module = FakeModule({})

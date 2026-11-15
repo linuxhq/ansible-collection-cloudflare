@@ -92,7 +92,8 @@ class PageRulesTests(TestCase):
 
         result = self.run_module(FakeModule(params()), client)
 
-        self.assertEqual(result["msg"], "Cloudflare did not apply the requested page rule")
+        self.assertTrue(result["msg"].startswith("Cloudflare did not apply the requested page rule: "))
+        self.assertIn({"field": "targets", "requested": TARGETS, "stored": []}, result["differences"])
 
     def test_omitted_status_and_priority_preserve_current_values(self):
         current = {"id": "rule", "actions": ACTIONS, "priority": 10, "status": "disabled", "targets": TARGETS}

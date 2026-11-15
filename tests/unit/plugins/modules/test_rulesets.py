@@ -360,7 +360,8 @@ class RulesetRuleFieldTests(TestCase):
 
         result = self.run_module(FakeModule(params(rules=[requested])), client)
 
-        self.assertEqual(result["msg"], "Cloudflare did not apply the requested ruleset")
+        self.assertTrue(result["msg"].startswith("Cloudflare did not apply the requested ruleset: rules requested "))
+        self.assertEqual([difference["field"] for difference in result["differences"]], ["rules"])
 
     def test_created_ruleset_with_assigned_fields_and_defaults_is_applied(self):
         requested = {"action": "skip", "expression": "true", "action_parameters": {"ruleset": "current"}}

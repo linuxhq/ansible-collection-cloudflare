@@ -39,6 +39,9 @@ options:
     default: present
 notes:
   - Cloudflare only returns the client secret when a token is created.
+  - Cloudflare may store a requested value in a canonical form that differs from the request. The module then
+    fails after the write, naming the requested and stored value of each differing field in the message and in
+    C(differences), so the stored form can be requested instead.
 """
 
 EXAMPLES = r"""
@@ -99,6 +102,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     cloudflare_error_context,
     ensure_resource_absent,
+    fail_not_applied,
     find_resource,
     payload_from_params,
     resource_field,
@@ -123,7 +127,11 @@ def checked_token(module, service_token, expected_id=None):
     resource_id(module, service_token, "service token", expected=expected_id)
     resource_field(module, service_token, "name", "service token", expected=module.params["name"])
     if not duration_matches(service_token, module.params["duration"]):
-        module.fail_json(msg="Cloudflare did not apply the requested service token duration")
+        fail_not_applied(
+            module,
+            "service token",
+            [{"field": "duration", "requested": module.params["duration"], "stored": service_token.get("duration")}],
+        )
 
     return service_token
 
