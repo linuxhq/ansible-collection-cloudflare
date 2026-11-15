@@ -11,6 +11,9 @@ description:
   - Create, update, populate, and delete Cloudflare Rules lists by name.
   - Item updates wait for the resulting bulk operation to complete and fail when
     Cloudflare reports the operation failed.
+  - When this run creates the Rules list and Cloudflare rejects its items or the
+    item operation fails or times out, the list is deleted again before the
+    module fails. An existing list is never deleted.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
@@ -186,6 +189,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
+    cloudflare_error_details,
     ensure_resource_absent,
     find_resource,
     require_applied,
@@ -308,11 +312,12 @@ def transient_error(exc):
     return status_code == 429 or (isinstance(status_code, int) and status_code >= 500)
 
 
-def submit_items(module, client, account_id, list_id, items, deadline):
+def submit_items(module, client, account_id, list_id, items, deadline, fail=None):
+    fail = fail or module.fail_json
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            module.fail_json(msg="Timed out submitting the Rules list items operation", rules_list_id=list_id)
+            fail(msg="Timed out submitting the Rules list items operation", rules_list_id=list_id)
 
         try:
             with cloudflare_error_context(
@@ -336,18 +341,19 @@ def submit_items(module, client, account_id, list_id, items, deadline):
             continue
 
         if time.monotonic() >= deadline:
-            module.fail_json(msg="Timed out submitting the Rules list items operation", rules_list_id=list_id)
+            fail(msg="Timed out submitting the Rules list items operation", rules_list_id=list_id)
 
         return serialize_resource(operation)
 
 
-def wait_for_operation(module, client, account_id, operation, deadline):
+def wait_for_operation(module, client, account_id, operation, deadline, fail=None):
+    fail = fail or module.fail_json
     operation_id = None
     if isinstance(operation, dict):
         operation_id = operation.get("operation_id") or operation.get("id")
 
     if not isinstance(operation_id, str) or not operation_id.strip() or operation_id != operation_id.strip():
-        module.fail_json(
+        fail(
             msg="Rules list items submission did not return an operation id",
             operation=operation,
         )
@@ -356,7 +362,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            module.fail_json(
+            fail(
                 msg="Timed out waiting for the Rules list items operation to complete",
                 operation_id=operation_id,
                 operation=status,
@@ -383,13 +389,13 @@ def wait_for_operation(module, client, account_id, operation, deadline):
             continue
 
         if time.monotonic() >= deadline:
-            module.fail_json(
+            fail(
                 msg="Timed out waiting for the Rules list items operation to complete",
                 operation_id=operation_id,
             )
 
         if not isinstance(status, dict) or not isinstance(status.get("status"), str):
-            module.fail_json(
+            fail(
                 msg="Cloudflare API returned malformed Rules list operation data",
                 operation_id=operation_id,
             )
@@ -401,14 +407,14 @@ def wait_for_operation(module, client, account_id, operation, deadline):
             return status
 
         if operation_status == "failed":
-            module.fail_json(
+            fail(
                 msg="Rules list items operation failed",
                 operation_id=operation_id,
                 operation=status,
             )
 
         if operation_status not in ("pending", "running"):
-            module.fail_json(
+            fail(
                 msg="Cloudflare API returned an unknown Rules list operation status",
                 operation_id=operation_id,
                 operation=status,
@@ -661,6 +667,29 @@ def fail_not_applied(module, kind, desired_items, stored_items):
     )
 
 
+def created_list_rollback(module, lists, account_id, list_id):
+    """Return a failure callback that deletes the Rules list this run created before failing."""
+
+    def fail(**failure):
+        try:
+            lists.delete(list_id, account_id=account_id)
+        except cloudflare.APIError as rollback_error:
+            module.fail_json(
+                **{
+                    **failure,
+                    "msg": f"{failure['msg']}; rolling back the created Rules list also failed, delete it manually",
+                    "rules_list_id": list_id,
+                    "rollback_error": cloudflare_error_details(rollback_error),
+                }
+            )
+
+        module.fail_json(
+            **{**failure, "msg": f"{failure['msg']}; the created Rules list was rolled back", "rules_list_id": list_id}
+        )
+
+    return fail
+
+
 def ensure_present(module, client, current):
     params = module.params
     account_id = params["account_id"]
@@ -764,13 +793,28 @@ def ensure_present(module, client, current):
 
         if items_changed:
             deadline = time.monotonic() + params["operation_timeout"]
-            items_operation = wait_for_operation(
-                module,
-                client,
-                account_id,
-                submit_items(module, client, account_id, current_id, desired_items, deadline),
-                deadline,
-            )
+            # A list this run created is deleted again when its items are rejected.
+            fail = created_list_rollback(module, lists, account_id, current_id) if created else module.fail_json
+            try:
+                items_operation = wait_for_operation(
+                    module,
+                    client,
+                    account_id,
+                    submit_items(module, client, account_id, current_id, desired_items, deadline, fail),
+                    deadline,
+                    fail,
+                )
+            except cloudflare.APIError as exc:
+                if not created:
+                    raise
+
+                fail(
+                    **{
+                        "msg": getattr(exc, "_cloudflare_message", "Cloudflare API request failed"),
+                        **getattr(exc, "_cloudflare_context", {}),
+                        **cloudflare_error_details(exc),
+                    }
+                )
 
             with cloudflare_error_context(
                 "Cloudflare API request failed while reading the updated Rules list",
