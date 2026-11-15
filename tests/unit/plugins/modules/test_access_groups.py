@@ -140,6 +140,31 @@ class AccessGroupsTests(TestCase):
                 api.list.assert_not_called()
                 api.create.assert_not_called()
 
+    def test_rejects_null_selector_before_any_request(self):
+        include = [{"email": {"email": "a@example.com"}}, {"any_valid_service_token": None}]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(include=include), check_mode=check_mode), client)
+
+                self.assertEqual(
+                    result["msg"],
+                    "include[1].any_valid_service_token must be a mapping; use {} for a selector without fields, as "
+                    "Cloudflare stores a null selector as {}",
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_empty_mapping_selector_is_unchanged(self):
+        include = [{"any_valid_service_token": {}}]
+        client, api = client_with([{"id": "group", "name": "admins", "include": include}])
+
+        result = self.run_module(FakeModule(params(include=include)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_stored_selector_fields_are_sent(self):
         include = [{"email": {"email": "a@example.com"}}, {"everyone": {}}, {"ip": {"ip": "192.0.2.0/24"}}]
         created = {"id": "group", "name": "admins", "include": include}
