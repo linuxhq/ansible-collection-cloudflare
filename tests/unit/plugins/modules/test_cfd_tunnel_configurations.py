@@ -192,6 +192,49 @@ class CfdTunnelConfigurationsTests(TestCase):
         )
         self.assertFalse(current["ingress"][0]["originRequest"]["noTLSVerify"])
 
+    def test_numbers_do_not_match_boolean_origin_defaults(self):
+        rules = [{"service": "http_status:404"}]
+        global_origin = {"originRequest": {"noTLSVerify": True}}
+        for config, current in (
+            ({"originRequest": {"noTLSVerify": 0}, "ingress": rules}, {"ingress": rules}),
+            ({"originRequest": {"proxyPort": False}, "ingress": rules}, {"ingress": rules}),
+            (
+                {"ingress": [{"service": "https://localhost:443", "originRequest": {"noTLSVerify": 0}}]},
+                {"ingress": [{"service": "https://localhost:443"}]},
+            ),
+            (
+                {
+                    **global_origin,
+                    "ingress": [{"service": "https://localhost:443", "originRequest": {"noTLSVerify": 1}}],
+                },
+                {**global_origin, "ingress": [{"service": "https://localhost:443"}]},
+            ),
+        ):
+            with self.subTest(config=config):
+                raised, api = self.run_module(module_for(config), {"config": current}, {"config": config})
+
+                self.assertTrue(raised.values["changed"])
+                api.update.assert_called_once_with("tunnel", account_id="account", config=config)
+
+    def test_boolean_origin_defaults_still_match(self):
+        rules = [{"service": "http_status:404"}]
+        global_origin = {"originRequest": {"noTLSVerify": True}}
+        for config, current in (
+            ({"originRequest": {"noTLSVerify": False}, "ingress": rules}, {"ingress": rules}),
+            (
+                {
+                    **global_origin,
+                    "ingress": [{"service": "https://localhost:443", "originRequest": {"noTLSVerify": True}}],
+                },
+                {**global_origin, "ingress": [{"service": "https://localhost:443"}]},
+            ),
+        ):
+            with self.subTest(config=config):
+                raised, api = self.run_module(module_for(config), {"config": current})
+
+                self.assertFalse(raised.values["changed"])
+                api.update.assert_not_called()
+
     def test_sdk_origin_request_spelling_fails_before_any_request(self):
         origin = {"no_tls_verify": True}
         for config in (

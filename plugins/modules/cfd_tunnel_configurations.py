@@ -76,6 +76,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     resource_id,
     serialize_resource,
     values_differ,
+    values_equal,
 )
 
 # https://developers.cloudflare.com/tunnel/reference/origin-parameters/
@@ -143,7 +144,7 @@ def normalize_origin(origin, defaults):
             if not value:
                 continue
 
-        elif key in defaults and value == defaults[key]:
+        elif key in defaults and values_equal(value, defaults[key]):
             continue
 
         normalized[key] = value
