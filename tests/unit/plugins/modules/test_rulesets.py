@@ -426,3 +426,38 @@ class RulesetRuleFieldTests(TestCase):
 
                 api.phases.update.assert_not_called()
                 self.assertFalse(result["changed"])
+
+    def test_null_rule_fields_count_as_omitted(self):
+        block = {"action": "block", "expression": "true"}
+        skip = {"action": "skip", "expression": "true", "action_parameters": {"ruleset": "current"}}
+        for field, requested, stored in (
+            ("enabled", block, {**ASSIGNED, **block, "enabled": True}),
+            ("logging", skip, {**ASSIGNED, **skip, "enabled": True, "logging": {"enabled": True}}),
+            ("ref", block, {**ASSIGNED, **block, "enabled": True}),
+            ("id", block, {**ASSIGNED, **block, "enabled": True}),
+        ):
+            with self.subTest(field=field, state="created"):
+                client, api = make_client(created={**CURRENT, "rules": [stored]})
+
+                result = self.run_module(FakeModule(params(rules=[{**requested, field: None}])), client)
+
+                self.assertEqual(api.create.call_args.kwargs["rules"], [{"enabled": True, **requested}])
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)
+
+            with self.subTest(field=field, state="current"):
+                client, api = make_client({**CURRENT, "rules": [stored]})
+
+                result = self.run_module(FakeModule(params(rules=[{**requested, field: None}])), client)
+
+                api.phases.update.assert_not_called()
+                self.assertFalse(result["changed"])
+
+    def test_disabled_rule_is_a_change_from_an_enabled_rule(self):
+        requested = {"action": "block", "expression": "true", "enabled": False}
+        current = {**CURRENT, "rules": [{**ASSIGNED, "action": "block", "expression": "true", "enabled": True}]}
+        client, _ignored = make_client(current)
+
+        result = self.run_module(FakeModule(params(rules=[requested]), check_mode=True), client)
+
+        self.assertTrue(result["changed"])
