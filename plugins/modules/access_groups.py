@@ -18,6 +18,9 @@ description:
     stores for it, such as C(email) of an C(email) selector. Cloudflare
     accepts any other field but does not store it, so the module fails before
     making changes.
+  - Each selector sets one rule, such as C(email) or C(everyone). Cloudflare
+    splits a selector with several rules into separate selectors, so such a
+    selector fails before any change.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)

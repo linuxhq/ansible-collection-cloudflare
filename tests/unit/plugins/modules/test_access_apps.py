@@ -446,7 +446,7 @@ class AccessAppsTests(TestCase):
             ({"cors_headers": {"allowed_methods": ["GET"], "foo": 1}}, ["cors_headers.foo"]),
             ({"destinations": [{"type": "public", "uri": "app.example.com", "foo": 1}]}, ["destinations[0].foo"]),
             ({"destinations": [{"type": "public", "cidr": "192.0.2.1"}]}, ["destinations[0].cidr"]),
-            ({"destinations": [{"uri": "app.example.com", "foo": 1}]}, ["destinations[0].foo"]),
+            ({"destinations": [{"type": "unknown", "uri": "app.example.com", "foo": 1}]}, ["destinations[0].foo"]),
             ({"policies": [{"id": "a", "precedence": 1, "foo": 1}]}, ["policies[0].foo"]),
             (
                 {"policies": [{"name": "inline", "decision": "allow", "include": [{"everyone": {}}], "foo": 1}]},
@@ -481,6 +481,79 @@ class AccessAppsTests(TestCase):
                     api.list.assert_not_called()
                     api.create.assert_not_called()
 
+    def test_unstored_nested_fields_fail_before_any_request(self):
+        inline = {"name": "inline", "decision": "allow", "include": [{"everyone": {}}]}
+        override = {"behavior": "public", "path_pattern": "/a"}
+        cases = (
+            (
+                {
+                    "destinations": [
+                        {"type": "public", "uri": "app.example.com", "overrides": [override, {**override, "foo": 1}]}
+                    ]
+                },
+                ["destinations[0].overrides[1].foo"],
+            ),
+            (
+                {
+                    "policies": [
+                        {
+                            **inline,
+                            "connection_rules": {"rdp": {"allowed_clipboard_local_to_remote_formats": [], "foo": 1}},
+                        }
+                    ]
+                },
+                ["policies[0].connection_rules.rdp.foo"],
+            ),
+            ({"policies": [{**inline, "connection_rules": {"foo": {}}}]}, ["policies[0].connection_rules.foo"]),
+            (
+                {"policies": [{**inline, "mfa_config": {"mfa_disabled": True, "foo": 1}}]},
+                ["policies[0].mfa_config.foo"],
+            ),
+        )
+        for updates, unsupported in cases:
+            for check_mode in (True, False):
+                with self.subTest(updates=updates, check_mode=check_mode):
+                    client, api = client_with()
+
+                    result = self.run_module(FakeModule(params(**updates), check_mode=check_mode), client)
+
+                    self.assertEqual(result["unsupported_fields"], unsupported)
+                    api.list.assert_not_called()
+                    api.create.assert_not_called()
+
+    def test_destination_without_type_fails_before_any_request(self):
+        destinations = [{"type": "public", "uri": "app.example.com"}, {"uri": "app.example.com/a"}, {"type": None}]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(destinations=destinations), check_mode=check_mode), client)
+
+                self.assertEqual(
+                    result["msg"],
+                    "destinations[1], destinations[2] must set type; Cloudflare stores a destination without one as "
+                    "type public",
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_inline_policy_selector_with_several_rules_fails_before_any_request(self):
+        include = [{"email": {"email": "a@example.com"}, "everyone": {}}]
+        policies = [{"name": "inline", "decision": "allow", "include": include}]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(policies=policies), check_mode=check_mode), client)
+
+                self.assertEqual(
+                    result["msg"],
+                    "policies[0].include[0] sets the selectors 'email', 'everyone', which Cloudflare splits into "
+                    "separate include entries; list each selector as its own entry",
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
     def test_inline_policy_unstored_selector_fields_fail_before_any_request(self):
         policies = [{"name": "inline", "decision": "allow", "include": [{"email": {"email": "a@example.com", "x": 1}}]}]
         client, api = client_with()
@@ -495,8 +568,9 @@ class AccessAppsTests(TestCase):
         destinations = [
             {"type": "public", "uri": "app.example.com", "overrides": [{"behavior": "public", "path_pattern": "/a"}]},
             {"type": "private", "cidr": "192.0.2.0/24", "l4_protocol": "tcp", "port_range": "22", "vnet_id": "v"},
-            {"uri": "app.example.com/b"},
+            {"type": "public", "uri": "app.example.com/b"},
         ]
+        rdp = {field: ["text"] for field in access_apps.POLICY_CONNECTION_RULES_FIELDS["rdp"]}
         policies = [
             {"id": "a", "precedence": 1},
             {
@@ -504,6 +578,8 @@ class AccessAppsTests(TestCase):
                 "decision": "allow",
                 "include": [{"email": {"email": "a@example.com"}}],
                 "approval_groups": [{"approvals_needed": 1, "email_list_uuid": "list"}],
+                "connection_rules": {"rdp": rdp},
+                "mfa_config": {"allowed_authenticators": ["totp"], "mfa_disabled": False, "session_duration": "24h"},
                 "precedence": 2,
             },
         ]

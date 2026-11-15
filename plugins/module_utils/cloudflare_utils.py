@@ -459,10 +459,11 @@ def comparable_access_rules(rules, desired):
 
 
 def validate_access_selectors(module, rules=None, prefix=""):
-    """Fail when an Access selector uses an SDK spelling or a field Cloudflare drops.
+    """Fail when an Access selector uses an SDK spelling, several rules, or a field Cloudflare drops.
 
-    SDK spellings must use their API keys instead. Unknown selector keys are left to Cloudflare, which rejects them. rules
-    defaults to the module parameters; prefix names their location in
+    SDK spellings must use their API keys instead. Each selector sets one rule, as every SDK AccessRuleParam type has
+    one key; Cloudflare splits a selector with several rules into separate selectors. Unknown selector keys are left to
+    Cloudflare, which rejects them. rules defaults to the module parameters; prefix names their location in
     failure messages, such as "policies[0].".
     """
     rules = module.params if rules is None else rules
@@ -474,6 +475,12 @@ def validate_access_selectors(module, rules=None, prefix=""):
                     module.fail_json(
                         msg=f"{prefix}{field} selector {key!r} must use the Cloudflare API key {api_key!r}"
                     )
+
+            if isinstance(selector, dict) and len(selector) > 1:
+                module.fail_json(
+                    msg=f"{prefix}{field}[{index}] sets the selectors {', '.join(repr(key) for key in selector)}, which "
+                    f"Cloudflare splits into separate {field} entries; list each selector as its own entry"
+                )
 
             for key, config in selector.items() if isinstance(selector, dict) else ():
                 if key in ACCESS_SELECTOR_KEYS:
