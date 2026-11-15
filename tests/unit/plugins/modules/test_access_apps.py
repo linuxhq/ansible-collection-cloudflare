@@ -554,6 +554,42 @@ class AccessAppsTests(TestCase):
                 api.list.assert_not_called()
                 api.create.assert_not_called()
 
+    def test_inline_policy_null_selector_fails_before_any_request(self):
+        policies = [{"name": "inline", "decision": "allow", "include": [{"everyone": None}]}]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(policies=policies), check_mode=check_mode), client)
+
+                self.assertEqual(
+                    result["msg"],
+                    "policies[0].include[0].everyone must be a mapping; use {} for a selector without fields, as "
+                    "Cloudflare stores a null selector as {}",
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_empty_destination_overrides_fail_before_any_request(self):
+        destinations = [
+            {"type": "public", "uri": "app.example.com", "overrides": []},
+            {"type": "public", "uri": "app.example.com/a"},
+            {"type": "public", "uri": "app.example.com/b", "overrides": []},
+        ]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(destinations=destinations), check_mode=check_mode), client)
+
+                self.assertEqual(
+                    result["msg"],
+                    "destinations[0].overrides, destinations[2].overrides must be omitted instead of an empty list; "
+                    "Cloudflare stores a destination with empty overrides without them",
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
     def test_inline_policy_unstored_selector_fields_fail_before_any_request(self):
         policies = [{"name": "inline", "decision": "allow", "include": [{"email": {"email": "a@example.com", "x": 1}}]}]
         client, api = client_with()

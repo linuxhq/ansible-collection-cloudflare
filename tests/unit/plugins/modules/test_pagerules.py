@@ -337,6 +337,28 @@ class PageRulesTests(TestCase):
                     api.list.assert_not_called()
                     api.create.assert_not_called()
 
+    def test_value_of_id_only_action_fails_before_any_request(self):
+        for action_id in (
+            "always_use_https",
+            "disable_apps",
+            "disable_performance",
+            "disable_security",
+            "disable_zaraz",
+        ):
+            for check_mode in (True, False):
+                with self.subTest(action_id=action_id, check_mode=check_mode):
+                    actions = [{"id": "ssl", "value": "strict"}, {"id": action_id, "value": "on"}]
+                    client, api = client_with()
+
+                    result = self.run_module(FakeModule(params(actions=actions), check_mode=check_mode), client)
+
+                    self.assertEqual(result["unsupported_fields"], ["actions[1].value"])
+                    self.assertEqual(
+                        result["msg"], "Cloudflare does not store these page rule fields: actions[1].value"
+                    )
+                    api.list.assert_not_called()
+                    api.create.assert_not_called()
+
     def test_unstored_target_fields_fail_before_delete(self):
         targets = [{"target": "url", "constraint": {"value": "example.com/*"}, "foo": 1}]
         client, api = client_with([{"id": "rule", "targets": TARGETS}])

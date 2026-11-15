@@ -25,12 +25,14 @@ options:
     elements: dict
     description:
       - Actions applied when the page rule matches.
-      - Each action accepts only C(id) and C(value). The C(value) of a
-        C(forwarding_url) action accepts only C(url) and C(status_code), and
-        that of a C(cache_key_fields) action only C(cookie), C(header),
-        C(host), C(query_string), and C(user), each with the fields Cloudflare
-        stores for it. Cloudflare accepts any other key but does not store it,
-        so the module fails before making changes.
+      - Each action accepts only C(id) and C(value), and the
+        C(always_use_https), C(disable_apps), C(disable_performance),
+        C(disable_security), and C(disable_zaraz) actions accept only C(id).
+        The C(value) of a C(forwarding_url) action accepts only C(url) and
+        C(status_code), and that of a C(cache_key_fields) action only
+        C(cookie), C(header), C(host), C(query_string), and C(user), each with
+        the fields Cloudflare stores for it. Cloudflare accepts any other key
+        but does not store it, so the module fails before making changes.
       - Actions are compared by C(id), regardless of their order.
       - The C(value) of a C(cache_ttl_by_status) action is compared on every
         key, so a status code removed from it is removed from the rule. Other
@@ -157,6 +159,8 @@ EXACT_VALUE_ACTIONS = ("cache_ttl_by_status",)
 # keyed by action id; other values are not checked.
 TARGET_FIELDS = {"constraint": ("operator", "value"), "target": None}
 ACTION_FIELDS = ("id", "value")
+# Actions whose SDK type has only an id; Cloudflare drops their value.
+ID_ONLY_ACTIONS = ("always_use_https", "disable_apps", "disable_performance", "disable_security", "disable_zaraz")
 ACTION_VALUE_FIELDS = {
     "cache_key_fields": {
         "cookie": ("check_presence", "include"),
@@ -180,8 +184,9 @@ def validate_field_names(module):
     actions = params.get("actions") if params["state"] == "present" else None
     for index, action in enumerate(actions or ()):
         path = f"actions[{index}]"
-        unknown.extend(unsupported_fields(action, ACTION_FIELDS, path))
         action_id = action.get("id")
+        fields = ("id",) if action_id in ID_ONLY_ACTIONS else ACTION_FIELDS
+        unknown.extend(unsupported_fields(action, fields, path))
         if isinstance(action_id, str) and action_id in ACTION_VALUE_FIELDS:
             unknown.extend(unsupported_fields(action.get("value"), ACTION_VALUE_FIELDS[action_id], f"{path}.value"))
 

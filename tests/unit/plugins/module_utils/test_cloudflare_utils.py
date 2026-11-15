@@ -450,6 +450,23 @@ class ValueTests(TestCase):
                     },
                 )
 
+    def test_access_selectors_reject_non_mapping_known_selector_values(self):
+        for field in ("include", "exclude", "require"):
+            for value in (None, "", []):
+                with self.subTest(field=field, value=value):
+                    rules = {field: [{"everyone": {}}, {"any_valid_service_token": value}]}
+
+                    with self.assertRaises(ModuleFail) as raised:
+                        validate_access_selectors(FakeModule({}), rules, "policies[0].")
+
+                    self.assertEqual(
+                        raised.exception.values,
+                        {
+                            "msg": f"policies[0].{field}[1].any_valid_service_token must be a mapping; use {{}} for a "
+                            "selector without fields, as Cloudflare stores a null selector as {}"
+                        },
+                    )
+
     def test_access_selectors_accept_stored_fields_and_unknown_selector_types(self):
         rules = {
             "include": [

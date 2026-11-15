@@ -459,12 +459,13 @@ def comparable_access_rules(rules, desired):
 
 
 def validate_access_selectors(module, rules=None, prefix=""):
-    """Fail when an Access selector uses an SDK spelling, several rules, or a field Cloudflare drops.
+    """Fail when an Access selector uses an SDK spelling, several rules, a null value, or a field Cloudflare drops.
 
     SDK spellings must use their API keys instead. Each selector sets one rule, as every SDK AccessRuleParam type has
-    one key; Cloudflare splits a selector with several rules into separate selectors. Unknown selector keys are left to
-    Cloudflare, which rejects them. rules defaults to the module parameters; prefix names their location in
-    failure messages, such as "policies[0].".
+    one key; Cloudflare splits a selector with several rules into separate selectors. A known selector's value must be
+    a mapping, as in the SDK AccessRuleParam types; Cloudflare stores a null value as {}. Unknown selector keys are left
+    to Cloudflare, which rejects them. rules defaults to the module parameters; prefix names their location in failure
+    messages, such as "policies[0].".
     """
     rules = module.params if rules is None else rules
     unknown = []
@@ -483,9 +484,17 @@ def validate_access_selectors(module, rules=None, prefix=""):
                 )
 
             for key, config in selector.items() if isinstance(selector, dict) else ():
-                if key in ACCESS_SELECTOR_KEYS:
-                    fields = ACCESS_SELECTOR_KEYS[key] + ACCESS_SELECTOR_ASSIGNED_KEYS.get(key, ())
-                    unknown.extend(unsupported_fields(config, fields, f"{prefix}{field}[{index}].{key}"))
+                if key not in ACCESS_SELECTOR_KEYS:
+                    continue
+
+                if not isinstance(config, dict):
+                    module.fail_json(
+                        msg=f"{prefix}{field}[{index}].{key} must be a mapping; use {{}} for a selector without "
+                        "fields, as Cloudflare stores a null selector as {}"
+                    )
+
+                fields = ACCESS_SELECTOR_KEYS[key] + ACCESS_SELECTOR_ASSIGNED_KEYS.get(key, ())
+                unknown.extend(unsupported_fields(config, fields, f"{prefix}{field}[{index}].{key}"))
 
     if unknown:
         module.fail_json(

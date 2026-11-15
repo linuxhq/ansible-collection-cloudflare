@@ -118,6 +118,9 @@ options:
         Each C(overrides) entry accepts only C(behavior) and C(path_pattern).
         Cloudflare accepts any other field but does not store it, so the
         module fails before making changes.
+      - An empty C(overrides) list fails before making changes, because
+        Cloudflare stores the destination without C(overrides); omit
+        C(overrides) instead.
       - Each entry is compared exactly, so keys omitted from an entry are
         removed from it.
       - A bare IP address in C(cidr) is sent with its full-length prefix,
@@ -170,6 +173,10 @@ options:
       - Each inline policy selector sets one rule, such as C(email) or
         C(everyone). Cloudflare splits a selector with several rules into
         separate selectors, so such a selector fails before any change.
+      - The value of an inline policy selector of a known type must be a
+        mapping, such as V({}) for C(everyone) or C(any_valid_service_token).
+        Cloudflare stores a null value as V({}), so such a selector fails
+        before any change.
       - Stored policies are compared with the entries at the same position.
         An entry that sets a selector or has no C(id) is an inline policy whose
         C(include), C(exclude), and C(require) are compared exactly, so a
@@ -488,6 +495,17 @@ def validate_field_names(module):
     if untyped:
         module.fail_json(
             msg=f"{', '.join(untyped)} must set type; Cloudflare stores a destination without one as type public"
+        )
+
+    empty_overrides = [
+        f"destinations[{index}].overrides"
+        for index, destination in enumerate(destinations)
+        if destination.get("overrides") == []
+    ]
+    if empty_overrides:
+        module.fail_json(
+            msg=f"{', '.join(empty_overrides)} must be omitted instead of an empty list; Cloudflare stores a "
+            "destination with empty overrides without them"
         )
 
     unknown = unsupported_fields(params.get("cors_headers"), CORS_HEADERS_FIELDS, "cors_headers")

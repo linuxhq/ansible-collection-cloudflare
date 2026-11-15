@@ -21,6 +21,9 @@ description:
   - Each selector sets one rule, such as C(email) or C(everyone). Cloudflare
     splits a selector with several rules into separate selectors, so such a
     selector fails before any change.
+  - The value of a selector of a known type must be a mapping, such as
+    V({}) for C(everyone) or C(any_valid_service_token). Cloudflare stores a
+    null value as V({}), so such a selector fails before any change.
   - Settings this module does not manage, such as C(session_duration), are
     preserved on an existing policy.
 version_added: '2.0.0'
