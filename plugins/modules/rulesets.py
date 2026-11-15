@@ -215,14 +215,7 @@ def comparable_rules(rules, desired_rules):
     comparable = []
     for index, rule in enumerate(rules):
         desired = desired_rules[index] if index < len(desired_rules) else {}
-        # A null request field is omitted from the comparison, so only an
-        # empty request value stands for the field Cloudflare dropped.
-        empty = {
-            key: value
-            for key, value in EMPTY_RULE_FIELDS.items()
-            if key in desired and not values_differ(desired[key], value)
-        }
-        rule = {**empty, **rule}
+        rule = {**{key: value for key, value in EMPTY_RULE_FIELDS.items() if key in desired}, **rule}
         comparable.append(
             {
                 key: (
@@ -276,8 +269,15 @@ def run(module, client):
 
     # The update replaces every rule, so give each rule Cloudflare's enabled
     # default; an existing disabled rule is then a visible change, not re-enabled
-    # silently.
-    rules = None if params.get("rules") is None else [{"enabled": True, **rule} for rule in params["rules"]]
+    # silently. A null rule field counts as omitted.
+    rules = (
+        None
+        if params.get("rules") is None
+        else [
+            {"enabled": True, **{key: value for key, value in rule.items() if value is not None}}
+            for rule in params["rules"]
+        ]
+    )
 
     if current is None:
         if params.get("name") is None:
