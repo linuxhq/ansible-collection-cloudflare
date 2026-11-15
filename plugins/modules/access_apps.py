@@ -141,6 +141,15 @@ options:
         Cloudflare API key names, such as C(github-organization) and
         C(azureAD); the SDK spellings C(github_organization) and C(azure_ad)
         fail before any change.
+      - Stored policies are compared with the entries at the same position.
+        An entry that sets a selector or has no C(id) is an inline policy whose
+        C(include), C(exclude), and C(require) are compared exactly, so a
+        selector key or list removed from it is a change; an omitted selector
+        list matches an empty one, and the C(id) Cloudflare adds to a
+        C(github-organization) selector matches a selector that omits it.
+        Other entries, such as C(id) and
+        C(precedence) links to reusable policies, are compared only on the keys
+        they set.
   same_site_cookie_attribute:
     type: str
     description:
@@ -211,12 +220,15 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    ACCESS_SELECTOR_FIELDS,
     cidr_from_address,
     cloudflare_client,
     cloudflare_error_context,
+    comparable_access_rules,
     ensure_resource_absent,
     ensure_resource_present,
     find_resource,
+    normalize_current_by_desired_fields,
     payload_from_params,
     serialize_resource,
     validate_access_selectors,
@@ -384,21 +396,56 @@ def validate_policy_order(module):
         )
 
 
-def comparable_app(app, allowed_idps):
-    """Return app with stored identity providers in the requested order when they match it.
+def comparable_policy(policy, desired):
+    """Return policy projected onto the fields of desired.
+
+    The selectors of an inline policy, one that sets a selector or has no id,
+    are kept whole, apart from keys Cloudflare assigns, so removed selector
+    keys and lists count as differences. An omitted selector list matches an
+    empty one.
+    """
+    if not isinstance(policy, dict) or not isinstance(desired, dict):
+        return policy
+
+    comparable = normalize_current_by_desired_fields(policy, desired)
+    if "id" in desired and not any(field in desired for field in ACCESS_SELECTOR_FIELDS):
+        return comparable
+
+    policy = comparable_access_rules(policy, desired)
+    for field in ACCESS_SELECTOR_FIELDS:
+        comparable.pop(field, None)
+        stored = policy.get(field)
+        if field in desired:
+            comparable[field] = [] if stored is None else stored
+        elif stored:
+            comparable[field] = stored
+
+    return comparable
+
+
+def comparable_app(app, allowed_idps, policies):
+    """Return app in the form compared with the requested settings.
 
     Cloudflare ignores the order of allowed_idps and stores identity providers
-    in its own order.
+    in its own order, so stored identity providers that match the request take
+    its order. Stored policies are paired with the requested ones by position.
     """
     app = serialize_resource(app)
-    stored = app.get("allowed_idps") if isinstance(app, dict) else None
+    if not isinstance(app, dict):
+        return app
+
+    stored = app.get("allowed_idps")
     if (
         isinstance(allowed_idps, list)
         and isinstance(stored, list)
         and all(isinstance(idp, str) for idp in stored)
         and sorted(stored) == sorted(allowed_idps)
     ):
-        return {**app, "allowed_idps": allowed_idps}
+        app = {**app, "allowed_idps": allowed_idps}
+
+    stored = app.get("policies")
+    if isinstance(policies, list) and isinstance(stored, list) and len(stored) == len(policies):
+        app = {**app, "policies": [comparable_policy(*pair) for pair in zip(stored, policies)]}
 
     return app
 
@@ -468,9 +515,9 @@ def run(module, client):
         expected_name=params["name"],
         defaults=FIELD_DEFAULTS,
         preserved_fields=preserved_fields,
-        exact_values=("cors_headers", "destinations"),
+        exact_values=("cors_headers", "destinations", "policies"),
         context={"account_id": account_id},
-        comparable=lambda app: comparable_app(app, params.get("allowed_idps")),
+        comparable=lambda app: comparable_app(app, params.get("allowed_idps"), params.get("policies")),
     )
 
 

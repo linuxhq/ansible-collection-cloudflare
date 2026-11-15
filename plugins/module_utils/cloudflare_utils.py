@@ -361,6 +361,46 @@ ACCESS_SELECTOR_API_KEYS = {
 
 ACCESS_SELECTOR_FIELDS = ("exclude", "include", "require")
 
+# Cloudflare adds these keys to the selectors below, such as the GitHub
+# organization's id, so a stored selector matches a request that omits them.
+ACCESS_SELECTOR_ASSIGNED_KEYS = {"github-organization": ("id",)}
+
+
+def comparable_access_selector(selector, desired):
+    """Return selector without the keys Cloudflare assigned that desired does not set."""
+    if not isinstance(selector, dict) or not isinstance(desired, dict):
+        return selector
+
+    comparable = {}
+    for name, config in selector.items():
+        requested = desired.get(name)
+        if isinstance(config, dict) and isinstance(requested, dict):
+            assigned = ACCESS_SELECTOR_ASSIGNED_KEYS.get(name, ())
+            config = {key: value for key, value in config.items() if key in requested or key not in assigned}
+
+        comparable[name] = config
+
+    return comparable
+
+
+def comparable_access_rules(rules, desired):
+    """Return rules with each selector paired, by position, with the one desired sets.
+
+    Keys Cloudflare assigned to a stored selector are dropped when the paired
+    selector does not set them.
+    """
+    rules = serialize_resource(rules)
+    if not isinstance(rules, dict) or not isinstance(desired, dict):
+        return rules
+
+    comparable = dict(rules)
+    for field in ACCESS_SELECTOR_FIELDS:
+        stored, requested = rules.get(field), desired.get(field)
+        if isinstance(stored, list) and isinstance(requested, list) and len(stored) == len(requested):
+            comparable[field] = [comparable_access_selector(*pair) for pair in zip(stored, requested)]
+
+    return comparable
+
 
 def validate_access_selectors(module, rules=None, prefix=""):
     """Fail when an Access selector uses an SDK spelling instead of its API key.

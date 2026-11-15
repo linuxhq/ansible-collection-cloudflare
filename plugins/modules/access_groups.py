@@ -11,7 +11,9 @@ description:
   - Create, update, and delete Cloudflare Access groups by name.
   - Access selectors in O(include), O(exclude), and O(require) use Cloudflare
     API key names, such as C(github-organization) and C(azureAD), and are
-    compared exactly, including their nested fields.
+    compared exactly, including their nested fields, except that the C(id)
+    Cloudflare adds to a C(github-organization) selector matches a selector
+    that omits it.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
@@ -97,6 +99,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ACCESS_SELECTOR_FIELDS,
     cloudflare_client,
     cloudflare_error_context,
+    comparable_access_rules,
     ensure_resource_absent,
     ensure_resource_present,
     find_resource,
@@ -150,6 +153,7 @@ def run(module, client):
         defaults={"is_default": False},
         preserved_fields=PRESERVED_FIELDS,
         exact_values=ACCESS_SELECTOR_FIELDS,
+        comparable=lambda resource: comparable_access_rules(resource, params),
         context={"account_id": account_id},
     )
 

@@ -451,6 +451,73 @@ class AccessAppsTests(TestCase):
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_removed_inline_policy_selectors_are_a_change(self):
+        github = {"identity_provider_id": "idp", "name": "org"}
+        inline = {"name": "inline", "decision": "allow", "include": [{"github-organization": github}]}
+        stored_policy = {
+            **inline,
+            "id": "policy-id",
+            "precedence": 1,
+            "include": [{"github-organization": {**github, "team": "admins"}}],
+            "exclude": [],
+            "require": [{"email_domain": {"domain": "example.com"}}],
+        }
+        current = stored(policies=[stored_policy])
+        client, api = client_with([current], updated=stored(policies=[{**stored_policy, **inline, "require": []}]))
+
+        result = self.run_module(FakeModule(params(policies=[inline])), client)
+
+        self.assertEqual(api.update.call_args.kwargs["policies"], [inline])
+        self.assertTrue(result["changed"])
+
+        client, api = client_with([current], updated=current)
+        result = self.run_module(FakeModule(params(policies=[inline])), client)
+
+        self.assertIn("did not apply", result["msg"])
+
+    def test_inline_policy_matches_assigned_github_organization_id(self):
+        github = {"identity_provider_id": "idp", "name": "org"}
+        inline = {"name": "inline", "decision": "allow", "include": [{"github-organization": github}]}
+        stored_policy = {**inline, "id": "a", "include": [{"github-organization": {**github, "id": "314135"}}]}
+        client, api = client_with([stored(policies=[stored_policy])])
+
+        result = self.run_module(FakeModule(params(policies=[inline])), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_unchanged_inline_policy_matches_empty_stored_selector_lists(self):
+        include = [{"github-organization": {"identity_provider_id": "idp", "name": "org"}}]
+        policies = [
+            {"name": "inline", "decision": "allow", "include": include},
+            {"name": "explicit", "decision": "allow", "include": include, "exclude": [], "require": []},
+        ]
+        stored_policies = [
+            {"id": "a", "precedence": 1, "name": "inline", "decision": "allow", "include": include, "exclude": []},
+            {"id": "b", "precedence": 2, "name": "explicit", "decision": "allow", "include": include},
+        ]
+        client, api = client_with([stored(policies=stored_policies)])
+
+        result = self.run_module(FakeModule(params(policies=policies)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_reusable_policy_link_ignores_stored_selectors(self):
+        stored_policy = {
+            "id": "a",
+            "precedence": 1,
+            "name": "reusable",
+            "include": [{"everyone": {}}],
+            "require": [{"email_domain": {"domain": "example.com"}}],
+        }
+        client, api = client_with([stored(policies=[stored_policy])])
+
+        result = self.run_module(FakeModule(params(policies=[{"id": "a", "precedence": 1}])), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_policies_in_precedence_order_match_stored_order(self):
         policies = [{"id": "b", "precedence": 1}, {"id": "a", "precedence": 2}]
         client, api = client_with([stored(policies=policies)])
