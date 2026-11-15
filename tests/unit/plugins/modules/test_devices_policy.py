@@ -218,3 +218,41 @@ class DevicesPolicyTests(TestCase):
 
         api.edit.assert_not_called()
         self.assertFalse(result["changed"])
+
+    def test_unknown_route_fields_fail_before_any_request(self):
+        routes = [{"address": "192.0.2.0/24", "description": None}, {"host": "example.com", "foo": "x"}]
+        for field in ("include", "exclude"):
+            for check_mode in (True, False):
+                with self.subTest(field=field, check_mode=check_mode):
+                    result, api = self.run_module(
+                        FakeModule({"account_id": "account", field: routes}, check_mode=check_mode), {field: []}
+                    )
+
+                    api.get.assert_not_called()
+                    api.edit.assert_not_called()
+                    self.assertIn(f"{field}[1].foo", result["msg"])
+                    self.assertEqual(result["unsupported_fields"], [f"{field}[1].foo"])
+
+    def test_unknown_service_mode_field_fails_before_any_request(self):
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                result, api = self.run_module(
+                    FakeModule(
+                        {"account_id": "account", "service_mode_v2": {"mode": "warp", "foo": 1}}, check_mode=check_mode
+                    ),
+                    {"service_mode_v2": {"mode": "warp"}},
+                )
+
+                api.get.assert_not_called()
+                api.edit.assert_not_called()
+                self.assertIn("service_mode_v2.foo", result["msg"])
+                self.assertEqual(result["unsupported_fields"], ["service_mode_v2.foo"])
+
+    def test_known_route_and_service_mode_fields_are_sent(self):
+        routes = [{"address": "192.0.2.0/24", "description": None}, {"host": "example.com", "description": "kept"}]
+        sent = {"exclude": routes, "service_mode_v2": {"mode": "proxy", "port": 3000}}
+        result, api = self.run_module(FakeModule({"account_id": "account", **sent}), {"exclude": []}, sent)
+
+        api.edit.assert_called_once_with(account_id="account", **sent)
+        self.assertTrue(result["changed"])
+        self.assertNotIn("msg", result)
