@@ -67,15 +67,24 @@ options:
       - C(hostname) entries must not repeat a C(hostname.url_hostname), and
         C(redirect) entries must not repeat a C(redirect.source_url), even when
         their other fields differ.
-      - A C(redirect.source_url) without a path, such as C(example.com), is the
-        same as one with a trailing slash, such as C(example.com/), which is how
-        Cloudflare stores it.
+      - A C(redirect.source_url) is compared in the form Cloudflare stores, where a
+        missing path becomes C(/), the scheme is lowercased, an empty port such
+        as C(https://example.com:/a) and the brackets around an IPv6 address are
+        removed, and C(%3F) in the path becomes C(?). Other rewrites Cloudflare
+        makes, such as decoding other percent-escapes or removing dot segments,
+        are not modelled, so the module reports that Cloudflare did not apply
+        such values.
       - C(hostname) entries must not include both a wildcard such as
         C(*.example.com) and its exact hostname C(example.com), whatever the
         value of C(exclude_exact_hostname); Cloudflare treats them as
         duplicates.
       - A C(redirect.source_url) must not include a query string such as
-        C(?x=1), a fragment such as C(#top), or a port such as C(:8080).
+        C(?x=1), a fragment such as C(#top), userinfo such as C(user@), or a port
+        such as C(:8080).
+      - A C(redirect.source_url) may have no scheme or an C(http) or C(https)
+        scheme followed by C(//) and a host. A leading name that starts with a
+        letter and is followed by C(:), such as C(example.com) in
+        C(example.com:8080/a), is read as a scheme.
       - A C(redirect.status_code), when set, must be the integer 301, 302,
         307, or 308.
   operation_timeout:
@@ -157,6 +166,7 @@ message:
 """
 
 import json
+import re
 import time
 from ipaddress import ip_address, ip_network
 
@@ -196,6 +206,11 @@ IDENTITY_FIELDS = {
     "redirect": "source_url",
 }
 
+# Cloudflare reads a leading name followed by ':' in a redirect source URL as
+# its scheme, and accepts only these schemes.
+SOURCE_URL_SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*:")
+SOURCE_URL_SCHEMES = ("http", "https")
+
 # Fields the SDK item models require inside each mapping-valued list kind.
 REQUIRED_STRING_FIELDS = {
     "hostname": ("url_hostname",),
@@ -234,19 +249,80 @@ def canonical_ip(value):
     return f"{parsed}{separator}{prefix}"
 
 
-def source_url_location(value):
-    """Return value without a leading scheme such as https://."""
-    scheme, separator, rest = value.partition("://")
-    return rest if separator and "/" not in scheme else value
+def split_source_url(value):
+    """Return the scheme or None, the authority or None when a scheme lacks `//`, and the path."""
+    scheme = None
+    rest = value
+    match = SOURCE_URL_SCHEME.match(value)
+    if match:
+        scheme = value[: match.end() - 1]
+        rest = value[match.end() :]
+        if not rest.startswith("//"):
+            return scheme, None, rest
+
+        rest = rest[2:]
+
+    authority, slash, path = rest.partition("/")
+    return scheme, authority, slash + path
 
 
-def canonical_source_url(value):
-    # Cloudflare stores a source URL without a path, such as example.com, with
-    # a trailing slash.
-    if not isinstance(value, str):
-        return value
+def split_authority(authority):
+    """Return the host, without IPv6 brackets, and the port of an authority, which is None when absent."""
+    if authority.startswith("[") and "]" in authority:
+        host, _ignored, rest = authority[1:].partition("]")
+        return host, rest[1:] if rest.startswith(":") else None
 
-    return value if "/" in source_url_location(value) else f"{value}/"
+    if authority.count(":") == 1:
+        host, _ignored, port = authority.partition(":")
+        return host, port
+
+    return authority, None
+
+
+def source_url_error(value):
+    """Return why Cloudflare rejects value as a redirect source URL, or None."""
+    if "?" in value or "#" in value:
+        return "must not include a query string or a fragment"
+
+    scheme, authority, _ignored = split_source_url(value)
+    if scheme is not None and scheme.lower() not in SOURCE_URL_SCHEMES:
+        return f"must not use a scheme other than http or https, but {scheme!r} is read as its scheme"
+
+    if scheme is not None and not authority:
+        return "must include a host after the scheme and '//'"
+
+    if "@" in authority:
+        return "must not include userinfo"
+
+    port = split_authority(authority)[1]
+    if port and port.isascii() and port.isdigit():
+        return "must not include a port"
+
+    return None
+
+
+def stored_source_url(value):
+    """Return value in the form Cloudflare stores a valid redirect source URL."""
+    scheme, authority, path = split_source_url(value)
+    host, port = split_authority(authority)
+    if port:
+        host = f"{host}:{port}"
+
+    prefix = f"{scheme.lower()}://" if scheme is not None else ""
+    return prefix + host + re.sub("%3[Ff]", "?", path or "/")
+
+
+def expected_items(items):
+    """Return normalized desired items in the form Cloudflare stores them."""
+    expected = []
+    for item in items:
+        redirect = item.get("redirect")
+        if isinstance(redirect, dict) and isinstance(redirect.get("source_url"), str):
+            item = {**item, "redirect": {**redirect, "source_url": stored_source_url(redirect["source_url"])}}
+
+        expected.append(item)
+
+    return normalize_items(expected)
 
 
 def canonical_item(item):
@@ -431,8 +507,6 @@ def normalize_items(items):
                     for redirect_key, redirect_value in normalized_value.items()
                     if redirect_value is not None and values_differ(redirect_value, REDIRECT_DEFAULTS.get(redirect_key))
                 }
-                if "source_url" in normalized_value:
-                    normalized_value["source_url"] = canonical_source_url(normalized_value["source_url"])
 
             normalized[key] = normalized_value
 
@@ -485,16 +559,6 @@ def valid_hostname(value):
     return "*" not in value.removeprefix("*.")
 
 
-def valid_source_url(value):
-    """Return whether value has no query string, fragment, or port, which Cloudflare rejects."""
-    if "?" in value or "#" in value:
-        return False
-
-    authority = source_url_location(value).partition("/")[0]
-    host, separator, port = authority.rpartition(":")
-    return not (separator and host and ":" not in host and "[" not in authority and port.isascii() and port.isdigit())
-
-
 def validate_elements(module, kind):
     """Fail when an element lacks the field that stores the list kind, has other keys, or holds an invalid value."""
     for index, element in enumerate(module.params.get("elements") or ()):
@@ -530,11 +594,9 @@ def validate_elements(module, kind):
             )
 
         source_url = redirect.get("source_url") if isinstance(redirect, dict) else None
-        if isinstance(source_url, str) and not valid_source_url(source_url):
-            module.fail_json(
-                msg=f"elements[{index}].redirect.source_url must not include a query string, a fragment, or a port",
-                source_url=source_url,
-            )
+        source_url_problem = source_url_error(source_url) if isinstance(source_url, str) else None
+        if source_url_problem:
+            module.fail_json(msg=f"elements[{index}].redirect.source_url {source_url_problem}", source_url=source_url)
 
         hostname = element.get("hostname") if kind == "hostname" else None
         url_hostname = hostname.get("url_hostname") if isinstance(hostname, dict) else None
@@ -574,6 +636,9 @@ def validate_elements(module, kind):
     values = set()
     for item in normalize_items(module.params.get("elements")):
         value = item[kind][field] if field else item[kind]
+        if kind == "redirect":
+            value = stored_source_url(value)
+
         if canonical_item(value) in values:
             name = f"{kind}.{field}" if field else kind
             module.fail_json(msg=f"elements must not repeat the {name!r} value {value!r}", **{field or kind: value})
@@ -667,6 +732,7 @@ def ensure_present(module, client, current):
 
     if params.get("elements") is not None:
         desired_items = normalize_items(params["elements"])
+        stored_items = expected_items(desired_items)
         current_count = current.get("num_items")
 
         if current_count is not None and (
@@ -677,12 +743,12 @@ def ensure_present(module, client, current):
         ):
             module.fail_json(msg="Cloudflare API returned malformed Rules list data")
 
-        if current_count is not None and current_count != len(desired_items):
+        if current_count is not None and current_count != len(stored_items):
             items_changed = True
         else:
             items_changed = values_differ(
                 normalize_items(list_items(module, client, account_id, current_id)),
-                desired_items,
+                stored_items,
             )
 
         if module.check_mode and items_changed:
@@ -717,7 +783,7 @@ def ensure_present(module, client, current):
 
             if values_differ(
                 normalize_items(list_items(module, client, account_id, current_id)),
-                desired_items,
+                stored_items,
             ):
                 module.fail_json(msg="Cloudflare did not apply the requested Rules list items")
 

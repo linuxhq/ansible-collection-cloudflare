@@ -76,10 +76,10 @@ class RulesListsTests(TestCase):
 
         self.assertEqual(
             rules_lists.normalize_items(items),
-            [{"redirect": {"source_url": "example.com/"}}],
+            [{"redirect": {"source_url": "example.com"}}],
         )
 
-    def test_canonical_source_url_adds_a_slash_only_without_a_path(self):
+    def test_stored_source_url_matches_cloudflare_rewrites(self):
         for value, expected in (
             ("example.com", "example.com/"),
             ("https://example.com", "https://example.com/"),
@@ -87,9 +87,74 @@ class RulesListsTests(TestCase):
             ("example.com/a", "example.com/a"),
             ("https://example.com/a", "https://example.com/a"),
             ("example.com/https://example.net", "example.com/https://example.net"),
+            ("HTTPS://example.com/a", "https://example.com/a"),
+            ("Http://example.com/a", "http://example.com/a"),
+            ("HTTP://Example.com:/A", "http://Example.com/A"),
+            ("https://example.com:/a", "https://example.com/a"),
+            ("https://example.com:", "https://example.com/"),
+            ("https://example.com:/", "https://example.com/"),
+            ("1example.com:/a", "1example.com/a"),
+            ("[2001:db8::1]/a", "2001:db8::1/a"),
+            ("https://[2001:db8::1]/a", "https://2001:db8::1/a"),
+            ("https://[2001:db8::1]", "https://2001:db8::1/"),
+            ("[2001:db8::1]", "2001:db8::1/"),
+            ("example.com/a%3Fx", "example.com/a?x"),
+            ("example.com/a%3fx", "example.com/a?x"),
+            ("example.com/a%3Fx%3D1", "example.com/a?x%3D1"),
+            ("example.com/a%2Fb", "example.com/a%2Fb"),
+            ("example.com/a%3Db", "example.com/a%3Db"),
+            ("example.com/a:b", "example.com/a:b"),
+            ("example.com/a@b", "example.com/a@b"),
         ):
             with self.subTest(value=value):
-                self.assertEqual(rules_lists.canonical_source_url(value), expected)
+                self.assertEqual(rules_lists.stored_source_url(value), expected)
+
+    def test_rewritten_source_urls_match_stored_items(self):
+        stored = [
+            "https://example.com/a",
+            "http://Example.com/A",
+            "https://example.com/b",
+            "2001:db8::1/",
+            "https://2001:db8::1/a",
+            "example.com/a?x",
+            "example.com/",
+        ]
+        sources = [
+            "HTTPS://example.com/a",
+            "HTTP://Example.com:/A",
+            "https://example.com:/b",
+            "[2001:db8::1]",
+            "https://[2001:db8::1]/a",
+            "example.com/a%3Fx",
+            "example.com",
+        ]
+        current = {**CURRENT, "kind": "redirect", "num_items": len(stored)}
+        items = [{"redirect": {"source_url": value, "target_url": "https://example.net/"}} for value in stored]
+        elements = [{"redirect": {"source_url": value, "target_url": "https://example.net/"}} for value in sources]
+        client, api = make_client([current], items=items)
+
+        result = self.run_module(FakeModule(params(kind=None, elements=elements)), client)
+
+        api.items.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_rewritten_source_urls_are_submitted_as_given(self):
+        source = "https://[2001:db8::1]/a%3Fx"
+        current = {**CURRENT, "kind": "redirect", "num_items": 0}
+        stored = [{"redirect": {"source_url": "https://2001:db8::1/a?x", "target_url": "https://example.net/"}}]
+        client, api = make_client([current], items=stored, fetched={**current, "num_items": 1})
+        elements = [{"redirect": {"source_url": source, "target_url": "https://example.net/"}}]
+
+        with patch.object(rules_lists.time, "monotonic", return_value=1):
+            result = self.run_module(FakeModule(params(kind=None, elements=elements)), client)
+
+        api.items.update.assert_called_once_with(
+            "list",
+            account_id="account",
+            body=[{"redirect": {"source_url": source, "target_url": "https://example.net/"}}],
+        )
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["message"], "Rules list updated")
 
     def test_redirect_numbers_are_not_dropped_as_boolean_defaults(self):
         redirect = {"source_url": "example.com/a", "include_subdomains": 0, "subpath_matching": 1}
@@ -517,19 +582,36 @@ class RulesListsTests(TestCase):
                 status_code=value,
             )
 
-    def test_source_urls_with_a_query_fragment_or_port_fail_before_any_write(self):
-        for value in (
-            "example.com/a?x=1",
-            "example.com/?x=1",
-            "example.com/a?",
-            "example.com?x=1",
-            "https://example.com/a?x=1",
-            "example.com/a#frag",
-            "example.com#f",
-            "example.com:8080/a",
-            "localhost:80/a",
-            "https://example.com:8080/a",
-            "https://example.com:443",
+    def test_source_urls_cloudflare_rejects_fail_before_any_write(self):
+        query = "must not include a query string or a fragment"
+        for value, problem in (
+            ("example.com/a?x=1", query),
+            ("example.com/?x=1", query),
+            ("example.com/a?", query),
+            ("example.com?x=1", query),
+            ("https://example.com/a?x=1", query),
+            ("example.com/a#frag", query),
+            ("example.com#f", query),
+            ("https://example.com:8080/a", "must not include a port"),
+            ("https://example.com:443", "must not include a port"),
+            ("1example.com:80/a", "must not include a port"),
+            ("https://[2001:db8::1]:8080/a", "must not include a port"),
+            ("https://user@example.com/a", "must not include userinfo"),
+            ("https://user:pass@example.com/a", "must not include userinfo"),
+            ("user@example.com/a", "must not include userinfo"),
+            ("http:example.com/a", "must include a host after the scheme and '//'"),
+            ("https:/example.com/a", "must include a host after the scheme and '//'"),
+            ("https:///a", "must include a host after the scheme and '//'"),
+        ) + tuple(
+            (value, f"must not use a scheme other than http or https, but {scheme!r} is read as its scheme")
+            for value, scheme in (
+                ("ftp://example.com/a", "ftp"),
+                ("a+b://example.com/a", "a+b"),
+                ("example.com:8080/a", "example.com"),
+                ("localhost:80/a", "localhost"),
+                ("example.com:/a", "example.com"),
+                ("user:pass@example.com/a", "user"),
+            )
         ):
             self.assert_elements_fail_before_any_write(
                 "redirect",
@@ -537,7 +619,7 @@ class RulesListsTests(TestCase):
                     {"redirect": {"source_url": "example.com/b", "target_url": "https://example.net"}},
                     {"redirect": {"source_url": value, "target_url": "https://example.net"}},
                 ],
-                "elements[1].redirect.source_url must not include a query string, a fragment, or a port",
+                f"elements[1].redirect.source_url {problem}",
                 source_url=value,
             )
 
@@ -545,14 +627,34 @@ class RulesListsTests(TestCase):
         for value in (
             "example.com/a",
             "http://example.com/a",
+            "HTTPS://example.com/a",
             "example.com/a:b",
+            "example.com/a@b",
             "example.com/a%3Fx",
             "[2001:db8::1]/a",
             "https://[2001:db8::1]/a",
             "https://example.com:/a",
+            "https://example.com:",
+            "1example.com:/a",
         ):
             with self.subTest(source_url=value):
-                self.assertTrue(rules_lists.valid_source_url(value))
+                self.assertIsNone(rules_lists.source_url_error(value))
+
+    def test_source_urls_cloudflare_stores_alike_fail_before_any_write(self):
+        for first, second, stored in (
+            ("HTTPS://example.com/a", "https://example.com/a", "https://example.com/a"),
+            ("https://example.com:/a", "https://example.com/a", "https://example.com/a"),
+            ("example.com/a%3Fx", "example.com/a%3fx", "example.com/a?x"),
+        ):
+            self.assert_elements_fail_before_any_write(
+                "redirect",
+                [
+                    {"redirect": {"source_url": first, "target_url": "https://example.net/1"}},
+                    {"redirect": {"source_url": second, "target_url": "https://example.net/2"}},
+                ],
+                f"elements must not repeat the 'redirect.source_url' value {stored!r}",
+                source_url=stored,
+            )
 
     def test_valid_redirect_status_codes_are_accepted(self):
         for value in (301, 302, 307, 308, None):
