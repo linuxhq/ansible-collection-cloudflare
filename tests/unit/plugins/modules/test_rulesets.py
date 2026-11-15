@@ -405,3 +405,24 @@ class RulesetRuleFieldTests(TestCase):
         result = self.run_module(FakeModule(params(rules=[requested]), check_mode=True), client)
 
         self.assertTrue(result["changed"])
+
+    def test_null_fields_match_rules_cloudflare_stored_without_them(self):
+        stored = {**ASSIGNED, "action": "block", "expression": "true", "enabled": True}
+        for field in ("description", "action_parameters"):
+            requested = {"action": "block", "expression": "true", field: None}
+            with self.subTest(field=field, state="created"):
+                client, api = make_client(created={**CURRENT, "rules": [stored]})
+
+                result = self.run_module(FakeModule(params(rules=[requested])), client)
+
+                api.create.assert_called_once()
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)
+
+            with self.subTest(field=field, state="current"):
+                client, api = make_client({**CURRENT, "rules": [stored]})
+
+                result = self.run_module(FakeModule(params(rules=[requested])), client)
+
+                api.phases.update.assert_not_called()
+                self.assertFalse(result["changed"])
