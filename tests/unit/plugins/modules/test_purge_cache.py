@@ -136,6 +136,21 @@ class PurgeCacheTests(TestCase):
                     "Cloudflare purges nothing for these empty cache purge lists or null files: cache.files[1]",
                 )
 
+    def test_rejects_files_that_are_not_a_url_or_mapping_before_any_request(self):
+        files = ["https://example.com/a.css", 5, True, {"url": "https://example.com/"}, 1.5, ["https://example.com/"]]
+        invalid = ["cache.files[1]", "cache.files[2]", "cache.files[4]", "cache.files[5]"]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                result, purge = self.run_ansible_module({"files": files}, check_mode=check_mode)
+
+                purge.assert_not_called()
+                self.assertEqual(result["invalid_fields"], invalid)
+                self.assertEqual(
+                    result["msg"],
+                    "Cloudflare purges nothing for these files that are not a URL string or mapping: "
+                    + ", ".join(invalid),
+                )
+
     def test_rejects_unused_file_fields_before_any_request(self):
         files = [
             "https://example.com/a.css",

@@ -99,7 +99,8 @@ options:
       - An empty C(allowed_headers), C(allowed_methods), or C(allowed_origins)
         list fails before making changes, because Cloudflare does not store
         it; omit the key instead.
-      - Compared exactly, so omitting a key removes it.
+      - Compared exactly, so omitting a key removes it. A key set to null is
+        not sent and counts as omitted.
       - Cloudflare omits V(false) for C(allow_all_headers),
         C(allow_all_methods), C(allow_all_origins), and C(allow_credentials),
         and V(0) for C(max_age), so those values match an application that
@@ -164,6 +165,7 @@ options:
     elements: dict
     description:
       - Access policies attached to the application.
+      - A field of an entry set to null is not sent and counts as omitted.
       - Each entry accepts only the fields of a reusable policy link, C(id),
         C(precedence), and C(account_id), or of an inline policy, such as
         C(name), C(decision), C(include), C(exclude), C(require), and
@@ -209,7 +211,7 @@ options:
         An entry that sets a selector or has no C(id) is an inline policy whose
         C(include), C(exclude), and C(require) are compared exactly, so a
         selector key or list removed from it is a change; an omitted or null
-        selector list matches an empty one, a null one is not sent, and the
+        selector list matches an empty one, and the
         C(id) Cloudflare adds to a
         C(github-organization) selector matches a selector that omits it.
         Other entries, such as C(id) and
@@ -619,9 +621,9 @@ def validate_empty_values(module):
         )
 
 
-def requested_policy(policy):
-    """Return policy without the selector lists set to null, which count as omitted."""
-    return {key: value for key, value in policy.items() if key not in ACCESS_SELECTOR_FIELDS or value is not None}
+def without_nulls(value):
+    """Return the mapping value without the keys set to null, which count as omitted."""
+    return {key: item for key, item in value.items() if item is not None}
 
 
 def comparable_policy(policy, desired):
@@ -743,8 +745,11 @@ def run(module, client):
             for destination in payload["destinations"]
         ]
 
+    if "cors_headers" in payload:
+        payload["cors_headers"] = without_nulls(payload["cors_headers"])
+
     if "policies" in payload:
-        payload["policies"] = [requested_policy(policy) for policy in payload["policies"]]
+        payload["policies"] = [without_nulls(policy) for policy in payload["policies"]]
 
     ensure_resource_present(
         module,
@@ -760,7 +765,7 @@ def run(module, client):
         exact_values=("cors_headers", "destinations", "policies"),
         context={"account_id": account_id},
         comparable=lambda app: comparable_app(
-            app, params.get("allowed_idps"), payload.get("policies"), params.get("cors_headers")
+            app, params.get("allowed_idps"), payload.get("policies"), payload.get("cors_headers")
         ),
     )
 
