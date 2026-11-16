@@ -55,10 +55,21 @@ options:
       - Complete set of entries that the Rules list must contain.
       - Each entry must set the field named by the list kind, such as C(ip) or
         C(hostname), and may also set C(comment); no other keys are accepted.
+      - A C(comment) must be a string of at most 500 characters.
       - A C(hostname) entry must be a mapping with a non-empty string
         C(url_hostname).
       - A C(redirect) entry must be a mapping with non-empty strings
         C(source_url) and C(target_url).
+      - A C(hostname) entry accepts only C(url_hostname) and
+        C(exclude_exact_hostname). A C(redirect) entry accepts only
+        C(source_url), C(target_url), C(include_subdomains),
+        C(preserve_path_suffix), C(preserve_query_string), C(status_code), and
+        C(subpath_matching). C(exclude_exact_hostname), C(include_subdomains),
+        C(preserve_path_suffix), C(preserve_query_string), and
+        C(subpath_matching) must be V(true) or V(false). A field set to null
+        is not sent.
+      - These checks run before any change, because Cloudflare rejects such
+        entries only after the list and its description are written.
       - An C(ip) entry must be an IP address, or a CIDR with a prefix length of
         8 to 32 for IPv4 or 12 to 128 for IPv6 and no host bits set.
         IPv4-mapped IPv6 addresses and scoped IPv6 addresses such as
@@ -223,6 +234,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     resource_field,
     resource_id,
     serialize_resource,
+    unsupported_fields,
     values_differ,
 )
 
@@ -270,6 +282,28 @@ REQUIRED_STRING_FIELDS = {
 MAX_ASN = 4294967295
 
 REDIRECT_STATUS_CODES = (301, 302, 307, 308)
+
+# Fields of the SDK HostnameParam and RedirectParam types, and those typed as
+# booleans; Cloudflare rejects any other field or a non-boolean flag.
+ITEM_VALUE_FIELDS = {
+    "hostname": ("exclude_exact_hostname", "url_hostname"),
+    "redirect": (
+        "include_subdomains",
+        "preserve_path_suffix",
+        "preserve_query_string",
+        "source_url",
+        "status_code",
+        "subpath_matching",
+        "target_url",
+    ),
+}
+BOOLEAN_ITEM_FIELDS = {
+    "hostname": ("exclude_exact_hostname",),
+    "redirect": ("include_subdomains", "preserve_path_suffix", "preserve_query_string", "subpath_matching"),
+}
+
+# Longest item comment Cloudflare accepts.
+MAX_COMMENT_LENGTH = 500
 
 # Cloudflare omits an empty list description.
 LIST_DEFAULTS = {"description": ""}
@@ -593,6 +627,34 @@ def validate_elements(module, kind):
             value = element[kind].get(field) if isinstance(element[kind], dict) else None
             if not isinstance(value, str) or not value:
                 module.fail_json(msg=f"elements[{index}].{kind} must be a mapping with a non-empty string {field!r}")
+
+        # A field set to null is not sent, so it counts as omitted.
+        fields = (
+            {key: value for key, value in element[kind].items() if value is not None}
+            if kind in ITEM_VALUE_FIELDS
+            else {}
+        )
+        unknown = unsupported_fields(fields, ITEM_VALUE_FIELDS.get(kind, ()), f"elements[{index}].{kind}")
+        if unknown:
+            module.fail_json(
+                msg=f"elements[{index}].{kind} supports only {', '.join(ITEM_VALUE_FIELDS[kind])}",
+                unsupported_fields=unknown,
+            )
+
+        not_boolean = [
+            f"elements[{index}].{kind}.{field}"
+            for field in BOOLEAN_ITEM_FIELDS.get(kind, ())
+            if field in fields and not isinstance(fields[field], bool)
+        ]
+        if not_boolean:
+            module.fail_json(msg=f"{', '.join(not_boolean)} must be true or false", invalid_fields=not_boolean)
+
+        comment = element.get("comment")
+        if comment is not None and (not isinstance(comment, str) or len(comment) > MAX_COMMENT_LENGTH):
+            module.fail_json(
+                msg=f"elements[{index}].comment must be a string of at most {MAX_COMMENT_LENGTH} characters",
+                comment=comment,
+            )
 
         asn = element.get("asn")
         if kind == "asn" and (not isinstance(asn, int) or isinstance(asn, bool) or not 1 <= asn <= MAX_ASN):
