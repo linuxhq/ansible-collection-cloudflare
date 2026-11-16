@@ -46,7 +46,7 @@ class PurgeCacheTests(TestCase):
         client.assert_not_called()
         self.assertEqual(result["msg"], "cache must not be empty")
 
-    def run_ansible_module(self, cache):
+    def run_ansible_module(self, cache, check_mode=False):
         client = Mock()
         client.cache.purge.return_value = {"id": "zone"}
         context = Mock()
@@ -60,7 +60,7 @@ class PurgeCacheTests(TestCase):
             raise ModuleFail(values)
 
         with (
-            patch_module_args(params(cache=cache)),
+            patch_module_args({**params(cache=cache), "_ansible_check_mode": check_mode}),
             patch.object(AnsibleModule, "exit_json", exit_json),
             patch.object(AnsibleModule, "fail_json", fail_json),
             patch.object(purge_cache, "cloudflare_client", return_value=context),
@@ -85,11 +85,42 @@ class PurgeCacheTests(TestCase):
 
     def test_sends_only_set_cache_options_with_their_types(self):
         files = ["https://example.com/a.css", {"url": "https://example.com/", "headers": {"Accept-Language": "en"}}]
+        for cache, expected in (
+            ({"purge_everything": "true"}, {"purge_everything": True}),
+            ({"files": files}, {"files": files}),
+        ):
+            with self.subTest(cache=cache):
+                result, purge = self.run_ansible_module(cache)
 
-        result, purge = self.run_ansible_module({"purge_everything": "true", "files": files})
+                purge.assert_called_once_with(zone_id="zone", **expected)
+                self.assertTrue(result["changed"])
 
-        purge.assert_called_once_with(zone_id="zone", purge_everything=True, files=files)
-        self.assertTrue(result["changed"])
+    def test_rejects_mixed_purge_types_before_any_request(self):
+        for cache in (
+            {"tags": ["a"], "hosts": ["example.com"]},
+            {"purge_everything": True, "files": ["https://example.com/a.css"]},
+        ):
+            for check_mode in (True, False):
+                with self.subTest(cache=cache, check_mode=check_mode):
+                    result, purge = self.run_ansible_module(cache, check_mode=check_mode)
+
+                    purge.assert_not_called()
+                    self.assertEqual(
+                        result["msg"],
+                        "parameters are mutually exclusive: files|hosts|prefixes|purge_everything|tags found in cache",
+                    )
+
+    def test_rejects_empty_lists_before_any_request(self):
+        for key in ("files", "tags", "hosts", "prefixes"):
+            for check_mode in (True, False):
+                with self.subTest(key=key, check_mode=check_mode):
+                    result, client = self.run_main(FakeModule(params(cache={key: []}), check_mode=check_mode))
+
+                    client.assert_not_called()
+                    self.assertEqual(result["empty_fields"], [f"cache.{key}"])
+                    self.assertEqual(
+                        result["msg"], f"Cloudflare purges nothing for these empty cache purge lists: cache.{key}"
+                    )
 
     def test_rejects_unused_file_fields_before_any_request(self):
         files = [
@@ -129,11 +160,11 @@ class PurgeCacheTests(TestCase):
         self.assertEqual(result["msg"], "zone_id must not be empty")
 
     def test_purges_cache(self):
-        cache = {"files": ["https://example.com/a.css"], "tags": ["a"]}
+        cache = {"files": ["https://example.com/a.css"]}
 
         result, purge = self.run_module(FakeModule(params(cache=cache)), {"id": "zone"})
 
-        purge.assert_called_once_with(zone_id="zone", files=["https://example.com/a.css"], tags=["a"])
+        purge.assert_called_once_with(zone_id="zone", files=["https://example.com/a.css"])
         self.assertTrue(result["changed"])
         self.assertEqual(result["purge_cache"], {"id": "zone"})
 

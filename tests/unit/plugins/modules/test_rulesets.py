@@ -111,11 +111,13 @@ class RulesetsTests(TestCase):
             {"action": "skip", "expression": "true", "action_parameters": {"ruleset": "current"}},
             {"action": "skip", "expression": "true", "action_parameters": {"phases": [], "products": []}},
             {"action": "skip", "expression": "true", "action_parameters": {"rules": {}}},
+            {"action": "skip", "expression": "true", "action_parameters": {"rulesets": []}},
         ]
         empty = [
             "rules[1].action_parameters.phases",
             "rules[1].action_parameters.products",
             "rules[2].action_parameters.rules",
+            "rules[3].action_parameters.rulesets",
         ]
         for check_mode in (True, False):
             client, api = make_client(CURRENT)
@@ -131,7 +133,12 @@ class RulesetsTests(TestCase):
             )
 
     def test_accepts_non_empty_skip_parameters(self):
-        action_parameters = {"phases": ["http_ratelimit"], "products": ["waf"], "rules": {"ruleset": ["rule"]}}
+        action_parameters = {
+            "phases": ["http_ratelimit"],
+            "products": ["waf"],
+            "rules": {"ruleset": ["rule"]},
+            "rulesets": ["ruleset"],
+        }
         rules = [
             {
                 "action": "skip",

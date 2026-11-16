@@ -654,6 +654,51 @@ class AccessAppsTests(TestCase):
                 api.list.assert_not_called()
                 api.create.assert_not_called()
 
+    def test_empty_values_fail_before_any_request(self):
+        inline = {"name": "inline", "decision": "allow", "include": [{"everyone": {}}]}
+        cases = (
+            ({"cors_headers": {"allowed_origins": [], "allowed_methods": ["GET"]}}, ["cors_headers.allowed_origins"]),
+            (
+                {"cors_headers": {"allowed_headers": [], "allowed_methods": [], "allow_all_origins": True}},
+                ["cors_headers.allowed_headers", "cors_headers.allowed_methods"],
+            ),
+            ({"destinations": []}, ["destinations"]),
+            ({"policies": [{**inline, "approval_groups": []}]}, ["policies[0].approval_groups"]),
+            (
+                {
+                    "policies": [
+                        {
+                            **inline,
+                            "approval_groups": [
+                                {"approvals_needed": 1, "email_list_uuid": "list"},
+                                {"approvals_needed": 1, "email_addresses": []},
+                            ],
+                        }
+                    ]
+                },
+                ["policies[0].approval_groups[1].email_addresses"],
+            ),
+            (
+                {"policies": [inline, {**inline, "purpose_justification_prompt": "", "session_duration": ""}]},
+                ["policies[1].purpose_justification_prompt", "policies[1].session_duration"],
+            ),
+        )
+        for updates, empty in cases:
+            for check_mode in (True, False):
+                with self.subTest(updates=updates, check_mode=check_mode):
+                    client, api = client_with()
+
+                    result = self.run_module(FakeModule(params(**updates), check_mode=check_mode), client)
+
+                    self.assertEqual(result["empty_fields"], empty)
+                    self.assertEqual(
+                        result["msg"],
+                        "Cloudflare does not store an empty value for these Access application fields: "
+                        f"{', '.join(empty)}; omit them instead",
+                    )
+                    api.list.assert_not_called()
+                    api.create.assert_not_called()
+
     def test_inline_policy_unstored_selector_fields_fail_before_any_request(self):
         policies = [{"name": "inline", "decision": "allow", "include": [{"email": {"email": "a@example.com", "x": 1}}]}]
         client, api = client_with()
@@ -730,6 +775,17 @@ class AccessAppsTests(TestCase):
     def test_inline_policy_matches_assigned_github_organization_id(self):
         github = {"identity_provider_id": "idp", "name": "org"}
         inline = {"name": "inline", "decision": "allow", "include": [{"github-organization": github}]}
+        stored_policy = {**inline, "id": "a", "include": [{"github-organization": {**github, "id": "314135"}}]}
+        client, api = client_with([stored(policies=[stored_policy])])
+
+        result = self.run_module(FakeModule(params(policies=[inline])), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_inline_policy_null_github_organization_id_matches_assigned_id(self):
+        github = {"identity_provider_id": "idp", "name": "org"}
+        inline = {"name": "inline", "decision": "allow", "include": [{"github-organization": {**github, "id": None}}]}
         stored_policy = {**inline, "id": "a", "include": [{"github-organization": {**github, "id": "314135"}}]}
         client, api = client_with([stored(policies=[stored_policy])])
 

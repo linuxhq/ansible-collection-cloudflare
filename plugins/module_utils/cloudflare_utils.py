@@ -480,8 +480,24 @@ ACCESS_SELECTOR_KEYS = {
 ACCESS_APPROVAL_GROUP_FIELDS = ("approvals_needed", "email_addresses", "email_list_uuid")
 
 
+def empty_approval_group_fields(groups, path):
+    """Return the path of each empty email_addresses list in the approval groups.
+
+    Cloudflare drops it, so it would never match the request.
+    """
+    return [
+        f"{path}[{index}].email_addresses"
+        for index, group in enumerate(groups if isinstance(groups, list) else ())
+        if isinstance(group, dict) and group.get("email_addresses") == []
+    ]
+
+
 def comparable_access_selector(selector, desired):
-    """Return selector without the keys Cloudflare assigned that desired does not set."""
+    """Return selector without the keys Cloudflare assigned that desired does not set.
+
+    An assigned key that desired sets to null is not set, as it is not stored
+    as null.
+    """
     if not isinstance(selector, dict) or not isinstance(desired, dict):
         return selector
 
@@ -490,7 +506,9 @@ def comparable_access_selector(selector, desired):
         requested = desired.get(name)
         if isinstance(config, dict) and isinstance(requested, dict):
             assigned = ACCESS_SELECTOR_ASSIGNED_KEYS.get(name, ())
-            config = {key: value for key, value in config.items() if key in requested or key not in assigned}
+            config = {
+                key: value for key, value in config.items() if key not in assigned or requested.get(key) is not None
+            }
 
         comparable[name] = config
 

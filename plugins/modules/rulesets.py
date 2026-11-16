@@ -47,8 +47,9 @@ options:
         without C(logging) uses Cloudflare's default, C(logging.enabled=true).
         Cloudflare drops an empty C(description) or C(action_parameters), so either
         matches a rule without that field.
-      - An empty C(action_parameters.phases), C(action_parameters.products), or
-        C(action_parameters.rules) of a C(skip) rule fails before any change,
+      - An empty C(action_parameters.phases), C(action_parameters.products),
+        C(action_parameters.rules), or C(action_parameters.rulesets) of a
+        C(skip) rule fails before any change,
         because Cloudflare does not store it; omit the parameter instead.
       - A rule's C(action_parameters.headers) and C(action_parameters.rules) mappings
         are compared on their complete key sets, so omitting an entry removes it.
@@ -157,13 +158,13 @@ ACTION_PARAMETER_API_KEYS = {
 }
 
 # Skip rule action parameters Cloudflare drops when they hold these empty values.
-EMPTY_SKIP_PARAMETERS = {"phases": [], "products": [], "rules": {}}
+EMPTY_SKIP_PARAMETERS = {"phases": [], "products": [], "rules": {}, "rulesets": []}
 
 
 def validate_action_parameters(module):
     """Fail when an action parameter uses an SDK spelling or a skip rule parameter is empty.
 
-    Cloudflare drops an empty skip rule phases, products, or rules value, so
+    Cloudflare drops an empty skip rule phases, products, rules, or rulesets value, so
     the rule would never match the request.
     """
     empty = []
