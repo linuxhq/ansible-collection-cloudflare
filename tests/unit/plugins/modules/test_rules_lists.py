@@ -694,7 +694,7 @@ class RulesListsTests(TestCase):
         for kind, element, unexpected in (
             ("ip", {"ip": "192.0.2.1", "description": "office"}, ["description"]),
             ("ip", {"ip": "192.0.2.1", "asn": 5, "comment": "office"}, ["asn"]),
-            ("asn", {"asn": 13335, "id": "item", "hostname": {"url_hostname": "example.com"}}, ["hostname", "id"]),
+            ("asn", {"asn": 13335, "id": "item", "hostname": {"url_hostname": "example.com"}}, ["hostname"]),
         ):
             self.assert_elements_fail_before_any_write(
                 kind,
@@ -771,6 +771,7 @@ class RulesListsTests(TestCase):
         for kind, element in (
             ("ip", {"ip": "192.0.2.1", "comment": "x" * 500}),
             ("ip", {"ip": "192.0.2.1", "comment": None}),
+            ("ip", {"ip": "192.0.2.1", "asn": None, "id": "item", "created_on": "x", "modified_on": "y"}),
             ("redirect", {"redirect": redirect, "comment": ""}),
             ("hostname", {"hostname": {"url_hostname": "*.example.com", "exclude_exact_hostname": True}}),
             ("hostname", {"hostname": {"url_hostname": "example.com", "exclude_exact_hostname": None}}),

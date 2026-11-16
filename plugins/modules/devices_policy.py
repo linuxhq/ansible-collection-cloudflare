@@ -181,6 +181,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_settings,
     payload_from_params,
     serialize_resource,
+    unsupported_fields,
 )
 
 FIELDS = (
@@ -209,25 +210,14 @@ SERVICE_MODE_FIELDS = ("mode", "port")
 
 
 def validate_field_names(module):
-    """Fail when a route or service mode field Cloudflare accepts but never stores is requested.
-
-    Null fields are ignored, as Cloudflare drops them and the comparison ignores them.
-    """
+    """Fail when a route or service mode field Cloudflare accepts but never stores is requested."""
     params = module.params
     unknown = []
     for option in ("exclude", "include"):
         for index, route in enumerate(params.get(option) or ()):
-            unknown.extend(
-                f"{option}[{index}].{field}"
-                for field, value in route.items()
-                if field not in ROUTE_FIELDS and value is not None
-            )
+            unknown.extend(unsupported_fields(route, ROUTE_FIELDS, f"{option}[{index}]"))
 
-    unknown.extend(
-        f"service_mode_v2.{field}"
-        for field, value in (params.get("service_mode_v2") or {}).items()
-        if field not in SERVICE_MODE_FIELDS and value is not None
-    )
+    unknown.extend(unsupported_fields(params.get("service_mode_v2"), SERVICE_MODE_FIELDS, "service_mode_v2"))
     if unknown:
         module.fail_json(
             msg=f"Cloudflare does not store these device policy fields: {', '.join(unknown)}",

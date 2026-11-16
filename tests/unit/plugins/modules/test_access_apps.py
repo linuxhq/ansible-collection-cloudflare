@@ -656,6 +656,20 @@ class AccessAppsTests(TestCase):
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_null_unknown_nested_fields_are_ignored(self):
+        requested = {
+            "cors_headers": {"allow_all_origins": True, "foo": None},
+            "destinations": [{"type": "public", "uri": "app.example.com", "foo": None}],
+            "policies": [{"id": "policy-id", "precedence": 1, "account_id": None}],
+        }
+        client, api = client_with()
+
+        result = self.run_module(FakeModule(params(**requested), check_mode=True), client)
+
+        self.assertNotIn("msg", result)
+        self.assertTrue(result["changed"])
+        api.create.assert_not_called()
+
     def test_nested_null_inline_policy_fields_count_as_omitted(self):
         rdp = {"allowed_clipboard_local_to_remote_formats": ["text"]}
         policy = {

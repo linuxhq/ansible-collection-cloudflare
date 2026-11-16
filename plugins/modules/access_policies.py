@@ -175,6 +175,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_present,
     find_resource,
     payload_from_params,
+    unsupported_fields,
     validate_access_selectors,
 )
 
@@ -215,10 +216,9 @@ FALSE_FIELDS = (
 def validate_field_names(module):
     """Fail when an approval group field Cloudflare accepts but never stores, or an empty one, is requested."""
     unknown = [
-        f"approval_groups[{index}].{field}"
+        field
         for index, group in enumerate(module.params.get("approval_groups") or ())
-        for field in group
-        if field not in ACCESS_APPROVAL_GROUP_FIELDS
+        for field in unsupported_fields(group, ACCESS_APPROVAL_GROUP_FIELDS, f"approval_groups[{index}]")
     ]
     if unknown:
         module.fail_json(

@@ -557,6 +557,17 @@ class ValueTests(TestCase):
             with self.subTest(value=value):
                 self.assertEqual(unsupported_fields(value, fields, "opt"), [])
 
+    def test_unsupported_fields_ignore_null_values(self):
+        fields = {"a": ("b",)}
+        value = {"a": {"b": 1, "x": None}, "y": None}
+
+        self.assertEqual(unsupported_fields(value, fields, "opt"), [])
+
+    def test_access_selectors_ignore_null_unknown_fields(self):
+        rules = {"include": [{"email": {"email": "a@example.com", "bogus": None}}]}
+
+        validate_access_selectors(FakeModule({}), rules, "policies[0].")
+
     def test_access_selectors_reject_unstored_nested_fields(self):
         rules = {
             "include": [{"email": {"email": "a@example.com", "bogus": "x"}}, {"everyone": {"bogus": 1}}],

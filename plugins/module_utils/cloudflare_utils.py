@@ -309,13 +309,17 @@ def unsupported_fields(value, fields, path):
 
     fields lists the allowed keys, or maps each allowed key to the fields of
     its own mapping value, or to None when that value is not checked. Values
-    that are not mappings are not checked.
+    that are not mappings are not checked. Null values are ignored, as they are
+    not sent and count as omitted.
     """
     if not isinstance(value, dict):
         return []
 
     unknown = []
     for key, item in value.items():
+        if item is None:
+            continue
+
         if key not in fields:
             unknown.append(f"{path}.{key}")
         elif isinstance(fields, dict) and fields[key] is not None:
