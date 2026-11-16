@@ -257,6 +257,29 @@ class AccessPoliciesTests(TestCase):
                 api.list.assert_not_called()
                 api.update.assert_not_called()
 
+    def test_rejects_empty_approval_group_email_list_uuid_before_any_request(self):
+        approval_groups = [
+            {"approvals_needed": 1, "email_addresses": ["a@example.com"]},
+            {"approvals_needed": 1, "email_addresses": [], "email_list_uuid": ""},
+        ]
+        empty = ["approval_groups[1].email_addresses", "approval_groups[1].email_list_uuid"]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with([policy()])
+
+                result = self.run_module(
+                    FakeModule(params(approval_groups=approval_groups), check_mode=check_mode), client
+                )
+
+                self.assertEqual(result["empty_fields"], empty)
+                self.assertEqual(
+                    result["msg"],
+                    "Cloudflare does not store an empty value for these Access policy fields: "
+                    f"{', '.join(empty)}; omit them instead",
+                )
+                api.list.assert_not_called()
+                api.update.assert_not_called()
+
     def test_empty_approval_groups_match_cleared_groups(self):
         client, api = client_with([policy()])
 

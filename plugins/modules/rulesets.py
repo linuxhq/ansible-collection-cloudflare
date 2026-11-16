@@ -51,6 +51,8 @@ options:
         C(action_parameters.rules), or C(action_parameters.rulesets) of a
         C(skip) rule fails before any change,
         because Cloudflare does not store it; omit the parameter instead.
+      - An empty C(id) or C(ref) fails before any change, because Cloudflare
+        assigns the rule its own value instead; omit the field instead.
       - A rule's C(action_parameters.headers) and C(action_parameters.rules) mappings
         are compared on their complete key sets, so omitting an entry removes it.
       - Use the Cloudflare API names for C(set_cache_control) directives, such as
@@ -190,6 +192,25 @@ def validate_action_parameters(module):
         )
 
 
+def validate_assigned_fields(module):
+    """Fail when a rule requests an empty id or ref.
+
+    Cloudflare assigns the rule its own value instead, so the rule would never
+    match the request.
+    """
+    empty = [
+        f"rules[{index}].{field}"
+        for index, rule in enumerate(module.params.get("rules") or ())
+        for field in ("id", "ref")
+        if rule.get(field) == ""
+    ]
+    if empty:
+        module.fail_json(
+            msg=f"Cloudflare assigns its own value for these empty rule fields: {', '.join(empty)}; omit them instead",
+            empty_fields=empty,
+        )
+
+
 def rules_from_resource(module, ruleset):
     rules = ruleset.get("rules")
     if rules is None:
@@ -275,6 +296,7 @@ def run(module, client):
     rulesets = client.rulesets
     if params["state"] == "present":
         validate_action_parameters(module)
+        validate_assigned_fields(module)
 
     with cloudflare_error_context(
         "Cloudflare API request failed while gathering the ruleset entrypoint",

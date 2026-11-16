@@ -44,6 +44,8 @@ options:
           - A mapping accepts only C(url) and C(headers). Cloudflare accepts
             any other key but ignores it, so the module fails before any
             request.
+          - A null item fails before any request, because Cloudflare accepts
+            it but purges nothing for it.
         type: list
         elements: raw
       tags:
@@ -151,11 +153,13 @@ def cache_payload(module):
 
 
 def validate_empty_lists(module):
-    """Fail when a list suboption is empty, as Cloudflare would purge nothing."""
-    empty = [f"cache.{key}" for key in CACHE_KEYS if module.params["cache"].get(key) == []]
+    """Fail when a list suboption is empty or a file is null, as Cloudflare would purge nothing for it."""
+    cache = module.params["cache"]
+    empty = [f"cache.{key}" for key in CACHE_KEYS if cache.get(key) == []]
+    empty.extend(f"cache.files[{index}]" for index, item in enumerate(cache.get("files") or ()) if item is None)
     if empty:
         module.fail_json(
-            msg=f"Cloudflare purges nothing for these empty cache purge lists: {', '.join(empty)}",
+            msg=f"Cloudflare purges nothing for these empty cache purge lists or null files: {', '.join(empty)}",
             empty_fields=empty,
         )
 

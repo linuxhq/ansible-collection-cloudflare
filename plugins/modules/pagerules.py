@@ -52,6 +52,11 @@ options:
         C(operator) and C(value) are its only keys. Cloudflare accepts any
         other key but does not store it, so the module fails before making
         changes.
+      - Each target must set C(target) and the C(operator) and C(value) of its
+        C(constraint), which identify the page rule; otherwise the module
+        fails before any request.
+      - A page rule matches only when its stored targets equal the requested
+        targets.
       - URL values are matched as Cloudflare stores them, with the host in
         lowercase and a slash after a bare host, before any trailing wildcard.
   priority:
@@ -144,7 +149,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_error_context,
     ensure_resource_absent,
     ensure_resource_present,
-    normalize_current_by_desired_fields,
     payload_from_params,
     require_mapping,
     serialize_resource,
@@ -198,6 +202,32 @@ def validate_field_names(module):
         module.fail_json(
             msg=f"Cloudflare does not store these page rule fields: {', '.join(unknown)}",
             unsupported_fields=unknown,
+        )
+
+
+def validate_targets(module):
+    """Fail when a target omits a field that identifies the page rule.
+
+    Page rules are matched on these fields, so a target without one could
+    never match its stored rule.
+    """
+    missing = []
+    for index, target in enumerate(module.params["targets"]):
+        path = f"targets[{index}]"
+        if target.get("target") is None:
+            missing.append(f"{path}.target")
+
+        constraint = target.get("constraint")
+        if not isinstance(constraint, dict):
+            missing.append(f"{path}.constraint")
+            continue
+
+        missing.extend(f"{path}.constraint.{field}" for field in ("operator", "value") if constraint.get(field) is None)
+
+    if missing:
+        module.fail_json(
+            msg=f"Page rule targets must set these fields that identify the page rule: {', '.join(missing)}",
+            missing_fields=missing,
         )
 
 
@@ -324,7 +354,7 @@ def find_pagerule(module, client, targets):
     for pagerule in pagerules:
         pagerule = serialize_resource(pagerule)
         stored = target_identity(pagerule_targets(module, pagerule))
-        if not values_differ(normalize_current_by_desired_fields(stored, identity), identity):
+        if not values_differ(stored, identity):
             if found is not None:
                 module.fail_json(msg="Multiple page rules match the requested target constraints")
 
@@ -358,6 +388,7 @@ def run(module, client):
     zone_id = module.params["zone_id"]
     page_rules = client.page_rules
     validate_field_names(module)
+    validate_targets(module)
     targets = canonical_targets(module.params["targets"])
     current, rule_count = find_pagerule(module, client, targets)
 

@@ -137,6 +137,28 @@ class ZonesTests(TestCase):
                 client.zones.settings.get.assert_not_called()
                 client.zones.settings.edit.assert_not_called()
 
+    def test_empty_setting_value_mappings_fail_before_any_request(self):
+        settings = [
+            {"id": "nel", "value": {}},
+            {"id": "security_header", "value": {"strict_transport_security": {}}},
+            {"id": "aegis", "value": {"enabled": True}},
+            {"id": "other_object", "value": {}},
+        ]
+        empty = ["settings[0].value", "settings[1].value.strict_transport_security"]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client = client_with([ZONE])
+
+                result = self.run_module(FakeModule(params(settings=settings), check_mode=check_mode), client)
+
+                self.assertEqual(result["empty_fields"], empty)
+                self.assertEqual(
+                    result["msg"], f"Cloudflare does not apply these empty zone setting values: {', '.join(empty)}"
+                )
+                client.zones.list.assert_not_called()
+                client.zones.settings.get.assert_not_called()
+                client.zones.settings.edit.assert_not_called()
+
     def test_stored_setting_value_fields_are_sent(self):
         value = {
             "strict_transport_security": dict.fromkeys(

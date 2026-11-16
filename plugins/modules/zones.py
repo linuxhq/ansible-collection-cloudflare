@@ -74,6 +74,9 @@ options:
             stores for them, such as C(enabled) of C(nel). Cloudflare accepts
             any other field but does not store it, so the module fails before
             making changes. Other values are not checked.
+          - An empty mapping at any level of these object values, such as
+            V({}) for C(nel), fails before making changes, because Cloudflare
+            accepts it but leaves the stored value unchanged.
           - For settings Cloudflare exposes as an C(enabled) flag, such as
             C(ssl_recommender), the value sets that flag.
         required: true
@@ -219,22 +222,43 @@ def setting_matches(current_value, desired_value):
     return setting_values_equal(normalize_current_by_desired_fields(current_value, desired_value), desired_value)
 
 
+def empty_mappings(value, path):
+    """Return the path of value and of each mapping nested in it that is empty."""
+    if not isinstance(value, dict):
+        return []
+
+    if not value:
+        return [path]
+
+    return [found for key, item in value.items() for found in empty_mappings(item, f"{path}.{key}")]
+
+
 def validate_settings(module):
     setting_ids = set()
     unknown = []
+    empty = []
     for index, setting in enumerate(module.params.get("settings") or []):
         if not setting["id"].strip() or setting["id"] != setting["id"].strip() or setting["id"] in setting_ids:
             module.fail_json(msg="Each zone setting requires a unique valid id")
 
         setting_ids.add(setting["id"])
         if setting["id"] in SETTING_VALUE_FIELDS:
+            path = f"settings[{index}].value"
             fields = SETTING_VALUE_FIELDS[setting["id"]]
-            unknown.extend(unsupported_fields(setting["value"], fields, f"settings[{index}].value"))
+            unknown.extend(unsupported_fields(setting["value"], fields, path))
+            empty.extend(empty_mappings(setting["value"], path))
 
     if unknown:
         module.fail_json(
             msg=f"Cloudflare does not store these zone setting fields: {', '.join(unknown)}",
             unsupported_fields=unknown,
+        )
+
+    # Cloudflare accepts an empty mapping but leaves the stored value unchanged.
+    if empty:
+        module.fail_json(
+            msg=f"Cloudflare does not apply these empty zone setting values: {', '.join(empty)}",
+            empty_fields=empty,
         )
 
 

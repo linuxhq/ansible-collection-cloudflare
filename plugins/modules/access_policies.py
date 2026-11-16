@@ -83,8 +83,9 @@ options:
       - Each group accepts only C(approvals_needed), C(email_addresses), and
         C(email_list_uuid). Cloudflare accepts any other field but does not
         store it, so the module fails before making changes.
-      - An empty C(email_addresses) list in a group fails before making
-        changes, because Cloudflare does not store it; omit it instead.
+      - An empty C(email_addresses) list or C(email_list_uuid) in a group
+        fails before making changes, because Cloudflare does not store it;
+        omit it instead.
       - An existing policy's value is preserved when omitted.
       - V([]) clears the groups; Cloudflare then omits them, so V([]) matches a
         policy without approval groups.

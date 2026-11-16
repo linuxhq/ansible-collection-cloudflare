@@ -480,15 +480,21 @@ ACCESS_SELECTOR_KEYS = {
 ACCESS_APPROVAL_GROUP_FIELDS = ("approvals_needed", "email_addresses", "email_list_uuid")
 
 
+# Approval group fields Cloudflare drops when they hold these empty values.
+EMPTY_APPROVAL_GROUP_FIELDS = {"email_addresses": [], "email_list_uuid": ""}
+
+
 def empty_approval_group_fields(groups, path):
-    """Return the path of each empty email_addresses list in the approval groups.
+    """Return the path of each empty email_addresses list or email_list_uuid in the approval groups.
 
     Cloudflare drops it, so it would never match the request.
     """
     return [
-        f"{path}[{index}].email_addresses"
+        f"{path}[{index}].{field}"
         for index, group in enumerate(groups if isinstance(groups, list) else ())
-        if isinstance(group, dict) and group.get("email_addresses") == []
+        if isinstance(group, dict)
+        for field, empty in EMPTY_APPROVAL_GROUP_FIELDS.items()
+        if field in group and group[field] == empty
     ]
 
 

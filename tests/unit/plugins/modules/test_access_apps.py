@@ -663,6 +663,15 @@ class AccessAppsTests(TestCase):
                 ["cors_headers.allowed_headers", "cors_headers.allowed_methods"],
             ),
             ({"destinations": []}, ["destinations"]),
+            ({"session_duration": ""}, ["session_duration"]),
+            (
+                {
+                    "policies": [
+                        {**inline, "approval_groups": [{"approvals_needed": 1, "email_list_uuid": ""}]},
+                    ]
+                },
+                ["policies[0].approval_groups[0].email_list_uuid"],
+            ),
             ({"policies": [{**inline, "approval_groups": []}]}, ["policies[0].approval_groups"]),
             (
                 {
@@ -793,6 +802,94 @@ class AccessAppsTests(TestCase):
 
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
+
+    def test_default_cors_header_values_match_omitted_keys(self):
+        defaults = {
+            "allow_all_headers": False,
+            "allow_all_methods": False,
+            "allow_all_origins": False,
+            "allow_credentials": False,
+            "max_age": 0,
+        }
+        for cors, cloudflare in (
+            ({**defaults, "allowed_methods": ["GET"]}, {"allowed_methods": ["GET"]}),
+            ({"allow_credentials": False}, None),
+            ({"allow_credentials": False}, {}),
+        ):
+            with self.subTest(cors=cors, cloudflare=cloudflare):
+                created = stored(cors_headers=cloudflare)
+                client, api = client_with(created=created)
+
+                result = self.run_module(FakeModule(params(cors_headers=cors)), client)
+
+                self.assertEqual(api.create.call_args.kwargs["cors_headers"], cors)
+                self.assertEqual(result["message"], "Access application created")
+
+                client, api = client_with([created])
+
+                result = self.run_module(FakeModule(params(cors_headers=cors)), client)
+
+                api.update.assert_not_called()
+                self.assertFalse(result["changed"])
+
+    def test_non_default_cors_header_value_omitted_by_cloudflare_is_not_applied(self):
+        cors = {"allowed_methods": ["GET"], "allow_credentials": True, "max_age": 0}
+        client, api = client_with([stored(cors_headers={"allowed_methods": ["GET"]})])
+
+        result = self.run_module(FakeModule(params(cors_headers=cors), check_mode=True), client)
+
+        api.update.assert_not_called()
+        self.assertTrue(result["changed"])
+
+        client, api = client_with(created=stored(cors_headers={"allowed_methods": ["GET"]}))
+
+        result = self.run_module(FakeModule(params(cors_headers=cors)), client)
+
+        api.create.assert_called_once()
+
+        self.assertEqual(
+            result["differences"],
+            [
+                {
+                    "field": "cors_headers",
+                    "requested": cors,
+                    "stored": {"allow_credentials": False, "max_age": 0, "allowed_methods": ["GET"]},
+                }
+            ],
+        )
+
+    def test_inline_policy_false_flags_match_omitted_fields(self):
+        flags = dict.fromkeys(("approval_required", "isolation_required", "purpose_justification_required"), False)
+        inline = {"name": "inline", "decision": "allow", "include": [{"everyone": {}}], **flags}
+        stored_policy = {
+            "id": "a",
+            "precedence": 1,
+            "name": "inline",
+            "decision": "allow",
+            "include": [{"everyone": {}}],
+        }
+        created = stored(policies=[stored_policy])
+        client, api = client_with(created=created)
+
+        result = self.run_module(FakeModule(params(policies=[inline])), client)
+
+        self.assertEqual(api.create.call_args.kwargs["policies"], [inline])
+        self.assertEqual(result["message"], "Access application created")
+
+        client, api = client_with([created])
+
+        result = self.run_module(FakeModule(params(policies=[inline])), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+        client, api = client_with([created])
+
+        result = self.run_module(
+            FakeModule(params(policies=[{**inline, "approval_required": True}]), check_mode=True), client
+        )
+
+        self.assertTrue(result["changed"])
 
     def test_unchanged_inline_policy_matches_empty_stored_selector_lists(self):
         include = [{"github-organization": {"identity_provider_id": "idp", "name": "org"}}]
