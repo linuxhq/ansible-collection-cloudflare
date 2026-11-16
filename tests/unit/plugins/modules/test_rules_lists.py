@@ -580,6 +580,85 @@ class RulesListsTests(TestCase):
                 unexpected_keys=unexpected,
             )
 
+    def test_unknown_hostname_and_redirect_fields_fail_before_any_write(self):
+        redirect = {"source_url": "example.com/a", "target_url": "https://example.net"}
+        for kind, value, unknown, fields in (
+            (
+                "hostname",
+                {"url_hostname": "example.com", "bogus": 1, "comment": "x"},
+                ["elements[0].hostname.bogus", "elements[0].hostname.comment"],
+                "exclude_exact_hostname, url_hostname",
+            ),
+            (
+                "redirect",
+                {**redirect, "preserve_path": True},
+                ["elements[0].redirect.preserve_path"],
+                ", ".join(rules_lists.ITEM_VALUE_FIELDS["redirect"]),
+            ),
+        ):
+            self.assert_elements_fail_before_any_write(
+                kind,
+                [{kind: value}],
+                f"elements[0].{kind} supports only {fields}",
+                unsupported_fields=unknown,
+            )
+
+    def test_non_boolean_item_flags_fail_before_any_write(self):
+        redirect = {"source_url": "example.com/a", "target_url": "https://example.net"}
+        for kind, value, invalid in (
+            (
+                "hostname",
+                {"url_hostname": "*.example.com", "exclude_exact_hostname": "false"},
+                ["exclude_exact_hostname"],
+            ),
+            ("hostname", {"url_hostname": "*.example.com", "exclude_exact_hostname": 0}, ["exclude_exact_hostname"]),
+            (
+                "redirect",
+                {**redirect, "include_subdomains": 1, "preserve_path_suffix": "yes", "subpath_matching": False},
+                ["include_subdomains", "preserve_path_suffix"],
+            ),
+            ("redirect", {**redirect, "preserve_query_string": "true"}, ["preserve_query_string"]),
+        ):
+            paths = [f"elements[0].{kind}.{field}" for field in invalid]
+            self.assert_elements_fail_before_any_write(
+                kind,
+                [{kind: value}],
+                f"{', '.join(paths)} must be true or false",
+                invalid_fields=paths,
+            )
+
+    def test_invalid_comments_fail_before_any_write(self):
+        for comment in (1, True, ["a"], "x" * 501):
+            self.assert_elements_fail_before_any_write(
+                "ip",
+                [{"ip": "192.0.2.1", "comment": "ok"}, {"ip": "192.0.2.2", "comment": comment}],
+                "elements[1].comment must be a string of at most 500 characters",
+                comment=comment,
+            )
+
+    def test_valid_item_fields_comments_and_nulls_are_accepted(self):
+        redirect = {
+            "source_url": "example.com/a",
+            "target_url": "https://example.net",
+            "include_subdomains": True,
+            "preserve_path_suffix": False,
+            "preserve_query_string": None,
+            "subpath_matching": True,
+        }
+        for kind, element in (
+            ("ip", {"ip": "192.0.2.1", "comment": "x" * 500}),
+            ("ip", {"ip": "192.0.2.1", "comment": None}),
+            ("redirect", {"redirect": redirect, "comment": ""}),
+            ("hostname", {"hostname": {"url_hostname": "*.example.com", "exclude_exact_hostname": True}}),
+            ("hostname", {"hostname": {"url_hostname": "example.com", "exclude_exact_hostname": None}}),
+        ):
+            with self.subTest(element=element):
+                client, _ignored = make_client()
+
+                result = self.run_module(FakeModule(params(kind=kind, elements=[element]), check_mode=True), client)
+
+                self.assertTrue(result["changed"])
+
     def test_valid_redirect_and_commented_elements_are_accepted(self):
         for kind, element in (
             ("ip", {"ip": "192.0.2.1", "comment": "office"}),

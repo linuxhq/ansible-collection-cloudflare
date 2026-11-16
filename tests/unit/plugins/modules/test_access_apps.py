@@ -718,6 +718,54 @@ class AccessAppsTests(TestCase):
                 {"policies": [inline, {**inline, "purpose_justification_prompt": "", "session_duration": ""}]},
                 ["policies[1].purpose_justification_prompt", "policies[1].session_duration"],
             ),
+            (
+                {
+                    "destinations": [
+                        {"type": "public", "uri": "app.example.com"},
+                        {"type": "private", "hostname": "", "port_range": "", "vnet_id": ""},
+                    ]
+                },
+                ["destinations[1].hostname", "destinations[1].port_range", "destinations[1].vnet_id"],
+            ),
+            (
+                {"destinations": [{"type": "private", "cidr": "10.0.0.0/8", "vnet_id": ""}]},
+                ["destinations[0].vnet_id"],
+            ),
+            (
+                {
+                    "policies": [
+                        {
+                            **inline,
+                            "connection_rules": {
+                                "rdp": {
+                                    "allowed_clipboard_local_to_remote_formats": [],
+                                    "allowed_clipboard_remote_to_local_formats": [],
+                                }
+                            },
+                        }
+                    ]
+                },
+                [
+                    "policies[0].connection_rules.rdp.allowed_clipboard_local_to_remote_formats",
+                    "policies[0].connection_rules.rdp.allowed_clipboard_remote_to_local_formats",
+                ],
+            ),
+            (
+                {
+                    "policies": [
+                        {
+                            **inline,
+                            "connection_rules": {
+                                "rdp": {
+                                    "allowed_clipboard_local_to_remote_formats": ["text"],
+                                    "allowed_clipboard_remote_to_local_formats": [],
+                                }
+                            },
+                        }
+                    ]
+                },
+                ["policies[0].connection_rules.rdp.allowed_clipboard_remote_to_local_formats"],
+            ),
         )
         for updates, empty in cases:
             for check_mode in (True, False):

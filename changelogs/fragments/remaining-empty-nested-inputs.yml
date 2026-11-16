@@ -1,0 +1,14 @@
+---
+bugfixes:
+  - access_apps - fail before any request when C(hostname), C(port_range), or C(vnet_id) of a private destination is
+    empty, or when C(allowed_clipboard_local_to_remote_formats) or C(allowed_clipboard_remote_to_local_formats) of an
+    inline policy C(connection_rules.rdp) is an empty list. Cloudflare dropped these values, so the application never
+    matched the request.
+  - zones - fail before any request when the value of C(aegis), C(automatic_platform_optimization), C(nel), or
+    C(security_header), or the C(strict_transport_security) value of C(security_header), is not a mapping, such as
+    V(on) for C(nel). Cloudflare rejected it, possibly after an earlier zone or setting write in the same run.
+  - rules_lists - fail before any change when a C(hostname) or C(redirect) element sets a field the Cloudflare
+    item type does not define, a non-boolean C(exclude_exact_hostname), C(include_subdomains),
+    C(preserve_path_suffix), C(preserve_query_string), or C(subpath_matching), or a C(comment) that is not a string
+    of at most 500 characters. Cloudflare rejected these items only after an existing list's description had been
+    written.

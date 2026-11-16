@@ -74,6 +74,9 @@ options:
             stores for them, such as C(enabled) of C(nel). Cloudflare accepts
             any other field but does not store it, so the module fails before
             making changes. Other values are not checked.
+          - These values, and the C(strict_transport_security) value of
+            C(security_header), must be mappings; any other value, such as
+            V(on) for C(nel), fails before making changes.
           - An empty mapping at any level of these object values, such as
             V({}) for C(nel), fails before making changes, because Cloudflare
             accepts it but leaves the stored value unchanged.
@@ -236,6 +239,29 @@ def empty_mappings(value, path):
     return [found for key, item in value.items() for found in empty_mappings(item, f"{path}.{key}")]
 
 
+def non_mappings(value, fields, path):
+    """Return the path of value and of each value typed as an object in fields that is not a mapping.
+
+    fields maps a key to the fields of its object value, as in
+    SETTING_VALUE_FIELDS; null values are reported separately.
+    """
+    if value is None:
+        return []
+
+    if not isinstance(value, dict):
+        return [path]
+
+    if not isinstance(fields, dict):
+        return []
+
+    return [
+        found
+        for key, item in value.items()
+        if key in fields
+        for found in non_mappings(item, fields[key], f"{path}.{key}")
+    ]
+
+
 def null_values(value, path):
     """Return the path of value and of each value nested in it that is null."""
     if value is None:
@@ -255,6 +281,7 @@ def validate_settings(module):
     unknown = []
     empty = []
     null = []
+    not_mapping = []
     for index, setting in enumerate(module.params.get("settings") or []):
         if not setting["id"].strip() or setting["id"] != setting["id"].strip() or setting["id"] in setting_ids:
             module.fail_json(msg="Each zone setting requires a unique valid id")
@@ -266,6 +293,7 @@ def validate_settings(module):
         elif setting["id"] in SETTING_VALUE_FIELDS:
             null.extend(null_values(setting["value"], path))
             fields = SETTING_VALUE_FIELDS[setting["id"]]
+            not_mapping.extend(non_mappings(setting["value"], fields, path))
             unknown.extend(unsupported_fields(setting["value"], fields, path))
             empty.extend(empty_mappings(setting["value"], path))
 
@@ -274,6 +302,13 @@ def validate_settings(module):
         module.fail_json(
             msg=f"Cloudflare does not apply these null zone setting values: {', '.join(null)}",
             null_fields=null,
+        )
+
+    # Cloudflare rejects these, possibly after an earlier write in the same run.
+    if not_mapping:
+        module.fail_json(
+            msg=f"These zone setting values must be mappings: {', '.join(not_mapping)}",
+            invalid_fields=not_mapping,
         )
 
     if unknown:

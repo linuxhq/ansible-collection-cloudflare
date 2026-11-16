@@ -136,6 +136,9 @@ options:
       - An empty list fails before making changes, because Cloudflare
         replaces it with a C(public) destination for O(domain); omit
         O(destinations) instead.
+      - An empty C(hostname), C(port_range), or C(vnet_id) of a C(private)
+        destination fails before making changes, because Cloudflare does not
+        store it; omit the key instead.
       - Each entry is compared exactly, so keys omitted from an entry are
         removed from it.
       - A bare IP address in C(cidr) is sent with its full-length prefix,
@@ -180,7 +183,10 @@ options:
         any other field but does not store it, so the module fails before
         making changes.
       - An empty C(approval_groups) list, an empty C(email_addresses) list or
-        C(email_list_uuid) in one of its groups, and an empty
+        C(email_list_uuid) in one of its groups, an empty
+        C(allowed_clipboard_local_to_remote_formats) or
+        C(allowed_clipboard_remote_to_local_formats) list under
+        C(connection_rules.rdp), and an empty
         C(purpose_justification_prompt) or C(session_duration) fail before
         making changes, because Cloudflare does not store them; omit them
         instead.
@@ -490,6 +496,7 @@ POLICY_CONNECTION_RULES_FIELDS = {
 POLICY_MFA_CONFIG_FIELDS = ("allowed_authenticators", "mfa_disabled", "session_duration")
 # Fields Cloudflare drops when they hold an empty value.
 EMPTY_CORS_HEADERS_FIELDS = ("allowed_headers", "allowed_methods", "allowed_origins")
+EMPTY_DESTINATION_FIELDS = ("hostname", "port_range", "vnet_id")
 EMPTY_POLICY_FIELDS = ("purpose_justification_prompt", "session_duration")
 # Cloudflare omits these fields when they hold their default value.
 CORS_HEADERS_DEFAULTS = {
@@ -598,8 +605,14 @@ def validate_empty_values(module):
         for field in EMPTY_CORS_HEADERS_FIELDS
         if isinstance(cors_headers, dict) and cors_headers.get(field) == []
     ]
-    if params.get("destinations") == []:
+    destinations = params.get("destinations")
+    if destinations == []:
         empty.append("destinations")
+
+    for index, destination in enumerate(destinations or ()):
+        empty.extend(
+            f"destinations[{index}].{field}" for field in EMPTY_DESTINATION_FIELDS if destination.get(field) == ""
+        )
 
     if params.get("session_duration") == "":
         empty.append("session_duration")
@@ -612,6 +625,14 @@ def validate_empty_values(module):
 
         empty.extend(empty_approval_group_fields(approval_groups, f"{path}.approval_groups"))
         empty.extend(f"{path}.{field}" for field in EMPTY_POLICY_FIELDS if policy.get(field) == "")
+        connection_rules = policy.get("connection_rules")
+        rdp = connection_rules.get("rdp") if isinstance(connection_rules, dict) else None
+        if isinstance(rdp, dict):
+            empty.extend(
+                f"{path}.connection_rules.rdp.{field}"
+                for field in POLICY_CONNECTION_RULES_FIELDS["rdp"]
+                if rdp.get(field) == []
+            )
 
     if empty:
         module.fail_json(

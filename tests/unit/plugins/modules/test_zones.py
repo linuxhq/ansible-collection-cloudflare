@@ -201,6 +201,33 @@ class ZonesTests(TestCase):
                 client.zones.list.assert_not_called()
                 client.zones.settings.edit.assert_not_called()
 
+    def test_non_mapping_object_setting_values_fail_before_any_request(self):
+        settings = [
+            {"id": "min_tls_version", "value": "1.2"},
+            {"id": "nel", "value": "on"},
+            {"id": "aegis", "value": True},
+            {"id": "automatic_platform_optimization", "value": ["enabled"]},
+            {"id": "security_header", "value": {"strict_transport_security": True}},
+            {"id": "other_object", "value": "on"},
+        ]
+        invalid = [
+            "settings[1].value",
+            "settings[2].value",
+            "settings[3].value",
+            "settings[4].value.strict_transport_security",
+        ]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client = client_with([ZONE])
+
+                result = self.run_module(FakeModule(params(settings=settings), check_mode=check_mode), client)
+
+                self.assertEqual(result["invalid_fields"], invalid)
+                self.assertEqual(result["msg"], f"These zone setting values must be mappings: {', '.join(invalid)}")
+                client.zones.list.assert_not_called()
+                client.zones.settings.get.assert_not_called()
+                client.zones.settings.edit.assert_not_called()
+
     def test_stored_setting_value_fields_are_sent(self):
         value = {
             "strict_transport_security": dict.fromkeys(
