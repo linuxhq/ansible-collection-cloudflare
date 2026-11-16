@@ -272,7 +272,6 @@ class DevicesPolicyTests(TestCase):
             {"mode": "warp", "port": 3000},
             {"mode": "warp_tunnel_only", "port": 3000},
             {"mode": "posture_only", "port": 3000},
-            {"port": 3000},
         ):
             for check_mode in (True, False):
                 with self.subTest(requested=requested, check_mode=check_mode):
@@ -287,6 +286,36 @@ class DevicesPolicyTests(TestCase):
                         result["msg"],
                         "service_mode_v2.port requires mode proxy; Cloudflare does not store a port for another mode",
                     )
+
+    def test_service_mode_port_without_mode_is_sent(self):
+        # Cloudflare rejects a port without a mode on the only write.
+        for requested in ({"port": 3000}, {"mode": None, "port": 3000}):
+            with self.subTest(requested=requested):
+                _result, api = self.run_module(
+                    FakeModule({"account_id": "account", "service_mode_v2": requested}),
+                    {"service_mode_v2": {"mode": "warp"}},
+                    {"service_mode_v2": {"mode": "warp"}},
+                )
+
+                api.edit.assert_called_once_with(account_id="account", service_mode_v2=requested)
+
+    def test_null_unstored_fields_are_ignored(self):
+        # Cloudflare drops null fields, and the comparison ignores them.
+        route = {"address": "192.0.2.0/24", "description": "office"}
+        result, api = self.run_module(
+            FakeModule(
+                {
+                    "account_id": "account",
+                    "exclude": [{**route, "foo": None}],
+                    "service_mode_v2": {"mode": "warp", "port": None, "bar": None},
+                }
+            ),
+            {"exclude": [route], "service_mode_v2": {"mode": "warp"}},
+        )
+
+        self.assertNotIn("msg", result)
+        self.assertFalse(result["changed"])
+        api.edit.assert_not_called()
 
     def test_service_mode_does_not_carry_port_into_another_mode(self):
         result, api = self.run_module(

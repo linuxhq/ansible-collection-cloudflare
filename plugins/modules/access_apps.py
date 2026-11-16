@@ -28,6 +28,12 @@ options:
   name:
     description:
       - Access application name.
+      - Cloudflare trims surrounding whitespace from the name, so a name with
+        leading or trailing whitespace is not idempotent; each run creates
+        another resource and then fails because Cloudflare returns the
+        trimmed name.
+      - An empty or whitespace-only name fails before any change, because
+        Cloudflare does not store it.
     required: true
     type: str
   domain:
@@ -125,9 +131,9 @@ options:
       - Each entry must set C(type), such as C(public); Cloudflare stores an
         entry without one as a C(public) destination, so the module fails
         before making changes.
-      - Each entry accepts only the fields Cloudflare stores for its C(type),
-        such as C(type), C(uri), and C(overrides) of a C(public) destination.
-        Each C(overrides) entry accepts only C(behavior) and C(path_pattern).
+      - A C(public) or C(private) entry accepts only the fields Cloudflare
+        stores for its C(type), such as C(type), C(uri), and C(overrides) of a
+        C(public) destination. Each C(overrides) entry accepts only C(behavior) and C(path_pattern).
         Cloudflare accepts any other field but does not store it, so the
         module fails before making changes.
       - An empty C(overrides) list fails before making changes, because
@@ -178,9 +184,7 @@ options:
         C(email_addresses), and C(email_list_uuid). C(connection_rules)
         accepts only C(rdp), whose value accepts only
         C(allowed_clipboard_local_to_remote_formats) and
-        C(allowed_clipboard_remote_to_local_formats), and C(mfa_config) accepts
-        only C(allowed_authenticators), C(mfa_disabled), and
-        C(session_duration). The same applies to the
+        C(allowed_clipboard_remote_to_local_formats). The same applies to the
         nested fields of a known inline policy selector. Cloudflare accepts
         any other field, such as C(account_id), but does not store it, so the
         module fails before making changes.
@@ -207,14 +211,14 @@ options:
         C(email) or C(everyone). Cloudflare drops an empty selector V({}) and
         splits a selector with several rules into separate selectors, so such
         a selector fails before any change.
-      - The value of an inline policy selector of a known type must be a
-        mapping, such as V({}) for C(everyone) or C(any_valid_service_token).
-        Cloudflare stores a null value as V({}), so such a selector fails
-        before any change.
-      - A nested field of an inline policy selector of a known type must not
-        be V(""), such as the C(account_id) of a C(device_posture) selector.
-        Cloudflare does not store an empty value, so such a selector fails
-        before any change; omit the field instead.
+      - Cloudflare stores a null C(any_valid_service_token) inline policy
+        selector value as V({}), so such a selector fails before any change;
+        use V({}) instead.
+      - The C(account_id) of a C(cloudflare_account_member) or
+        C(device_posture) inline policy selector and the
+        C(identity_provider_id) of a C(saml) one must not be V(""). Cloudflare
+        does not store the empty value, so such a selector fails before any
+        change; omit the field instead.
       - Stored policies are compared with the entries at the same position.
         An entry that sets a selector or has no C(id) is an inline policy whose
         C(include), C(exclude), and C(require) are compared exactly, so a
@@ -461,16 +465,11 @@ CORS_HEADERS_FIELDS = (
     "allowed_origins",
     "max_age",
 )
+# Destination types whose dropped fields were verified; Cloudflare checks the others.
 DESTINATION_FIELDS = {
-    "all_preview_workers": ("overrides", "type"),
-    "all_workers": ("overrides", "type"),
-    "preview_worker": ("overrides", "type", "worker_id"),
     "private": ("cidr", "hostname", "l4_protocol", "port_range", "type", "vnet_id"),
     "public": ("overrides", "type", "uri"),
-    "via_mcp_server_portal": ("mcp_server_id", "type"),
-    "worker": ("overrides", "type", "worker_id"),
 }
-ANY_DESTINATION_FIELDS = tuple(sorted({field for fields in DESTINATION_FIELDS.values() for field in fields}))
 # DestinationOverrideParam.
 DESTINATION_OVERRIDE_FIELDS = ("behavior", "path_pattern")
 # A policy entry is a reusable policy link or an inline policy; the SDK inline
@@ -492,11 +491,10 @@ POLICY_FIELDS = (
     "require",
     "session_duration",
 )
-# The inline policy ConnectionRules and MfaConfig types.
+# The inline policy ConnectionRules type.
 POLICY_CONNECTION_RULES_FIELDS = {
     "rdp": ("allowed_clipboard_local_to_remote_formats", "allowed_clipboard_remote_to_local_formats"),
 }
-POLICY_MFA_CONFIG_FIELDS = ("allowed_authenticators", "mfa_disabled", "session_duration")
 # Inline policy fields Cloudflare stores exactly as sent, so keys removed from
 # them count as differences.
 INLINE_POLICY_EXACT_FIELDS = ("approval_groups", "connection_rules")
@@ -567,8 +565,9 @@ def validate_field_names(module):
     unknown = unsupported_fields(params.get("cors_headers"), CORS_HEADERS_FIELDS, "cors_headers")
     for index, destination in enumerate(destinations):
         kind = destination["type"]
-        fields = DESTINATION_FIELDS.get(kind if isinstance(kind, str) else None, ANY_DESTINATION_FIELDS)
-        unknown.extend(unsupported_fields(destination, fields, f"destinations[{index}]"))
+        if isinstance(kind, str) and kind in DESTINATION_FIELDS:
+            unknown.extend(unsupported_fields(destination, DESTINATION_FIELDS[kind], f"destinations[{index}]"))
+
         overrides = destination.get("overrides")
         for position, override in enumerate(overrides if isinstance(overrides, list) else ()):
             path = f"destinations[{index}].overrides[{position}]"
@@ -582,9 +581,6 @@ def validate_field_names(module):
                 POLICY_CONNECTION_RULES_FIELDS,
                 f"policies[{index}].connection_rules",
             )
-        )
-        unknown.extend(
-            unsupported_fields(policy.get("mfa_config"), POLICY_MFA_CONFIG_FIELDS, f"policies[{index}].mfa_config")
         )
         approval_groups = policy.get("approval_groups")
         for position, group in enumerate(approval_groups if isinstance(approval_groups, list) else ()):
@@ -744,6 +740,10 @@ def run(module, client):
     account_id = params["account_id"]
     applications = client.zero_trust.access.applications
     if params["state"] == "present":
+        # Cloudflare stores an empty name as null, so the resource is never found again.
+        if not params["name"].strip():
+            module.fail_json(msg="name must not be empty or only whitespace")
+
         validate_type_fields(module)
         validate_policy_order(module)
         validate_field_names(module)

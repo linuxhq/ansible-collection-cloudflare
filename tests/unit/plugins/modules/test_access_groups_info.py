@@ -23,9 +23,20 @@ class AccessGroupsInfoTests(TestCase):
         client.zero_trust.access.groups.list.assert_called_once_with(account_id="account")
         self.assertEqual(raised.exception.values, {"changed": False, "access_groups": groups})
 
+    def test_lists_nameless_groups(self):
+        # Cloudflare stores a group with an empty name as null.
+        client = Mock()
+        groups = [{"id": "one"}, {"id": "two", "name": "admins"}]
+        client.zero_trust.access.groups.list.return_value = groups
+
+        with self.assertRaises(ModuleExit) as raised:
+            access_groups_info.run(FakeModule({"account_id": "account"}), client)
+
+        self.assertEqual(raised.exception.values["access_groups"], groups)
+
     def test_rejects_malformed_groups(self):
         client = Mock()
-        client.zero_trust.access.groups.list.return_value = [{"id": "one"}]
+        client.zero_trust.access.groups.list.return_value = [{"name": "admins"}]
 
         with self.assertRaises(ModuleFail):
             access_groups_info.run(FakeModule({"account_id": "account"}), client)

@@ -51,6 +51,24 @@ class AccessPoliciesTests(TestCase):
 
         return raised.exception.values
 
+    def test_empty_name_fails_before_any_request(self):
+        # Cloudflare stores an empty name as null, so the policy is never found again.
+        client, api = client_with()
+
+        result = self.run_module(FakeModule(params(name="")), client)
+
+        self.assertEqual(result["msg"], "name must not be empty")
+        api.list.assert_not_called()
+
+    def test_nameless_policy_does_not_block_lookup(self):
+        # Cloudflare stores a policy with an empty name as null.
+        client, _ignored = client_with([{"id": "nameless", "decision": "allow"}, policy()])
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertFalse(result["changed"])
+        self.assertEqual(result["access_policy"]["id"], "policy")
+
     def test_matches_name_across_listed_policies(self):
         other = policy(id="other", name="users")
         client, api = client_with([other, policy()])
@@ -68,6 +86,41 @@ class AccessPoliciesTests(TestCase):
         result = self.run_module(FakeModule(params()), client)
 
         api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_padded_name_is_created_then_unchanged(self):
+        # Cloudflare stores an Access policy name with its surrounding whitespace.
+        padded = policy(name=" p43 ")
+        client, api = client_with(created=padded)
+
+        result = self.run_module(FakeModule(params(name=" p43 ")), client)
+
+        api.create.assert_called_once_with(account_id="account", decision="allow", include=INCLUDE, name=" p43 ")
+        self.assertTrue(result["changed"])
+
+        client, api = client_with([padded])
+
+        result = self.run_module(FakeModule(params(name=" p43 ")), client)
+
+        api.create.assert_not_called()
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_whitespace_only_name_is_created_then_unchanged(self):
+        # Cloudflare stores a whitespace-only Access policy name verbatim.
+        blank = policy(name="   ")
+        client, api = client_with([{"id": "nameless"}], created=blank)
+
+        result = self.run_module(FakeModule(params(name="   ")), client)
+
+        self.assertNotIn("msg", result)
+        self.assertTrue(result["changed"])
+
+        client, api = client_with([blank])
+
+        result = self.run_module(FakeModule(params(name="   ")), client)
+
+        api.create.assert_not_called()
         self.assertFalse(result["changed"])
 
     def test_creates_policy(self):

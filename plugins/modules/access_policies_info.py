@@ -39,7 +39,7 @@ access_policies:
       type: str
     name:
       description: Access policy name.
-      returned: always
+      returned: when Cloudflare stores one; it stores an empty name as null
       type: str
 
 """
@@ -64,6 +64,7 @@ def run(module, client):
             "access_policies",
             client.zero_trust.access.policies.list(account_id=account_id),
             "Access policy",
+            required_fields=("id",),
         )
 
 

@@ -25,9 +25,19 @@ class AccessServiceTokensInfoTests(TestCase):
         client.zero_trust.access.service_tokens.list.assert_called_once_with(account_id="account")
         self.assertEqual(raised.exception.values, {"changed": False, "service_tokens": tokens})
 
-    def test_rejects_malformed_service_tokens(self):
+    def test_lists_nameless_service_tokens(self):
+        # Cloudflare stores a token with an empty name as null.
         client = Mock()
         client.zero_trust.access.service_tokens.list.return_value = [{"id": "one", "name": None}]
+
+        with self.assertRaises(ModuleExit) as raised:
+            access_service_tokens_info.run(FakeModule({"account_id": "account"}), client)
+
+        self.assertEqual(raised.exception.values["service_tokens"], [{"id": "one"}])
+
+    def test_rejects_malformed_service_tokens(self):
+        client = Mock()
+        client.zero_trust.access.service_tokens.list.return_value = [{"name": "token"}]
 
         with self.assertRaises(ModuleFail):
             access_service_tokens_info.run(FakeModule({"account_id": "account"}), client)

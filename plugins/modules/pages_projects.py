@@ -30,12 +30,14 @@ options:
     type: str
     description:
       - Pages project name.
-      - V(.) and V(..) fail before any request.
+      - V(""), V(.), and V(..) fail before any request.
   production_branch:
     type: str
     description:
       - Git branch deployed to the production environment.
       - Required when creating a new Pages project.
+      - V("") fails before any change, because Cloudflare keeps the current
+        branch.
   build_config:
     type: dict
     description:
@@ -59,20 +61,28 @@ options:
         project.
       - Environment variables and bindings, such as C(kv_namespaces) entries, set
         to null are deleted from the project. An empty binding map changes nothing.
-      - Cloudflare keeps the value of any other setting set to null, such as
-        C(compatibility_date), a whole C(env_vars) or binding map, or a field
-        inside an entry other than C(services) C(entrypoint) and C(r2_buckets)
-        C(jurisdiction), so the module fails before making changes.
+        C(wrangler_config_hash), C(placement.mode), and C(limits.cpu_ms) set to
+        null are cleared, and an environment variable C(value) set to null is
+        stored as V("").
+      - Any other C(wrangler_config_hash) fails before making changes, because
+        Cloudflare does not store it when it creates or updates a project.
+      - Cloudflare keeps the current value of a whole C(preview) or
+        C(production) configuration, C(always_use_latest_compatibility_date),
+        C(compatibility_date), C(compatibility_flags), C(fail_open),
+        C(usage_model), a whole C(env_vars), C(kv_namespaces), C(limits), or
+        C(placement), and the C(type) of an environment variable set to null,
+        so the module fails before making changes.
       - Keys under C(preview) and C(production) must be Pages deployment
         settings, such as C(compatibility_date), C(env_vars), or
         C(build_image_major_version). Cloudflare accepts any other key but does
         not store it, so the module fails before making changes.
       - The same applies to fields of C(limits), C(placement), and each
-        C(env_vars) or binding entry, such as C(type) and C(value) of an
-        environment variable or C(namespace_id) of a C(kv_namespaces) entry.
-      - An empty C(compatibility_date), C(usage_model),
-        C(wrangler_config_hash), or C(placement.mode) fails before making
-        changes, because Cloudflare does not store it; omit it instead.
+        C(browsers), C(env_vars), C(kv_namespaces), or C(vectorize_bindings)
+        entry, such as C(type) and C(value) of an environment variable or
+        C(namespace_id) of a C(kv_namespaces) entry.
+      - An empty C(compatibility_date), C(usage_model), or C(placement.mode)
+        fails before making changes, because Cloudflare does not store it; omit
+        it instead.
   rotate_secrets:
     type: bool
     default: false
@@ -82,8 +92,6 @@ options:
       - Cloudflare returns C(web_analytics_token), so a changed token is
         detected and applied without O(rotate_secrets).
       - The module reports C(changed) when enabled with either credential input.
-      - Requires a C(secret_text) value under O(deployment_configs) or
-        C(build_config.web_analytics_token).
   source:
     type: dict
     description:
@@ -252,45 +260,33 @@ DEPLOYMENT_SETTINGS = (
     "vectorize_bindings",
     "wrangler_config_hash",
 )
-# Fields of each entry in a deployment env_vars or binding map, and of each
-# deployment setting object, from the same cloudflare SDK types.
+# Fields of each entry in the deployment env_vars and binding maps whose other
+# fields Cloudflare drops, and of each deployment setting object, from the
+# same cloudflare SDK types.
 DEPLOYMENT_ENTRY_FIELDS = {
-    "ai_bindings": ("project_id",),
-    "analytics_engine_datasets": ("dataset",),
     "browsers": (),
-    "d1_databases": ("id",),
-    "durable_object_namespaces": ("namespace_id",),
     "env_vars": ("type", "value"),
-    "hyperdrive_bindings": ("id",),
     "kv_namespaces": ("namespace_id",),
-    "mtls_certificates": ("certificate_id",),
-    "queue_producers": ("name",),
-    "r2_buckets": ("name", "jurisdiction"),
-    "services": ("service", "entrypoint", "environment"),
     "vectorize_bindings": ("index_name",),
 }
 DEPLOYMENT_OBJECT_FIELDS = {"limits": ("cpu_ms",), "placement": ("mode",)}
 
-# Cloudflare clears these settings when they are set to null, but keeps the
-# current value of any other setting set to null.
+# Cloudflare clears these build settings when they are set to null, but keeps
+# the current value of any other build setting set to null.
 NULLABLE_BUILD_SETTINGS = ("web_analytics_tag", "web_analytics_token")
-NULLABLE_DEPLOYMENT_SETTINGS = (
-    "ai_bindings",
-    "analytics_engine_datasets",
-    "browsers",
-    "d1_databases",
-    "durable_object_namespaces",
+# Cloudflare keeps the current value of these deployment settings, and of an
+# environment variable's type or value, when they are set to null.
+NON_NULLABLE_DEPLOYMENT_SETTINGS = (
+    "always_use_latest_compatibility_date",
+    "compatibility_date",
+    "compatibility_flags",
     "env_vars",
-    "hyperdrive_bindings",
+    "fail_open",
     "kv_namespaces",
-    "mtls_certificates",
-    "queue_producers",
-    "r2_buckets",
-    "services",
-    "vectorize_bindings",
+    "limits",
+    "placement",
+    "usage_model",
 )
-# Cloudflare clears these fields of a binding entry when they are set to null.
-NULLABLE_BINDING_FIELDS = {"r2_buckets": ("jurisdiction",), "services": ("entrypoint",)}
 
 
 def contains_null(value):
@@ -311,7 +307,8 @@ def validate_setting_names(module):
         config = (params.get("deployment_configs") or {}).get(environment)
         for key, value in config.items() if isinstance(config, dict) else ():
             path = f"deployment_configs.{environment}.{key}"
-            if key not in DEPLOYMENT_SETTINGS:
+            # Cloudflare drops wrangler_config_hash on create and update.
+            if key not in DEPLOYMENT_SETTINGS or key == "wrangler_config_hash" and value is not None:
                 unknown.append(path)
 
             if key in DEPLOYMENT_OBJECT_FIELDS and isinstance(value, dict):
@@ -339,25 +336,21 @@ def validate_null_settings(module):
         if key not in NULLABLE_BUILD_SETTINGS and contains_null(value)
     ]
     for environment, config in (params.get("deployment_configs") or {}).items():
-        if not isinstance(config, dict):
-            if config is None:
-                unsupported.append(f"deployment_configs.{environment}")
+        path = f"deployment_configs.{environment}"
+        if config is None:
+            unsupported.append(path)
 
+        if not isinstance(config, dict):
             continue
 
-        for key, value in config.items():
-            path = f"deployment_configs.{environment}.{key}"
-            if key not in NULLABLE_DEPLOYMENT_SETTINGS or value is None:
-                if contains_null(value):
-                    unsupported.append(path)
-
-                continue
-
-            # Entries may be null, which deletes them, but not most of their fields.
-            for name, entry in value.items() if isinstance(value, dict) else ():
-                for field, item in entry.items() if isinstance(entry, dict) else ():
-                    if field not in NULLABLE_BINDING_FIELDS.get(key, ()) and contains_null(item):
-                        unsupported.append(f"{path}.{name}.{field}")
+        unsupported.extend(
+            f"{path}.{key}" for key in NON_NULLABLE_DEPLOYMENT_SETTINGS if key in config and config[key] is None
+        )
+        # Variables may be null, which deletes them, but not their type.
+        env_vars = config.get("env_vars")
+        for name, variable in env_vars.items() if isinstance(env_vars, dict) else ():
+            if isinstance(variable, dict) and "type" in variable and variable["type"] is None:
+                unsupported.append(f"{path}.env_vars.{name}.type")
 
     if unsupported:
         module.fail_json(
@@ -369,9 +362,9 @@ def validate_null_settings(module):
 def validate_empty_settings(module):
     """Fail when a deployment setting Cloudflare does not store when empty is requested empty.
 
-    Cloudflare keeps the previous compatibility_date and usage_model, drops an
-    empty wrangler_config_hash, and stores an empty placement mode as an empty
-    placement, so none would match the request.
+    Cloudflare keeps the previous compatibility_date and usage_model, and stores
+    an empty placement mode as an empty placement, so none would match the
+    request.
     """
     empty = []
     for environment, config in (module.params.get("deployment_configs") or {}).items():
@@ -379,7 +372,7 @@ def validate_empty_settings(module):
             continue
 
         path = f"deployment_configs.{environment}"
-        for setting in ("compatibility_date", "usage_model", "wrangler_config_hash"):
+        for setting in ("compatibility_date", "usage_model"):
             if config.get(setting) == "":
                 empty.append(f"{path}.{setting}")
 
@@ -549,9 +542,6 @@ def desired_domain_names(module):
     names = []
     for domain in module.params.get("domains") or []:
         domain_name = domain["name"]
-        if not domain_name.strip() or domain_name != domain_name.strip():
-            module.fail_json(msg="Each Pages project domain requires a valid name")
-
         if not set(domain_name) <= DOMAIN_CHARACTERS or not valid_dns_labels(domain_name):
             module.fail_json(
                 msg=(
@@ -770,9 +760,6 @@ def ensure_present(module, client, domain_names):
         (payload.get("build_config") or {}).get("web_analytics_token") is not None
         or values_differ(without_secret_values(payload), serialize_resource(payload))
     )
-    if params["rotate_secrets"] and not secrets_requested:
-        module.fail_json(msg="rotate_secrets requires a secret_text value or build_config.web_analytics_token")
-
     current = get_project(module, client)
     created = current is None
     if created and params.get("production_branch") is None:
@@ -850,12 +837,19 @@ def ensure_absent(module, client):
 
 
 def run(module, client):
-    # The SDK refuses to build a request path with a dot segment.
+    # The SDK refuses to build a request path with an empty or dot segment.
+    if module.params["name"] == "":
+        module.fail_json(msg="name must not be empty")
+
     if module.params["name"] in DOT_SEGMENTS:
         module.fail_json(msg="name must not be '.' or '..'")
 
-    domain_names = desired_domain_names(module)
     if module.params["state"] == "present":
+        # Cloudflare keeps the current branch when it is set to "".
+        if module.params.get("production_branch") == "":
+            module.fail_json(msg="production_branch must not be empty")
+
+        domain_names = desired_domain_names(module)
         validate_setting_names(module)
         validate_null_settings(module)
         validate_empty_settings(module)

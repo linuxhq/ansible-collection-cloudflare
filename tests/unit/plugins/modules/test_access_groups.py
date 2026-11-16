@@ -44,6 +44,27 @@ class AccessGroupsTests(TestCase):
 
         return raised.exception.values
 
+    def test_empty_or_whitespace_name_fails_before_any_request(self):
+        # Cloudflare stores such a name as null or "", so the resource is never found again.
+        for name in ("", "   "):
+            with self.subTest(name=name):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(name=name)), client)
+
+                self.assertEqual(result["msg"], "name must not be empty or only whitespace")
+                api.list.assert_not_called()
+
+    def test_nameless_group_does_not_block_lookup(self):
+        # Cloudflare stores a group with an empty name as null.
+        group = {"id": "group", "name": "admins", "include": [{"email": {"email": "admin@example.com"}}]}
+        client, _ignored = client_with([{"id": "nameless"}, group])
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertNotIn("msg", result)
+        self.assertEqual(result["access_group"]["id"], "group")
+
     def test_looks_up_by_name_server_side(self):
         client, api = client_with()
         self.run_module(FakeModule(params(), check_mode=True), client)
@@ -203,8 +224,12 @@ class AccessGroupsTests(TestCase):
                 api.create.assert_not_called()
 
     def test_empty_selector_value_fails_before_any_request(self):
-        include = [{"device_posture": {"integration_uid": "posture", "account_id": ""}}, {"email": {"email": ""}}]
-        empty = ["include[0].device_posture.account_id", "include[1].email.email"]
+        include = [
+            {"device_posture": {"integration_uid": "posture", "account_id": ""}},
+            {"email": {"email": ""}},
+            {"saml": {"attribute_name": "group", "attribute_value": "", "identity_provider_id": ""}},
+        ]
+        empty = ["include[0].device_posture.account_id", "include[2].saml.identity_provider_id"]
         for check_mode in (True, False):
             with self.subTest(check_mode=check_mode):
                 client, api = client_with()

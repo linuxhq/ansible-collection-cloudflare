@@ -117,13 +117,16 @@ class CfdTunnelTests(TestCase):
                 self.assertEqual(result["current_config_src"], "local")
                 self.assertEqual(result["requested_config_src"], "cloudflare")
 
-    def test_requires_config_source_only_when_creating(self):
-        client, api = client_with()
+    def test_creates_tunnel_without_config_source(self):
+        # Cloudflare creates a tunnel without a configuration source.
+        created = {"id": "tunnel-id", "name": "tunnel"}
+        client, api = client_with(created=created)
 
         result = self.run_module(FakeModule(params(config_src=None)), client)
 
-        api.create.assert_not_called()
-        self.assertEqual(result["msg"], "config_src is required when creating a cloudflared tunnel")
+        api.create.assert_called_once_with(account_id="account", name="tunnel")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["cfd_tunnel"], created)
 
     def test_creates_remote_tunnel_with_secret(self):
         created = {"id": "tunnel-id", "name": "tunnel", "config_src": "cloudflare"}
@@ -143,13 +146,16 @@ class CfdTunnelTests(TestCase):
 
         self.assertIn("wrong cloudflared tunnel", result["msg"])
 
-    def test_rejects_invalid_secret_before_lookup(self):
-        client, api = client_with()
+    def test_sends_secret_without_local_checks(self):
+        # Cloudflare validates the secret on the only write, so it is sent as given.
+        created = {"id": "tunnel-id", "name": "tunnel", "config_src": "local"}
+        client, api = client_with(created=created)
 
-        result = self.run_module(FakeModule(params(config_src="local", tunnel_secret="short")), client)
+        self.run_module(FakeModule(params(config_src="local", tunnel_secret="short")), client)
 
-        api.list.assert_not_called()
-        self.assertIn("at least 32 bytes", result["msg"])
+        api.create.assert_called_once_with(
+            account_id="account", config_src="local", name="tunnel", tunnel_secret="short"
+        )
 
     def test_check_mode_does_not_rotate_secret(self):
         client, api = client_with([{"id": "tunnel-id", "name": "tunnel", "config_src": "local"}])

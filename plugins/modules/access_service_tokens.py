@@ -22,6 +22,12 @@ options:
   name:
     description:
       - Name of the service token.
+      - Cloudflare trims surrounding whitespace from the name, so a name with
+        leading or trailing whitespace is not idempotent; each run creates
+        another resource and then fails because Cloudflare returns the
+        trimmed name.
+      - An empty or whitespace-only name fails before any change, because
+        Cloudflare does not store it.
     required: true
     type: str
   duration:
@@ -140,6 +146,9 @@ def run(module, client):
     params = module.params
     account_id = params["account_id"]
     service_tokens = client.zero_trust.access.service_tokens
+    # Cloudflare stores an empty name as null, so the token is never found again.
+    if params["state"] == "present" and not params["name"].strip():
+        module.fail_json(msg="name must not be empty or only whitespace")
 
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the service token",

@@ -34,6 +34,17 @@ class AccessServiceTokensTests(TestCase):
 
         return raised.exception.values
 
+    def test_empty_or_whitespace_name_fails_before_any_request(self):
+        # Cloudflare stores such a name as null or "", so the resource is never found again.
+        for name in ("", "   "):
+            with self.subTest(name=name):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(name=name)), client)
+
+                self.assertEqual(result["msg"], "name must not be empty or only whitespace")
+                api.list.assert_not_called()
+
     def test_creates_token_with_explicit_duration_and_returns_secret(self):
         created = {"id": "token", "name": "automation", "duration": "1y", "client_secret": "secret"}
         client, api = client_with(created=created)

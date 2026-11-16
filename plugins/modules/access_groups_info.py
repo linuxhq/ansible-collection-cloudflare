@@ -39,7 +39,7 @@ access_groups:
       type: str
     name:
       description: Access group name.
-      returned: always
+      returned: when Cloudflare stores one; it stores an empty name as null
       type: str
 
 """
@@ -64,6 +64,7 @@ def run(module, client):
             "access_groups",
             client.zero_trust.access.groups.list(account_id=account_id),
             "Access group",
+            required_fields=("id",),
         )
 
 

@@ -111,10 +111,10 @@ options:
     type: dict
     description:
       - WARP client service mode configuration.
-      - Accepts only C(mode) and C(port). Cloudflare accepts any other key but
+      - Accepts only C(mode) and C(port); a null key is ignored. Cloudflare accepts any other key but
         does not store it, so the module fails before making changes.
-      - C(port) requires a C(mode) of C(proxy). Cloudflare does not store a
-        port for another mode, so the module fails before making changes.
+      - C(port) with a C(mode) other than C(proxy) fails before making
+        changes, because Cloudflare does not store a port for another mode.
       - Cloudflare replaces the whole configuration on every write. When
         C(mode) equals the current mode, keys omitted here, such as C(port),
         keep their current values.
@@ -209,15 +209,24 @@ SERVICE_MODE_FIELDS = ("mode", "port")
 
 
 def validate_field_names(module):
-    """Fail when a route or service mode field Cloudflare accepts but never stores is requested."""
+    """Fail when a route or service mode field Cloudflare accepts but never stores is requested.
+
+    Null fields are ignored, as Cloudflare drops them and the comparison ignores them.
+    """
     params = module.params
     unknown = []
     for option in ("exclude", "include"):
         for index, route in enumerate(params.get(option) or ()):
-            unknown.extend(f"{option}[{index}].{field}" for field in route if field not in ROUTE_FIELDS)
+            unknown.extend(
+                f"{option}[{index}].{field}"
+                for field, value in route.items()
+                if field not in ROUTE_FIELDS and value is not None
+            )
 
     unknown.extend(
-        f"service_mode_v2.{field}" for field in params.get("service_mode_v2") or {} if field not in SERVICE_MODE_FIELDS
+        f"service_mode_v2.{field}"
+        for field, value in (params.get("service_mode_v2") or {}).items()
+        if field not in SERVICE_MODE_FIELDS and value is not None
     )
     if unknown:
         module.fail_json(
@@ -225,8 +234,9 @@ def validate_field_names(module):
             unsupported_fields=unknown,
         )
 
+    # Cloudflare rejects a port without a mode.
     service_mode_v2 = params.get("service_mode_v2") or {}
-    if "port" in service_mode_v2 and service_mode_v2.get("mode") != "proxy":
+    if service_mode_v2.get("port") is not None and service_mode_v2.get("mode") not in (None, "proxy"):
         module.fail_json(
             msg="service_mode_v2.port requires mode proxy; Cloudflare does not store a port for another mode"
         )
@@ -250,7 +260,7 @@ def comparable_policy(policy, payload):
     policy = dict(policy)
     for field in ("exclude", "include"):
         requested, routes = serialize_resource(payload.get(field)), policy.get(field)
-        if isinstance(requested, list) and isinstance(routes, list):
+        if requested is not None and isinstance(routes, list):
             policy[field] = [
                 (
                     {**route, "description": ""}
@@ -301,7 +311,7 @@ def run(module, client):
     ):
         current = serialize_resource(policy.get(account_id=account_id))
 
-    if isinstance(payload.get("service_mode_v2"), dict) and isinstance(current, dict):
+    if "service_mode_v2" in payload and isinstance(current, dict):
         payload["service_mode_v2"] = service_mode(payload["service_mode_v2"], current.get("service_mode_v2"))
 
     ensure_settings(

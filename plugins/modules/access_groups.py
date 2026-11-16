@@ -22,13 +22,12 @@ description:
     C(everyone). Cloudflare drops an empty selector V({}) and splits a
     selector with several rules into separate selectors, so such a selector
     fails before any change.
-  - The value of a selector of a known type must be a mapping, such as
-    V({}) for C(everyone) or C(any_valid_service_token). Cloudflare stores a
-    null value as V({}), so such a selector fails before any change.
-  - A nested field of a selector of a known type must not be V(""), such as
-    the C(account_id) of a C(device_posture) selector. Cloudflare does not
-    store an empty value, so such a selector fails before any change; omit
-    the field instead.
+  - Cloudflare stores a null C(any_valid_service_token) selector value as
+    V({}), so such a selector fails before any change; use V({}) instead.
+  - The C(account_id) of a C(cloudflare_account_member) or C(device_posture)
+    selector and the C(identity_provider_id) of a C(saml) selector must not
+    be V(""). Cloudflare does not store the empty value, so such a selector
+    fails before any change; omit the field instead.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
@@ -45,6 +44,12 @@ options:
     type: str
     description:
       - Access group name.
+      - Cloudflare trims surrounding whitespace from the name, so a name with
+        leading or trailing whitespace is not idempotent; each run creates
+        another resource and then fails because Cloudflare returns the
+        trimmed name.
+      - An empty or whitespace-only name fails before any change, because
+        Cloudflare does not store it.
   include:
     type: list
     elements: dict
@@ -135,6 +140,10 @@ def run(module, client):
     account_id = params["account_id"]
     groups = client.zero_trust.access.groups
     if params["state"] == "present":
+        # Cloudflare stores an empty name as null, so the resource is never found again.
+        if not params["name"].strip():
+            module.fail_json(msg="name must not be empty or only whitespace")
+
         validate_access_selectors(module)
 
     with cloudflare_error_context(

@@ -22,13 +22,12 @@ description:
     C(everyone). Cloudflare drops an empty selector V({}) and splits a
     selector with several rules into separate selectors, so such a selector
     fails before any change.
-  - The value of a selector of a known type must be a mapping, such as
-    V({}) for C(everyone) or C(any_valid_service_token). Cloudflare stores a
-    null value as V({}), so such a selector fails before any change.
-  - A nested field of a selector of a known type must not be V(""), such as
-    the C(account_id) of a C(device_posture) selector. Cloudflare does not
-    store an empty value, so such a selector fails before any change; omit
-    the field instead.
+  - Cloudflare stores a null C(any_valid_service_token) selector value as
+    V({}), so such a selector fails before any change; use V({}) instead.
+  - The C(account_id) of a C(cloudflare_account_member) or C(device_posture)
+    selector and the C(identity_provider_id) of a C(saml) selector must not
+    be V(""). Cloudflare does not store the empty value, so such a selector
+    fails before any change; omit the field instead.
   - Settings this module does not manage, such as C(session_duration), are
     preserved on an existing policy.
 version_added: '2.0.0'
@@ -47,6 +46,8 @@ options:
     type: str
     description:
       - Access policy name.
+      - An empty name fails before any change, because Cloudflare stores it as
+        null.
   decision:
     type: str
     choices:
@@ -239,6 +240,10 @@ def run(module, client):
     account_id = params["account_id"]
     policies = client.zero_trust.access.policies
     if params["state"] == "present":
+        # Cloudflare stores an empty name as null, so the policy is never found again.
+        if params["name"] == "":
+            module.fail_json(msg="name must not be empty")
+
         validate_field_names(module)
         validate_access_selectors(module)
 

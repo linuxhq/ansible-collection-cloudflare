@@ -53,6 +53,17 @@ class AccessAppsTests(TestCase):
 
         return raised.exception.values
 
+    def test_empty_or_whitespace_name_fails_before_any_request(self):
+        # Cloudflare stores such a name as null or "", so the resource is never found again.
+        for name in ("", "   "):
+            with self.subTest(name=name):
+                client, api = client_with()
+
+                result = self.run_module(FakeModule(params(name=name)), client)
+
+                self.assertEqual(result["msg"], "name must not be empty or only whitespace")
+                api.list.assert_not_called()
+
     def test_looks_up_by_exact_name_server_side(self):
         client, api = client_with()
         self.run_module(FakeModule(params(), check_mode=True), client)
@@ -446,7 +457,6 @@ class AccessAppsTests(TestCase):
             ({"cors_headers": {"allowed_methods": ["GET"], "foo": 1}}, ["cors_headers.foo"]),
             ({"destinations": [{"type": "public", "uri": "app.example.com", "foo": 1}]}, ["destinations[0].foo"]),
             ({"destinations": [{"type": "public", "cidr": "192.0.2.1"}]}, ["destinations[0].cidr"]),
-            ({"destinations": [{"type": "unknown", "uri": "app.example.com", "foo": 1}]}, ["destinations[0].foo"]),
             ({"policies": [{"id": "a", "precedence": 1, "foo": 1}]}, ["policies[0].foo"]),
             # Cloudflare accepts a policy account_id but never returns it.
             ({"policies": [{"id": "a", "precedence": 1, "account_id": "account"}]}, ["policies[0].account_id"]),
@@ -491,6 +501,28 @@ class AccessAppsTests(TestCase):
                     api.list.assert_not_called()
                     api.create.assert_not_called()
 
+    def test_other_destination_types_reach_cloudflare(self):
+        # Cloudflare rejects an unknown type on the first write; worker fields are unverified.
+        for destination in (
+            {"type": "unknown", "uri": "app.example.com", "foo": 1},
+            {"type": "worker", "worker_id": "w", "foo": 1},
+        ):
+            with self.subTest(destination=destination):
+                client, api = client_with()
+
+                self.run_module(FakeModule(params(destinations=[destination])), client)
+
+                api.create.assert_called_once()
+
+    def test_non_list_inline_policy_selectors_reach_cloudflare(self):
+        # Cloudflare rejects these on the first write; the module must not raise TypeError.
+        policies = [{"name": "inline", "decision": "allow", "include": 5, "exclude": "x"}]
+        client, api = client_with()
+
+        self.run_module(FakeModule(params(policies=policies)), client)
+
+        api.create.assert_called_once()
+
     def test_unstored_nested_fields_fail_before_any_request(self):
         inline = {"name": "inline", "decision": "allow", "include": [{"everyone": {}}]}
         override = {"behavior": "public", "path_pattern": "/a"}
@@ -515,10 +547,6 @@ class AccessAppsTests(TestCase):
                 ["policies[0].connection_rules.rdp.foo"],
             ),
             ({"policies": [{**inline, "connection_rules": {"foo": {}}}]}, ["policies[0].connection_rules.foo"]),
-            (
-                {"policies": [{**inline, "mfa_config": {"mfa_disabled": True, "foo": 1}}]},
-                ["policies[0].mfa_config.foo"],
-            ),
         )
         for updates, unsupported in cases:
             for check_mode in (True, False):
@@ -565,7 +593,7 @@ class AccessAppsTests(TestCase):
                 api.create.assert_not_called()
 
     def test_inline_policy_null_selector_fails_before_any_request(self):
-        policies = [{"name": "inline", "decision": "allow", "include": [{"everyone": None}]}]
+        policies = [{"name": "inline", "decision": "allow", "include": [{"any_valid_service_token": None}]}]
         for check_mode in (True, False):
             with self.subTest(check_mode=check_mode):
                 client, api = client_with()
@@ -574,7 +602,8 @@ class AccessAppsTests(TestCase):
 
                 self.assertEqual(
                     result["msg"],
-                    "policies[0].include[0].everyone must be a mapping; use {} for a selector without fields, as "
+                    "policies[0].include[0].any_valid_service_token must be a mapping; use {} for a selector without "
+                    "fields, as "
                     "Cloudflare stores a null selector as {}",
                 )
                 api.list.assert_not_called()

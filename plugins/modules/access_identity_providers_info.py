@@ -69,14 +69,8 @@ def run(module, client):
             module,
             client.zero_trust.identity_providers.list(account_id=account_id),
             "Access identity provider",
-            required_fields=("id", "type"),
+            required_fields=("id", "name", "type"),
         )
-
-    # Cloudflare allows an empty name, so only require a string without padding.
-    for provider in providers:
-        name = provider.get("name")
-        if not isinstance(name, str) or name != name.strip():
-            module.fail_json(msg="Cloudflare API returned malformed Access identity provider data")
 
     module.exit_json(
         changed=False,

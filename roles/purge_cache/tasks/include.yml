@@ -16,7 +16,6 @@
   when:
     - purge_cache_api_token is not none
     - _cache.cache is defined
-    - _cache.cache | length > 0
     - _cache.zone_id is defined
   changed_when:
     - ansible_check_mode | bool

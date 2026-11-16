@@ -39,7 +39,7 @@ service_tokens:
       type: str
     name:
       description: Service token name.
-      returned: always
+      returned: when Cloudflare stores one; it stores an empty name as null
       type: str
     duration:
       description: Configured service token lifetime.
@@ -68,6 +68,7 @@ def run(module, client):
             "service_tokens",
             client.zero_trust.access.service_tokens.list(account_id=account_id),
             "Access service token",
+            required_fields=("id",),
         )
 
 

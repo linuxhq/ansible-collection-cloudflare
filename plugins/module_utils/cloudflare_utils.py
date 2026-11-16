@@ -4,7 +4,6 @@
 
 import json
 import os
-from base64 import b64decode
 from contextlib import contextmanager
 from ipaddress import ip_address
 
@@ -116,25 +115,18 @@ def cloudflare_client(module):
 
 
 def validate_cloudflare_params(module):
-    api_token = module.params.get("api_token")
-    if not isinstance(api_token, str) or not api_token.strip():
-        module.fail_json(msg="api_token must not be empty")
+    api_token = module.params["api_token"]
+    # HTTPX cannot encode another character in the Authorization header.
+    if not api_token.isascii():
+        module.fail_json(msg="api_token must contain only ASCII characters")
 
-    if any(ord(character) < 32 or ord(character) == 127 for character in api_token):
-        module.fail_json(msg="api_token must not contain control characters")
-
+    # The SDK refuses to build a request path with an empty or dot segment.
     for name, value in module.params.items():
-        if (name in {"domain", "name", "phase", "production_branch"} or name.endswith("_id")) and isinstance(
-            value, str
-        ):
-            if not value.strip():
+        if (name == "phase" or name.endswith("_id")) and isinstance(value, str):
+            if value == "":
                 module.fail_json(msg=f"{name} must not be empty")
 
-            if value != value.strip():
-                module.fail_json(msg=f"{name} must not contain leading or trailing whitespace")
-
-            # The SDK refuses to build a request path with a dot segment.
-            if (name == "phase" or name.endswith("_id")) and value in DOT_SEGMENTS:
+            if value in DOT_SEGMENTS:
                 module.fail_json(msg=f"{name} must not be '.' or '..'")
 
     return api_token.strip()
@@ -195,10 +187,19 @@ def serialize_resource(resource):
 def resource_field(module, resource, field, resource_name, expected=None, strict=True):
     """Return a string field of resource, failing when it is malformed.
 
-    strict also rejects an empty value or one with surrounding whitespace.
+    strict also rejects an empty value, and one that is blank or has
+    surrounding whitespace unless field is a name, which Cloudflare can store
+    that way.
     """
     value = resource.get(field) if isinstance(resource, dict) else None
-    if not isinstance(value, str) or strict and (not value.strip() or value != value.strip()):
+    if not isinstance(value, str):
+        invalid = True
+    elif field == "name":
+        invalid = strict and not value
+    else:
+        invalid = strict and (not value.strip() or value != value.strip())
+
+    if invalid:
         failure = {"msg": f"Cloudflare API returned malformed {resource_name} data"}
         if isinstance(resource, dict) and "id" in resource:
             failure["resource_id"] = resource["id"]
@@ -247,11 +248,16 @@ def find_resource(module, items, resource_name, field, value):
 
     Fail when more than one item matches, so an ambiguous name never selects
     an arbitrary resource. Only the matched items are validated strictly, so
-    an unrelated item with surrounding whitespace in its field is skipped.
+    an unrelated item with surrounding whitespace in its field is skipped,
+    and an item without the field, such as an Access policy Cloudflare stored
+    without a name, never matches.
     """
     matches = []
     for item in items:
         resource = serialize_resource(item)
+        if isinstance(resource, dict) and not isinstance(resource.get(field), str):
+            continue
+
         if resource_field(module, resource, field, resource_name, strict=False) == value:
             resource_field(module, resource, field, resource_name)
             matches.append(resource)
@@ -498,6 +504,16 @@ ACCESS_SELECTOR_KEYS = {
     "user_risk_score": ("user_risk_score",),
 }
 
+# Access selectors whose null value Cloudflare stores as {}.
+ACCESS_SELECTORS_STORED_AS_EMPTY = ("any_valid_service_token",)
+
+# Access selector fields Cloudflare accepts as "" but drops.
+ACCESS_SELECTOR_DROPPED_EMPTY_FIELDS = {
+    "cloudflare_account_member": ("account_id",),
+    "device_posture": ("account_id",),
+    "saml": ("identity_provider_id",),
+}
+
 # Fields of an Access policy approval group, from the cloudflare SDK
 # ApprovalGroupParam type. Cloudflare accepts any other field but drops it.
 ACCESS_APPROVAL_GROUP_FIELDS = ("approvals_needed", "email_addresses", "email_list_uuid")
@@ -568,16 +584,17 @@ def validate_access_selectors(module, rules=None, prefix=""):
 
     Each selector is a mapping that sets one rule, as every SDK AccessRuleParam type has one key; Cloudflare drops an
     empty selector and splits a selector with several rules into separate selectors. SDK spellings must use their API
-    keys instead. A known selector's value must be a mapping, as in the SDK AccessRuleParam types; Cloudflare stores a
-    null value as {}. Its fields must be ones Cloudflare stores, and not empty strings, which Cloudflare drops. Unknown
-    selector keys are left to Cloudflare, which rejects them. rules defaults to the module parameters; prefix names
-    their location in failure messages, such as "policies[0].".
+    keys instead. Cloudflare stores a null any_valid_service_token as {}. A known selector's fields must be ones
+    Cloudflare stores, and not the empty strings it drops. Other values are left to Cloudflare, which rejects them.
+    rules defaults to the module parameters; prefix names their location in failure messages, such as "policies[0].".
     """
     rules = module.params if rules is None else rules
     unknown = []
     empty = []
     for field in ACCESS_SELECTOR_FIELDS:
-        for index, selector in enumerate(rules.get(field) or ()):
+        # Cloudflare rejects selectors that are not a list.
+        selectors = rules.get(field)
+        for index, selector in enumerate(selectors if isinstance(selectors, list) else ()):
             path = f"{prefix}{field}[{index}]"
             if not isinstance(selector, dict):
                 module.fail_json(msg=f"{path} must be a mapping that sets one selector, such as {{'everyone': {{}}}}")
@@ -598,18 +615,22 @@ def validate_access_selectors(module, rules=None, prefix=""):
                 )
 
             for key, config in selector.items():
-                if key not in ACCESS_SELECTOR_KEYS:
-                    continue
-
-                if not isinstance(config, dict):
+                if config is None and key in ACCESS_SELECTORS_STORED_AS_EMPTY:
                     module.fail_json(
                         msg=f"{path}.{key} must be a mapping; use {{}} for a selector without "
                         "fields, as Cloudflare stores a null selector as {}"
                     )
 
+                if key not in ACCESS_SELECTOR_KEYS or not isinstance(config, dict):
+                    continue
+
                 fields = ACCESS_SELECTOR_KEYS[key] + ACCESS_SELECTOR_ASSIGNED_KEYS.get(key, ())
                 unknown.extend(unsupported_fields(config, fields, f"{path}.{key}"))
-                empty.extend(f"{path}.{key}.{name}" for name, value in config.items() if value == "")
+                empty.extend(
+                    f"{path}.{key}.{name}"
+                    for name in ACCESS_SELECTOR_DROPPED_EMPTY_FIELDS.get(key, ())
+                    if config.get(name) == ""
+                )
 
     if unknown:
         module.fail_json(
@@ -623,19 +644,6 @@ def validate_access_selectors(module, rules=None, prefix=""):
             "omit them instead",
             empty_fields=empty,
         )
-
-
-def validate_tunnel_secret(module, secret):
-    if secret is None:
-        return
-
-    try:
-        if len(b64decode(secret, validate=True)) >= 32:
-            return
-    except ValueError:
-        pass
-
-    module.fail_json(msg="tunnel_secret must be base64-encoded and at least 32 bytes")
 
 
 def exit_resource_list(module, result_key, items, resource_name, required_fields=("id", "name")):
