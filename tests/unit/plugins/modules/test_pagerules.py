@@ -11,7 +11,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 )
 
 ACTIONS = [{"id": "always_use_https"}]
-TARGETS = [{"target": "url", "constraint": {"value": "example.com/*"}}]
+TARGETS = [{"target": "url", "constraint": {"operator": "matches", "value": "example.com/*"}}]
 
 
 def params(**updates):
@@ -72,6 +72,61 @@ class PageRulesTests(TestCase):
 
         self.assertEqual(found, current)
         self.assertEqual(rule_count, 1)
+
+    def test_partial_targets_fail_before_any_request(self):
+        cases = (
+            ([{"target": "url"}], ["targets[0].constraint"]),
+            ([{"constraint": TARGETS[0]["constraint"]}], ["targets[0].target"]),
+            ([{"target": "url", "constraint": {"value": "example.com/*"}}], ["targets[0].constraint.operator"]),
+            (
+                [TARGETS[0], {"target": "url", "constraint": {"operator": None}}],
+                ["targets[1].constraint.operator", "targets[1].constraint.value"],
+            ),
+        )
+        for targets, missing in cases:
+            for state in ("present", "absent"):
+                for check_mode in (True, False):
+                    with self.subTest(targets=targets, state=state, check_mode=check_mode):
+                        client, api = client_with([{"id": "other", "targets": TARGETS}], deleted={"id": "other"})
+
+                        result = self.run_module(
+                            FakeModule(params(targets=targets, state=state), check_mode=check_mode), client
+                        )
+
+                        self.assertEqual(result["missing_fields"], missing)
+                        self.assertEqual(
+                            result["msg"],
+                            f"Page rule targets must set these fields that identify the page rule: {', '.join(missing)}",
+                        )
+                        api.list.assert_not_called()
+                        api.create.assert_not_called()
+                        api.update.assert_not_called()
+                        api.delete.assert_not_called()
+
+    def test_finds_rule_only_when_targets_are_equal(self):
+        other = {"target": "url", "constraint": {"operator": "matches", "value": "other.example.com/*"}}
+        for stored in (
+            [{"target": "url", "constraint": {"operator": "contains", "value": "example.com/*"}}],
+            [{"target": "url", "constraint": {"operator": "matches", "value": "www.example.com/*"}}],
+            [TARGETS[0], other],
+        ):
+            with self.subTest(stored=stored):
+                client, _ignored = client_with([{"id": "other", "targets": stored}])
+
+                found, rule_count = pagerules.find_pagerule(FakeModule(params()), client, TARGETS)
+
+                self.assertIsNone(found)
+                self.assertEqual(rule_count, 1)
+
+    def test_absent_does_not_delete_a_rule_with_other_targets(self):
+        stored = [{"target": "url", "constraint": {"operator": "matches", "value": "www.example.com/*"}}]
+        client, api = client_with([{"id": "other", "targets": stored}], deleted={"id": "other"})
+
+        result = self.run_module(FakeModule(params(state="absent")), client)
+
+        api.delete.assert_not_called()
+        self.assertFalse(result["changed"])
+        self.assertEqual(result["message"], "Page rule already absent")
 
     def test_rejects_ambiguous_target_match(self):
         client, _ignored = client_with([{"id": "one", "targets": TARGETS}, {"id": "two", "targets": TARGETS}])
@@ -198,7 +253,7 @@ class PageRulesTests(TestCase):
         current = {
             "id": "rule",
             "actions": [{"id": "always_use_https", "provider_default": True}],
-            "targets": [{"target": "url", "constraint": {"value": "example.com/*", "provider_default": True}}],
+            "targets": [{**TARGETS[0], "constraint": {**TARGETS[0]["constraint"], "provider_default": True}}],
         }
         client, api = client_with([current])
 
@@ -371,7 +426,7 @@ class PageRulesTests(TestCase):
                     api.create.assert_not_called()
 
     def test_unstored_target_fields_fail_before_delete(self):
-        targets = [{"target": "url", "constraint": {"value": "example.com/*"}, "foo": 1}]
+        targets = [{**TARGETS[0], "foo": 1}]
         client, api = client_with([{"id": "rule", "targets": TARGETS}])
 
         result = self.run_module(FakeModule(params(state="absent", targets=targets)), client)

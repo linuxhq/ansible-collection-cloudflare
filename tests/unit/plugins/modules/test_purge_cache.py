@@ -119,8 +119,22 @@ class PurgeCacheTests(TestCase):
                     client.assert_not_called()
                     self.assertEqual(result["empty_fields"], [f"cache.{key}"])
                     self.assertEqual(
-                        result["msg"], f"Cloudflare purges nothing for these empty cache purge lists: cache.{key}"
+                        result["msg"],
+                        f"Cloudflare purges nothing for these empty cache purge lists or null files: cache.{key}",
                     )
+
+    def test_rejects_null_files_before_any_request(self):
+        files = ["https://example.com/a.css", None]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                result, purge = self.run_ansible_module({"files": files}, check_mode=check_mode)
+
+                purge.assert_not_called()
+                self.assertEqual(result["empty_fields"], ["cache.files[1]"])
+                self.assertEqual(
+                    result["msg"],
+                    "Cloudflare purges nothing for these empty cache purge lists or null files: cache.files[1]",
+                )
 
     def test_rejects_unused_file_fields_before_any_request(self):
         files = [

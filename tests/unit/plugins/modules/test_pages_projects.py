@@ -230,6 +230,35 @@ class PagesProjectsTests(TestCase):
                 api.get.assert_not_called()
                 api.edit.assert_not_called()
 
+    def test_rejects_empty_settings_cloudflare_does_not_store_before_any_request(self):
+        cases = (
+            (
+                {"production": {"wrangler_config_hash": ""}},
+                ["deployment_configs.production.wrangler_config_hash"],
+            ),
+            (
+                {"preview": {"placement": {"mode": ""}}, "production": {"placement": {"mode": "smart"}}},
+                ["deployment_configs.preview.placement.mode"],
+            ),
+        )
+        for deployment_configs, empty in cases:
+            for check_mode in (True, False):
+                with self.subTest(deployment_configs=deployment_configs, check_mode=check_mode):
+                    client, api = client_with([PROJECT])
+
+                    result = self.run_module(
+                        FakeModule(params(deployment_configs=deployment_configs), check_mode=check_mode), client
+                    )
+
+                    self.assertEqual(result["empty_settings"], empty)
+                    self.assertEqual(
+                        result["msg"],
+                        "Cloudflare does not store an empty value for these Pages project settings: "
+                        f"{', '.join(empty)}; omit them instead",
+                    )
+                    api.get.assert_not_called()
+                    api.edit.assert_not_called()
+
     def test_rejects_unstored_setting_names_before_any_request(self):
         cases = (
             (

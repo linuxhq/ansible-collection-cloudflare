@@ -100,6 +100,10 @@ options:
         list fails before making changes, because Cloudflare does not store
         it; omit the key instead.
       - Compared exactly, so omitting a key removes it.
+      - Cloudflare omits V(false) for C(allow_all_headers),
+        C(allow_all_methods), C(allow_all_origins), and C(allow_credentials),
+        and V(0) for C(max_age), so those values match an application that
+        does not return the key.
   custom_deny_message:
     type: str
     description:
@@ -173,10 +177,15 @@ options:
         nested fields of a known inline policy selector. Cloudflare accepts
         any other field but does not store it, so the module fails before
         making changes.
-      - An empty C(approval_groups) list, an empty C(email_addresses) list in
-        one of its groups, and an empty C(purpose_justification_prompt) or
-        C(session_duration) fail before making changes, because Cloudflare
-        does not store them; omit them instead.
+      - An empty C(approval_groups) list, an empty C(email_addresses) list or
+        C(email_list_uuid) in one of its groups, and an empty
+        C(purpose_justification_prompt) or C(session_duration) fail before
+        making changes, because Cloudflare does not store them; omit them
+        instead.
+      - Cloudflare omits V(false) for C(approval_required),
+        C(isolation_required), and C(purpose_justification_required) of an
+        inline policy, so V(false) matches a policy that does not return the
+        field.
       - Cloudflare returns the policies in ascending C(precedence) order, so
         entries that set C(precedence) must be listed in that order; otherwise
         the module fails before any change.
@@ -225,6 +234,8 @@ options:
       - Maximum duration of an authenticated Access session.
       - When omitted, the current value is left unchanged; Cloudflare defaults
         to V(24h) on create.
+      - V("") fails before making changes, because Cloudflare then stores
+        V(24h); omit it instead.
   skip_interstitial:
     type: bool
     description:
@@ -478,6 +489,12 @@ POLICY_MFA_CONFIG_FIELDS = ("allowed_authenticators", "mfa_disabled", "session_d
 # Fields Cloudflare drops when they hold an empty value.
 EMPTY_CORS_HEADERS_FIELDS = ("allowed_headers", "allowed_methods", "allowed_origins")
 EMPTY_POLICY_FIELDS = ("purpose_justification_prompt", "session_duration")
+# Cloudflare omits these fields when they hold their default value.
+CORS_HEADERS_DEFAULTS = {
+    **dict.fromkeys(("allow_all_headers", "allow_all_methods", "allow_all_origins", "allow_credentials"), False),
+    "max_age": 0,
+}
+POLICY_FALSE_FIELDS = ("approval_required", "isolation_required", "purpose_justification_required")
 
 
 def validate_type_fields(module):
@@ -582,6 +599,9 @@ def validate_empty_values(module):
     if params.get("destinations") == []:
         empty.append("destinations")
 
+    if params.get("session_duration") == "":
+        empty.append("session_duration")
+
     for index, policy in enumerate(params.get("policies") or ()):
         path = f"policies[{index}]"
         approval_groups = policy.get("approval_groups")
@@ -610,11 +630,12 @@ def comparable_policy(policy, desired):
     The selectors of an inline policy, one that sets a selector or has no id,
     are kept whole, apart from keys Cloudflare assigns, so removed selector
     keys and lists count as differences. An omitted selector list matches an
-    empty one.
+    empty one, and an omitted POLICY_FALSE_FIELDS field matches false.
     """
     if not isinstance(policy, dict) or not isinstance(desired, dict):
         return policy
 
+    policy = {**dict.fromkeys(POLICY_FALSE_FIELDS, False), **policy}
     comparable = normalize_current_by_desired_fields(policy, desired)
     if "id" in desired and not any(field in desired for field in ACCESS_SELECTOR_FIELDS):
         return comparable
@@ -631,16 +652,24 @@ def comparable_policy(policy, desired):
     return comparable
 
 
-def comparable_app(app, allowed_idps, policies):
+def comparable_app(app, allowed_idps, policies, cors_headers):
     """Return app in the form compared with the requested settings.
 
     Cloudflare ignores the order of allowed_idps and stores identity providers
     in its own order, so stored identity providers that match the request take
     its order. Stored policies are paired with the requested ones by position.
+    Cloudflare omits CORS header fields that hold their default, so a requested
+    one the stored CORS headers omit matches its default.
     """
     app = serialize_resource(app)
     if not isinstance(app, dict):
         return app
+
+    stored = app.get("cors_headers")
+    if isinstance(cors_headers, dict) and (stored is None or isinstance(stored, dict)):
+        defaults = {key: value for key, value in CORS_HEADERS_DEFAULTS.items() if key in cors_headers}
+        if defaults:
+            app = {**app, "cors_headers": {**defaults, **(stored or {})}}
 
     stored = app.get("allowed_idps")
     if (
@@ -730,7 +759,9 @@ def run(module, client):
         preserved_fields=preserved_fields,
         exact_values=("cors_headers", "destinations", "policies"),
         context={"account_id": account_id},
-        comparable=lambda app: comparable_app(app, params.get("allowed_idps"), payload.get("policies")),
+        comparable=lambda app: comparable_app(
+            app, params.get("allowed_idps"), payload.get("policies"), params.get("cors_headers")
+        ),
     )
 
 
