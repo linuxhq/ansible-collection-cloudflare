@@ -617,6 +617,37 @@ class AccessAppsTests(TestCase):
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_nested_null_inline_policy_fields_count_as_omitted(self):
+        rdp = {"allowed_clipboard_local_to_remote_formats": ["text"]}
+        policy = {
+            "name": "inline",
+            "decision": "allow",
+            "include": [{"everyone": {}}],
+            "connection_rules": {"rdp": rdp},
+            "mfa_config": {"mfa_disabled": True},
+        }
+        requested = {
+            **policy,
+            "connection_rules": {"rdp": {**rdp, "allowed_clipboard_remote_to_local_formats": None}},
+            "mfa_config": {"mfa_disabled": True, "allowed_authenticators": None, "session_duration": None},
+        }
+        stored_policy = {"id": "a", "precedence": 1, **policy, "exclude": [], "require": []}
+        app = stored(policies=[stored_policy])
+        client, api = client_with(created=app)
+
+        result = self.run_module(FakeModule(params(policies=[requested])), client)
+
+        self.assertNotIn("msg", result)
+        self.assertTrue(result["changed"])
+        self.assertEqual(api.create.call_args.kwargs["policies"], [policy])
+
+        client, api = client_with([app])
+        result = self.run_module(FakeModule(params(policies=[requested])), client)
+
+        self.assertNotIn("msg", result)
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_non_mapping_inline_policy_selector_fails_before_any_request(self):
         for selector in (None, "everyone", ["everyone"]):
             for check_mode in (True, False):

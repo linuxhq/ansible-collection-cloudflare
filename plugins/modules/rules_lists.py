@@ -84,6 +84,10 @@ options:
         C(xn--) form.
       - A C(hostname.url_hostname) entry may use a C(*) wildcard only as a
         single leading C(*.) label.
+      - Each other label of a C(hostname.url_hostname) entry must be non-empty
+        and must not start or end with C(-), so C(a..example.com),
+        C(.example.com), C(-a.example.com), C(a-.example.com), and a bare
+        C(*.) are not supported. A single trailing C(.) is accepted.
       - C(hostname.exclude_exact_hostname=false) may be set only when
         C(hostname.url_hostname) is a wildcard such as C(*.example.com).
       - An C(asn) entry must be an integer from 1 to 4294967295.
@@ -560,11 +564,19 @@ def valid_ip(value):
 
 
 def valid_hostname(value):
-    """Return whether value has only supported characters, and `*` appears only as a single leading `*.` label."""
+    """Return whether value has only supported characters, `*` only as a single leading `*.` label, and valid labels."""
     if not set(value) <= HOSTNAME_CHARACTERS:
         return False
 
-    return "*" not in value.removeprefix("*.")
+    host = value.removeprefix("*.")
+    if "*" in host:
+        return False
+
+    # A single trailing dot is accepted; every other label must be non-empty
+    # and must not start or end with a hyphen.
+    return all(
+        label and not label.startswith("-") and not label.endswith("-") for label in host.removesuffix(".").split(".")
+    )
 
 
 def source_url_error(value):
@@ -674,7 +686,8 @@ def validate_elements(module, kind):
             module.fail_json(
                 msg=(
                     f"elements[{index}].hostname.url_hostname may contain only ASCII letters, digits, "
-                    "'.', '-', '_', and a '*' wildcard only as a single leading '*.' label"
+                    "'.', '-', '_', and a '*' wildcard only as a single leading '*.' label, "
+                    "and each other label must be non-empty and must not start or end with '-'"
                 ),
                 url_hostname=url_hostname,
             )

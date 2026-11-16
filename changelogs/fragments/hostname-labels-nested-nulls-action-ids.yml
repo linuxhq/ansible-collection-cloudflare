@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - rules_lists - fail before any change when a hostname C(url_hostname) has an empty label or a label that starts or ends
+    with C(-), or is only a wildcard label with no host, instead of creating the list and then failing when Cloudflare
+    rejects the item.
+  - access_apps - treat a null field nested in an inline policy's C(connection_rules), C(connection_rules.rdp), or
+    C(mfa_config) as omitted, as documented, so the application converges instead of reporting a change on every run.
+  - pagerules - fail before any request when an action C(id) is not a non-empty string, instead of crashing with a
+    TypeError when an existing page rule is compared.

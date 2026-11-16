@@ -432,6 +432,15 @@ class RulesListsTests(TestCase):
                 "example.com:443",
                 "exa mple.com",
                 "bücher.example",
+                "-a.example.com",
+                "a-.example.com",
+                "a.-b.example.com",
+                "a..example.com",
+                ".example.com",
+                "*.",
+                "*.-a.example.com",
+                "example.com..",
+                ".",
             )
         ] + [
             ("asn", {"asn": value}, "elements[1].asn must be an integer from 1 to 4294967295", value)
@@ -690,6 +699,8 @@ class RulesListsTests(TestCase):
             ("hostname", {"hostname": {"url_hostname": "example.com."}}),
             ("hostname", {"hostname": {"url_hostname": "Example.COM"}}),
             ("hostname", {"hostname": {"url_hostname": "xn--bcher-kva.example"}}),
+            ("hostname", {"hostname": {"url_hostname": "a-b.example.com"}}),
+            ("hostname", {"hostname": {"url_hostname": "*.example.com."}}),
             ("asn", {"asn": 1}),
             ("asn", {"asn": 13335}),
             ("asn", {"asn": 4294967295}),
