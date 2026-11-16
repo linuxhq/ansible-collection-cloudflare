@@ -240,6 +240,22 @@ class PagesProjectsTests(TestCase):
                 {"preview": {"placement": {"mode": ""}}, "production": {"placement": {"mode": "smart"}}},
                 ["deployment_configs.preview.placement.mode"],
             ),
+            (
+                {"production": {"compatibility_date": ""}},
+                ["deployment_configs.production.compatibility_date"],
+            ),
+            (
+                {"preview": {"usage_model": "", "compatibility_date": "2024-01-01"}},
+                ["deployment_configs.preview.usage_model"],
+            ),
+            (
+                {"production": {"usage_model": "", "compatibility_date": "", "wrangler_config_hash": ""}},
+                [
+                    "deployment_configs.production.compatibility_date",
+                    "deployment_configs.production.usage_model",
+                    "deployment_configs.production.wrangler_config_hash",
+                ],
+            ),
         )
         for deployment_configs, empty in cases:
             for check_mode in (True, False):

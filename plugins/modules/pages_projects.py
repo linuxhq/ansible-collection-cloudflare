@@ -69,9 +69,9 @@ options:
       - The same applies to fields of C(limits), C(placement), and each
         C(env_vars) or binding entry, such as C(type) and C(value) of an
         environment variable or C(namespace_id) of a C(kv_namespaces) entry.
-      - An empty C(wrangler_config_hash) or C(placement.mode) fails before
-        making changes, because Cloudflare does not store it; omit it
-        instead.
+      - An empty C(compatibility_date), C(usage_model),
+        C(wrangler_config_hash), or C(placement.mode) fails before making
+        changes, because Cloudflare does not store it; omit it instead.
   rotate_secrets:
     type: bool
     default: false
@@ -331,8 +331,9 @@ def validate_null_settings(module):
 def validate_empty_settings(module):
     """Fail when a deployment setting Cloudflare does not store when empty is requested empty.
 
-    Cloudflare drops an empty wrangler_config_hash and stores an empty
-    placement mode as an empty placement, so neither would match the request.
+    Cloudflare keeps the previous compatibility_date and usage_model, drops an
+    empty wrangler_config_hash, and stores an empty placement mode as an empty
+    placement, so none would match the request.
     """
     empty = []
     for environment, config in (module.params.get("deployment_configs") or {}).items():
@@ -340,8 +341,9 @@ def validate_empty_settings(module):
             continue
 
         path = f"deployment_configs.{environment}"
-        if config.get("wrangler_config_hash") == "":
-            empty.append(f"{path}.wrangler_config_hash")
+        for setting in ("compatibility_date", "usage_model", "wrangler_config_hash"):
+            if config.get(setting) == "":
+                empty.append(f"{path}.{setting}")
 
         placement = config.get("placement")
         if isinstance(placement, dict) and placement.get("mode") == "":

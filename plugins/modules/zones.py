@@ -77,6 +77,9 @@ options:
           - An empty mapping at any level of these object values, such as
             V({}) for C(nel), fails before making changes, because Cloudflare
             accepts it but leaves the stored value unchanged.
+          - A null value, or a null at any level of the object values above,
+            such as a null C(enabled) of C(nel), fails before making changes,
+            because Cloudflare either rejects it or stores a different value.
           - For settings Cloudflare exposes as an C(enabled) flag, such as
             C(ssl_recommender), the value sets that flag.
         required: true
@@ -233,20 +236,45 @@ def empty_mappings(value, path):
     return [found for key, item in value.items() for found in empty_mappings(item, f"{path}.{key}")]
 
 
+def null_values(value, path):
+    """Return the path of value and of each value nested in it that is null."""
+    if value is None:
+        return [path]
+
+    if isinstance(value, dict):
+        return [found for key, item in value.items() for found in null_values(item, f"{path}.{key}")]
+
+    if isinstance(value, list):
+        return [found for index, item in enumerate(value) for found in null_values(item, f"{path}[{index}]")]
+
+    return []
+
+
 def validate_settings(module):
     setting_ids = set()
     unknown = []
     empty = []
+    null = []
     for index, setting in enumerate(module.params.get("settings") or []):
         if not setting["id"].strip() or setting["id"] != setting["id"].strip() or setting["id"] in setting_ids:
             module.fail_json(msg="Each zone setting requires a unique valid id")
 
         setting_ids.add(setting["id"])
-        if setting["id"] in SETTING_VALUE_FIELDS:
-            path = f"settings[{index}].value"
+        path = f"settings[{index}].value"
+        if setting["value"] is None:
+            null.append(path)
+        elif setting["id"] in SETTING_VALUE_FIELDS:
+            null.extend(null_values(setting["value"], path))
             fields = SETTING_VALUE_FIELDS[setting["id"]]
             unknown.extend(unsupported_fields(setting["value"], fields, path))
             empty.extend(empty_mappings(setting["value"], path))
+
+    # Cloudflare rejects a null value or stores a different one, such as false.
+    if null:
+        module.fail_json(
+            msg=f"Cloudflare does not apply these null zone setting values: {', '.join(null)}",
+            null_fields=null,
+        )
 
     if unknown:
         module.fail_json(
