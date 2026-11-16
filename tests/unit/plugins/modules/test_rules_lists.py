@@ -441,6 +441,10 @@ class RulesListsTests(TestCase):
                 "*.-a.example.com",
                 "example.com..",
                 ".",
+                f"{'a' * 64}.example.com",
+                f"*.{'a' * 64}.example.com",
+                ".".join(["a" * 63] * 4),
+                "*." + ".".join(["a" * 63] * 3 + ["b" * 60]),
             )
         ] + [
             ("asn", {"asn": value}, "elements[1].asn must be an integer from 1 to 4294967295", value)
@@ -548,6 +552,44 @@ class RulesListsTests(TestCase):
                 f"elements[1].redirect.source_url {problem}",
                 source_url=value,
             )
+
+    def test_target_urls_without_scheme_or_host_fail_before_any_write(self):
+        for value in (
+            "www.example.org/d",
+            "example.org",
+            "/relative",
+            "//example.org/d",
+            "ftp://example.org/d",
+            "https://",
+            "https:///d",
+            "https://[::1/d",
+        ):
+            self.assert_elements_fail_before_any_write(
+                "redirect",
+                [
+                    {"redirect": {"source_url": "example.com/b", "target_url": "https://example.net"}},
+                    {"redirect": {"source_url": "example.com/a", "target_url": value}},
+                ],
+                "elements[1].redirect.target_url must be an absolute http or https URL with a host",
+                target_url=value,
+            )
+
+    def test_absolute_target_urls_are_accepted(self):
+        for value in (
+            "https://example.net",
+            "http://example.net/d?x=1",
+            "HTTPS://Example.net/d",
+            "https://[2001:db8::1]/",
+        ):
+            with self.subTest(value=value):
+                client, _ignored = make_client()
+                element = {"redirect": {"source_url": "example.com/a", "target_url": value}}
+
+                result = self.run_module(
+                    FakeModule(params(kind="redirect", elements=[element]), check_mode=True), client
+                )
+
+                self.assertTrue(result["changed"])
 
     def test_source_urls_cloudflare_stores_as_written_are_accepted(self):
         for value in (
@@ -701,6 +743,10 @@ class RulesListsTests(TestCase):
             ("hostname", {"hostname": {"url_hostname": "xn--bcher-kva.example"}}),
             ("hostname", {"hostname": {"url_hostname": "a-b.example.com"}}),
             ("hostname", {"hostname": {"url_hostname": "*.example.com."}}),
+            ("hostname", {"hostname": {"url_hostname": f"{'a' * 63}.example.com"}}),
+            ("hostname", {"hostname": {"url_hostname": ".".join(["a" * 63] * 3 + ["b" * 61])}}),
+            ("hostname", {"hostname": {"url_hostname": ".".join(["a" * 63] * 3 + ["b" * 61]) + "."}}),
+            ("hostname", {"hostname": {"url_hostname": "*." + ".".join(["a" * 63] * 3 + ["b" * 59])}}),
             ("asn", {"asn": 1}),
             ("asn", {"asn": 13335}),
             ("asn", {"asn": 4294967295}),

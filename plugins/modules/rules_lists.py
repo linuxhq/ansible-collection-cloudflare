@@ -84,10 +84,12 @@ options:
         C(xn--) form.
       - A C(hostname.url_hostname) entry may use a C(*) wildcard only as a
         single leading C(*.) label.
-      - Each other label of a C(hostname.url_hostname) entry must be non-empty
-        and must not start or end with C(-), so C(a..example.com),
+      - Each other label of a C(hostname.url_hostname) entry must have 1 to 63
+        characters and must not start or end with C(-), so C(a..example.com),
         C(.example.com), C(-a.example.com), C(a-.example.com), and a bare
         C(*.) are not supported. A single trailing C(.) is accepted.
+      - A C(hostname.url_hostname) entry must have at most 253 characters, not
+        counting a single trailing C(.).
       - C(hostname.exclude_exact_hostname=false) may be set only when
         C(hostname.url_hostname) is a wildcard such as C(*.example.com).
       - An C(asn) entry must be an integer from 1 to 4294967295.
@@ -107,6 +109,9 @@ options:
       - A C(redirect.source_url) must not include a query string such as
         C(?x=1), a fragment such as C(#top), userinfo such as C(user@), or a port
         such as C(:8080), and may use only the C(http) or C(https) scheme.
+      - A C(redirect.target_url) must be an absolute URL with the C(http) or
+        C(https) scheme and a host, such as C(https://example.com/path);
+        C(example.com/path) and C(/path) are not supported.
       - A C(redirect.status_code), when set, must be the integer 301, 302,
         307, or 308.
   operation_timeout:
@@ -220,10 +225,12 @@ import string
 import time
 from difflib import SequenceMatcher
 from ipaddress import ip_address, ip_network
+from urllib.parse import urlsplit
 
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    MAX_DNS_NAME_LENGTH,
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
@@ -235,6 +242,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     resource_id,
     serialize_resource,
     unsupported_fields,
+    valid_dns_labels,
     values_differ,
 )
 
@@ -263,6 +271,7 @@ IDENTITY_FIELDS = {
 }
 
 SOURCE_URL_SCHEMES = ("http", "https")
+TARGET_URL_SCHEMES = ("http", "https")
 
 # Characters the SDK documents for a hostname url_hostname (ASCII letters,
 # digits, '*', and '-'), plus '.', '_', and uppercase letters, which
@@ -572,11 +581,17 @@ def valid_hostname(value):
     if "*" in host:
         return False
 
-    # A single trailing dot is accepted; every other label must be non-empty
-    # and must not start or end with a hyphen.
-    return all(
-        label and not label.startswith("-") and not label.endswith("-") for label in host.removesuffix(".").split(".")
-    )
+    # A single trailing dot is accepted and does not count toward the length.
+    return valid_dns_labels(host.removesuffix(".")) and len(value.removesuffix(".")) <= MAX_DNS_NAME_LENGTH
+
+
+def target_url_valid(value):
+    """Return whether value is an absolute http or https URL with a host."""
+    try:
+        parts = urlsplit(value)
+        return parts.scheme in TARGET_URL_SCHEMES and bool(parts.hostname)
+    except ValueError:
+        return False
 
 
 def source_url_error(value):
@@ -680,6 +695,13 @@ def validate_elements(module, kind):
         if source_url_problem:
             module.fail_json(msg=f"elements[{index}].redirect.source_url {source_url_problem}", source_url=source_url)
 
+        target_url = redirect.get("target_url") if isinstance(redirect, dict) else None
+        if isinstance(target_url, str) and not target_url_valid(target_url):
+            module.fail_json(
+                msg=f"elements[{index}].redirect.target_url must be an absolute http or https URL with a host",
+                target_url=target_url,
+            )
+
         hostname = element.get("hostname") if kind == "hostname" else None
         url_hostname = hostname.get("url_hostname") if isinstance(hostname, dict) else None
         if isinstance(url_hostname, str) and not valid_hostname(url_hostname):
@@ -687,7 +709,8 @@ def validate_elements(module, kind):
                 msg=(
                     f"elements[{index}].hostname.url_hostname may contain only ASCII letters, digits, "
                     "'.', '-', '_', and a '*' wildcard only as a single leading '*.' label, "
-                    "and each other label must be non-empty and must not start or end with '-'"
+                    "each other label must have 1 to 63 characters and must not start or end with '-', "
+                    "and the name must have at most 253 characters"
                 ),
                 url_hostname=url_hostname,
             )

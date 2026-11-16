@@ -31,6 +31,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     resource_list,
     serialize_resource,
     unsupported_fields,
+    valid_dns_labels,
     validate_access_selectors,
     validate_tunnel_secret,
     values_differ,
@@ -600,6 +601,23 @@ class ValueTests(TestCase):
         }
 
         validate_access_selectors(FakeModule(rules))
+
+    def test_valid_dns_labels(self):
+        for name, expected in (
+            ("example.com", True),
+            ("a-b.example.com", True),
+            (f"{'a' * 63}.example.com", True),
+            (".".join(["a" * 63] * 3 + ["b" * 61]), True),
+            (f"{'a' * 64}.example.com", False),
+            (".".join(["a" * 63] * 3 + ["b" * 62]), False),
+            ("", False),
+            ("a..example.com", False),
+            ("example.com.", False),
+            ("-a.example.com", False),
+            ("a-.example.com", False),
+        ):
+            with self.subTest(name=name):
+                self.assertIs(valid_dns_labels(name), expected)
 
 
 class InfoTests(TestCase):
