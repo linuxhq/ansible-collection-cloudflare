@@ -159,6 +159,48 @@ class ZonesTests(TestCase):
                 client.zones.settings.get.assert_not_called()
                 client.zones.settings.edit.assert_not_called()
 
+    def test_null_setting_values_fail_before_any_request(self):
+        settings = [
+            {"id": "nel", "value": {"enabled": None}},
+            {"id": "min_tls_version", "value": None},
+            {"id": "security_header", "value": {"strict_transport_security": {"enabled": True, "max_age": None}}},
+            {"id": "aegis", "value": {"enabled": True, "pool_id": None}},
+            {"id": "automatic_platform_optimization", "value": {"enabled": True, "hostnames": ["a", None]}},
+            {"id": "other_object", "value": {"foo": None}},
+        ]
+        null = [
+            "settings[0].value.enabled",
+            "settings[1].value",
+            "settings[2].value.strict_transport_security.max_age",
+            "settings[3].value.pool_id",
+            "settings[4].value.hostnames[1]",
+        ]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client = client_with([ZONE])
+
+                result = self.run_module(FakeModule(params(settings=settings), check_mode=check_mode), client)
+
+                self.assertEqual(result["null_fields"], null)
+                self.assertEqual(
+                    result["msg"], f"Cloudflare does not apply these null zone setting values: {', '.join(null)}"
+                )
+                client.zones.list.assert_not_called()
+                client.zones.settings.get.assert_not_called()
+                client.zones.settings.edit.assert_not_called()
+
+    def test_null_security_header_policy_fails_before_any_request(self):
+        settings = [{"id": "security_header", "value": {"strict_transport_security": None}}]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client = client_with([ZONE])
+
+                result = self.run_module(FakeModule(params(settings=settings), check_mode=check_mode), client)
+
+                self.assertEqual(result["null_fields"], ["settings[0].value.strict_transport_security"])
+                client.zones.list.assert_not_called()
+                client.zones.settings.edit.assert_not_called()
+
     def test_stored_setting_value_fields_are_sent(self):
         value = {
             "strict_transport_security": dict.fromkeys(
