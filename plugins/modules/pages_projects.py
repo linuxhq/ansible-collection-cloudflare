@@ -100,6 +100,12 @@ options:
         description:
           - Fully qualified custom domain name.
           - Compared case-insensitively; Cloudflare stores domain names in lowercase.
+          - Must contain only ASCII letters, digits, C(.), and C(-), with no
+            trailing C(.); write internationalized names in their C(xn--) form.
+          - Each label must have 1 to 63 characters and must not start or end
+            with C(-), and the name must have at most 253 characters.
+          - These checks run before any request, because Cloudflare rejects
+            such names only after the project is created or updated.
         required: true
         type: str
   state:
@@ -159,6 +165,7 @@ message:
 
 """
 
+import string
 from copy import deepcopy
 
 from ansible.module_utils.basic import AnsibleModule
@@ -174,10 +181,14 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     resource_field,
     resource_list,
     serialize_resource,
+    valid_dns_labels,
     values_differ,
 )
 
 FIELDS = ("build_config", "deployment_configs", "name", "production_branch", "source")
+
+# Characters Cloudflare accepts in a Pages custom domain name.
+DOMAIN_CHARACTERS = frozenset(string.ascii_letters + string.digits + ".-")
 
 # Cloudflare accepts other keys in build_config and in a preview or production
 # deployment config but does not store them. These match the cloudflare SDK
@@ -486,6 +497,16 @@ def desired_domain_names(module):
         domain_name = domain["name"]
         if not domain_name.strip() or domain_name != domain_name.strip():
             module.fail_json(msg="Each Pages project domain requires a valid name")
+
+        if not set(domain_name) <= DOMAIN_CHARACTERS or not valid_dns_labels(domain_name):
+            module.fail_json(
+                msg=(
+                    "Each Pages project domain name may contain only ASCII letters, digits, '.', and '-', "
+                    "each label must have 1 to 63 characters and must not start or end with '-', "
+                    "and the name must have at most 253 characters with no trailing '.'"
+                ),
+                domain=domain_name,
+            )
 
         domain_name = domain_name.lower()
 

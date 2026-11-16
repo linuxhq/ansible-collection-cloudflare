@@ -128,6 +128,45 @@ class PagesProjectsTests(TestCase):
                 api.get.assert_not_called()
                 self.assertEqual(result["msg"], "Each Pages project domain requires a valid name")
 
+    def test_rejects_unsupported_domain_names_before_api_calls(self):
+        for name in (
+            "p38fix.linuxhq.dev.",
+            "bücher.example.com",
+            "a_b.example.com",
+            "*.example.com",
+            "a..example.com",
+            ".example.com",
+            "-a.example.com",
+            "a-.example.com",
+            f"{'a' * 64}.example.com",
+            ".".join(["a" * 63] * 4) + ".com",
+        ):
+            for state, check_mode in (("present", False), ("present", True), ("absent", False)):
+                with self.subTest(name=name, state=state, check_mode=check_mode):
+                    client, api = client_with([PROJECT], created=PROJECT, edited=PROJECT)
+
+                    result = self.run_module(
+                        FakeModule(params(state=state, domains=[{"name": name}]), check_mode=check_mode), client
+                    )
+
+                    self.assertIn("Each Pages project domain name may contain only", result["msg"])
+                    self.assertEqual(result["domain"], name)
+                    api.get.assert_not_called()
+                    api.create.assert_not_called()
+                    api.edit.assert_not_called()
+                    api.domains.create.assert_not_called()
+
+    def test_accepts_domain_names_at_the_length_limits(self):
+        for name in (f"{'a' * 63}.example.com", ".".join(["a" * 63] * 3 + ["b" * 61]), "xn--bcher-kva.Example.com"):
+            with self.subTest(name=name):
+                current = {**PROJECT, "domains": [name.lower()]}
+                client, api = client_with([current], domains=[{"name": name.lower()}])
+
+                result = self.run_module(FakeModule(params(domains=[{"name": name}])), client)
+
+                self.assertFalse(result["changed"])
+                api.domains.create.assert_not_called()
+
     def test_null_bindings_are_deleted(self):
         keep = {"namespace_id": "keep-id"}
         current = {

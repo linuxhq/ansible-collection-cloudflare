@@ -27,6 +27,10 @@ else:
 # Differing fields named in a "did not apply" failure message.
 MESSAGE_FIELDS = 10
 
+# Longest DNS name and label, in characters, without a trailing dot.
+MAX_DNS_NAME_LENGTH = 253
+MAX_DNS_LABEL_LENGTH = 63
+
 
 class CloudflareResponseError(Exception):
     pass
@@ -264,6 +268,18 @@ def cidr_from_address(value):
         return f"{value}/{ip_address(value).max_prefixlen}"
     except ValueError:
         return value
+
+
+def valid_dns_labels(name):
+    """Return whether name is at most 253 characters of dot-separated labels.
+
+    Each label must have 1 to 63 characters and must not start or end with
+    a hyphen. Callers check the allowed characters and strip a trailing dot.
+    """
+    return len(name) <= MAX_DNS_NAME_LENGTH and all(
+        0 < len(label) <= MAX_DNS_LABEL_LENGTH and not label.startswith("-") and not label.endswith("-")
+        for label in name.split(".")
+    )
 
 
 def payload_from_params(params, fields):
