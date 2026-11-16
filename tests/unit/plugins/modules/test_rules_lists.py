@@ -542,6 +542,16 @@ class RulesListsTests(TestCase):
             ("https://[2001:db8::1]:8080/a", "must not include a port"),
             ("ftp://example.com/a", "must use the http or https scheme, or none"),
             ("a+b://example.com/a", "must use the http or https scheme, or none"),
+            # Cloudflare rejects these when it replaces the list items.
+            ("https://example.com:abc/", "must not include a port"),
+            ("http:example.com", "must use the http or https scheme followed by '://', or none"),
+            ("example.com:/", "must use the http or https scheme followed by '://', or none"),
+            ("example.com:abc/", "must use the http or https scheme followed by '://', or none"),
+            ("2001:db8::1/", "must enclose an IPv6 address in brackets"),
+            ("https://2001:db8::1/a", "must enclose an IPv6 address in brackets"),
+            ("example.com/%zz", "must use '%' only in a percent-escape such as %20"),
+            ("example.com/%2", "must use '%' only in a percent-escape such as %20"),
+            ("example.com/a%", "must use '%' only in a percent-escape such as %20"),
         ):
             self.assert_elements_fail_before_any_write(
                 "redirect",
@@ -570,6 +580,16 @@ class RulesListsTests(TestCase):
             "https://example.com:80x/",
             "https://[2001:db8::1]:abc/",
             "https://user@example.com:abc/",
+            # Cloudflare rejects these when it replaces the list items.
+            " https://example.com/",
+            "\thttps://example.com/",
+            "\u00a0https://example.com/",
+            "https://example.com/a\tb",
+            "https://example.com/a\nb",
+            "https://example.com/a\rb",
+            "https://example.com/a\x7fb",
+            "https://example.com/%zz",
+            "https://example.com/%2",
         ):
             self.assert_elements_fail_before_any_write(
                 "redirect",
@@ -579,7 +599,8 @@ class RulesListsTests(TestCase):
                 ],
                 (
                     "elements[1].redirect.target_url must be an absolute http or https URL with a host, "
-                    "no whitespace in its authority, and only digits in its port"
+                    "no whitespace in its authority, and only digits in its port, must not start with whitespace "
+                    "or contain an ASCII control character, and may use '%' only in a percent-escape such as %20"
                 ),
                 target_url=value,
             )
@@ -599,6 +620,8 @@ class RulesListsTests(TestCase):
             "https://-a.example.com/",
             "https://ex\u00e4mple.com/",
             "https://example.com/a b",
+            "https://example.com/ ",
+            "https://example.com/%2F",
         ):
             with self.subTest(value=value):
                 client, _ignored = make_client()
@@ -620,7 +643,10 @@ class RulesListsTests(TestCase):
             "example.com/a@b",
             "example.com/a%2Fb",
             "example.com/https://example.net",
-            "https://2001:db8::1/a",
+            "example.com/%2F",
+            "https://[2001:db8::1]/a",
+            # Cloudflare stores this as https://example.com/.
+            "https://example.com:/",
         ):
             with self.subTest(source_url=value):
                 self.assertIsNone(rules_lists.source_url_error(value))

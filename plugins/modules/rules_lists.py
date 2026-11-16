@@ -108,12 +108,20 @@ options:
         duplicates.
       - A C(redirect.source_url) must not include a query string such as
         C(?x=1), a fragment such as C(#top), userinfo such as C(user@), or a port
-        such as C(:8080), and may use only the C(http) or C(https) scheme.
+        such as C(:8080), and may use only the C(http) or C(https) scheme,
+        followed by C(://), so C(http:example.com) and C(example.com:/) are
+        not supported. An IPv6 address host must be enclosed in brackets, such
+        as C([2001:db8::1]/).
+      - A C(redirect.source_url) or C(redirect.target_url) may use C(%) only
+        in a percent-escape of two hexadecimal digits, such as C(%20), so
+        C(example.com/%zz) is not supported.
       - A C(redirect.target_url) must be an absolute URL with the C(http) or
         C(https) scheme and a host, such as C(https://example.com/path);
         C(example.com/path) and C(/path) are not supported. Its authority
         must not contain whitespace, and its port, when set, must contain
-        only digits, so C(https://example.com:abc/) is not supported.
+        only digits, so C(https://example.com:abc/) is not supported. It must
+        not start with whitespace or contain an ASCII control character, such
+        as a tab or newline, anywhere.
       - A C(redirect.status_code), when set, must be the integer 301, 302,
         307, or 308.
   operation_timeout:
@@ -223,6 +231,7 @@ message:
 """
 
 import json
+import re
 import string
 import time
 from difflib import SequenceMatcher
@@ -274,6 +283,9 @@ IDENTITY_FIELDS = {
 
 SOURCE_URL_SCHEMES = ("http", "https")
 TARGET_URL_SCHEMES = ("http", "https")
+# A "%" not followed by two hexadecimal digits, which Cloudflare rejects in a
+# redirect URL.
+INVALID_PERCENT_ESCAPE = re.compile(r"%(?![0-9A-Fa-f]{2})")
 
 # Characters the SDK documents for a hostname url_hostname (ASCII letters,
 # digits, '*', and '-'), plus '.', '_', and uppercase letters, which
@@ -590,8 +602,17 @@ def valid_hostname(value):
 def target_url_valid(value):
     """Return whether value is an absolute http or https URL with a host.
 
-    The authority must not contain whitespace, and a port must be digits.
+    The value must not start with whitespace or contain an ASCII control
+    character or a "%" outside a percent-escape. The authority must not
+    contain whitespace, and a port must be digits.
     """
+    if (
+        value[:1].isspace()
+        or any(ord(character) < 0x20 or ord(character) == 0x7F for character in value)
+        or INVALID_PERCENT_ESCAPE.search(value)
+    ):
+        return False
+
     try:
         parts = urlsplit(value)
     except ValueError:
@@ -622,6 +643,9 @@ def source_url_error(value):
     if "#" in value:
         return "must not include a fragment"
 
+    if INVALID_PERCENT_ESCAPE.search(value):
+        return "must use '%' only in a percent-escape such as %20"
+
     scheme, separator, rest = value.partition("://")
     if not separator or "/" in scheme:
         scheme, rest = None, value
@@ -634,9 +658,15 @@ def source_url_error(value):
         return "must not include userinfo"
 
     host_port = authority.rpartition("]")[2] if authority.startswith("[") else authority
+    if host_port.count(":") > 1:
+        return "must enclose an IPv6 address in brackets"
+
     port = host_port.rpartition(":")[2]
-    if host_port.count(":") == 1 and port.isascii() and port.isdigit():
+    if host_port.count(":") == 1 and ((port.isascii() and port.isdigit()) or (scheme is not None and port)):
         return "must not include a port"
+
+    if scheme is None and ":" in host_port:
+        return "must use the http or https scheme followed by '://', or none"
 
     return None
 
@@ -720,7 +750,8 @@ def validate_elements(module, kind):
             module.fail_json(
                 msg=(
                     f"elements[{index}].redirect.target_url must be an absolute http or https URL with a host, "
-                    "no whitespace in its authority, and only digits in its port"
+                    "no whitespace in its authority, and only digits in its port, must not start with whitespace "
+                    "or contain an ASCII control character, and may use '%' only in a percent-escape such as %20"
                 ),
                 target_url=target_url,
             )

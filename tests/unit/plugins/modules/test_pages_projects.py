@@ -199,6 +199,51 @@ class PagesProjectsTests(TestCase):
                     api.edit.assert_not_called()
                     api.domains.create.assert_not_called()
 
+    def test_rejects_invalid_punycode_labels_before_api_calls(self):
+        # Cloudflare rejects these when it adds the domain, after the project is created or updated.
+        for name in (
+            "xn--zz.example.com",
+            "xn--a.example.com",
+            "xn--abc.example.com",
+            "xn--a-ecp.example.com",
+            "xn--0.example.com",
+            "a.XN--ZZ.example.com",
+            "site.xn--zz",
+        ):
+            for state, check_mode in (("present", False), ("present", True), ("absent", False)):
+                with self.subTest(name=name, state=state, check_mode=check_mode):
+                    client, api = client_with([PROJECT], created=PROJECT, edited=PROJECT)
+
+                    result = self.run_module(
+                        FakeModule(params(state=state, domains=[{"name": name}]), check_mode=check_mode), client
+                    )
+
+                    self.assertIn("starts with 'xn--' must be the valid punycode form", result["msg"])
+                    self.assertEqual(result["domain"], name)
+                    api.get.assert_not_called()
+                    api.create.assert_not_called()
+                    api.edit.assert_not_called()
+                    api.domains.create.assert_not_called()
+
+    def test_accepts_valid_punycode_labels(self):
+        # Cloudflare adds each of these domains.
+        for name in (
+            "xn--bcher-kva.example.com",
+            "XN--BCHER-KVA.example.com",
+            "xn--strae-oqa.example.com",
+            "xn--zca.example.com",
+            "xn--ls8h.example.com",
+            "site.xn--p1ai",
+        ):
+            with self.subTest(name=name):
+                current = {**PROJECT, "domains": [name.lower()]}
+                client, api = client_with([current], domains=[{"name": name.lower()}])
+
+                result = self.run_module(FakeModule(params(domains=[{"name": name}])), client)
+
+                self.assertFalse(result["changed"])
+                api.domains.create.assert_not_called()
+
     def test_accepts_domain_names_with_numeric_inner_labels(self):
         for name in (
             "123.example.com",

@@ -112,6 +112,11 @@ options:
           - Its last label must have at least two characters and must not be a
             special-use top-level domain, C(example), C(invalid), C(local),
             C(localhost), or C(test).
+          - A label that starts with C(xn--) must be the punycode form of a
+            non-ASCII label, such as C(xn--bcher-kva), that encodes back to
+            the same text, is unchanged by NFKC normalization, and has no
+            control, format, unassigned, or separator characters, so
+            C(xn--zz) and C(xn--a) are not supported.
           - These checks run before any request, because Cloudflare rejects
             such names only after the project is created or updated.
           - Cloudflare also rejects other unregistered top-level domains, which
@@ -181,6 +186,7 @@ message:
 """
 
 import string
+import unicodedata
 from copy import deepcopy
 
 from ansible.module_utils.basic import AnsibleModule
@@ -517,6 +523,28 @@ def current_domain_names(module, project, domains):
     return project_domain_names(module, project) | {name.lower() for name in domain_names}
 
 
+def valid_ace_label(label):
+    """Return whether label, a lowercase label that starts with xn--, encodes an internationalized label.
+
+    The text after xn-- must be punycode that encodes back to the same text,
+    and the label it encodes must be non-ASCII, unchanged by NFKC
+    normalization, and free of control, format, unassigned, and separator
+    characters. Cloudflare rejects other such labels only after the project is
+    created or updated.
+    """
+    try:
+        decoded = label[4:].encode("ascii").decode("punycode")
+    except UnicodeError:
+        return False
+
+    return (
+        not decoded.isascii()
+        and decoded.encode("punycode") == label[4:].encode("ascii")
+        and unicodedata.normalize("NFKC", decoded) == decoded
+        and not any(unicodedata.category(character)[0] in "CZ" for character in decoded)
+    )
+
+
 def desired_domain_names(module):
     names = []
     for domain in module.params.get("domains") or []:
@@ -549,6 +577,15 @@ def desired_domain_names(module):
                     "label such as an IPv4 address, a one-character label, or a special-use top-level domain "
                     "(example, invalid, local, localhost, or test), and must not be or end in 'pages.dev' or "
                     "'workers.dev'"
+                ),
+                domain=domain["name"],
+            )
+
+        if any(label.startswith("xn--") and not valid_ace_label(label) for label in labels):
+            module.fail_json(
+                msg=(
+                    "Each label of a Pages project domain name that starts with 'xn--' must be the valid punycode "
+                    "form of an internationalized label, such as 'xn--bcher-kva'"
                 ),
                 domain=domain["name"],
             )

@@ -897,6 +897,40 @@ class AccessAppsTests(TestCase):
 
         self.assertIn("did not apply", result["msg"])
 
+    def test_removed_inline_policy_approval_group_and_connection_rule_keys_are_a_change(self):
+        group = {"email_addresses": ["a@example.com", "b@example.com"]}
+        rdp = {"allowed_clipboard_local_to_remote_formats": ["text"]}
+        inline = {
+            "name": "inline",
+            "decision": "allow",
+            "include": [{"everyone": {}}],
+            "approval_groups": [group],
+            "connection_rules": {"rdp": rdp},
+        }
+        stored_policy = {"id": "policy-id", "precedence": 1, **inline, "exclude": [], "require": []}
+        cases = (
+            ("approval_groups", [{**group, "approvals_needed": 2}]),
+            ("connection_rules", {"rdp": {**rdp, "allowed_clipboard_remote_to_local_formats": ["text"]}}),
+            ("connection_rules", {"rdp": rdp, "extra": {}}),
+        )
+        for field, value in cases:
+            with self.subTest(field=field, value=value):
+                current = stored(policies=[{**stored_policy, field: value}])
+                client, api = client_with([current], updated=stored(policies=[stored_policy]))
+
+                result = self.run_module(FakeModule(params(policies=[inline])), client)
+
+                self.assertNotIn("msg", result)
+                self.assertEqual(api.update.call_args.kwargs["policies"], [inline])
+                self.assertTrue(result["changed"])
+
+        client, api = client_with([stored(policies=[stored_policy])])
+        result = self.run_module(FakeModule(params(policies=[inline])), client)
+
+        self.assertNotIn("msg", result)
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_inline_policy_matches_assigned_github_organization_id(self):
         github = {"identity_provider_id": "idp", "name": "org"}
         inline = {"name": "inline", "decision": "allow", "include": [{"github-organization": github}]}

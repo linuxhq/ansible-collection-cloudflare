@@ -222,9 +222,11 @@ options:
         selector list matches an empty one, and the
         C(id) Cloudflare adds to a
         C(github-organization) selector matches a selector that omits it.
-        Other entries, such as C(id) and
-        C(precedence) links to reusable policies, are compared only on the keys
-        they set.
+        The C(approval_groups) and C(connection_rules) an inline policy sets
+        are also compared exactly, so a key removed from one of them, such as
+        the C(approvals_needed) of a group, is a change. Other entries, such as
+        C(id) and C(precedence) links to reusable policies, are compared only
+        on the keys they set.
   same_site_cookie_attribute:
     type: str
     description:
@@ -495,6 +497,9 @@ POLICY_CONNECTION_RULES_FIELDS = {
     "rdp": ("allowed_clipboard_local_to_remote_formats", "allowed_clipboard_remote_to_local_formats"),
 }
 POLICY_MFA_CONFIG_FIELDS = ("allowed_authenticators", "mfa_disabled", "session_duration")
+# Inline policy fields Cloudflare stores exactly as sent, so keys removed from
+# them count as differences.
+INLINE_POLICY_EXACT_FIELDS = ("approval_groups", "connection_rules")
 # Fields Cloudflare drops when they hold an empty value.
 EMPTY_CORS_HEADERS_FIELDS = ("allowed_headers", "allowed_methods", "allowed_origins")
 EMPTY_DESTINATION_FIELDS = ("hostname", "port_range", "vnet_id")
@@ -671,7 +676,8 @@ def comparable_policy(policy, desired):
 
     The selectors of an inline policy, one that sets a selector or has no id,
     are kept whole, apart from keys Cloudflare assigns, so removed selector
-    keys and lists count as differences. An omitted selector list matches an
+    keys and lists count as differences. Its requested approval_groups and
+    connection_rules are kept whole too. An omitted selector list matches an
     empty one, and an omitted POLICY_FALSE_FIELDS field matches false.
     """
     if not isinstance(policy, dict) or not isinstance(desired, dict):
@@ -690,6 +696,10 @@ def comparable_policy(policy, desired):
             comparable[field] = [] if stored is None else stored
         elif stored:
             comparable[field] = stored
+
+    for field in INLINE_POLICY_EXACT_FIELDS:
+        if field in desired:
+            comparable[field] = policy.get(field)
 
     return comparable
 

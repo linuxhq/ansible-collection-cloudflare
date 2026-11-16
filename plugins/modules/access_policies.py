@@ -86,6 +86,8 @@ options:
       - An empty C(email_addresses) list or C(email_list_uuid) in a group
         fails before making changes, because Cloudflare does not store it;
         omit it instead.
+      - Compared exactly, so a key removed from a group, such as
+        C(approvals_needed), is a change.
       - An existing policy's value is preserved when omitted.
       - V([]) clears the groups; Cloudflare then omits them, so V([]) matches a
         policy without approval groups.
@@ -276,7 +278,7 @@ def run(module, client):
         # Cloudflare omits a prompt cleared with "" and approval groups cleared with [].
         defaults={**dict.fromkeys(FALSE_FIELDS, False), "approval_groups": [], "purpose_justification_prompt": ""},
         preserved_fields=PRESERVED_FIELDS + UNMANAGED_FIELDS,
-        exact_values=ACCESS_SELECTOR_FIELDS,
+        exact_values=(*ACCESS_SELECTOR_FIELDS, "approval_groups"),
         comparable=lambda resource: comparable_access_rules(resource, params),
         context={"account_id": account_id},
     )
