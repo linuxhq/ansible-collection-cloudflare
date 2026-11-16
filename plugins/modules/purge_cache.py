@@ -24,7 +24,11 @@ options:
   cache:
     description:
       - Cache purge payload.
-      - Set at least one suboption.
+      - Set exactly one suboption. Cloudflare accepts a request that combines
+        purge types, but its API documents one type per request, so the
+        module fails before any request.
+      - A list suboption must not be empty. Cloudflare accepts an empty list
+        but purges nothing, so the module fails before any request.
     required: true
     type: dict
     suboptions:
@@ -146,6 +150,16 @@ def cache_payload(module):
     return payload_from_params(module.params["cache"], CACHE_KEYS)
 
 
+def validate_empty_lists(module):
+    """Fail when a list suboption is empty, as Cloudflare would purge nothing."""
+    empty = [f"cache.{key}" for key in CACHE_KEYS if module.params["cache"].get(key) == []]
+    if empty:
+        module.fail_json(
+            msg=f"Cloudflare purges nothing for these empty cache purge lists: {', '.join(empty)}",
+            empty_fields=empty,
+        )
+
+
 def validate_field_names(module):
     """Fail when a file mapping sets a field Cloudflare accepts but ignores."""
     unknown = []
@@ -183,6 +197,7 @@ def main():
                     "hosts": {"type": "list", "elements": "str"},
                     "prefixes": {"type": "list", "elements": "str"},
                 },
+                "mutually_exclusive": [list(CACHE_KEYS)],
             },
         },
         supports_check_mode=True,
@@ -191,6 +206,7 @@ def main():
     if not cache_payload(module):
         module.fail_json(msg="cache must not be empty")
 
+    validate_empty_lists(module)
     validate_field_names(module)
 
     if module.check_mode:

@@ -94,6 +94,27 @@ class AccessGroupsTests(TestCase):
 
         self.assertTrue(result["changed"])
 
+    def test_null_github_organization_id_matches_assigned_id(self):
+        include = [{"github-organization": {"identity_provider_id": "idp", "name": "org", "id": None}}]
+        current = {
+            "id": "group",
+            "name": "admins",
+            "include": [{"github-organization": {"identity_provider_id": "idp", "id": "314135", "name": "org"}}],
+        }
+        client, api = client_with(created=current)
+
+        result = self.run_module(FakeModule(params(include=include)), client)
+
+        api.create.assert_called_once_with(account_id="account", include=include, name="admins")
+        self.assertTrue(result["changed"])
+
+        client, api = client_with([current])
+
+        result = self.run_module(FakeModule(params(include=include)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_rejects_sdk_selector_key_before_any_request(self):
         for key, api_key in (("github_organization", "github-organization"), ("azure_ad", "azureAD")):
             with self.subTest(key=key):

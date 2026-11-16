@@ -235,6 +235,57 @@ class AccessPoliciesTests(TestCase):
                 api.list.assert_not_called()
                 api.update.assert_not_called()
 
+    def test_rejects_empty_approval_group_email_addresses_before_any_request(self):
+        approval_groups = [
+            {"approvals_needed": 1, "email_addresses": []},
+            {"approvals_needed": 1, "email_list_uuid": "list"},
+        ]
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with([policy()])
+
+                result = self.run_module(
+                    FakeModule(params(approval_groups=approval_groups), check_mode=check_mode), client
+                )
+
+                self.assertEqual(result["empty_fields"], ["approval_groups[0].email_addresses"])
+                self.assertEqual(
+                    result["msg"],
+                    "Cloudflare does not store an empty value for these Access policy fields: "
+                    "approval_groups[0].email_addresses; omit them instead",
+                )
+                api.list.assert_not_called()
+                api.update.assert_not_called()
+
+    def test_empty_approval_groups_match_cleared_groups(self):
+        client, api = client_with([policy()])
+
+        result = self.run_module(FakeModule(params(approval_groups=[])), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+        groups = [{"approvals_needed": 1, "email_addresses": ["a@example.com"]}]
+        client, api = client_with([policy(approval_groups=groups)], updated=policy())
+
+        result = self.run_module(FakeModule(params(approval_groups=[])), client)
+
+        self.assertEqual(api.update.call_args.kwargs["approval_groups"], [])
+        self.assertEqual(result["message"], "Access policy updated")
+        self.assertTrue(result["changed"])
+
+    def test_null_github_organization_id_matches_assigned_id(self):
+        include = [{"github-organization": {"identity_provider_id": "idp", "name": "org", "id": None}}]
+        stored = policy(
+            include=[{"github-organization": {"identity_provider_id": "idp", "id": "314135", "name": "org"}}]
+        )
+        client, api = client_with([stored])
+
+        result = self.run_module(FakeModule(params(include=include)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_rejects_unstored_selector_fields_before_any_request(self):
         client, api = client_with()
 

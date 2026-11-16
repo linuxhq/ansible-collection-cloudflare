@@ -96,6 +96,9 @@ options:
         C(allowed_methods), C(allowed_origins), and C(max_age). Cloudflare
         accepts any other key but does not store it, so the module fails before
         making changes.
+      - An empty C(allowed_headers), C(allowed_methods), or C(allowed_origins)
+        list fails before making changes, because Cloudflare does not store
+        it; omit the key instead.
       - Compared exactly, so omitting a key removes it.
   custom_deny_message:
     type: str
@@ -125,6 +128,9 @@ options:
       - An empty C(overrides) list fails before making changes, because
         Cloudflare stores the destination without C(overrides); omit
         C(overrides) instead.
+      - An empty list fails before making changes, because Cloudflare
+        replaces it with a C(public) destination for O(domain); omit
+        O(destinations) instead.
       - Each entry is compared exactly, so keys omitted from an entry are
         removed from it.
       - A bare IP address in C(cidr) is sent with its full-length prefix,
@@ -167,6 +173,10 @@ options:
         nested fields of a known inline policy selector. Cloudflare accepts
         any other field but does not store it, so the module fails before
         making changes.
+      - An empty C(approval_groups) list, an empty C(email_addresses) list in
+        one of its groups, and an empty C(purpose_justification_prompt) or
+        C(session_duration) fail before making changes, because Cloudflare
+        does not store them; omit them instead.
       - Cloudflare returns the policies in ascending C(precedence) order, so
         entries that set C(precedence) must be listed in that order; otherwise
         the module fails before any change.
@@ -272,6 +282,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     cloudflare_error_context,
     comparable_access_rules,
+    empty_approval_group_fields,
     ensure_resource_absent,
     ensure_resource_present,
     find_resource,
@@ -464,6 +475,9 @@ POLICY_CONNECTION_RULES_FIELDS = {
     "rdp": ("allowed_clipboard_local_to_remote_formats", "allowed_clipboard_remote_to_local_formats"),
 }
 POLICY_MFA_CONFIG_FIELDS = ("allowed_authenticators", "mfa_disabled", "session_duration")
+# Fields Cloudflare drops when they hold an empty value.
+EMPTY_CORS_HEADERS_FIELDS = ("allowed_headers", "allowed_methods", "allowed_origins")
+EMPTY_POLICY_FIELDS = ("purpose_justification_prompt", "session_duration")
 
 
 def validate_type_fields(module):
@@ -552,6 +566,39 @@ def validate_field_names(module):
         )
 
 
+def validate_empty_values(module):
+    """Fail when a field Cloudflare does not store when empty is requested empty.
+
+    Cloudflare drops these empty values, or replaces empty destinations with
+    one derived from the domain, so they would never match the request.
+    """
+    params = module.params
+    cors_headers = params.get("cors_headers")
+    empty = [
+        f"cors_headers.{field}"
+        for field in EMPTY_CORS_HEADERS_FIELDS
+        if isinstance(cors_headers, dict) and cors_headers.get(field) == []
+    ]
+    if params.get("destinations") == []:
+        empty.append("destinations")
+
+    for index, policy in enumerate(params.get("policies") or ()):
+        path = f"policies[{index}]"
+        approval_groups = policy.get("approval_groups")
+        if approval_groups == []:
+            empty.append(f"{path}.approval_groups")
+
+        empty.extend(empty_approval_group_fields(approval_groups, f"{path}.approval_groups"))
+        empty.extend(f"{path}.{field}" for field in EMPTY_POLICY_FIELDS if policy.get(field) == "")
+
+    if empty:
+        module.fail_json(
+            msg=f"Cloudflare does not store an empty value for these Access application fields: {', '.join(empty)}; "
+            "omit them instead",
+            empty_fields=empty,
+        )
+
+
 def requested_policy(policy):
     """Return policy without the selector lists set to null, which count as omitted."""
     return {key: value for key, value in policy.items() if key not in ACCESS_SELECTOR_FIELDS or value is not None}
@@ -619,6 +666,7 @@ def run(module, client):
         validate_type_fields(module)
         validate_policy_order(module)
         validate_field_names(module)
+        validate_empty_values(module)
         for index, policy in enumerate(params.get("policies") or ()):
             validate_access_selectors(module, policy, f"policies[{index}].")
 

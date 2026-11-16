@@ -83,7 +83,11 @@ options:
       - Each group accepts only C(approvals_needed), C(email_addresses), and
         C(email_list_uuid). Cloudflare accepts any other field but does not
         store it, so the module fails before making changes.
+      - An empty C(email_addresses) list in a group fails before making
+        changes, because Cloudflare does not store it; omit it instead.
       - An existing policy's value is preserved when omitted.
+      - V([]) clears the groups; Cloudflare then omits them, so V([]) matches a
+        policy without approval groups.
   approval_required:
     type: bool
     description:
@@ -162,6 +166,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     cloudflare_error_context,
     comparable_access_rules,
+    empty_approval_group_fields,
     ensure_resource_absent,
     ensure_resource_present,
     find_resource,
@@ -204,7 +209,7 @@ FALSE_FIELDS = (
 
 
 def validate_field_names(module):
-    """Fail when an approval group field Cloudflare accepts but never stores is requested."""
+    """Fail when an approval group field Cloudflare accepts but never stores, or an empty one, is requested."""
     unknown = [
         f"approval_groups[{index}].{field}"
         for index, group in enumerate(module.params.get("approval_groups") or ())
@@ -215,6 +220,14 @@ def validate_field_names(module):
         module.fail_json(
             msg=f"Cloudflare does not store these Access policy fields: {', '.join(unknown)}",
             unsupported_fields=unknown,
+        )
+
+    empty = empty_approval_group_fields(module.params.get("approval_groups"), "approval_groups")
+    if empty:
+        module.fail_json(
+            msg=f"Cloudflare does not store an empty value for these Access policy fields: {', '.join(empty)}; "
+            "omit them instead",
+            empty_fields=empty,
         )
 
 
@@ -259,8 +272,8 @@ def run(module, client):
         create=lambda payload: policies.create(account_id=account_id, **payload),
         update=lambda policy_id, payload: policies.update(policy_id, account_id=account_id, **payload),
         expected_name=params["name"],
-        # Cloudflare omits a prompt cleared with "".
-        defaults={**dict.fromkeys(FALSE_FIELDS, False), "purpose_justification_prompt": ""},
+        # Cloudflare omits a prompt cleared with "" and approval groups cleared with [].
+        defaults={**dict.fromkeys(FALSE_FIELDS, False), "approval_groups": [], "purpose_justification_prompt": ""},
         preserved_fields=PRESERVED_FIELDS + UNMANAGED_FIELDS,
         exact_values=ACCESS_SELECTOR_FIELDS,
         comparable=lambda resource: comparable_access_rules(resource, params),
