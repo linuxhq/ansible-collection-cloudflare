@@ -590,6 +590,33 @@ class AccessAppsTests(TestCase):
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_null_cors_header_and_inline_policy_fields_count_as_omitted(self):
+        cors = {"allowed_methods": ["GET"], "allowed_origins": ["https://a.example.com"]}
+        null_cors = dict.fromkeys(
+            ("allow_all_headers", "allow_all_methods", "allow_all_origins", "allow_credentials", "max_age")
+        )
+        include = [{"everyone": {}}]
+        policy = {"name": "inline", "decision": "allow", "include": include}
+        null_policy = dict.fromkeys(("approval_required", "isolation_required", "purpose_justification_required"))
+        requested = {"cors_headers": {**cors, **null_cors}, "policies": [{**policy, **null_policy}]}
+        stored_policy = {"id": "a", "precedence": 1, **policy, "exclude": [], "require": []}
+        app = stored(cors_headers=cors, policies=[stored_policy])
+        client, api = client_with(created=app)
+
+        result = self.run_module(FakeModule(params(**requested)), client)
+
+        self.assertNotIn("msg", result)
+        self.assertTrue(result["changed"])
+        self.assertEqual(api.create.call_args.kwargs["cors_headers"], cors)
+        self.assertEqual(api.create.call_args.kwargs["policies"], [policy])
+
+        client, api = client_with([app])
+        result = self.run_module(FakeModule(params(**requested)), client)
+
+        self.assertNotIn("msg", result)
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_non_mapping_inline_policy_selector_fails_before_any_request(self):
         for selector in (None, "everyone", ["everyone"]):
             for check_mode in (True, False):

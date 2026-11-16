@@ -44,8 +44,9 @@ options:
           - A mapping accepts only C(url) and C(headers). Cloudflare accepts
             any other key but ignores it, so the module fails before any
             request.
-          - A null item fails before any request, because Cloudflare accepts
-            it but purges nothing for it.
+          - A null item, or one that is neither a string nor a mapping, such
+            as V(5) or V(true), fails before any request, because Cloudflare
+            accepts it but purges nothing for it.
         type: list
         elements: raw
       tags:
@@ -164,6 +165,21 @@ def validate_empty_lists(module):
         )
 
 
+def validate_file_items(module):
+    """Fail when a file is neither a URL string nor a mapping, as Cloudflare would purge nothing for it."""
+    files = module.params["cache"].get("files") or ()
+    invalid = [
+        f"cache.files[{index}]"
+        for index, item in enumerate(files)
+        if item is not None and not isinstance(item, (str, dict))
+    ]
+    if invalid:
+        module.fail_json(
+            msg=f"Cloudflare purges nothing for these files that are not a URL string or mapping: {', '.join(invalid)}",
+            invalid_fields=invalid,
+        )
+
+
 def validate_field_names(module):
     """Fail when a file mapping sets a field Cloudflare accepts but ignores."""
     unknown = []
@@ -211,6 +227,7 @@ def main():
         module.fail_json(msg="cache must not be empty")
 
     validate_empty_lists(module)
+    validate_file_items(module)
     validate_field_names(module)
 
     if module.check_mode:
