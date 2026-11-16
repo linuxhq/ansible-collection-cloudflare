@@ -19,8 +19,6 @@ bugfixes:
     an existing zone. A new zone must be created before its settings can be read, so it is created first.
   - zones - ignore a trailing dot in O(name), which Cloudflare stores without it. The module created the zone and then
     failed on every run.
-  - warp_connector - when applying O(tunnel_secret) to a new connector fails, report the connector ID, that it was
-    rolled back, and the error's status code and response. When the rollback also fails, report both errors.
   - pages_projects - fail before any request when O(build_config) holds a key other than C(build_caching),
     C(build_command), C(destination_dir), C(root_dir), C(web_analytics_tag), or C(web_analytics_token), such as
     C(build_image_major_version), or when O(deployment_configs) C(preview) or C(production) holds a key that is not a

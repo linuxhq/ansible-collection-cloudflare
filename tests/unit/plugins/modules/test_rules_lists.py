@@ -909,25 +909,25 @@ class RulesListsTests(TestCase):
         self.assertEqual(result["items_operation"], {"id": "operation", "status": "completed"})
         self.assertEqual(result["rules_list"]["num_items"], 1)
 
-    def test_created_list_is_rolled_back_when_items_are_rejected(self):
+    def test_created_list_is_kept_when_items_are_rejected(self):
         created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
         body = {"success": False, "errors": [{"code": 10026, "message": "filter parsing error"}], "messages": []}
         client, api = make_client(created=created)
         api.items.update.side_effect = status_error(400, body)
 
-        with patch.object(rules_lists.time, "monotonic", return_value=1):
-            result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
+        with (
+            patch.object(rules_lists.time, "monotonic", return_value=1),
+            self.assertRaises(cloudflare.BadRequestError) as raised,
+        ):
+            rules_lists.run(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
 
-        api.delete.assert_called_once_with("list", account_id="account")
+        api.delete.assert_not_called()
         self.assertEqual(
-            result["msg"],
-            "Cloudflare API request failed while submitting the Rules list items; the created Rules list was rolled back",
+            raised.exception._cloudflare_message, "Cloudflare API request failed while submitting the Rules list items"
         )
-        self.assertEqual(result["rules_list_id"], "list")
-        self.assertEqual(result["status_code"], 400)
-        self.assertEqual(result["response"], body)
+        self.assertEqual(raised.exception._cloudflare_context, {"account_id": "account", "rules_list_id": "list"})
 
-    def test_created_list_is_rolled_back_when_the_items_operation_fails(self):
+    def test_created_list_is_kept_when_the_items_operation_fails(self):
         created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
         client, api = make_client(created=created)
         api.bulk_operations.get.return_value = {"id": "operation", "status": "failed", "error": "bad"}
@@ -935,25 +935,11 @@ class RulesListsTests(TestCase):
         with patch.object(rules_lists.time, "monotonic", return_value=1):
             result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
 
-        api.delete.assert_called_once_with("list", account_id="account")
-        self.assertEqual(result["msg"], "Rules list items operation failed; the created Rules list was rolled back")
+        api.delete.assert_not_called()
+        self.assertEqual(result["msg"], "Rules list items operation failed")
         self.assertEqual(result["operation"], {"id": "operation", "status": "failed", "error": "bad"})
 
-    def test_rollback_delete_is_bounded_without_retries(self):
-        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
-        client, api = make_client(created=created)
-        api.items.update.side_effect = status_error(400)
-
-        with patch.object(rules_lists.time, "monotonic", return_value=1):
-            self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
-
-        api.delete.assert_called_once_with("list", account_id="account")
-        self.assertEqual(
-            client.with_options.call_args_list[-1].kwargs,
-            {"timeout": rules_lists.ROLLBACK_TIMEOUT_SECONDS, "max_retries": 0},
-        )
-
-    def test_created_list_is_rolled_back_when_the_operation_id_is_wrong(self):
+    def test_wrong_operation_id_fails(self):
         created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
         client, api = make_client(created=created)
         api.bulk_operations.get.return_value = {"id": "other", "status": "completed"}
@@ -961,29 +947,9 @@ class RulesListsTests(TestCase):
         with patch.object(rules_lists.time, "monotonic", return_value=1):
             result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
 
-        api.delete.assert_called_once_with("list", account_id="account")
-        self.assertEqual(
-            result["msg"],
-            "Cloudflare API returned the wrong Rules list operation; the created Rules list was rolled back",
-        )
-
-    def test_failed_rollback_reports_both_errors(self):
-        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
-        client, api = make_client(created=created)
-        api.items.update.side_effect = status_error(400)
-        api.delete.side_effect = status_error(403)
-
-        with patch.object(rules_lists.time, "monotonic", return_value=1):
-            result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
-
-        self.assertEqual(
-            result["msg"],
-            "Cloudflare API request failed while submitting the Rules list items; "
-            "rolling back the created Rules list also failed, delete it manually",
-        )
-        self.assertEqual(result["status_code"], 400)
-        self.assertEqual(result["rollback_error"]["status_code"], 403)
-        self.assertEqual(result["rules_list_id"], "list")
+        api.delete.assert_not_called()
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong Rules list operation")
+        self.assertEqual(result["operation_id"], "operation")
 
     def test_existing_list_is_not_deleted_when_items_are_rejected(self):
         current = {**CURRENT, "num_items": 0}

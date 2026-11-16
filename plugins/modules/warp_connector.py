@@ -34,6 +34,10 @@ options:
       - Applied when creating a connector. Cloudflare does not return the current
         secret, so changes are not detected; use O(rotate_secrets) to apply the
         secret to an existing connector.
+      - When applying the secret to a newly created connector fails, the module
+        fails and names the connector ID. The connector remains without the
+        requested secret, and later runs report it present, so rerun with
+        O(rotate_secrets=true) to apply the secret.
   rotate_secrets:
     type: bool
     default: false
@@ -106,7 +110,7 @@ def checked_connector(module, connector, expected_id=None):
     return connector
 
 
-def apply_secret_or_roll_back(module, connectors, connector_id):
+def apply_created_secret(module, connectors, connector_id):
     params = module.params
     account_id = params["account_id"]
     try:
@@ -119,25 +123,16 @@ def apply_secret_or_roll_back(module, connectors, connector_id):
             or connector.get("name") != params["name"]
         ):
             raise CloudflareResponseError("Cloudflare API returned the wrong WARP Connector")
-    except (cloudflare.APIError, CloudflareResponseError) as apply_error:
-        try:
-            deleted = serialize_resource(connectors.delete(connector_id, account_id=account_id))
-            if isinstance(deleted, dict) and "id" in deleted and deleted["id"] != connector_id:
-                raise CloudflareResponseError("Cloudflare API returned the wrong WARP Connector")
-        except (cloudflare.APIError, CloudflareResponseError) as rollback_error:
-            module.fail_json(
-                msg="Failed to apply tunnel_secret and to roll back the created WARP Connector; delete it manually",
-                account_id=account_id,
-                warp_connector_id=connector_id,
-                apply_error=cloudflare_error_details(apply_error),
-                rollback_error=cloudflare_error_details(rollback_error),
-            )
-
+    except (cloudflare.APIError, CloudflareResponseError) as exc:
         module.fail_json(
-            msg="Failed to apply tunnel_secret; the created WARP Connector was rolled back",
+            msg=(
+                f"Failed to apply tunnel_secret to the created WARP Connector {connector_id}; it was created "
+                "without the requested secret. Later runs report it present and cannot detect the secret, "
+                "so rerun with rotate_secrets: true to apply it"
+            ),
             account_id=account_id,
             warp_connector_id=connector_id,
-            **cloudflare_error_details(apply_error),
+            **cloudflare_error_details(exc),
         )
 
     return connector
@@ -177,7 +172,7 @@ def ensure_present(module, connectors, current):
 
     warp_connector = checked_connector(module, warp_connector)
     if params.get("tunnel_secret") is not None:
-        warp_connector = apply_secret_or_roll_back(module, connectors, warp_connector["id"])
+        warp_connector = apply_created_secret(module, connectors, warp_connector["id"])
 
     module.exit_json(changed=True, message="WARP Connector created", warp_connector=warp_connector)
 
