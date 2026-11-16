@@ -30,14 +30,22 @@ def params(**updates):
     return values
 
 
-def client_with(projects=(), created=None, edited=None, domains=(), created_domain=None):
-    """Return a client whose successive project reads return projects; None means not found."""
+def client_with(
+    projects=(), created=None, edited=None, domains=(), created_domain=None, account_projects=(), other_domains=None
+):
+    """Return a client whose successive project reads return projects; None means not found.
+
+    other_domains maps another project's name to its domain list.
+    """
     client = Mock()
     api = client.pages.projects
+    api.list.return_value = list(account_projects)
     api.get.side_effect = [status_error(404) if project is None else project for project in projects]
     api.create.return_value = created
     api.edit.return_value = edited
-    api.domains.list.return_value = list(domains)
+    api.domains.list.side_effect = lambda project_name, account_id: list(
+        (other_domains or {}).get(project_name, domains)
+    )
     api.domains.create.return_value = created_domain
     return client, api
 
@@ -165,6 +173,16 @@ class PagesProjectsTests(TestCase):
             "pages.dev",
             "other-p39fix.pages.dev",
             "Other.Pages.Dev",
+            "workers.dev",
+            "p40fix.workers.dev",
+            "P40fix.Workers.Dev",
+            "p40fix.x",
+            "p40fix.test",
+            "p40fix.example",
+            "p40fix.invalid",
+            "p40fix.localhost",
+            "p40fix.local",
+            "p40fix.Test",
         ):
             for state, check_mode in (("present", False), ("present", True), ("absent", False)):
                 with self.subTest(name=name, state=state, check_mode=check_mode):
@@ -182,7 +200,18 @@ class PagesProjectsTests(TestCase):
                     api.domains.create.assert_not_called()
 
     def test_accepts_domain_names_with_numeric_inner_labels(self):
-        for name in ("123.example.com", "mypages.dev", "pages.dev.example.com"):
+        for name in (
+            "123.example.com",
+            "mypages.dev",
+            "pages.dev.example.com",
+            "myworkers.dev",
+            "workers.dev.example.com",
+            "test.example.com",
+            "p40fix.co.uk",
+            "p40fix.onion",
+            "p40fix.xn--p1ai",
+            "p40fix.trycloudflare.com",
+        ):
             with self.subTest(name=name):
                 current = {**PROJECT, "domains": [name]}
                 client, api = client_with([current], domains=[{"name": name}])
@@ -807,8 +836,78 @@ class PagesProjectsTests(TestCase):
 
         result = self.run_module(FakeModule(params(domains=[{"name": "Docs.Example.com"}])), client)
 
+        api.list.assert_not_called()
         api.domains.create.assert_not_called()
         self.assertFalse(result["changed"])
+
+    def test_rejects_domain_of_another_project_before_any_write(self):
+        account_projects = [
+            {"name": "docs", "domains": ["docs.pages.dev"]},
+            {"name": "active", "domains": ["active.pages.dev", "unrelated.example.com"]},
+            {"name": "other", "domains": ["other.pages.dev"]},
+        ]
+        # A pending custom domain is only in the domains list, and an active
+        # one is also in the project's domains field.
+        other_domains = {
+            "active": [{"name": "unrelated.example.com"}],
+            "other": [{"name": "Shared.example.com"}],
+        }
+        for exists, check_mode in ((False, False), (False, True), (True, False), (True, True)):
+            with self.subTest(exists=exists, check_mode=check_mode):
+                client, api = client_with(
+                    [PROJECT if exists else None],
+                    created=PROJECT,
+                    edited=PROJECT,
+                    account_projects=account_projects,
+                    other_domains=other_domains,
+                )
+
+                result = self.run_module(
+                    FakeModule(
+                        params(domains=[{"name": "new.example.com"}, {"name": "Shared.Example.com"}]),
+                        check_mode=check_mode,
+                    ),
+                    client,
+                )
+
+                api.list.assert_called_once_with(account_id="account")
+                self.assertEqual(
+                    [call.kwargs["project_name"] for call in api.domains.list.call_args_list],
+                    ["docs", "active", "other"] if exists else ["active", "other"],
+                )
+                self.assertEqual(result["msg"], "Pages project domain is already attached to another Pages project")
+                self.assertEqual(result["domain"], "shared.example.com")
+                self.assertEqual(result["project"], "other")
+                self.assertEqual(result["name"], "docs")
+                api.create.assert_not_called()
+                api.edit.assert_not_called()
+                api.domains.create.assert_not_called()
+
+    def test_pending_domain_of_this_project_skips_the_owner_check(self):
+        client, api = client_with([PROJECT], domains=[{"name": "new.example.com"}])
+
+        result = self.run_module(FakeModule(params(domains=[{"name": "new.example.com"}])), client)
+
+        api.list.assert_not_called()
+        api.domains.list.assert_called_once_with(project_name="docs", account_id="account")
+        api.domains.create.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_adds_domain_no_other_project_has(self):
+        refreshed = {**PROJECT, "domains": ["new.example.com"]}
+        account_projects = [{"name": "docs"}, {"name": "other", "domains": ["other.pages.dev"]}]
+        client, api = client_with(
+            [PROJECT, refreshed],
+            created_domain={"name": "new.example.com"},
+            account_projects=account_projects,
+            other_domains={"other": [{"name": "other.example.com"}]},
+        )
+
+        result = self.run_module(FakeModule(params(domains=[{"name": "new.example.com"}])), client)
+
+        api.list.assert_called_once_with(account_id="account")
+        api.domains.create.assert_called_once_with(project_name="docs", account_id="account", name="new.example.com")
+        self.assertTrue(result["changed"])
 
     def test_adds_mixed_case_domain_in_lowercase(self):
         refreshed = {**PROJECT, "domains": ["new.example.com"]}

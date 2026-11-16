@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - pages_projects - before any change, and in check mode, fail naming the other project when a C(domains[].name)
+    not yet on this project is attached to another Pages project in the account, and fail when a C(domains[].name)
+    is C(workers.dev) or ends in C(.workers.dev), or ends in a one-character label or in the special-use top-level
+    domain C(example), C(invalid), C(local), C(localhost), or C(test), instead of creating or updating the project
+    and then failing when Cloudflare rejects the domain.
