@@ -14,7 +14,10 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 SECRET = "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg="
 CREATED = {"id": "connector-id", "name": "connector"}
 APPLY_BODY = {"success": False, "errors": [{"code": 1001, "message": "invalid secret"}], "messages": []}
-ROLLBACK_BODY = {"success": False, "errors": [{"code": 1002, "message": "internal"}], "messages": []}
+SECRET_FAILURE = (
+    "Failed to apply tunnel_secret to the created WARP Connector connector-id; it was created without the requested "
+    "secret. Later runs report it present and cannot detect the secret, so rerun with rotate_secrets: true to apply it"
+)
 
 
 def params(**updates):
@@ -79,48 +82,26 @@ class WarpConnectorTests(TestCase):
         api.delete.assert_not_called()
         self.assertEqual(result["warp_connector"], {**CREATED, "tunnel_secret": SECRET})
 
-    def test_secret_failure_rolls_back_created_connector(self):
+    def test_secret_failure_keeps_created_connector(self):
         client, api = client_with(created=CREATED)
         api.edit.side_effect = status_error(400, APPLY_BODY)
 
         result = self.run_module(FakeModule(params(tunnel_secret=SECRET)), client)
 
-        api.delete.assert_called_once_with("connector-id", account_id="account")
-        self.assertEqual(result["msg"], "Failed to apply tunnel_secret; the created WARP Connector was rolled back")
+        api.delete.assert_not_called()
+        self.assertEqual(result["msg"], SECRET_FAILURE)
+        self.assertEqual(result["account_id"], "account")
         self.assertEqual(result["warp_connector_id"], "connector-id")
         self.assertEqual(result["status_code"], 400)
         self.assertEqual(result["response"], APPLY_BODY)
 
-    def test_reports_both_errors_when_rollback_fails(self):
-        client, api = client_with(created=CREATED)
-        api.edit.side_effect = status_error(400, APPLY_BODY)
-        api.delete.side_effect = status_error(500, ROLLBACK_BODY)
-
-        result = self.run_module(FakeModule(params(tunnel_secret=SECRET)), client)
-
-        self.assertIn("delete it manually", result["msg"])
-        self.assertEqual(result["warp_connector_id"], "connector-id")
-        self.assertEqual(result["apply_error"], {"status_code": 400, "response": APPLY_BODY})
-        self.assertEqual(result["rollback_error"], {"status_code": 500, "response": ROLLBACK_BODY})
-
-    def test_reports_connector_id_when_rollback_response_is_wrong(self):
-        client, api = client_with(created=CREATED)
-        api.edit.side_effect = status_error(400, APPLY_BODY)
-        api.delete.return_value = {"id": "other"}
-
-        result = self.run_module(FakeModule(params(tunnel_secret=SECRET)), client)
-
-        self.assertEqual(result["warp_connector_id"], "connector-id")
-        self.assertEqual(result["apply_error"], {"status_code": 400, "response": APPLY_BODY})
-        self.assertEqual(result["rollback_error"], {"error": "Cloudflare API returned the wrong WARP Connector"})
-
-    def test_wrong_secret_response_rolls_back_created_connector(self):
+    def test_wrong_secret_response_keeps_created_connector(self):
         client, api = client_with(created=CREATED, edited={"id": "wrong", "name": "connector"})
 
         result = self.run_module(FakeModule(params(tunnel_secret=SECRET)), client)
 
-        api.delete.assert_called_once_with("connector-id", account_id="account")
-        self.assertIn("rolled back", result["msg"])
+        api.delete.assert_not_called()
+        self.assertEqual(result["msg"], SECRET_FAILURE)
         self.assertEqual(result["warp_connector_id"], "connector-id")
         self.assertEqual(result["error"], "Cloudflare API returned the wrong WARP Connector")
 
