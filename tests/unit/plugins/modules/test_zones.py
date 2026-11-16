@@ -97,6 +97,21 @@ class ZonesTests(TestCase):
         client.zones.list.assert_not_called()
         self.assertEqual(result["msg"], "Each zone setting requires a unique valid id")
 
+    def test_rejects_dot_segment_setting_id_before_any_request(self):
+        for setting_id in (".", ".."):
+            for check_mode in (True, False):
+                with self.subTest(setting_id=setting_id, check_mode=check_mode):
+                    client = client_with([ZONE])
+
+                    result = self.run_module(
+                        FakeModule(params(settings=[{"id": setting_id, "value": "on"}]), check_mode=check_mode),
+                        client,
+                    )
+
+                    self.assertEqual(result["msg"], "Each zone setting id must not be '.' or '..'")
+                    self.assertEqual(result["setting"], setting_id)
+                    self.assertEqual(client.mock_calls, [])
+
     def test_rejects_duplicate_settings_before_lookup(self):
         client = client_with()
         settings = [{"id": "ssl", "value": "full"}, {"id": "ssl", "value": "strict"}]

@@ -31,6 +31,9 @@ MESSAGE_FIELDS = 10
 MAX_DNS_NAME_LENGTH = 253
 MAX_DNS_LABEL_LENGTH = 63
 
+# Path segments the SDK refuses to put in a request path.
+DOT_SEGMENTS = (".", "..")
+
 
 class CloudflareResponseError(Exception):
     pass
@@ -129,6 +132,10 @@ def validate_cloudflare_params(module):
 
             if value != value.strip():
                 module.fail_json(msg=f"{name} must not contain leading or trailing whitespace")
+
+            # The SDK refuses to build a request path with a dot segment.
+            if (name == "phase" or name.endswith("_id")) and value in DOT_SEGMENTS:
+                module.fail_json(msg=f"{name} must not be '.' or '..'")
 
     return api_token.strip()
 

@@ -563,6 +563,13 @@ class RulesListsTests(TestCase):
             "https://",
             "https:///d",
             "https://[::1/d",
+            "https://exa mple.com/",
+            "https://exa\tmple.com/",
+            "https://example.com :443/",
+            "https://example.com:abc/",
+            "https://example.com:80x/",
+            "https://[2001:db8::1]:abc/",
+            "https://user@example.com:abc/",
         ):
             self.assert_elements_fail_before_any_write(
                 "redirect",
@@ -570,7 +577,10 @@ class RulesListsTests(TestCase):
                     {"redirect": {"source_url": "example.com/b", "target_url": "https://example.net"}},
                     {"redirect": {"source_url": "example.com/a", "target_url": value}},
                 ],
-                "elements[1].redirect.target_url must be an absolute http or https URL with a host",
+                (
+                    "elements[1].redirect.target_url must be an absolute http or https URL with a host, "
+                    "no whitespace in its authority, and only digits in its port"
+                ),
                 target_url=value,
             )
 
@@ -580,6 +590,15 @@ class RulesListsTests(TestCase):
             "http://example.net/d?x=1",
             "HTTPS://Example.net/d",
             "https://[2001:db8::1]/",
+            # Cloudflare stores these as written.
+            "https://example.com:99999/",
+            "https://example.com:8443/ok",
+            "https://[2001:db8::1]:8443/",
+            "https://user@example.com/",
+            "https://user:pass@example.com/",
+            "https://-a.example.com/",
+            "https://ex\u00e4mple.com/",
+            "https://example.com/a b",
         ):
             with self.subTest(value=value):
                 client, _ignored = make_client()

@@ -883,6 +883,44 @@ class PagesProjectsTests(TestCase):
                 api.edit.assert_not_called()
                 api.domains.create.assert_not_called()
 
+    def test_project_deleted_after_listing_owns_no_domains(self):
+        refreshed = {**PROJECT, "domains": ["new.example.com"]}
+        account_projects = [{"name": "docs"}, {"name": "gone"}, {"name": "other"}]
+        client, api = client_with(
+            [PROJECT, refreshed],
+            created_domain={"name": "new.example.com"},
+            account_projects=account_projects,
+        )
+        other_domains = {"gone": status_error(404), "other": [{"name": "other.example.com"}]}
+
+        def domains_list(project_name, account_id):
+            domains = other_domains.get(project_name, [])
+            if isinstance(domains, Exception):
+                raise domains
+
+            return list(domains)
+
+        api.domains.list.side_effect = domains_list
+
+        result = self.run_module(FakeModule(params(domains=[{"name": "new.example.com"}])), client)
+
+        self.assertEqual(
+            [call.kwargs["project_name"] for call in api.domains.list.call_args_list], ["docs", "gone", "other"]
+        )
+        api.domains.create.assert_called_once_with(project_name="docs", account_id="account", name="new.example.com")
+        self.assertTrue(result["changed"])
+
+    def test_dot_segment_name_fails_before_any_request(self):
+        for name in (".", ".."):
+            for state in ("present", "absent"):
+                with self.subTest(name=name, state=state):
+                    client, _ignored = client_with()
+
+                    result = self.run_module(FakeModule(params(name=name, state=state)), client)
+
+                    self.assertEqual(result["msg"], "name must not be '.' or '..'")
+                    self.assertEqual(client.mock_calls, [])
+
     def test_pending_domain_of_this_project_skips_the_owner_check(self):
         client, api = client_with([PROJECT], domains=[{"name": "new.example.com"}])
 

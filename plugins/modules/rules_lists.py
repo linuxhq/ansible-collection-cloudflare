@@ -111,7 +111,9 @@ options:
         such as C(:8080), and may use only the C(http) or C(https) scheme.
       - A C(redirect.target_url) must be an absolute URL with the C(http) or
         C(https) scheme and a host, such as C(https://example.com/path);
-        C(example.com/path) and C(/path) are not supported.
+        C(example.com/path) and C(/path) are not supported. Its authority
+        must not contain whitespace, and its port, when set, must contain
+        only digits, so C(https://example.com:abc/) is not supported.
       - A C(redirect.status_code), when set, must be the integer 301, 302,
         307, or 308.
   operation_timeout:
@@ -586,12 +588,30 @@ def valid_hostname(value):
 
 
 def target_url_valid(value):
-    """Return whether value is an absolute http or https URL with a host."""
+    """Return whether value is an absolute http or https URL with a host.
+
+    The authority must not contain whitespace, and a port must be digits.
+    """
     try:
         parts = urlsplit(value)
-        return parts.scheme in TARGET_URL_SCHEMES and bool(parts.hostname)
     except ValueError:
         return False
+
+    if parts.scheme not in TARGET_URL_SCHEMES or not parts.hostname:
+        return False
+
+    # urlsplit drops tabs and newlines, so read the authority from the value.
+    authority = value.partition("://")[2]
+    for delimiter in "/?#":
+        authority = authority.partition(delimiter)[0]
+
+    if any(character.isspace() for character in authority):
+        return False
+
+    # Parse the port text: Cloudflare stores an out-of-range port such as
+    # 99999, for which urlsplit raises ValueError.
+    port = authority.rpartition("@")[2].rpartition("]")[2].partition(":")[2]
+    return not port or (port.isascii() and port.isdigit())
 
 
 def source_url_error(value):
@@ -698,7 +718,10 @@ def validate_elements(module, kind):
         target_url = redirect.get("target_url") if isinstance(redirect, dict) else None
         if isinstance(target_url, str) and not target_url_valid(target_url):
             module.fail_json(
-                msg=f"elements[{index}].redirect.target_url must be an absolute http or https URL with a host",
+                msg=(
+                    f"elements[{index}].redirect.target_url must be an absolute http or https URL with a host, "
+                    "no whitespace in its authority, and only digits in its port"
+                ),
                 target_url=target_url,
             )
 

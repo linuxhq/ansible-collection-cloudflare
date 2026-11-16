@@ -63,6 +63,7 @@ options:
       id:
         description:
           - Cloudflare zone setting identifier.
+          - V(.) and V(..) fail before any request.
         required: true
         type: str
       value:
@@ -158,6 +159,7 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    DOT_SEGMENTS,
     cloudflare_client,
     cloudflare_error_context,
     ensure_resource_absent,
@@ -285,6 +287,9 @@ def validate_settings(module):
     for index, setting in enumerate(module.params.get("settings") or []):
         if not setting["id"].strip() or setting["id"] != setting["id"].strip() or setting["id"] in setting_ids:
             module.fail_json(msg="Each zone setting requires a unique valid id")
+
+        if setting["id"] in DOT_SEGMENTS:
+            module.fail_json(msg="Each zone setting id must not be '.' or '..'", setting=setting["id"])
 
         setting_ids.add(setting["id"])
         path = f"settings[{index}].value"
