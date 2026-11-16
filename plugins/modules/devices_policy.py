@@ -244,11 +244,12 @@ def comparable_policy(policy, payload):
     """Return policy with each route stored without a description matching a requested empty description.
 
     Cloudflare drops a split tunnel route description set to "" and returns
-    the route without it.
+    the route without it. Null route fields are dropped from requested, as
+    the comparison ignores them.
     """
     policy = dict(policy)
     for field in ("exclude", "include"):
-        requested, routes = payload.get(field), policy.get(field)
+        requested, routes = serialize_resource(payload.get(field)), policy.get(field)
         if isinstance(requested, list) and isinstance(routes, list):
             policy[field] = [
                 (

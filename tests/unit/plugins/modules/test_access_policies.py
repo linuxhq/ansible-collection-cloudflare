@@ -297,6 +297,26 @@ class AccessPoliciesTests(TestCase):
         self.assertEqual(result["message"], "Access policy updated")
         self.assertTrue(result["changed"])
 
+    def test_approval_group_key_removal_is_a_change(self):
+        requested = [{"email_addresses": ["a@example.com", "b@example.com"]}]
+        stored = [{**requested[0], "approvals_needed": 2}]
+        client, api = client_with([policy(approval_groups=stored)], updated=policy(approval_groups=requested))
+
+        result = self.run_module(FakeModule(params(approval_groups=requested)), client)
+
+        self.assertEqual(api.update.call_args.kwargs["approval_groups"], requested)
+        self.assertNotIn("msg", result)
+        self.assertTrue(result["changed"])
+
+    def test_identical_approval_groups_are_unchanged(self):
+        groups = [{"approvals_needed": 2, "email_addresses": ["a@example.com", "b@example.com"]}]
+        client, api = client_with([policy(approval_groups=groups)])
+
+        result = self.run_module(FakeModule(params(approval_groups=groups)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_null_github_organization_id_matches_assigned_id(self):
         include = [{"github-organization": {"identity_provider_id": "idp", "name": "org", "id": None}}]
         stored = policy(
