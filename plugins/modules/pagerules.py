@@ -37,6 +37,8 @@ options:
         C(cookie), C(header), C(host), C(query_string), and C(user), each with
         the fields Cloudflare stores for it. Cloudflare accepts any other key
         but does not store it, so the module fails before making changes.
+      - Each action must set C(id) to a non-empty string; otherwise the module
+        fails before any request.
       - Actions are compared by C(id), regardless of their order.
       - The C(value) of a C(cache_ttl_by_status) action is compared on every
         key, so a status code removed from it is removed from the rule. Other
@@ -190,6 +192,14 @@ def validate_field_names(module):
 
     # Actions are not sent when removing a page rule.
     actions = params.get("actions") if params["state"] == "present" else None
+    invalid = [
+        f"actions[{index}].id"
+        for index, action in enumerate(actions or ())
+        if not isinstance(action.get("id"), str) or not action["id"]
+    ]
+    if invalid:
+        module.fail_json(msg=f"{', '.join(invalid)} must be a non-empty string", invalid_fields=invalid)
+
     for index, action in enumerate(actions or ()):
         path = f"actions[{index}]"
         action_id = action.get("id")

@@ -425,6 +425,22 @@ class PageRulesTests(TestCase):
                     api.list.assert_not_called()
                     api.create.assert_not_called()
 
+    def test_action_without_string_id_fails_before_any_request(self):
+        for action_id in ({"id": "ssl"}, ["ssl"], 1, "", None):
+            for current in ([], [{"id": "rule", "actions": [{"id": "ssl", "value": "strict"}], "targets": TARGETS}]):
+                for check_mode in (True, False):
+                    with self.subTest(action_id=action_id, existing=bool(current), check_mode=check_mode):
+                        actions = [{"id": "ssl", "value": "strict"}, {"id": action_id, "value": "on"}]
+                        client, api = client_with(current)
+
+                        result = self.run_module(FakeModule(params(actions=actions), check_mode=check_mode), client)
+
+                        self.assertEqual(result["msg"], "actions[1].id must be a non-empty string")
+                        self.assertEqual(result["invalid_fields"], ["actions[1].id"])
+                        api.list.assert_not_called()
+                        api.create.assert_not_called()
+                        api.update.assert_not_called()
+
     def test_unstored_target_fields_fail_before_delete(self):
         targets = [{**TARGETS[0], "foo": 1}]
         client, api = client_with([{"id": "rule", "targets": TARGETS}])

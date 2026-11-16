@@ -168,7 +168,9 @@ options:
     elements: dict
     description:
       - Access policies attached to the application.
-      - A field of an entry set to null is not sent and counts as omitted.
+      - A field of an entry set to null is not sent and counts as omitted,
+        including a nested field of C(connection_rules), C(connection_rules.rdp),
+        or C(mfa_config).
       - Each entry accepts only the fields of a reusable policy link, C(id),
         C(precedence), and C(account_id), or of an inline policy, such as
         C(name), C(decision), C(include), C(exclude), C(require), and
@@ -647,6 +649,24 @@ def without_nulls(value):
     return {key: item for key, item in value.items() if item is not None}
 
 
+def without_nested_nulls(value):
+    """Return value without the keys set to null at any level of its nested mappings."""
+    if not isinstance(value, dict):
+        return value
+
+    return {key: without_nested_nulls(item) for key, item in value.items() if item is not None}
+
+
+def policy_without_nulls(policy):
+    """Return the policy entry without null fields, including those in its nested mappings."""
+    policy = without_nulls(policy)
+    for field in ("connection_rules", "mfa_config"):
+        if field in policy:
+            policy[field] = without_nested_nulls(policy[field])
+
+    return policy
+
+
 def comparable_policy(policy, desired):
     """Return policy projected onto the fields of desired.
 
@@ -770,7 +790,7 @@ def run(module, client):
         payload["cors_headers"] = without_nulls(payload["cors_headers"])
 
     if "policies" in payload:
-        payload["policies"] = [without_nulls(policy) for policy in payload["policies"]]
+        payload["policies"] = [policy_without_nulls(policy) for policy in payload["policies"]]
 
     ensure_resource_present(
         module,
