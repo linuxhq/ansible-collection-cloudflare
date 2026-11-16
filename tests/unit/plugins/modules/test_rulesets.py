@@ -191,13 +191,14 @@ class RulesetsTests(TestCase):
         api.phases.update.assert_called_once_with(PHASE, zone_id="zone", rules=rules)
         self.assertTrue(result["changed"])
 
-    def test_create_requires_name(self):
+    def test_create_without_name_reaches_cloudflare(self):
+        # Cloudflare rejects a new ruleset without a name on the only write.
         client, api = make_client()
 
-        result = self.run_module(FakeModule(params(name=None)), client)
+        self.run_module(FakeModule(params(name=None)), client)
 
-        api.create.assert_not_called()
-        self.assertEqual(result["msg"], "name is required when creating a ruleset")
+        api.create.assert_called_once()
+        self.assertIsNone(api.create.call_args.kwargs["name"])
 
     def test_check_mode_does_not_create(self):
         client, api = make_client()

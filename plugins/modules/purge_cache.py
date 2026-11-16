@@ -24,11 +24,8 @@ options:
   cache:
     description:
       - Cache purge payload.
-      - Set exactly one suboption. Cloudflare accepts a request that combines
-        purge types, but its API documents one type per request, so the
-        module fails before any request.
-      - A list suboption must not be empty. Cloudflare accepts an empty list
-        but purges nothing, so the module fails before any request.
+      - Cloudflare validates the payload, such as one with no purge type, and
+        the module reports its error.
     required: true
     type: dict
     suboptions:
@@ -41,12 +38,6 @@ options:
           - URLs to purge.
           - Each item is a URL string, or a mapping with C(url) and the
             C(headers) the content was cached with.
-          - A mapping accepts only C(url) and C(headers). Cloudflare accepts
-            any other key but ignores it, so the module fails before any
-            request.
-          - A null item, or one that is neither a string nor a mapping, such
-            as V(5) or V(true), fails before any request, because Cloudflare
-            accepts it but purges nothing for it.
         type: list
         elements: raw
       tags:
@@ -138,59 +129,14 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     require_cloudflare_sdk,
     resource_id,
     serialize_resource,
-    unsupported_fields,
     validate_cloudflare_params,
 )
 
 CACHE_KEYS = ("files", "hosts", "prefixes", "purge_everything", "tags")
-# Fields of a file mapping, from the cloudflare SDK
-# CachePurgeSingleFileWithURLAndHeadersFile type. Cloudflare accepts any other
-# field but ignores it.
-FILE_FIELDS = ("headers", "url")
 
 
 def cache_payload(module):
     return payload_from_params(module.params["cache"], CACHE_KEYS)
-
-
-def validate_empty_lists(module):
-    """Fail when a list suboption is empty or a file is null, as Cloudflare would purge nothing for it."""
-    cache = module.params["cache"]
-    empty = [f"cache.{key}" for key in CACHE_KEYS if cache.get(key) == []]
-    empty.extend(f"cache.files[{index}]" for index, item in enumerate(cache.get("files") or ()) if item is None)
-    if empty:
-        module.fail_json(
-            msg=f"Cloudflare purges nothing for these empty cache purge lists or null files: {', '.join(empty)}",
-            empty_fields=empty,
-        )
-
-
-def validate_file_items(module):
-    """Fail when a file is neither a URL string nor a mapping, as Cloudflare would purge nothing for it."""
-    files = module.params["cache"].get("files") or ()
-    invalid = [
-        f"cache.files[{index}]"
-        for index, item in enumerate(files)
-        if item is not None and not isinstance(item, (str, dict))
-    ]
-    if invalid:
-        module.fail_json(
-            msg=f"Cloudflare purges nothing for these files that are not a URL string or mapping: {', '.join(invalid)}",
-            invalid_fields=invalid,
-        )
-
-
-def validate_field_names(module):
-    """Fail when a file mapping sets a field Cloudflare accepts but ignores."""
-    unknown = []
-    for index, item in enumerate(module.params["cache"].get("files") or ()):
-        unknown.extend(unsupported_fields(item, FILE_FIELDS, f"cache.files[{index}]"))
-
-    if unknown:
-        module.fail_json(
-            msg=f"Cloudflare does not use these cache purge fields: {', '.join(unknown)}",
-            unsupported_fields=unknown,
-        )
 
 
 def run(module, client):
@@ -217,18 +163,10 @@ def main():
                     "hosts": {"type": "list", "elements": "str"},
                     "prefixes": {"type": "list", "elements": "str"},
                 },
-                "mutually_exclusive": [list(CACHE_KEYS)],
             },
         },
         supports_check_mode=True,
     )
-
-    if not cache_payload(module):
-        module.fail_json(msg="cache must not be empty")
-
-    validate_empty_lists(module)
-    validate_file_items(module)
-    validate_field_names(module)
 
     if module.check_mode:
         require_cloudflare_sdk(module)

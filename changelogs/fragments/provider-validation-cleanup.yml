@@ -1,0 +1,70 @@
+---
+bugfixes:
+  - all modules - fail with a clear message when O(api_token) contains a non-ASCII character. The module crashed
+    with a UnicodeEncodeError while building the request headers.
+  - access_groups, access_policies, access_service_tokens, and their info modules - no longer fail with "malformed
+    data" when the account has a resource Cloudflare stored without a name (it stores an empty name as null). Lookups
+    skip such resources, the info modules return them without a name, and the info roles leave them out of their
+    name-keyed dicts.
+  - access_apps - send inline policy C(include), C(exclude), or C(require) values that are not lists to Cloudflare
+    instead of failing with a TypeError.
+  - pages_projects - reject a C(wrangler_config_hash) other than null before any request. Cloudflare drops it on
+    create and update, so the run never converged.
+  - pages_projects - validate O(domains) only with O(state=present). Deleting a project sends no domains, so an
+    invalid name blocked a valid delete.
+  - pagerules - check O(targets) for keys Cloudflare does not store only with O(state=present). Deleting a page
+    rule sends no targets, so such a key blocked a valid delete.
+  - rules_lists - reject a C(redirect.source_url) whose host is an IPv6 address, including a bracketed one such as
+    C([2001:db8::1]/), before any write. Cloudflare stores a bracketed address without its brackets, a form it
+    rejects, so the list never converged.
+  - rules_lists - reject a C(redirect.source_url) that contains C(%3F), C(%23), or C(%25) in any case before any
+    write. Cloudflare decodes them to C(?), C(#), and C(%), which it then rejects, so the list never converged.
+  - rules_lists - reject a C(redirect.source_url) without a host, such as C(https:///a) or C(/a), before any
+    write. Cloudflare rejected it only after creating the list.
+  - warp_connector - reject an empty O(warp_connector#module:tunnel_secret) when creating a connector. Cloudflare
+    rejected it only after the connector was created.
+minor_changes:
+  - Modules validate input only to prevent a crash, a partial change, a run that never converges, or an action on
+    the wrong resource; other input now reaches Cloudflare, and the module reports Cloudflare's error.
+  - all modules - only an empty or C(.)/C(..) C(phase) or C(_id) option, which the SDK cannot put in a request
+    path, and a non-ASCII O(api_token) fail early. Whitespace in these options, an empty C(domain), and empty,
+    whitespace-only, or control-character tokens are sent; Cloudflare or the SDK reports the error.
+  - all modules - accept leading or trailing whitespace in O(production_branch) and C(name). A name Cloudflare
+    stores with surrounding whitespace, such as that of an Access policy, cloudflared tunnel, or WARP Connector, is
+    no longer reported as malformed, so it converges. Cloudflare trims Access application, group, and service token
+    names, so a padded name there is not idempotent.
+  - access_apps, access_groups, access_service_tokens - an empty or whitespace-only O(access_groups#module:name)
+    fails before any change; access_policies fails only for an empty name, as Cloudflare stores a whitespace-only
+    one. pages_projects fails for an empty name or O(pages_projects#module:production_branch).
+  - access_apps, access_groups, access_policies - reject an empty string only in the C(account_id) of a
+    C(cloudflare_account_member) or C(device_posture) selector and the C(identity_provider_id) of a C(saml)
+    selector, and a non-mapping selector value only for a null C(any_valid_service_token), which Cloudflare
+    stores differently. Other such values, such as an empty C(saml) C(attribute_value), are sent.
+  - access_apps - no longer check inline policy C(mfa_config) keys, or destination keys for types other than
+    C(public) and C(private).
+  - cfd_tunnel - no longer check O(cfd_tunnel#module:tunnel_secret); Cloudflare accepts base64 secrets shorter than
+    32 bytes. A tunnel can be created without O(cfd_tunnel#module:config_src).
+  - devices_policy - send a C(service_mode_v2) C(port) without a C(mode) to Cloudflare, which rejects it; a
+    C(port) with a mode other than C(proxy) still fails before any change. Null route and C(service_mode_v2) keys
+    are ignored, as Cloudflare drops them.
+  - pagerules - no longer check the C(value) keys of a C(cache_key_fields) action or that each target sets
+    C(target), C(constraint.operator), and C(constraint.value); an action C(id) fails early only when it is a
+    mapping or a list. Null target, constraint, action, and value keys are ignored. Only a O(pagerules#module:priority)
+    of 0 fails early; Cloudflare rejects a negative one.
+  - pages_projects - accept null C(wrangler_config_hash), C(placement.mode), C(limits.cpu_ms), and environment
+    variable C(value), which Cloudflare clears, and send null values and binding entry keys whose handling by
+    Cloudflare is not verified, such as C(services) C(environment) or an C(r2_buckets) entry key. O(rotate_secrets)
+    without a secret no longer fails.
+  - purge_cache - allow combined purge types in O(purge_cache#module:cache) again, and send an empty O(cache), empty
+    lists, and any file items to Cloudflare, which rejects them or purges nothing. The purge_cache role no longer
+    skips an empty C(cache).
+  - rules_lists - accept a C(redirect.target_url) with any scheme or without a host, such as C(ftp://example.com/)
+    or C(https://), and a wildcard C(hostname.url_hostname) whose name has 252 characters, which Cloudflare stores.
+    A new list without O(rules_lists#module:kind) is sent to Cloudflare, which rejects it.
+  - rulesets - a new ruleset without O(rulesets#module:name) is sent to Cloudflare, which rejects it.
+  - warp_connector - check O(warp_connector#module:tunnel_secret) only when creating a connector, and only that it
+    is non-empty base64 with or without padding; Cloudflare rejects other values only after the connector is created.
+  - zones - accept a null C(pool_id) in the C(aegis) setting, which converges, ignore null unknown setting value
+    keys, no longer check C(automatic_platform_optimization) values or the setting ids of an existing zone for whitespace, send a
+    O(zones#module:name) of C(.) to Cloudflare, and create a zone without O(zones#module:account_id) in the API
+    token's account.

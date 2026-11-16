@@ -89,7 +89,7 @@ options:
         C(.example.com), C(-a.example.com), C(a-.example.com), and a bare
         C(*.) are not supported. A single trailing C(.) is accepted.
       - A C(hostname.url_hostname) entry must have at most 253 characters, not
-        counting a single trailing C(.).
+        counting a leading C(*.) or a single trailing C(.).
       - C(hostname.exclude_exact_hostname=false) may be set only when
         C(hostname.url_hostname) is a wildcard such as C(*.example.com).
       - An C(asn) entry must be an integer from 1 to 4294967295.
@@ -110,18 +110,22 @@ options:
         C(?x=1), a fragment such as C(#top), userinfo such as C(user@), or a port
         such as C(:8080), and may use only the C(http) or C(https) scheme,
         followed by C(://), so C(http:example.com) and C(example.com:/) are
-        not supported. An IPv6 address host must be enclosed in brackets, such
-        as C([2001:db8::1]/).
+        not supported. It must have a host, so C(/a) and C(https:///a) are not
+        supported, and its host must not be an IPv6 address, because Cloudflare
+        stores C([2001:db8::1]/) without its brackets, a form it rejects.
       - A C(redirect.source_url) or C(redirect.target_url) may use C(%) only
         in a percent-escape of two hexadecimal digits, such as C(%20), so
         C(example.com/%zz) is not supported.
-      - A C(redirect.target_url) must be an absolute URL with the C(http) or
-        C(https) scheme and a host, such as C(https://example.com/path);
-        C(example.com/path) and C(/path) are not supported. Its authority
-        must not contain whitespace, and its port, when set, must contain
-        only digits, so C(https://example.com:abc/) is not supported. It must
-        not start with whitespace or contain an ASCII control character, such
-        as a tab or newline, anywhere.
+      - A C(redirect.source_url) must not contain C(%3F), C(%23), or C(%25), in
+        any case, because Cloudflare decodes them to C(?), C(#), and C(%),
+        which it then rejects.
+      - A C(redirect.target_url) must start with a scheme, such as
+        C(https://example.com/path); C(example.com/path), C(/path), and
+        C(//example.com/path) are not supported. Its authority must not contain
+        whitespace, and its port, when set, must contain only digits, so
+        C(https://example.com:abc/) is not supported. It must not start with
+        whitespace or contain an ASCII control character, such as a tab or
+        newline, anywhere.
       - A C(redirect.status_code), when set, must be the integer 301, 302,
         307, or 308.
   operation_timeout:
@@ -241,7 +245,6 @@ from urllib.parse import urlsplit
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
-    MAX_DNS_NAME_LENGTH,
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
@@ -282,10 +285,12 @@ IDENTITY_FIELDS = {
 }
 
 SOURCE_URL_SCHEMES = ("http", "https")
-TARGET_URL_SCHEMES = ("http", "https")
 # A "%" not followed by two hexadecimal digits, which Cloudflare rejects in a
 # redirect URL.
 INVALID_PERCENT_ESCAPE = re.compile(r"%(?![0-9A-Fa-f]{2})")
+# Percent-escapes of "?", "#", and "%", which Cloudflare decodes in a redirect
+# source URL and then rejects, so the stored form could never be requested.
+DECODED_REJECTED_ESCAPE = re.compile(r"%(?:3F|23|25)", re.IGNORECASE)
 
 # Characters the SDK documents for a hostname url_hostname (ASCII letters,
 # digits, '*', and '-'), plus '.', '_', and uppercase letters, which
@@ -596,11 +601,11 @@ def valid_hostname(value):
         return False
 
     # A single trailing dot is accepted and does not count toward the length.
-    return valid_dns_labels(host.removesuffix(".")) and len(value.removesuffix(".")) <= MAX_DNS_NAME_LENGTH
+    return valid_dns_labels(host.removesuffix("."))
 
 
 def target_url_valid(value):
-    """Return whether value is an absolute http or https URL with a host.
+    """Return whether value is a URL with a scheme.
 
     The value must not start with whitespace or contain an ASCII control
     character or a "%" outside a percent-escape. The authority must not
@@ -618,7 +623,7 @@ def target_url_valid(value):
     except ValueError:
         return False
 
-    if parts.scheme not in TARGET_URL_SCHEMES or not parts.hostname:
+    if not parts.scheme:
         return False
 
     # urlsplit drops tabs and newlines, so read the authority from the value.
@@ -646,6 +651,9 @@ def source_url_error(value):
     if INVALID_PERCENT_ESCAPE.search(value):
         return "must use '%' only in a percent-escape such as %20"
 
+    if DECODED_REJECTED_ESCAPE.search(value):
+        return "must not contain %3F, %23, or %25, which Cloudflare decodes to characters it rejects"
+
     scheme, separator, rest = value.partition("://")
     if not separator or "/" in scheme:
         scheme, rest = None, value
@@ -654,18 +662,20 @@ def source_url_error(value):
         return "must use the http or https scheme, or none"
 
     authority = rest.partition("/")[0]
+    if not authority:
+        return "must include a host"
+
     if "@" in authority:
         return "must not include userinfo"
 
-    host_port = authority.rpartition("]")[2] if authority.startswith("[") else authority
-    if host_port.count(":") > 1:
-        return "must enclose an IPv6 address in brackets"
+    if authority.startswith("[") or authority.count(":") > 1:
+        return "must not use an IPv6 address as its host"
 
-    port = host_port.rpartition(":")[2]
-    if host_port.count(":") == 1 and ((port.isascii() and port.isdigit()) or (scheme is not None and port)):
+    port = authority.rpartition(":")[2]
+    if ":" in authority and ((port.isascii() and port.isdigit()) or (scheme is not None and port)):
         return "must not include a port"
 
-    if scheme is None and ":" in host_port:
+    if scheme is None and ":" in authority:
         return "must use the http or https scheme followed by '://', or none"
 
     return None
@@ -749,7 +759,7 @@ def validate_elements(module, kind):
         if isinstance(target_url, str) and not target_url_valid(target_url):
             module.fail_json(
                 msg=(
-                    f"elements[{index}].redirect.target_url must be an absolute http or https URL with a host, "
+                    f"elements[{index}].redirect.target_url must start with a scheme, have "
                     "no whitespace in its authority, and only digits in its port, must not start with whitespace "
                     "or contain an ASCII control character, and may use '%' only in a percent-escape such as %20"
                 ),
@@ -850,10 +860,8 @@ def ensure_present(module, client, current):
     lists = client.rules.lists
 
     if current is None:
-        if params.get("kind") is None:
-            module.fail_json(msg="kind is required when creating a Rules list")
-
-        current_kind = params["kind"]
+        # Cloudflare rejects a new list without a kind.
+        current_kind = params.get("kind")
     else:
         current_id = resource_id(module, current, "Rules list")
         current_kind = resource_field(module, current, "kind", "Rules list")
@@ -863,7 +871,8 @@ def ensure_present(module, client, current):
                 rules_list=current,
             )
 
-    validate_elements(module, current_kind)
+    if current_kind is not None:
+        validate_elements(module, current_kind)
 
     changed = False
     created = False

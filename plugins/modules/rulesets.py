@@ -330,10 +330,8 @@ def run(module, client):
     )
 
     if current is None:
-        if params.get("name") is None:
-            module.fail_json(msg="name is required when creating a ruleset")
-
-        name = params["name"]
+        # Cloudflare rejects a new ruleset without a name.
+        name = params.get("name")
         payload = {"kind": params["kind"], "name": name, "phase": phase, "rules": rules or []}
     else:
         name = resource_field(module, current, "name", "ruleset")

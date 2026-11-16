@@ -33,12 +33,9 @@ options:
         C(always_use_https), C(disable_apps), C(disable_performance),
         C(disable_security), and C(disable_zaraz) actions accept only C(id).
         The C(value) of a C(forwarding_url) action accepts only C(url) and
-        C(status_code), and that of a C(cache_key_fields) action only
-        C(cookie), C(header), C(host), C(query_string), and C(user), each with
-        the fields Cloudflare stores for it. Cloudflare accepts any other key
-        but does not store it, so the module fails before making changes.
-      - Each action must set C(id) to a non-empty string; otherwise the module
-        fails before any request.
+        C(status_code). Cloudflare accepts any other key but does not store
+        it, so the module fails before making changes.
+      - An action C(id) that is a mapping or a list fails before any request.
       - Actions are compared by C(id), regardless of their order.
       - The C(value) of a C(cache_ttl_by_status) action is compared on every
         key, so a status code removed from it is removed from the rule. Other
@@ -50,13 +47,10 @@ options:
     elements: dict
     description:
       - URL matching conditions that identify the page rule.
-      - Each target accepts only C(target) and C(constraint), whose
-        C(operator) and C(value) are its only keys. Cloudflare accepts any
-        other key but does not store it, so the module fails before making
-        changes.
-      - Each target must set C(target) and the C(operator) and C(value) of its
-        C(constraint), which identify the page rule; otherwise the module
-        fails before any request.
+      - With O(state=present), each target accepts only C(target) and
+        C(constraint), whose C(operator) and C(value) are its only keys.
+        Cloudflare accepts any other key but does not store it, so the module
+        fails before making changes.
       - A page rule matches only when its stored targets equal the requested
         targets.
       - URL values are matched as Cloudflare stores them, with the host in
@@ -66,9 +60,10 @@ options:
     description:
       - Evaluation priority of the page rule, as an ordinal position from 1 to
         the number of page rules in the zone, including a rule being created.
-      - A priority below 1 or above that number fails before any change, because
+      - A priority of 0 or above that number fails before any change, because
         Cloudflare would store the rule at the first or last position instead.
-      - In check mode, only the lower bound is checked, because page rules that
+        Cloudflare rejects a negative priority.
+      - In check mode, the upper bound is not checked, because page rules that
         earlier tasks in the same run would create are not counted.
       - An existing rule's priority is preserved when omitted.
   status:
@@ -171,73 +166,45 @@ TARGET_FIELDS = {"constraint": ("operator", "value"), "target": None}
 ACTION_FIELDS = ("id", "value")
 # Actions whose SDK type has only an id; Cloudflare drops their value.
 ID_ONLY_ACTIONS = ("always_use_https", "disable_apps", "disable_performance", "disable_security", "disable_zaraz")
-ACTION_VALUE_FIELDS = {
-    "cache_key_fields": {
-        "cookie": ("check_presence", "include"),
-        "header": ("check_presence", "exclude", "include"),
-        "host": ("resolved",),
-        "query_string": ("exclude", "include"),
-        "user": ("device_type", "geo", "lang"),
-    },
-    "forwarding_url": ("status_code", "url"),
-}
+ACTION_VALUE_FIELDS = {"forwarding_url": ("status_code", "url")}
 
 
 def validate_field_names(module):
-    """Fail when a target or action field Cloudflare accepts but never stores is requested."""
-    params = module.params
-    unknown = []
-    for index, target in enumerate(params["targets"]):
-        unknown.extend(unsupported_fields(target, TARGET_FIELDS, f"targets[{index}]"))
+    """Fail when a target or action field Cloudflare accepts but never stores is requested.
 
-    # Actions are not sent when removing a page rule.
-    actions = params.get("actions") if params["state"] == "present" else None
+    Targets and actions are not sent when removing a page rule. Null fields
+    are ignored, as Cloudflare drops them and the comparison ignores them.
+    """
+    params = module.params
+    if params["state"] != "present":
+        return
+
+    # Actions are keyed by id, so an id must be hashable.
     invalid = [
         f"actions[{index}].id"
-        for index, action in enumerate(actions or ())
-        if not isinstance(action.get("id"), str) or not action["id"]
+        for index, action in enumerate(params["actions"])
+        if isinstance(action.get("id"), (dict, list))
     ]
     if invalid:
-        module.fail_json(msg=f"{', '.join(invalid)} must be a non-empty string", invalid_fields=invalid)
+        module.fail_json(msg=f"{', '.join(invalid)} must not be a mapping or a list", invalid_fields=invalid)
 
-    for index, action in enumerate(actions or ()):
+    unknown = []
+    for index, target in enumerate(params["targets"]):
+        unknown.extend(unsupported_fields(serialize_resource(target), TARGET_FIELDS, f"targets[{index}]"))
+
+    for index, action in enumerate(params["actions"]):
         path = f"actions[{index}]"
+        action = serialize_resource(action)
         action_id = action.get("id")
         fields = ("id",) if action_id in ID_ONLY_ACTIONS else ACTION_FIELDS
         unknown.extend(unsupported_fields(action, fields, path))
-        if isinstance(action_id, str) and action_id in ACTION_VALUE_FIELDS:
+        if action_id in ACTION_VALUE_FIELDS:
             unknown.extend(unsupported_fields(action.get("value"), ACTION_VALUE_FIELDS[action_id], f"{path}.value"))
 
     if unknown:
         module.fail_json(
             msg=f"Cloudflare does not store these page rule fields: {', '.join(unknown)}",
             unsupported_fields=unknown,
-        )
-
-
-def validate_targets(module):
-    """Fail when a target omits a field that identifies the page rule.
-
-    Page rules are matched on these fields, so a target without one could
-    never match its stored rule.
-    """
-    missing = []
-    for index, target in enumerate(module.params["targets"]):
-        path = f"targets[{index}]"
-        if target.get("target") is None:
-            missing.append(f"{path}.target")
-
-        constraint = target.get("constraint")
-        if not isinstance(constraint, dict):
-            missing.append(f"{path}.constraint")
-            continue
-
-        missing.extend(f"{path}.constraint.{field}" for field in ("operator", "value") if constraint.get(field) is None)
-
-    if missing:
-        module.fail_json(
-            msg=f"Page rule targets must set these fields that identify the page rule: {', '.join(missing)}",
-            missing_fields=missing,
         )
 
 
@@ -374,14 +341,16 @@ def find_pagerule(module, client, targets):
 
 
 def validate_priority(module, current, rule_count):
-    """Fail when priority is below 1 or exceeds the zone's rule count after this change.
+    """Fail when priority is 0 or exceeds the zone's rule count after this change.
+
+    Cloudflare stores 0 as 1 and rejects a negative priority.
 
     Check mode skips the upper bound: rules that earlier tasks would create are
     not in the current count, so a valid batch would fail.
     """
     priority = module.params.get("priority")
-    if priority is not None and priority < 1:
-        module.fail_json(msg=f"priority {priority} must be at least 1", zone_id=module.params["zone_id"])
+    if priority == 0:
+        module.fail_json(msg="priority 0 must be at least 1", zone_id=module.params["zone_id"])
 
     if module.check_mode:
         return
@@ -398,7 +367,6 @@ def run(module, client):
     zone_id = module.params["zone_id"]
     page_rules = client.page_rules
     validate_field_names(module)
-    validate_targets(module)
     targets = canonical_targets(module.params["targets"])
     current, rule_count = find_pagerule(module, client, targets)
 

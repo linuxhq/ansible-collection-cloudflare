@@ -30,7 +30,10 @@ options:
     type: str
     description:
       - Secret used to authenticate the WARP Connector tunnel.
-      - Must be base64-encoded and decode to at least 32 bytes.
+      - When creating a connector, it must be non-empty and base64-encoded, with
+        or without padding, because Cloudflare rejects other values only after the
+        connector is created. It is not checked when O(rotate_secrets) applies it
+        to an existing connector.
       - Applied when creating a connector. Cloudflare does not return the current
         secret, so changes are not detected; use O(rotate_secrets) to apply the
         secret to an existing connector.
@@ -86,6 +89,8 @@ message:
 
 """
 
+from base64 import b64decode
+
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
@@ -99,8 +104,25 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     resource_field,
     resource_id,
     serialize_resource,
-    validate_tunnel_secret,
 )
+
+
+def validate_created_secret(module):
+    """Fail when tunnel_secret is empty or not base64, which Cloudflare rejects only after the connector is created.
+
+    Cloudflare accepts standard base64 of any length, with or without padding.
+    """
+    secret = module.params.get("tunnel_secret")
+    if secret is None:
+        return
+
+    try:
+        b64decode(secret + "=" * (-len(secret) % 4), validate=True)
+    except ValueError:
+        secret = ""
+
+    if not secret:
+        module.fail_json(msg="tunnel_secret must be non-empty and base64-encoded")
 
 
 def checked_connector(module, connector, expected_id=None):
@@ -160,6 +182,7 @@ def ensure_present(module, connectors, current):
         warp_connector = checked_connector(module, warp_connector, expected_id=current_id)
         module.exit_json(changed=True, message="WARP Connector updated", warp_connector=warp_connector)
 
+    validate_created_secret(module)
     if module.check_mode:
         module.exit_json(changed=True, message="WARP Connector would be created")
 
@@ -181,9 +204,6 @@ def run(module, client):
     params = module.params
     account_id = params["account_id"]
     connectors = client.zero_trust.tunnels.warp_connector
-    if params["state"] == "present":
-        validate_tunnel_secret(module, params.get("tunnel_secret"))
-
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the WARP Connector",
         account_id=account_id,

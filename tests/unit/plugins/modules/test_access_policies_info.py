@@ -33,6 +33,17 @@ class AccessPoliciesInfoTests(TestCase):
 
         self.assertEqual(raised.exception.values, {"changed": False, "access_policies": policies})
 
+    def test_lists_nameless_policies(self):
+        # Cloudflare stores a policy with an empty name as null.
+        client = Mock()
+        policies = [{"id": "one"}, {"id": "two", "name": "admins"}]
+        client.zero_trust.access.policies.list.return_value = iter(policies)
+
+        with self.assertRaises(ModuleExit) as raised:
+            access_policies_info.run(FakeModule({"account_id": "account"}), client)
+
+        self.assertEqual(raised.exception.values["access_policies"], policies)
+
     def test_rejects_malformed_policies(self):
         client = Mock()
         client.zero_trust.access.policies.list.return_value = [{"name": "admins"}]

@@ -33,7 +33,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     unsupported_fields,
     valid_dns_labels,
     validate_access_selectors,
-    validate_tunnel_secret,
     values_differ,
 )
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
@@ -174,28 +173,37 @@ class ClientTests(TestCase):
 
         constructor.assert_called_once_with(api_token="secret", default_headers=EXPECTED_HEADERS)
 
-        for name in ("account_id", "domain", "name", "phase", "production_branch", "tunnel_id", "zone_id"):
+        # The SDK raises ValueError for an empty path parameter.
+        for name in ("account_id", "phase", "tunnel_id", "zone_id"):
             with (
                 self.subTest(name=name),
                 patch.object(cloudflare_utils, "Cloudflare", constructor),
                 self.assertRaises(ModuleFail) as raised,
-                cloudflare_client(FakeModule({"api_token": "secret", name: " \t"})),
+                cloudflare_client(FakeModule({"api_token": "secret", name: ""})),
             ):
                 pass
 
             self.assertEqual(raised.exception.values["msg"], f"{name} must not be empty")
 
-        with (
-            patch.object(cloudflare_utils, "Cloudflare", constructor),
-            self.assertRaises(ModuleFail) as raised,
-            cloudflare_client(FakeModule({"api_token": "secret", "account_id": " account"})),
-        ):
-            pass
+        # Cloudflare rejects these on the first request, or the module checks them.
+        for name, value in (("zone_id", " \t"), ("domain", ""), ("name", ""), ("production_branch", "")):
+            with (
+                self.subTest(name=name, value=value),
+                patch.object(cloudflare_utils, "Cloudflare", constructor),
+                cloudflare_client(FakeModule({"api_token": "secret", name: value})),
+            ):
+                pass
 
-        self.assertEqual(
-            raised.exception.values["msg"],
-            "account_id must not contain leading or trailing whitespace",
-        )
+    def test_client_passes_padded_values_to_cloudflare(self):
+        # Cloudflare trims, rejects, or stores these as sent.
+        constructor = Mock(return_value=sdk_context(Mock()))
+        for name in ("account_id", "domain", "name", "phase", "production_branch", "zone_id"):
+            with (
+                self.subTest(name=name),
+                patch.object(cloudflare_utils, "Cloudflare", constructor),
+                cloudflare_client(FakeModule({"api_token": "secret", name: " value "})),
+            ):
+                pass
 
     def test_client_rejects_dot_segment_path_parameters(self):
         constructor = Mock(return_value=sdk_context(Mock()))
@@ -222,20 +230,29 @@ class ClientTests(TestCase):
             ):
                 pass
 
-    def test_client_rejects_empty_or_control_character_tokens(self):
-        for token, message in (
-            (" ", "api_token must not be empty"),
-            ("secret\nvalue", "api_token must not contain control characters"),
+    def test_client_rejects_non_ascii_tokens(self):
+        # HTTPX raises UnicodeEncodeError for the header.
+        with (
+            patch.object(cloudflare_utils, "Cloudflare", Mock()),
+            self.assertRaises(ModuleFail) as raised,
+            cloudflare_client(FakeModule({"api_token": "secr\u00e9t"})),
         ):
+            pass
+
+        self.assertEqual(raised.exception.values["msg"], "api_token must contain only ASCII characters")
+
+    def test_client_leaves_empty_and_control_character_tokens_to_the_sdk(self):
+        # The SDK fails these with a connection error before sending a request.
+        for token in (" ", "secret\nvalue"):
+            constructor = Mock(return_value=sdk_context(Mock()))
             with (
                 self.subTest(token=token),
-                patch.object(cloudflare_utils, "Cloudflare", Mock()),
-                self.assertRaises(ModuleFail) as raised,
+                patch.object(cloudflare_utils, "Cloudflare", constructor),
                 cloudflare_client(FakeModule({"api_token": token})),
             ):
                 pass
 
-            self.assertEqual(raised.exception.values["msg"], message)
+            constructor.assert_called_once()
 
     def test_client_reports_sdk_failures_with_context(self):
         cases = (
@@ -280,14 +297,6 @@ class ClientTests(TestCase):
 
 
 class ValueTests(TestCase):
-    def test_validates_tunnel_secrets(self):
-        validate_tunnel_secret(FakeModule({}), None)
-        validate_tunnel_secret(FakeModule({}), "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
-
-        for secret in ("not-base64", "c2hvcnQ="):
-            with self.subTest(secret=secret), self.assertRaises(ModuleFail):
-                validate_tunnel_secret(FakeModule({}), secret)
-
     def test_serializes_sdk_models_to_json_values(self):
         expires_at = datetime(2026, 8, 11, 12, 30, tzinfo=timezone.utc)
 
@@ -467,7 +476,14 @@ class ValueTests(TestCase):
         self.assertIsNone(find_resource(module, iter(items), "resource", "name", "Three"))
 
         with self.assertRaises(ModuleFail):
-            find_resource(module, [{"id": "one"}], "resource", "name", "One")
+            find_resource(module, [{"id": "one", "name": "One"}, "not a mapping"], "resource", "name", "One")
+
+    def test_find_resource_skips_items_without_the_field(self):
+        # Cloudflare stores an Access policy, group, or token with an empty name as null.
+        items = [{"id": "nameless"}, {"id": "null", "name": None}, {"id": "one", "name": "One"}]
+
+        self.assertEqual(find_resource(FakeModule({}), iter(items), "resource", "name", "One"), items[2])
+        self.assertIsNone(find_resource(FakeModule({}), iter(items[:2]), "resource", "name", "One"))
 
     def test_get_or_none_maps_only_not_found(self):
         self.assertIsNone(get_or_none(Mock(side_effect=status_error(404))))
@@ -493,8 +509,6 @@ class ValueTests(TestCase):
         cases = (
             (lambda items: resource_list(module, items, "resource", ("id", "name")), {"id": " one", "name": "One"}),
             (lambda items: resource_list(module, items, "resource", ("id", "name")), {"id": "one", "name": 1}),
-            (lambda items: find_resource(module, items, "resource", "name", "One"), {"id": "one", "name": None}),
-            (lambda items: find_resource(module, items, "resource", "name", " One"), {"id": "one", "name": " One"}),
         )
         for lookup, item in cases:
             with self.subTest(item=item), self.assertRaises(ModuleFail) as raised:
@@ -505,6 +519,11 @@ class ValueTests(TestCase):
                 {"msg": "Cloudflare API returned malformed resource data", "resource_id": item["id"]},
             )
 
+    def test_find_resource_matches_a_padded_name(self):
+        item = {"id": "one", "name": " One "}
+
+        self.assertEqual(find_resource(FakeModule({}), [item], "resource", "name", " One "), item)
+
     def test_find_resource_fails_on_duplicate_names(self):
         items = [{"id": "one", "name": "One"}, {"id": "two", "name": "Two"}, {"id": "three", "name": "One"}]
 
@@ -513,6 +532,19 @@ class ValueTests(TestCase):
 
         self.assertEqual(raised.exception.values["msg"], "Found more than one resource with name 'One'")
         self.assertEqual(raised.exception.values["matching_ids"], ["one", "three"])
+
+    def test_resource_field_accepts_a_padded_name_but_not_a_padded_id(self):
+        resource = {"id": "one", "name": " One "}
+
+        self.assertEqual(resource_field(FakeModule({}), resource, "name", "resource", expected=" One "), " One ")
+        for value in (" one", ""):
+            with self.subTest(id=value), self.assertRaises(ModuleFail):
+                resource_field(FakeModule({}), {"id": value}, "id", "resource")
+
+        # Cloudflare stores a whitespace-only Access policy name verbatim.
+        self.assertEqual(resource_field(FakeModule({}), {"name": "   "}, "name", "resource"), "   ")
+        with self.assertRaises(ModuleFail):
+            resource_field(FakeModule({}), {"name": ""}, "name", "resource")
 
     def test_unsupported_fields_lists_unknown_keys_at_every_level(self):
         fields = {"a": ("b", "c"), "d": None}
@@ -563,9 +595,9 @@ class ValueTests(TestCase):
                     },
                 )
 
-    def test_access_selectors_reject_non_mapping_known_selector_values(self):
+    def test_access_selectors_reject_null_any_valid_service_token(self):
         for field in ("include", "exclude", "require"):
-            for value in (None, "", []):
+            for value in (None,):
                 with self.subTest(field=field, value=value):
                     rules = {field: [{"everyone": {}}, {"any_valid_service_token": value}]}
 
@@ -579,6 +611,15 @@ class ValueTests(TestCase):
                             "selector without fields, as Cloudflare stores a null selector as {}"
                         },
                     )
+
+    def test_access_selectors_leave_other_non_mapping_values_to_cloudflare(self):
+        # Cloudflare rejects these on the first write.
+        rules = {
+            "include": [{"email": None}, {"ip": None}, {"group": None}, {"email": "a@example.com"}],
+            "require": [{"everyone": []}, {"everyone": True}, {"any_valid_service_token": ""}],
+        }
+
+        validate_access_selectors(FakeModule(rules))
 
     def test_access_selectors_reject_non_mapping_and_empty_selectors(self):
         cases = (
@@ -597,12 +638,19 @@ class ValueTests(TestCase):
 
                     self.assertEqual(raised.exception.values, {"msg": f"policies[0].{field}[1] {message}"})
 
-    def test_access_selectors_reject_empty_string_fields(self):
+    def test_access_selectors_reject_empty_string_fields_cloudflare_drops(self):
         rules = {
-            "include": [{"device_posture": {"integration_uid": "posture", "account_id": ""}}],
-            "require": [{"saml": {"attribute_name": "group", "attribute_value": ""}}],
+            "include": [
+                {"device_posture": {"integration_uid": "posture", "account_id": ""}},
+                {"cloudflare_account_member": {"account_id": ""}},
+            ],
+            "require": [{"saml": {"attribute_name": "group", "attribute_value": "x", "identity_provider_id": ""}}],
         }
-        empty = ["include[0].device_posture.account_id", "require[0].saml.attribute_value"]
+        empty = [
+            "include[0].device_posture.account_id",
+            "include[1].cloudflare_account_member.account_id",
+            "require[0].saml.identity_provider_id",
+        ]
 
         with self.assertRaises(ModuleFail) as raised:
             validate_access_selectors(FakeModule(rules))
@@ -615,6 +663,15 @@ class ValueTests(TestCase):
                 "empty_fields": empty,
             },
         )
+
+    def test_access_selectors_leave_other_empty_string_fields_to_cloudflare(self):
+        # Cloudflare stores an empty saml attribute_value and rejects the others on the first write.
+        rules = {
+            "include": [{"email": {"email": ""}}, {"device_posture": {"integration_uid": ""}}],
+            "require": [{"saml": {"attribute_name": "group", "attribute_value": ""}}],
+        }
+
+        validate_access_selectors(FakeModule(rules))
 
     def test_access_selectors_accept_stored_fields_and_unknown_selector_types(self):
         rules = {

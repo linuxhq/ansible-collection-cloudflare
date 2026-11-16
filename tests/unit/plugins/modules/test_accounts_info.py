@@ -47,7 +47,7 @@ class AccountsInfoTests(TestCase):
 
     def test_rejects_malformed_accounts(self):
         with self.assertRaises(ModuleFail) as raised:
-            accounts_info.run(FakeModule({"name": "wanted"}), client_with([{"id": "account"}]))
+            accounts_info.run(FakeModule({"name": "wanted"}), client_with(["account"]))
 
         self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed account data")
 

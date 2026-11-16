@@ -279,13 +279,14 @@ class RulesListsTests(TestCase):
         api.create.assert_not_called()
         self.assertTrue(result["changed"])
 
-    def test_create_requires_kind(self):
+    def test_create_without_kind_reaches_cloudflare(self):
+        # Cloudflare rejects a new list without a kind on the only write.
+        # Element checks depend on the kind, so they are skipped without one.
         client, api = make_client()
 
-        result = self.run_module(FakeModule(params(kind=None)), client)
+        self.run_module(FakeModule(params(kind=None, elements=[{"ip": "not an ip"}])), client)
 
-        api.create.assert_not_called()
-        self.assertEqual(result["msg"], "kind is required when creating a Rules list")
+        api.create.assert_called_once_with(account_id="account", description="addresses", kind=None, name="addresses")
 
     def test_creates_list_with_default_description(self):
         created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
@@ -444,7 +445,7 @@ class RulesListsTests(TestCase):
                 f"{'a' * 64}.example.com",
                 f"*.{'a' * 64}.example.com",
                 ".".join(["a" * 63] * 4),
-                "*." + ".".join(["a" * 63] * 3 + ["b" * 60]),
+                ".".join(["a" * 63] * 3 + ["b" * 58, "com"]),
             )
         ] + [
             ("asn", {"asn": value}, "elements[1].asn must be an integer from 1 to 4294967295", value)
@@ -539,7 +540,7 @@ class RulesListsTests(TestCase):
             ("localhost:80/a", "must not include a port"),
             ("https://example.com:8080/a", "must not include a port"),
             ("https://example.com:443", "must not include a port"),
-            ("https://[2001:db8::1]:8080/a", "must not include a port"),
+            ("https://[2001:db8::1]:8080/a", "must not use an IPv6 address as its host"),
             ("ftp://example.com/a", "must use the http or https scheme, or none"),
             ("a+b://example.com/a", "must use the http or https scheme, or none"),
             # Cloudflare rejects these when it replaces the list items.
@@ -547,8 +548,34 @@ class RulesListsTests(TestCase):
             ("http:example.com", "must use the http or https scheme followed by '://', or none"),
             ("example.com:/", "must use the http or https scheme followed by '://', or none"),
             ("example.com:abc/", "must use the http or https scheme followed by '://', or none"),
-            ("2001:db8::1/", "must enclose an IPv6 address in brackets"),
-            ("https://2001:db8::1/a", "must enclose an IPv6 address in brackets"),
+            ("2001:db8::1/", "must not use an IPv6 address as its host"),
+            ("https://2001:db8::1/a", "must not use an IPv6 address as its host"),
+            # Cloudflare stores these without the brackets, a form it rejects.
+            ("[2001:db8::1]/", "must not use an IPv6 address as its host"),
+            ("https://[2001:db8::1]/a", "must not use an IPv6 address as its host"),
+            # Cloudflare decodes these to "?", "#", and "%", which it then rejects.
+            (
+                "example.com/a%3fx",
+                "must not contain %3F, %23, or %25, which Cloudflare decodes to characters it rejects",
+            ),
+            (
+                "example.com/a%3Fx",
+                "must not contain %3F, %23, or %25, which Cloudflare decodes to characters it rejects",
+            ),
+            (
+                "example.com/a%23",
+                "must not contain %3F, %23, or %25, which Cloudflare decodes to characters it rejects",
+            ),
+            (
+                "example.com/a%25",
+                "must not contain %3F, %23, or %25, which Cloudflare decodes to characters it rejects",
+            ),
+            # Cloudflare rejects a source URL without a host after the list is created.
+            ("https:///a", "must include a host"),
+            ("https://", "must include a host"),
+            ("http://", "must include a host"),
+            ("/a", "must include a host"),
+            ("//a", "must include a host"),
             ("example.com/%zz", "must use '%' only in a percent-escape such as %20"),
             ("example.com/%2", "must use '%' only in a percent-escape such as %20"),
             ("example.com/a%", "must use '%' only in a percent-escape such as %20"),
@@ -563,15 +590,12 @@ class RulesListsTests(TestCase):
                 source_url=value,
             )
 
-    def test_target_urls_without_scheme_or_host_fail_before_any_write(self):
+    def test_target_urls_without_scheme_fail_before_any_write(self):
         for value in (
             "www.example.org/d",
             "example.org",
             "/relative",
             "//example.org/d",
-            "ftp://example.org/d",
-            "https://",
-            "https:///d",
             "https://[::1/d",
             "https://exa mple.com/",
             "https://exa\tmple.com/",
@@ -598,7 +622,7 @@ class RulesListsTests(TestCase):
                     {"redirect": {"source_url": "example.com/a", "target_url": value}},
                 ],
                 (
-                    "elements[1].redirect.target_url must be an absolute http or https URL with a host, "
+                    "elements[1].redirect.target_url must start with a scheme, have "
                     "no whitespace in its authority, and only digits in its port, must not start with whitespace "
                     "or contain an ASCII control character, and may use '%' only in a percent-escape such as %20"
                 ),
@@ -622,6 +646,9 @@ class RulesListsTests(TestCase):
             "https://example.com/a b",
             "https://example.com/ ",
             "https://example.com/%2F",
+            "ftp://example.com/",
+            "https://",
+            "https:///d",
         ):
             with self.subTest(value=value):
                 client, _ignored = make_client()
@@ -644,7 +671,7 @@ class RulesListsTests(TestCase):
             "example.com/a%2Fb",
             "example.com/https://example.net",
             "example.com/%2F",
-            "https://[2001:db8::1]/a",
+            "example.com/a%2Fb%41",
             # Cloudflare stores this as https://example.com/.
             "https://example.com:/",
         ):
@@ -792,6 +819,8 @@ class RulesListsTests(TestCase):
             ("hostname", {"hostname": {"url_hostname": ".".join(["a" * 63] * 3 + ["b" * 61])}}),
             ("hostname", {"hostname": {"url_hostname": ".".join(["a" * 63] * 3 + ["b" * 61]) + "."}}),
             ("hostname", {"hostname": {"url_hostname": "*." + ".".join(["a" * 63] * 3 + ["b" * 59])}}),
+            # Cloudflare stores a wildcard of a 252-character name, 254 characters in all.
+            ("hostname", {"hostname": {"url_hostname": "*." + ".".join(["a" * 63] * 3 + ["b" * 56, "com"])}}),
             ("asn", {"asn": 1}),
             ("asn", {"asn": 13335}),
             ("asn", {"asn": 4294967295}),

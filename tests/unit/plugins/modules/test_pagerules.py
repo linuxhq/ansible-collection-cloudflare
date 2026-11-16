@@ -90,35 +90,29 @@ class PageRulesTests(TestCase):
         self.assertEqual(found, current)
         self.assertEqual(rule_count, 1)
 
-    def test_partial_targets_fail_before_any_request(self):
-        cases = (
-            ([{"target": "url"}], ["targets[0].constraint"]),
-            ([{"constraint": TARGETS[0]["constraint"]}], ["targets[0].target"]),
-            ([{"target": "url", "constraint": {"value": "example.com/*"}}], ["targets[0].constraint.operator"]),
-            (
-                [TARGETS[0], {"target": "url", "constraint": {"operator": None}}],
-                ["targets[1].constraint.operator", "targets[1].constraint.value"],
-            ),
-        )
-        for targets, missing in cases:
-            for state in ("present", "absent"):
-                for check_mode in (True, False):
-                    with self.subTest(targets=targets, state=state, check_mode=check_mode):
-                        client, api = client_with([{"id": "other", "targets": TARGETS}], deleted={"id": "other"})
+    def test_partial_targets_reach_cloudflare(self):
+        # Cloudflare rejects partial targets on the only write.
+        for targets in (
+            [{"target": "url"}],
+            [{"constraint": TARGETS[0]["constraint"]}],
+            [{"target": "url", "constraint": {"value": "example.com/*"}}],
+            [TARGETS[0], {"target": "url", "constraint": {"operator": None}}],
+            [{"target": "url", "constraint": "example.com/*"}],
+        ):
+            with self.subTest(targets=targets):
+                client, api = client_with([{"id": "other", "targets": TARGETS}], created={"id": "new"})
 
-                        result = self.run_module(
-                            FakeModule(params(targets=targets, state=state), check_mode=check_mode), client
-                        )
+                self.run_module(FakeModule(params(targets=targets)), client)
 
-                        self.assertEqual(result["missing_fields"], missing)
-                        self.assertEqual(
-                            result["msg"],
-                            f"Page rule targets must set these fields that identify the page rule: {', '.join(missing)}",
-                        )
-                        api.list.assert_not_called()
-                        api.create.assert_not_called()
-                        api.update.assert_not_called()
-                        api.delete.assert_not_called()
+                api.create.assert_called_once()
+                self.assertEqual(api.create.call_args.kwargs["targets"], targets)
+
+                client, api = client_with([{"id": "other", "targets": TARGETS}])
+
+                result = self.run_module(FakeModule(params(targets=targets, state="absent")), client)
+
+                api.delete.assert_not_called()
+                self.assertEqual(result["message"], "Page rule already absent")
 
     def test_finds_rule_only_when_targets_are_equal(self):
         other = {"target": "url", "constraint": {"operator": "matches", "value": "other.example.com/*"}}
@@ -244,6 +238,35 @@ class PageRulesTests(TestCase):
                     api.create.assert_not_called()
                     api.update.assert_not_called()
                     self.assertEqual(result["msg"], "priority 0 must be at least 1")
+
+    def test_negative_priority_reaches_cloudflare(self):
+        # Cloudflare rejects a negative priority on the only write.
+        client, api = client_with(created={"id": "new"})
+
+        self.run_module(FakeModule(params(priority=-1)), client)
+
+        self.assertEqual(api.create.call_args.kwargs["priority"], -1)
+
+    def test_null_unstored_fields_are_ignored(self):
+        # Cloudflare drops null fields, and the comparison ignores them.
+        targets = [{**TARGETS[0], "foo": None, "constraint": {**TARGETS[0]["constraint"], "bar": None}}]
+        actions = [
+            {"id": "always_use_https", "value": None},
+            {"id": "forwarding_url", "value": {"url": "https://example.com", "status_code": 301, "x": None}},
+            {"id": "ssl", "value": "strict", "baz": None},
+        ]
+        stored = [
+            {"id": "always_use_https"},
+            {"id": "forwarding_url", "value": {"url": "https://example.com", "status_code": 301}},
+            {"id": "ssl", "value": "strict"},
+        ]
+        client, api = client_with([{"id": "rule", "actions": stored, "status": "active", "targets": TARGETS}])
+
+        result = self.run_module(FakeModule(params(actions=actions, targets=targets)), client)
+
+        self.assertNotIn("msg", result)
+        self.assertFalse(result["changed"])
+        api.update.assert_not_called()
 
     def test_accepts_priority_up_to_rule_count(self):
         other = {"id": "other", "actions": ACTIONS, "priority": 1, "targets": []}
@@ -396,15 +419,6 @@ class PageRulesTests(TestCase):
             ({"targets": [{"target": "url", "constraint": {**constraint, "qux": 1}}]}, ["targets[0].constraint.qux"]),
             ({"actions": [{"id": "always_use_https", "baz": 1}]}, ["actions[0].baz"]),
             ({"actions": [{"id": "forwarding_url", "value": forwarding}]}, ["actions[0].value.bar"]),
-            (
-                {
-                    "actions": [
-                        {"id": "cache_key_fields", "value": {"host": {"resolved": True, "x": 1}, "y": {}}},
-                        {"id": "ssl", "value": "strict"},
-                    ]
-                },
-                ["actions[0].value.host.x", "actions[0].value.y"],
-            ),
         )
         for updates, unsupported in cases:
             for check_mode in (True, False):
@@ -442,8 +456,8 @@ class PageRulesTests(TestCase):
                     api.list.assert_not_called()
                     api.create.assert_not_called()
 
-    def test_action_without_string_id_fails_before_any_request(self):
-        for action_id in ({"id": "ssl"}, ["ssl"], 1, "", None):
+    def test_unhashable_action_id_fails_before_any_request(self):
+        for action_id in ({"id": "ssl"}, ["ssl"]):
             for current in ([], [{"id": "rule", "actions": [{"id": "ssl", "value": "strict"}], "targets": TARGETS}]):
                 for check_mode in (True, False):
                     with self.subTest(action_id=action_id, existing=bool(current), check_mode=check_mode):
@@ -452,28 +466,40 @@ class PageRulesTests(TestCase):
 
                         result = self.run_module(FakeModule(params(actions=actions), check_mode=check_mode), client)
 
-                        self.assertEqual(result["msg"], "actions[1].id must be a non-empty string")
+                        self.assertEqual(result["msg"], "actions[1].id must not be a mapping or a list")
                         self.assertEqual(result["invalid_fields"], ["actions[1].id"])
                         api.list.assert_not_called()
                         api.create.assert_not_called()
                         api.update.assert_not_called()
 
-    def test_unstored_target_fields_fail_before_delete(self):
-        targets = [{**TARGETS[0], "foo": 1}]
-        client, api = client_with([{"id": "rule", "targets": TARGETS}])
+    def test_other_invalid_action_ids_reach_cloudflare(self):
+        # Cloudflare rejects these on the only write.
+        for action in ({"id": 1, "value": "on"}, {"id": "", "value": "on"}, {"id": None}, {"value": "on"}):
+            with self.subTest(action=action):
+                actions = [{"id": "ssl", "value": "strict"}, action]
+                client, api = client_with(created={"id": "new"})
+
+                self.run_module(FakeModule(params(actions=actions)), client)
+
+                api.create.assert_called_once()
+
+    def test_unstored_target_fields_do_not_block_delete(self):
+        targets = [{**TARGETS[0], "foo": 1, "constraint": {**TARGETS[0]["constraint"], "bar": 1}}]
+        client, api = client_with([{"id": "rule", "targets": TARGETS}], deleted={"id": "rule"})
 
         result = self.run_module(FakeModule(params(state="absent", targets=targets)), client)
 
-        self.assertEqual(result["unsupported_fields"], ["targets[0].foo"])
-        api.list.assert_not_called()
-        api.delete.assert_not_called()
+        api.delete.assert_called_once_with(pagerule_id="rule", zone_id="zone")
+        self.assertTrue(result["changed"])
 
     def test_stored_fields_are_sent(self):
         targets = [{"target": "url", "constraint": {"operator": "matches", "value": "example.com/*"}}]
+        # Cloudflare validates cache_key_fields values.
         cache_key = {
+            "bogus": {"x": 1},
             "cookie": {"check_presence": ["a"], "include": ["b"]},
             "header": {"check_presence": ["a"], "exclude": ["b"], "include": ["c"]},
-            "host": {"resolved": True},
+            "host": {"resolved": True, "x": 1},
             "query_string": {"exclude": "*", "include": []},
             "user": {"device_type": True, "geo": False, "lang": True},
         }

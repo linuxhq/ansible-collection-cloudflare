@@ -56,8 +56,17 @@ class AccessIdentityProvidersInfoTests(TestCase):
             },
         )
 
-    def test_rejects_padded_name(self):
-        client = client_with([{"id": "provider", "name": " idp", "type": "onetimepin"}])
+    def test_returns_padded_name(self):
+        providers = [{"id": "provider", "name": " idp", "type": "onetimepin"}]
+        client = client_with(providers)
+
+        with self.assertRaises(ModuleExit) as raised:
+            access_identity_providers_info.run(FakeModule({"account_id": "account"}), client)
+
+        self.assertEqual(raised.exception.values["access_identity_providers"], providers)
+
+    def test_rejects_non_string_name(self):
+        client = client_with([{"id": "provider", "name": None, "type": "onetimepin"}])
 
         with self.assertRaises(ModuleFail) as raised:
             access_identity_providers_info.run(FakeModule({"account_id": "account"}), client)

@@ -106,35 +106,56 @@ class PagesProjectsTests(TestCase):
         api.create.assert_not_called()
         self.assertTrue(result["changed"])
 
-    def test_rotation_requires_credentials(self):
-        for updates in (
-            {},
-            {"deployment_configs": {"production": {"env_vars": {"MODE": {"type": "plain_text", "value": "prod"}}}}},
-            {"deployment_configs": {"production": {"env_vars": {"OLD": None}}}},
-            {"build_config": {"web_analytics_token": None}},
+    def test_rotation_without_credentials_changes_nothing(self):
+        # Nothing secret is requested, so rotation has nothing to resend.
+        client, api = client_with([PROJECT])
+
+        result = self.run_module(FakeModule(params(rotate_secrets=True)), client)
+
+        api.edit.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_empty_name_and_production_branch_fail_before_any_request(self):
+        for updates, message in (
+            ({"name": ""}, "name must not be empty"),
+            ({"name": "", "state": "absent"}, "name must not be empty"),
+            ({"production_branch": ""}, "production_branch must not be empty"),
         ):
             with self.subTest(updates=updates):
-                client, api = client_with()
+                client, _ignored = client_with([PROJECT])
 
-                result = self.run_module(FakeModule(params(rotate_secrets=True, **updates)), client)
+                result = self.run_module(FakeModule(params(**updates)), client)
 
-                api.get.assert_not_called()
-                self.assertEqual(
-                    result["msg"],
-                    "rotate_secrets requires a secret_text value or build_config.web_analytics_token",
-                )
+                self.assertEqual(result["msg"], message)
+                self.assertEqual(client.mock_calls, [])
 
-    def test_rejects_invalid_requested_domains_before_api_calls(self):
-        for state in ("present", "absent"):
-            with self.subTest(state=state):
-                client, api = client_with()
+    def test_padded_production_branch_is_sent(self):
+        # Cloudflare stores the branch as sent.
+        client, api = client_with([PROJECT], edited={**PROJECT, "production_branch": " main "})
 
-                result = self.run_module(
-                    FakeModule(params(state=state, domains=[{"name": " invalid.example.com"}])), client
-                )
+        result = self.run_module(FakeModule(params(production_branch=" main ")), client)
 
-                api.get.assert_not_called()
-                self.assertEqual(result["msg"], "Each Pages project domain requires a valid name")
+        self.assertEqual(api.edit.call_args.kwargs["production_branch"], " main ")
+        self.assertTrue(result["changed"])
+
+    def test_rejects_padded_domain_names_before_api_calls(self):
+        client, api = client_with()
+
+        result = self.run_module(FakeModule(params(domains=[{"name": " invalid.example.com"}])), client)
+
+        api.get.assert_not_called()
+        self.assertIn("may contain only ASCII letters", result["msg"])
+
+    def test_absent_ignores_requested_domain_names(self):
+        # Deleting a project sends no domains, so invalid names must not block it.
+        client, api = client_with([PROJECT])
+
+        result = self.run_module(
+            FakeModule(params(state="absent", domains=[{"name": " invalid"}, {"name": "x.workers.dev"}])), client
+        )
+
+        api.delete.assert_called_once_with(project_name="docs", account_id="account")
+        self.assertTrue(result["changed"])
 
     def test_rejects_unsupported_domain_names_before_api_calls(self):
         for name in (
@@ -149,7 +170,7 @@ class PagesProjectsTests(TestCase):
             f"{'a' * 64}.example.com",
             ".".join(["a" * 63] * 4) + ".com",
         ):
-            for state, check_mode in (("present", False), ("present", True), ("absent", False)):
+            for state, check_mode in (("present", False), ("present", True)):
                 with self.subTest(name=name, state=state, check_mode=check_mode):
                     client, api = client_with([PROJECT], created=PROJECT, edited=PROJECT)
 
@@ -184,7 +205,7 @@ class PagesProjectsTests(TestCase):
             "p40fix.local",
             "p40fix.Test",
         ):
-            for state, check_mode in (("present", False), ("present", True), ("absent", False)):
+            for state, check_mode in (("present", False), ("present", True)):
                 with self.subTest(name=name, state=state, check_mode=check_mode):
                     client, api = client_with([PROJECT], created=PROJECT, edited=PROJECT)
 
@@ -210,7 +231,7 @@ class PagesProjectsTests(TestCase):
             "a.XN--ZZ.example.com",
             "site.xn--zz",
         ):
-            for state, check_mode in (("present", False), ("present", True), ("absent", False)):
+            for state, check_mode in (("present", False), ("present", True)):
                 with self.subTest(name=name, state=state, check_mode=check_mode):
                     client, api = client_with([PROJECT], created=PROJECT, edited=PROJECT)
 
@@ -340,32 +361,40 @@ class PagesProjectsTests(TestCase):
                 {"deployment_configs": {"production": {"compatibility_date": None, "env_vars": {"A": None}}}},
                 ["deployment_configs.production.compatibility_date"],
             ),
-            (
-                {"deployment_configs": {"preview": {"placement": {"mode": None}}}},
-                ["deployment_configs.preview.placement"],
-            ),
             ({"deployment_configs": {"preview": None}}, ["deployment_configs.preview"]),
-            (
-                {"deployment_configs": {"production": {"env_vars": None, "kv_namespaces": None}}},
-                ["deployment_configs.production.env_vars", "deployment_configs.production.kv_namespaces"],
-            ),
             (
                 {
                     "deployment_configs": {
                         "production": {
-                            "env_vars": {"A": {"type": "plain_text", "value": None}},
-                            "kv_namespaces": {"NS": {"namespace_id": None}},
-                            "r2_buckets": {"B": {"name": None, "jurisdiction": None}},
-                            "services": {"S": {"service": "worker", "environment": None, "entrypoint": None}},
+                            "always_use_latest_compatibility_date": None,
+                            "compatibility_flags": None,
+                            "env_vars": None,
+                            "fail_open": None,
+                            "kv_namespaces": None,
+                            "limits": None,
+                            "placement": None,
+                            "usage_model": None,
                         }
                     }
                 },
                 [
-                    "deployment_configs.production.env_vars.A.value",
-                    "deployment_configs.production.kv_namespaces.NS.namespace_id",
-                    "deployment_configs.production.r2_buckets.B.name",
-                    "deployment_configs.production.services.S.environment",
+                    "deployment_configs.production.always_use_latest_compatibility_date",
+                    "deployment_configs.production.compatibility_flags",
+                    "deployment_configs.production.env_vars",
+                    "deployment_configs.production.fail_open",
+                    "deployment_configs.production.kv_namespaces",
+                    "deployment_configs.production.limits",
+                    "deployment_configs.production.placement",
+                    "deployment_configs.production.usage_model",
                 ],
+            ),
+            (
+                {
+                    "deployment_configs": {
+                        "production": {"env_vars": {"A": {"type": "plain_text", "value": None}, "B": {"type": None}}}
+                    }
+                },
+                ["deployment_configs.production.env_vars.B.type"],
             ),
         )
         for options, unsupported in cases:
@@ -379,12 +408,91 @@ class PagesProjectsTests(TestCase):
                 api.get.assert_not_called()
                 api.edit.assert_not_called()
 
+    def test_other_null_settings_are_sent(self):
+        # Cloudflare rejects or clears these on the only write, or the module reports a value it kept.
+        desired = {
+            "production": {
+                "build_image_major_version": None,
+                "r2_buckets": None,
+                "kv_namespaces": {"NS": {"namespace_id": None}},
+                "services": {"S": {"service": "worker", "environment": None}},
+            }
+        }
+        client, api = client_with([PROJECT], edited=PROJECT)
+
+        self.run_module(FakeModule(params(deployment_configs=desired)), client)
+
+        self.assertEqual(api.edit.call_args.kwargs["deployment_configs"], desired)
+
+    def test_null_settings_cloudflare_clears_converge(self):
+        desired = {
+            "production": {"wrangler_config_hash": None, "placement": {"mode": None}, "limits": {"cpu_ms": None}}
+        }
+        current = {
+            **PROJECT,
+            "deployment_configs": {
+                "production": {"wrangler_config_hash": "abc", "placement": {"mode": "smart"}, "limits": {"cpu_ms": 50}}
+            },
+        }
+        cleared = {**PROJECT, "deployment_configs": {"production": {"placement": {}}}}
+        client, api = client_with([current], edited=cleared)
+
+        result = self.run_module(FakeModule(params(deployment_configs=desired)), client)
+
+        self.assertNotIn("msg", result)
+        self.assertTrue(result["changed"])
+        self.assertEqual(api.edit.call_args.kwargs["deployment_configs"], desired)
+
+        client, api = client_with([cleared])
+
+        result = self.run_module(FakeModule(params(deployment_configs=desired)), client)
+
+        api.edit.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_rejects_wrangler_config_hash_before_any_request(self):
+        # Cloudflare drops it on create and update, so the run never converges.
+        for value in ("abc", ""):
+            for found in ([PROJECT], [None]):
+                with self.subTest(value=value, existing=found != [None]):
+                    client, api = client_with(found, created=PROJECT, edited=PROJECT)
+
+                    result = self.run_module(
+                        FakeModule(params(deployment_configs={"production": {"wrangler_config_hash": value}})), client
+                    )
+
+                    self.assertEqual(
+                        result["unsupported_settings"], ["deployment_configs.production.wrangler_config_hash"]
+                    )
+                    api.get.assert_not_called()
+
+    def test_null_environment_variable_value_is_sent_and_converges(self):
+        # Cloudflare stores a null value as "".
+        desired = {"production": {"env_vars": {"A": {"type": "plain_text", "value": None}}}}
+        current = {
+            **PROJECT,
+            "deployment_configs": {"production": {"env_vars": {"A": {"type": "plain_text", "value": "1"}}}},
+        }
+        cleared = {
+            **PROJECT,
+            "deployment_configs": {"production": {"env_vars": {"A": {"type": "plain_text", "value": ""}}}},
+        }
+        client, api = client_with([current], edited=cleared)
+
+        result = self.run_module(FakeModule(params(deployment_configs=desired)), client)
+
+        self.assertNotIn("msg", result)
+        self.assertEqual(api.edit.call_args.kwargs["deployment_configs"], desired)
+
+        client, api = client_with([cleared])
+
+        result = self.run_module(FakeModule(params(deployment_configs=desired)), client)
+
+        api.edit.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_rejects_empty_settings_cloudflare_does_not_store_before_any_request(self):
         cases = (
-            (
-                {"production": {"wrangler_config_hash": ""}},
-                ["deployment_configs.production.wrangler_config_hash"],
-            ),
             (
                 {"preview": {"placement": {"mode": ""}}, "production": {"placement": {"mode": "smart"}}},
                 ["deployment_configs.preview.placement.mode"],
@@ -398,11 +506,10 @@ class PagesProjectsTests(TestCase):
                 ["deployment_configs.preview.usage_model"],
             ),
             (
-                {"production": {"usage_model": "", "compatibility_date": "", "wrangler_config_hash": ""}},
+                {"production": {"usage_model": "", "compatibility_date": ""}},
                 [
                     "deployment_configs.production.compatibility_date",
                     "deployment_configs.production.usage_model",
-                    "deployment_configs.production.wrangler_config_hash",
                 ],
             ),
         )
@@ -499,8 +606,8 @@ class PagesProjectsTests(TestCase):
                 ["deployment_configs.preview.kv_namespaces.KV.bogus"],
             ),
             (
-                {"production": {"services": {"S": {"service": "api", "environment": "production", "bogus": 1}}}},
-                ["deployment_configs.production.services.S.bogus"],
+                {"production": {"vectorize_bindings": {"V": {"index_name": "idx", "bogus": 1}}}},
+                ["deployment_configs.production.vectorize_bindings.V.bogus"],
             ),
             ({"production": {"browsers": {"B": {"bogus": 1}}}}, ["deployment_configs.production.browsers.B.bogus"]),
             (
@@ -513,11 +620,7 @@ class PagesProjectsTests(TestCase):
                     "preview": {"bogus_key": {"extra": 1}, "env_vars": {"A": None, "B": {"extra": 1}}},
                     "production": {"r2_buckets": {"R": {"name": "bucket", "jurisdiction": None, "bogus": None}}},
                 },
-                [
-                    "deployment_configs.preview.bogus_key",
-                    "deployment_configs.preview.env_vars.B.extra",
-                    "deployment_configs.production.r2_buckets.R.bogus",
-                ],
+                ["deployment_configs.preview.bogus_key", "deployment_configs.preview.env_vars.B.extra"],
             ),
         )
         for deployment_configs, unsupported in cases:
@@ -539,6 +642,21 @@ class PagesProjectsTests(TestCase):
                     api.get.assert_not_called()
                     api.create.assert_not_called()
                     api.edit.assert_not_called()
+
+    def test_other_binding_entry_fields_are_sent(self):
+        # Whether Cloudflare stores these is unverified, so they are left to it.
+        desired = {
+            "production": {
+                "services": {"S": {"service": "api", "bogus": 1}},
+                "r2_buckets": {"R": {"name": "bucket", "bogus": 1}},
+                "d1_databases": {"D": {"id": "db", "bogus": 1}},
+            }
+        }
+        client, api = client_with([PROJECT], edited=PROJECT)
+
+        self.run_module(FakeModule(params(deployment_configs=desired)), client)
+
+        self.assertEqual(api.edit.call_args.kwargs["deployment_configs"], desired)
 
     def test_stored_nested_setting_names_are_sent(self):
         entries = {

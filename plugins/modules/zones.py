@@ -29,7 +29,8 @@ options:
   account_id:
     description:
       - Account identifier used when creating a zone.
-      - Required when creating a zone.
+      - When omitted on create, Cloudflare creates the zone in the account of
+        the API token.
       - When provided, also limits the zone lookup to this account.
     type: str
   type:
@@ -64,17 +65,21 @@ options:
         description:
           - Cloudflare zone setting identifier.
           - V(.) and V(..) fail before any request.
+          - When the zone is created, an id with leading or trailing
+            whitespace fails before any change, because Cloudflare rejects it
+            only when the setting is read after the zone is created.
         required: true
         type: str
       value:
         description:
           - Desired zone setting value.
           - For object values, only the provided nested fields are compared.
-          - The object values of C(aegis), C(automatic_platform_optimization),
-            C(nel), and C(security_header) accept only the fields Cloudflare
+          - The object values of C(aegis), C(nel), and C(security_header)
+            accept only the fields Cloudflare
             stores for them, such as C(enabled) of C(nel). Cloudflare accepts
             any other field but does not store it, so the module fails before
-            making changes. Other values are not checked.
+            making changes; a null other field is ignored, as Cloudflare drops
+            it. Other values are not checked.
           - These values, and the C(strict_transport_security) value of
             C(security_header), must be mappings; any other value, such as
             V(on) for C(nel), fails before making changes.
@@ -84,6 +89,8 @@ options:
           - A null value, or a null at any level of the object values above,
             such as a null C(enabled) of C(nel), fails before making changes,
             because Cloudflare either rejects it or stores a different value.
+            A null C(pool_id) of C(aegis) is accepted; Cloudflare does not store
+            it.
           - For settings Cloudflare exposes as an C(enabled) flag, such as
             C(ssl_recommender), the value sets that flag.
         required: true
@@ -160,6 +167,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     DOT_SEGMENTS,
+    cloudflare,
     cloudflare_client,
     cloudflare_error_context,
     ensure_resource_absent,
@@ -179,19 +187,14 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 # id. Cloudflare accepts any other field but drops it.
 SETTING_VALUE_FIELDS = {
     "aegis": ("enabled", "pool_id"),
-    "automatic_platform_optimization": (
-        "cache_by_device_type",
-        "cf",
-        "enabled",
-        "hostnames",
-        "wordpress",
-        "wp_plugin",
-    ),
     "nel": ("enabled",),
     "security_header": {
         "strict_transport_security": ("enabled", "include_subdomains", "max_age", "nosniff", "preload"),
     },
 }
+# Fields of the setting values above that Cloudflare accepts as null and does
+# not store, so they match a stored value without them.
+NULLABLE_SETTING_FIELDS = {"aegis": ("pool_id",)}
 
 
 def setting_value_forms(value):
@@ -264,13 +267,22 @@ def non_mappings(value, fields, path):
     ]
 
 
-def null_values(value, path):
-    """Return the path of value and of each value nested in it that is null."""
+def null_values(value, path, fields=None):
+    """Return the path of value and of each value nested in it that is null.
+
+    fields lists the known keys of a mapping, as in SETTING_VALUE_FIELDS; a
+    null value under another key is ignored, as Cloudflare drops it.
+    """
     if value is None:
         return [path]
 
     if isinstance(value, dict):
-        return [found for key, item in value.items() for found in null_values(item, f"{path}.{key}")]
+        return [
+            found
+            for key, item in value.items()
+            if fields is None or key in fields
+            for found in null_values(item, f"{path}.{key}", fields.get(key) if isinstance(fields, dict) else None)
+        ]
 
     if isinstance(value, list):
         return [found for index, item in enumerate(value) for found in null_values(item, f"{path}[{index}]")]
@@ -285,7 +297,7 @@ def validate_settings(module):
     null = []
     not_mapping = []
     for index, setting in enumerate(module.params.get("settings") or []):
-        if not setting["id"].strip() or setting["id"] != setting["id"].strip() or setting["id"] in setting_ids:
+        if not setting["id"] or setting["id"] in setting_ids:
             module.fail_json(msg="Each zone setting requires a unique valid id")
 
         if setting["id"] in DOT_SEGMENTS:
@@ -296,11 +308,13 @@ def validate_settings(module):
         if setting["value"] is None:
             null.append(path)
         elif setting["id"] in SETTING_VALUE_FIELDS:
-            null.extend(null_values(setting["value"], path))
+            nullable = {f"{path}.{field}" for field in NULLABLE_SETTING_FIELDS.get(setting["id"], ())}
             fields = SETTING_VALUE_FIELDS[setting["id"]]
+            null.extend(found for found in null_values(setting["value"], path, fields) if found not in nullable)
             not_mapping.extend(non_mappings(setting["value"], fields, path))
-            unknown.extend(unsupported_fields(setting["value"], fields, path))
-            empty.extend(empty_mappings(setting["value"], path))
+            # Cloudflare drops a null unknown field, so it is ignored.
+            unknown.extend(unsupported_fields(serialize_resource(setting["value"]), fields, path))
+            empty.extend(empty_mappings(serialize_resource(setting["value"]), path))
 
     # Cloudflare rejects a null value or stores a different one, such as false.
     if null:
@@ -361,23 +375,25 @@ def edit_zone(module, client, zone_id, payload):
 
 def create_zone(module, client):
     params = module.params
-    if params.get("account_id") is None:
-        module.fail_json(msg="account_id is required when creating a zone")
-
     if module.check_mode:
         module.exit_json(changed=True, message="Zone would be created")
 
-    payload = {
-        "account": {"id": params["account_id"]},
-        "name": params["name"],
-        "type": params.get("type") or "full",
-    }
+    payload = {"name": params["name"], "type": params.get("type") or "full"}
+    if params.get("account_id") is not None:
+        payload["account"] = {"id": params["account_id"]}
+
     with cloudflare_error_context(
         "Cloudflare API request failed while creating the zone",
-        account_id=params["account_id"],
+        account_id=params.get("account_id"),
         name=params["name"],
     ):
-        return checked_zone(module, client.zones.create(**payload), payload)
+        # The SDK requires an account; when it is omitted, Cloudflare uses the
+        # account of the API token.
+        zone = client.zones.create(
+            account=payload.get("account", cloudflare.omit), name=payload["name"], type=payload["type"]
+        )
+
+    return checked_zone(module, zone, payload)
 
 
 def update_zone(module, client, zone):
@@ -490,9 +506,6 @@ def run(module, client):
     # lowercase without the root label's trailing dot.
     name = module.params["name"].lower()
     module.params["name"] = name.removesuffix(".")
-    if not module.params["name"]:
-        module.fail_json(msg="name must not be empty")
-
     if module.params["state"] == "present":
         validate_settings(module)
 
@@ -508,6 +521,14 @@ def run(module, client):
         )
 
     if current is None:
+        # Settings are read only after the zone is created, so Cloudflare
+        # would reject a padded setting id after that write.
+        padded = [
+            setting["id"] for setting in module.params.get("settings") or [] if setting["id"] != setting["id"].strip()
+        ]
+        if padded:
+            module.fail_json(msg="Zone setting ids must not contain leading or trailing whitespace", settings=padded)
+
         zone = create_zone(module, client)
     else:
         zone = current

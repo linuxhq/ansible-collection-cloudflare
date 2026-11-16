@@ -33,14 +33,14 @@ options:
       - cloudflare
     description:
       - Location from which the tunnel receives its configuration.
-      - Required when creating a cloudflared tunnel.
+      - When omitted on create, Cloudflare creates a tunnel without a
+        configuration source.
       - An existing tunnel's configuration source is not changed; the module
         fails before making changes when it differs from the requested value.
   tunnel_secret:
     type: str
     description:
       - Tunnel secret, which locally-managed tunnels need to run.
-      - Must be base64-encoded and decode to at least 32 bytes.
       - Applied when creating a tunnel. Cloudflare does not return the current
         secret, so changes are not detected; use O(rotate_secrets) to apply the
         secret to an existing tunnel.
@@ -109,7 +109,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     resource_field,
     resource_id,
     serialize_resource,
-    validate_tunnel_secret,
 )
 
 FIELDS = ("config_src", "name", "tunnel_secret")
@@ -154,9 +153,6 @@ def ensure_present(module, tunnels, current):
         cfd_tunnel = checked_tunnel(module, cfd_tunnel, expected_id=current_id)
         module.exit_json(changed=True, message="Cloudflared tunnel updated", cfd_tunnel=cfd_tunnel)
 
-    if not params.get("config_src"):
-        module.fail_json(msg="config_src is required when creating a cloudflared tunnel")
-
     if module.check_mode:
         module.exit_json(changed=True, message="Cloudflared tunnel would be created")
 
@@ -168,7 +164,9 @@ def ensure_present(module, tunnels, current):
         cfd_tunnel = tunnels.create(account_id=account_id, **payload_from_params(params, FIELDS))
 
     cfd_tunnel = checked_tunnel(module, cfd_tunnel)
-    resource_field(module, cfd_tunnel, "config_src", "cloudflared tunnel", expected=params["config_src"])
+    if params.get("config_src") is not None:
+        resource_field(module, cfd_tunnel, "config_src", "cloudflared tunnel", expected=params["config_src"])
+
     module.exit_json(changed=True, message="Cloudflared tunnel created", cfd_tunnel=cfd_tunnel)
 
 
@@ -176,9 +174,6 @@ def run(module, client):
     params = module.params
     account_id = params["account_id"]
     tunnels = client.zero_trust.tunnels.cloudflared
-    if params["state"] == "present":
-        validate_tunnel_secret(module, params.get("tunnel_secret"))
-
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the cloudflared tunnel",
         account_id=account_id,

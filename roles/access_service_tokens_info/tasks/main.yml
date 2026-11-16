@@ -24,7 +24,9 @@
   ansible.builtin.set_fact:
     _access_service_tokens_info_dict:
       "{{ (dict(_access_service_tokens_info_list |
-               json_query('[].name') |
-               zip(_access_service_tokens_info_list))) |
+               selectattr('name', 'defined') |
+               map(attribute='name') |
+               zip(_access_service_tokens_info_list |
+                   selectattr('name', 'defined')))) |
           d({}) }}"
 ...

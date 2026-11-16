@@ -98,9 +98,9 @@ Standards for Python modules, lookup plugins, and filter plugins under
 - Keep nested relationship constraints beside the nested schema.
 - Use `mutually_exclusive`, `required_by`, `required_if`,
   `required_one_of`, and `required_together` for static relationships.
-- Use explicit validation for semantic, range, state-dependent, or
-  provider-dependent constraints.
-- Validate inputs before external operations whenever possible.
+- Validate input only to prevent a crash, a partial change, a run that
+  never converges, or an action on the wrong resource; let the provider
+  reject everything else.
 - Model each valid alternate identifier with relationship validators.
 
 #### State and check mode
@@ -120,7 +120,8 @@ Standards for Python modules, lookup plugins, and filter plugins under
 - Convert provider request and response shapes with collection helpers when
   available.
 - Omit unset values from provider requests.
-- Validate external response structure before relying on required fields.
+- Rely on the SDK response shape; check a response field only when real
+  responses can omit it or return a form the module cannot use.
 - Return a top-level dictionary containing JSON-serializable UTF-8 data.
 - Return provider data unmodified; do not redact fields. Callers protect
   sensitive output with task-level `no_log`.

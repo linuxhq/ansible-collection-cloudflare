@@ -3,6 +3,8 @@
 from unittest import TestCase
 from unittest.mock import Mock, call
 
+import cloudflare
+
 from ansible_collections.linuxhq.cloudflare.plugins.modules import zones
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
@@ -81,18 +83,36 @@ class ZonesTests(TestCase):
 
                 client.zones.list.assert_called_once_with(**expected)
 
-    def test_create_requires_account(self):
-        client = client_with()
+    def test_creates_zone_without_account(self):
+        # Cloudflare creates the zone in the account of the API token.
+        client = client_with(created=ZONE)
 
         result = self.run_module(FakeModule(params(account_id=None)), client)
 
+        client.zones.list.assert_called_once_with(name="example.com")
+        client.zones.create.assert_called_once_with(account=cloudflare.omit, name="example.com", type="full")
+        self.assertTrue(result["changed"])
+
+    def test_padded_setting_id_reaches_cloudflare(self):
+        # Cloudflare rejects it when the setting is read, before any write.
+        client = client_with([ZONE], setting={"id": " ssl", "value": "full"})
+
+        self.run_module(FakeModule(params(settings=[{"id": " ssl", "value": "full"}])), client)
+
+        client.zones.settings.get.assert_called_once_with(setting_id=" ssl", zone_id="zone")
+
+    def test_padded_setting_id_fails_before_creating_a_zone(self):
+        client = client_with(created=ZONE)
+
+        result = self.run_module(FakeModule(params(settings=[{"id": " ssl", "value": "full"}])), client)
+
         client.zones.create.assert_not_called()
-        self.assertEqual(result["msg"], "account_id is required when creating a zone")
+        self.assertEqual(result["msg"], "Zone setting ids must not contain leading or trailing whitespace")
 
     def test_rejects_invalid_setting_before_lookup(self):
         client = client_with()
 
-        result = self.run_module(FakeModule(params(settings=[{"id": " ", "value": "on"}])), client)
+        result = self.run_module(FakeModule(params(settings=[{"id": "", "value": "on"}])), client)
 
         client.zones.list.assert_not_called()
         self.assertEqual(result["msg"], "Each zone setting requires a unique valid id")
@@ -136,7 +156,6 @@ class ZonesTests(TestCase):
             "settings[0].value.bar",
             "settings[1].value.foo",
             "settings[2].value.foo",
-            "settings[3].value.foo",
         ]
         for check_mode in (True, False):
             with self.subTest(check_mode=check_mode):
@@ -187,8 +206,6 @@ class ZonesTests(TestCase):
             "settings[0].value.enabled",
             "settings[1].value",
             "settings[2].value.strict_transport_security.max_age",
-            "settings[3].value.pool_id",
-            "settings[4].value.hostnames[1]",
         ]
         for check_mode in (True, False):
             with self.subTest(check_mode=check_mode):
@@ -203,6 +220,16 @@ class ZonesTests(TestCase):
                 client.zones.list.assert_not_called()
                 client.zones.settings.get.assert_not_called()
                 client.zones.settings.edit.assert_not_called()
+
+    def test_null_unknown_setting_fields_are_ignored(self):
+        # Cloudflare drops a null unknown field (nel foo: null is stored as {"enabled": true}).
+        value = {"enabled": True, "foo": None}
+        client = client_with([ZONE], setting={"id": "nel", "value": {"enabled": True}})
+
+        result = self.run_module(FakeModule(params(settings=[{"id": "nel", "value": value}])), client)
+
+        self.assertNotIn("msg", result)
+        self.assertFalse(result["changed"])
 
     def test_null_security_header_policy_fails_before_any_request(self):
         settings = [{"id": "security_header", "value": {"strict_transport_security": None}}]
@@ -228,7 +255,6 @@ class ZonesTests(TestCase):
         invalid = [
             "settings[1].value",
             "settings[2].value",
-            "settings[3].value",
             "settings[4].value.strict_transport_security",
         ]
         for check_mode in (True, False):
@@ -432,13 +458,34 @@ class ZonesTests(TestCase):
                         account={"id": "account"}, name="example.com", type="full"
                     )
 
-    def test_rejects_root_label_name(self):
-        client = client_with()
+    def test_root_label_name_reaches_cloudflare(self):
+        # Cloudflare rejects the empty name on the only write.
+        client = client_with(created={**ZONE, "name": ""})
 
-        result = self.run_module(FakeModule(params(name=".")), client)
+        self.run_module(FakeModule(params(name=".")), client)
 
-        client.zones.list.assert_not_called()
-        self.assertEqual(result["msg"], "name must not be empty")
+        client.zones.list.assert_called_once_with(name="", account={"id": "account"})
+        client.zones.create.assert_called_once_with(account={"id": "account"}, name="", type="full")
+
+    def test_null_aegis_pool_id_is_sent_and_converges(self):
+        # Cloudflare accepts a null pool_id and does not store it.
+        value = {"enabled": True, "pool_id": None}
+        for stored, changed in (({"enabled": False}, True), ({"enabled": True}, False)):
+            with self.subTest(stored=stored):
+                client = client_with(
+                    [ZONE],
+                    setting={"id": "aegis", "value": stored},
+                    edited_setting={"id": "aegis", "value": {"enabled": True}},
+                )
+
+                result = self.run_module(FakeModule(params(settings=[{"id": "aegis", "value": value}])), client)
+
+                self.assertNotIn("msg", result)
+                self.assertEqual(result["changed"], changed)
+                if changed:
+                    client.zones.settings.edit.assert_called_once_with(setting_id="aegis", zone_id="zone", value=value)
+                else:
+                    client.zones.settings.edit.assert_not_called()
 
     def test_non_editable_setting_fails_before_any_write(self):
         settings = {

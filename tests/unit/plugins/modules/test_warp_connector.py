@@ -105,6 +105,34 @@ class WarpConnectorTests(TestCase):
         self.assertEqual(result["warp_connector_id"], "connector-id")
         self.assertEqual(result["error"], "Cloudflare API returned the wrong WARP Connector")
 
+    def test_rejects_non_base64_secret_before_create(self):
+        for secret in ("short", "eHh4-eHh4", ""):
+            with self.subTest(secret=secret):
+                client, api = client_with(created=CREATED)
+
+                result = self.run_module(FakeModule(params(tunnel_secret=secret)), client)
+
+                api.create.assert_not_called()
+                self.assertEqual(result["msg"], "tunnel_secret must be non-empty and base64-encoded")
+
+    def test_creates_connector_with_short_or_unpadded_secret(self):
+        # Cloudflare accepts base64 secrets of any length, with or without padding.
+        for secret in ("YQ==", "YQ", "YWJj"):
+            with self.subTest(secret=secret):
+                client, api = client_with(created=CREATED, edited=CREATED)
+
+                result = self.run_module(FakeModule(params(tunnel_secret=secret)), client)
+
+                api.edit.assert_called_once_with("connector-id", account_id="account", tunnel_secret=secret)
+                self.assertEqual(result["message"], "WARP Connector created")
+
+    def test_rotates_secret_without_local_checks(self):
+        client, api = client_with([CREATED], edited=CREATED)
+
+        self.run_module(FakeModule(params(tunnel_secret="short", rotate_secrets=True)), client)
+
+        api.edit.assert_called_once_with("connector-id", account_id="account", tunnel_secret="short")
+
     def test_rotates_secret_on_existing_connector(self):
         client, api = client_with([CREATED], edited={**CREATED, "token": "secret"})
 
