@@ -448,6 +448,16 @@ class AccessAppsTests(TestCase):
             ({"destinations": [{"type": "public", "cidr": "192.0.2.1"}]}, ["destinations[0].cidr"]),
             ({"destinations": [{"type": "unknown", "uri": "app.example.com", "foo": 1}]}, ["destinations[0].foo"]),
             ({"policies": [{"id": "a", "precedence": 1, "foo": 1}]}, ["policies[0].foo"]),
+            # Cloudflare accepts a policy account_id but never returns it.
+            ({"policies": [{"id": "a", "precedence": 1, "account_id": "account"}]}, ["policies[0].account_id"]),
+            (
+                {
+                    "policies": [
+                        {"name": "inline", "decision": "allow", "include": [{"everyone": {}}], "account_id": "account"}
+                    ]
+                },
+                ["policies[0].account_id"],
+            ),
             (
                 {"policies": [{"name": "inline", "decision": "allow", "include": [{"everyone": {}}], "foo": 1}]},
                 ["policies[0].foo"],

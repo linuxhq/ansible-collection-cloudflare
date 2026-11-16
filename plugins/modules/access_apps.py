@@ -171,8 +171,8 @@ options:
       - A field of an entry set to null is not sent and counts as omitted,
         including a nested field of C(connection_rules), C(connection_rules.rdp),
         or C(mfa_config).
-      - Each entry accepts only the fields of a reusable policy link, C(id),
-        C(precedence), and C(account_id), or of an inline policy, such as
+      - Each entry accepts only the fields of a reusable policy link, C(id)
+        and C(precedence), or of an inline policy, such as
         C(name), C(decision), C(include), C(exclude), C(require), and
         C(approval_groups), whose entries accept only C(approvals_needed),
         C(email_addresses), and C(email_list_uuid). C(connection_rules)
@@ -182,8 +182,8 @@ options:
         only C(allowed_authenticators), C(mfa_disabled), and
         C(session_duration). The same applies to the
         nested fields of a known inline policy selector. Cloudflare accepts
-        any other field but does not store it, so the module fails before
-        making changes.
+        any other field, such as C(account_id), but does not store it, so the
+        module fails before making changes.
       - An empty C(approval_groups) list, an empty C(email_addresses) list or
         C(email_list_uuid) in one of its groups, an empty
         C(allowed_clipboard_local_to_remote_formats) or
@@ -474,7 +474,6 @@ DESTINATION_OVERRIDE_FIELDS = ("behavior", "path_pattern")
 # A policy entry is a reusable policy link or an inline policy; the SDK inline
 # policy type omits the fields shared with Access policies, such as name.
 POLICY_FIELDS = (
-    "account_id",
     "approval_groups",
     "approval_required",
     "connection_rules",

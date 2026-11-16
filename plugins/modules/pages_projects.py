@@ -30,6 +30,7 @@ options:
     type: str
     description:
       - Pages project name.
+      - V(.) and V(..) fail before any request.
   production_branch:
     type: str
     description:
@@ -185,6 +186,7 @@ from copy import deepcopy
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    DOT_SEGMENTS,
     cloudflare_client,
     cloudflare_error_context,
     differs,
@@ -616,11 +618,15 @@ def check_domain_owners(module, client, existing_names, domain_names):
             account_id=params["account_id"],
             name=other["name"],
         ):
-            other_domains = current_domain_names(
-                module,
-                other,
-                client.pages.projects.domains.list(project_name=other["name"], account_id=params["account_id"]),
+            domains = get_or_none(
+                client.pages.projects.domains.list, project_name=other["name"], account_id=params["account_id"]
             )
+
+        # A project deleted since it was listed has no domains.
+        if domains is None:
+            continue
+
+        other_domains = current_domain_names(module, other, domains)
 
         for domain_name in requested:
             if domain_name in other_domains:
@@ -807,6 +813,10 @@ def ensure_absent(module, client):
 
 
 def run(module, client):
+    # The SDK refuses to build a request path with a dot segment.
+    if module.params["name"] in DOT_SEGMENTS:
+        module.fail_json(msg="name must not be '.' or '..'")
+
     domain_names = desired_domain_names(module)
     if module.params["state"] == "present":
         validate_setting_names(module)

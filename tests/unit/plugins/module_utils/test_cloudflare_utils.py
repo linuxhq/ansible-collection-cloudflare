@@ -197,6 +197,31 @@ class ClientTests(TestCase):
             "account_id must not contain leading or trailing whitespace",
         )
 
+    def test_client_rejects_dot_segment_path_parameters(self):
+        constructor = Mock(return_value=sdk_context(Mock()))
+        for name in ("account_id", "phase", "tunnel_id", "zone_id"):
+            for value in (".", ".."):
+                with (
+                    self.subTest(name=name, value=value),
+                    patch.object(cloudflare_utils, "Cloudflare", constructor),
+                    self.assertRaises(ModuleFail) as raised,
+                    cloudflare_client(FakeModule({"api_token": "secret", name: value})),
+                ):
+                    pass
+
+                self.assertEqual(raised.exception.values["msg"], f"{name} must not be '.' or '..'")
+
+        constructor.assert_not_called()
+
+        # A dot is a valid value of a parameter that is not a request path segment.
+        for name in ("domain", "name", "production_branch"):
+            with (
+                self.subTest(name=name),
+                patch.object(cloudflare_utils, "Cloudflare", constructor),
+                cloudflare_client(FakeModule({"api_token": "secret", name: ".."})),
+            ):
+                pass
+
     def test_client_rejects_empty_or_control_character_tokens(self):
         for token, message in (
             (" ", "api_token must not be empty"),

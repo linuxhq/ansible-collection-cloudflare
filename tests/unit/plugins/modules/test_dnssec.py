@@ -1,8 +1,11 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
+import cloudflare
+
+from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudflare_utils
 from ansible_collections.linuxhq.cloudflare.plugins.modules import dnssec
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
@@ -33,6 +36,20 @@ class DnssecTests(TestCase):
 
         client.dns.dnssec.get.assert_called_once_with(zone_id="zone")
         return raised.exception.values, client.dns.dnssec
+
+    def test_dot_segment_zone_id_fails_before_any_request(self):
+        for zone_id in (".", ".."):
+            module = FakeModule({**params(zone_id=zone_id), "api_token": "token"})
+            with (
+                self.subTest(zone_id=zone_id),
+                patch.object(dnssec, "AnsibleModule", return_value=module),
+                patch.object(cloudflare_utils, "Cloudflare", wraps=cloudflare.Cloudflare) as constructor,
+                self.assertRaises(ModuleFail) as raised,
+            ):
+                dnssec.main()
+
+            constructor.assert_not_called()
+            self.assertEqual(raised.exception.values["msg"], "zone_id must not be '.' or '..'")
 
     def test_pending_status_is_equivalent_to_requested_status(self):
         for current, status in (("pending", "active"), ("pending-disabled", "disabled")):
