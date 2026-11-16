@@ -106,9 +106,20 @@ options:
             with C(-), and the name must have at most 253 characters.
           - The name must have at least two labels, its last label must not be
             all digits, so IPv4 addresses are rejected, and it must not be
-            C(pages.dev) or end in C(.pages.dev).
+            C(pages.dev) or C(workers.dev) or end in C(.pages.dev) or
+            C(.workers.dev).
+          - Its last label must have at least two characters and must not be a
+            special-use top-level domain, C(example), C(invalid), C(local),
+            C(localhost), or C(test).
           - These checks run before any request, because Cloudflare rejects
             such names only after the project is created or updated.
+          - Cloudflare also rejects other unregistered top-level domains, which
+            the module does not check, when it adds the domain after the
+            project is created or updated.
+          - When a name is not yet attached to this project, the module lists
+            the account's Pages projects and their domains before any change,
+            and fails, naming the other project, when one of them already has
+            the domain.
         required: true
         type: str
   state:
@@ -192,6 +203,11 @@ FIELDS = ("build_config", "deployment_configs", "name", "production_branch", "so
 
 # Characters Cloudflare accepts in a Pages custom domain name.
 DOMAIN_CHARACTERS = frozenset(string.ascii_letters + string.digits + ".-")
+# Domains Cloudflare reserves for its own Pages and Workers hostnames.
+RESERVED_DOMAINS = ("pages.dev", "workers.dev")
+# Special-use top-level domains (RFC 2606, RFC 6761, and RFC 6762) that
+# Cloudflare rejects as invalid.
+SPECIAL_USE_TLDS = frozenset(("example", "invalid", "local", "localhost", "test"))
 
 # Cloudflare accepts other keys in build_config and in a preview or production
 # deployment config but does not store them. These match the cloudflare SDK
@@ -478,20 +494,25 @@ def remaining_removals(project, removed):
     return remaining
 
 
-def current_domain_names(module, project, domains):
+def project_domain_names(module, project):
     project_domains = project.get("domains")
     if project_domains is None:
-        project_domains = []
-    elif not isinstance(project_domains, list):
+        return set()
+
+    if not isinstance(project_domains, list):
         module.fail_json(msg="Cloudflare API returned malformed Pages domain data")
 
     for name in project_domains:
         if not isinstance(name, str) or not name.strip() or name != name.strip():
             module.fail_json(msg="Cloudflare API returned malformed Pages domain data")
 
-    domain_names = [domain["name"] for domain in resource_list(module, domains, "Pages domain", ("name",))]
     # Domain names are case-insensitive, and Cloudflare stores them lowercased.
-    return {name.lower() for name in project_domains + domain_names}
+    return {name.lower() for name in project_domains}
+
+
+def current_domain_names(module, project, domains):
+    domain_names = [domain["name"] for domain in resource_list(module, domains, "Pages domain", ("name",))]
+    return project_domain_names(module, project) | {name.lower() for name in domain_names}
 
 
 def desired_domain_names(module):
@@ -513,11 +534,19 @@ def desired_domain_names(module):
 
         domain_name = domain_name.lower()
         labels = domain_name.split(".")
-        if len(labels) < 2 or labels[-1].isdigit() or domain_name == "pages.dev" or domain_name.endswith(".pages.dev"):
+        if (
+            len(labels) < 2
+            or labels[-1].isdigit()
+            or len(labels[-1]) == 1
+            or labels[-1] in SPECIAL_USE_TLDS
+            or any(domain_name == reserved or domain_name.endswith("." + reserved) for reserved in RESERVED_DOMAINS)
+        ):
             module.fail_json(
                 msg=(
                     "Each Pages project domain name must have at least two labels, must not end in an all-numeric "
-                    "label such as an IPv4 address, and must not be or end in 'pages.dev'"
+                    "label such as an IPv4 address, a one-character label, or a special-use top-level domain "
+                    "(example, invalid, local, localhost, or test), and must not be or end in 'pages.dev' or "
+                    "'workers.dev'"
                 ),
                 domain=domain["name"],
             )
@@ -557,6 +586,53 @@ def existing_domain_names(module, client, project):
         return current_domain_names(module, project, domains)
 
 
+def check_domain_owners(module, client, existing_names, domain_names):
+    """Fail when another project in the account has a domain to be added.
+
+    Cloudflare rejects such a domain only after the project is created or
+    updated.
+    """
+    params = module.params
+    requested = [domain_name for domain_name in domain_names if domain_name not in existing_names]
+    if not requested:
+        return
+
+    with cloudflare_error_context(
+        "Cloudflare API request failed while gathering Pages projects",
+        account_id=params["account_id"],
+        name=params["name"],
+    ):
+        projects = resource_list(
+            module, client.pages.projects.list(account_id=params["account_id"]), "Pages project", ("name",)
+        )
+
+    for other in projects:
+        if other["name"] == params["name"]:
+            continue
+
+        # A project's domains field omits custom domains that are not active yet.
+        with cloudflare_error_context(
+            "Cloudflare API request failed while gathering Pages project domains",
+            account_id=params["account_id"],
+            name=other["name"],
+        ):
+            other_domains = current_domain_names(
+                module,
+                other,
+                client.pages.projects.domains.list(project_name=other["name"], account_id=params["account_id"]),
+            )
+
+        for domain_name in requested:
+            if domain_name in other_domains:
+                module.fail_json(
+                    msg="Pages project domain is already attached to another Pages project",
+                    account_id=params["account_id"],
+                    name=params["name"],
+                    domain=domain_name,
+                    project=other["name"],
+                )
+
+
 def update_project(module, client, current, payload, secrets_requested):
     params = module.params
     payload, removed = payload_with_removals(payload, current)
@@ -593,9 +669,8 @@ def update_project(module, client, current, payload, secrets_requested):
     return project, True
 
 
-def add_domains(module, client, project, domain_names):
+def add_domains(module, client, project, existing_names, domain_names):
     params = module.params
-    existing_names = existing_domain_names(module, client, project)
     missing_domains = [domain_name for domain_name in domain_names if domain_name not in existing_names]
     if module.check_mode and missing_domains:
         module.exit_json(
@@ -657,10 +732,12 @@ def ensure_present(module, client, domain_names):
 
     current = get_project(module, client)
     created = current is None
-    if created:
-        if params.get("production_branch") is None:
-            module.fail_json(msg="production_branch is required when creating a Pages project")
+    if created and params.get("production_branch") is None:
+        module.fail_json(msg="production_branch is required when creating a Pages project")
 
+    existing_names = existing_domain_names(module, client, current) if current is not None and domain_names else set()
+    check_domain_owners(module, client, existing_names, domain_names)
+    if created:
         if module.check_mode:
             module.exit_json(changed=True, message="Pages project would be created")
 
@@ -677,7 +754,7 @@ def ensure_present(module, client, domain_names):
     else:
         current, changed = update_project(module, client, current, payload, secrets_requested)
 
-    added_domains = add_domains(module, client, current, domain_names) if domain_names else []
+    added_domains = add_domains(module, client, current, existing_names, domain_names) if domain_names else []
     if added_domains:
         current = get_project(module, client)
         if current is None:
