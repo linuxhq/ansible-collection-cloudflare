@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - pages_projects - fail before any request when a C(domains[].name) has a single label, ends in an all-numeric label
+    such as an IPv4 address, or is C(pages.dev) or ends in C(.pages.dev), instead of creating or updating the project
+    and then failing when Cloudflare rejects the domain.

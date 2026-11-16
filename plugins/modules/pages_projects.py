@@ -104,6 +104,9 @@ options:
             trailing C(.); write internationalized names in their C(xn--) form.
           - Each label must have 1 to 63 characters and must not start or end
             with C(-), and the name must have at most 253 characters.
+          - The name must have at least two labels, its last label must not be
+            all digits, so IPv4 addresses are rejected, and it must not be
+            C(pages.dev) or end in C(.pages.dev).
           - These checks run before any request, because Cloudflare rejects
             such names only after the project is created or updated.
         required: true
@@ -509,6 +512,15 @@ def desired_domain_names(module):
             )
 
         domain_name = domain_name.lower()
+        labels = domain_name.split(".")
+        if len(labels) < 2 or labels[-1].isdigit() or domain_name == "pages.dev" or domain_name.endswith(".pages.dev"):
+            module.fail_json(
+                msg=(
+                    "Each Pages project domain name must have at least two labels, must not end in an all-numeric "
+                    "label such as an IPv4 address, and must not be or end in 'pages.dev'"
+                ),
+                domain=domain["name"],
+            )
 
         if domain_name not in names:
             names.append(domain_name)

@@ -156,6 +156,42 @@ class PagesProjectsTests(TestCase):
                     api.edit.assert_not_called()
                     api.domains.create.assert_not_called()
 
+    def test_rejects_provider_invalid_domain_names_before_api_calls(self):
+        for name in (
+            "localhost",
+            "com",
+            "a.123",
+            "192.0.2.1",
+            "pages.dev",
+            "other-p39fix.pages.dev",
+            "Other.Pages.Dev",
+        ):
+            for state, check_mode in (("present", False), ("present", True), ("absent", False)):
+                with self.subTest(name=name, state=state, check_mode=check_mode):
+                    client, api = client_with([PROJECT], created=PROJECT, edited=PROJECT)
+
+                    result = self.run_module(
+                        FakeModule(params(state=state, domains=[{"name": name}]), check_mode=check_mode), client
+                    )
+
+                    self.assertIn("must have at least two labels", result["msg"])
+                    self.assertEqual(result["domain"], name)
+                    api.get.assert_not_called()
+                    api.create.assert_not_called()
+                    api.edit.assert_not_called()
+                    api.domains.create.assert_not_called()
+
+    def test_accepts_domain_names_with_numeric_inner_labels(self):
+        for name in ("123.example.com", "mypages.dev", "pages.dev.example.com"):
+            with self.subTest(name=name):
+                current = {**PROJECT, "domains": [name]}
+                client, api = client_with([current], domains=[{"name": name}])
+
+                result = self.run_module(FakeModule(params(domains=[{"name": name}])), client)
+
+                self.assertFalse(result["changed"])
+                api.domains.create.assert_not_called()
+
     def test_accepts_domain_names_at_the_length_limits(self):
         for name in (f"{'a' * 63}.example.com", ".".join(["a" * 63] * 3 + ["b" * 61]), "xn--bcher-kva.Example.com"):
             with self.subTest(name=name):
