@@ -63,13 +63,15 @@ options:
       - Environment variables and bindings, such as C(kv_namespaces) entries, set
         to null are deleted from the project. An empty binding map changes nothing.
         C(wrangler_config_hash), C(placement.mode), and C(limits.cpu_ms) set to
-        null are cleared, and an environment variable C(value) set to null is
-        stored as V("").
+        null are cleared, and an environment variable C(value) or a C(services)
+        entry's C(environment) set to null is stored as V(""), which matches the
+        null on later runs.
       - Any other C(wrangler_config_hash) fails before making changes, because
         Cloudflare does not store it when it creates or updates a project.
       - Cloudflare keeps the current value of a whole C(preview) or
         C(production) configuration, C(always_use_latest_compatibility_date),
-        C(compatibility_date), C(compatibility_flags), C(fail_open),
+        C(build_image_major_version), C(compatibility_date),
+        C(compatibility_flags), C(fail_open),
         C(usage_model), a whole C(env_vars), C(limits), C(placement), or
         binding map, such as C(browsers), C(d1_databases), or C(kv_namespaces),
         and the C(type) of an environment variable set to null, so the module
@@ -288,6 +290,7 @@ NON_NULLABLE_DEPLOYMENT_SETTINGS = (
     "always_use_latest_compatibility_date",
     "analytics_engine_datasets",
     "browsers",
+    "build_image_major_version",
     "compatibility_date",
     "compatibility_flags",
     "d1_databases",

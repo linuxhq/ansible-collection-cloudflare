@@ -18,6 +18,8 @@
       tags:
         - molecule-idempotence-notest
       check_mode: false
+      diff: false
+      no_log: true
 
     - role: access_apps
       access_apps_list: []

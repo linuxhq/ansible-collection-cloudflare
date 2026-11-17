@@ -9,6 +9,3 @@ bugfixes:
   - access_apps - reject unknown fields in C(destinations) C(overrides) entries and in inline policy
     C(connection_rules), C(connection_rules.rdp), and C(mfa_config) before any request. Cloudflare accepted and dropped
     them, so the module wrote the application and then failed on every run.
-  - purge_cache - reject unknown fields in C(cache.files) mappings, such as a misspelled C(headers), before any request,
-    including in check mode. Cloudflare accepted and ignored them, so the module reported a purge of content cached
-    with different headers.

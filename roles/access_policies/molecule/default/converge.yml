@@ -18,6 +18,10 @@
       access_policies_list: []
       tags:
         - molecule-idempotence-notest
+      diff: false
+      no_log: true
 
-    - access_policies
+    - role: access_policies
+      diff: false
+      no_log: true
 ...

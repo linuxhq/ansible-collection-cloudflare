@@ -45,10 +45,11 @@ options:
     type: str
     description:
       - Access group name.
-      - Cloudflare trims surrounding whitespace from the name, so a name with
-        leading or trailing whitespace is not idempotent; each run creates
-        another resource and then fails because Cloudflare returns the
-        trimmed name.
+      - Cloudflare trims surrounding whitespace from the name, and group names
+        are unique, so a name with leading or trailing whitespace never
+        converges. The first run creates the group with the trimmed name and
+        then fails because Cloudflare returns the wrong Access group; later
+        runs fail because Cloudflare rejects the name as already in use.
       - An empty or whitespace-only name fails before any change, because
         Cloudflare does not store it.
   include:

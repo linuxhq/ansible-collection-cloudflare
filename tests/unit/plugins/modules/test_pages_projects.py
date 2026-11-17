@@ -384,6 +384,8 @@ class PagesProjectsTests(TestCase):
                         "production": {
                             "always_use_latest_compatibility_date": None,
                             "browsers": None,
+                            # Cloudflare accepts it but keeps the stored version.
+                            "build_image_major_version": None,
                             "compatibility_flags": None,
                             "env_vars": None,
                             "fail_open": None,
@@ -397,6 +399,7 @@ class PagesProjectsTests(TestCase):
                 [
                     "deployment_configs.production.always_use_latest_compatibility_date",
                     "deployment_configs.production.browsers",
+                    "deployment_configs.production.build_image_major_version",
                     "deployment_configs.production.compatibility_flags",
                     "deployment_configs.production.env_vars",
                     "deployment_configs.production.fail_open",
@@ -461,7 +464,6 @@ class PagesProjectsTests(TestCase):
         # Cloudflare rejects or clears these on the only write, or the module reports a value it kept.
         desired = {
             "production": {
-                "build_image_major_version": None,
                 "kv_namespaces": {"NS": {"namespace_id": None}},
                 "services": {"S": {"service": "worker", "environment": None}},
             }
@@ -531,6 +533,35 @@ class PagesProjectsTests(TestCase):
 
         self.assertNotIn("msg", result)
         self.assertEqual(api.edit.call_args.kwargs["deployment_configs"], desired)
+
+        client, api = client_with([cleared])
+
+        result = self.run_module(FakeModule(params(deployment_configs=desired)), client)
+
+        api.edit.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_null_service_environment_is_sent_and_converges(self):
+        # Cloudflare stores a null environment as "".
+        desired = {"production": {"services": {"API": {"service": "worker", "environment": None}}}}
+        cleared = {
+            **PROJECT,
+            "deployment_configs": {"production": {"services": {"API": {"service": "worker", "environment": ""}}}},
+        }
+        for stored in (None, "production"):
+            current = PROJECT
+            if stored is not None:
+                services = {"API": {"service": "worker", "environment": stored}}
+                current = {**PROJECT, "deployment_configs": {"production": {"services": services}}}
+
+            with self.subTest(stored=stored):
+                client, api = client_with([current], edited=cleared)
+
+                result = self.run_module(FakeModule(params(deployment_configs=desired)), client)
+
+                self.assertNotIn("msg", result)
+                self.assertTrue(result["changed"])
+                self.assertEqual(api.edit.call_args.kwargs["deployment_configs"], desired)
 
         client, api = client_with([cleared])
 

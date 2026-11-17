@@ -293,6 +293,42 @@ class ClientTests(TestCase):
 
         self.assertEqual(raised.exception.values["msg"], "Cloudflare API connection failed")
 
+    def test_client_reports_the_cause_of_a_connection_failure(self):
+        def make_client(transport):
+            def build(**kwargs):
+                return cloudflare.Cloudflare(**kwargs, max_retries=0, http_client=httpx.Client(transport=transport))
+
+            return build
+
+        def refuse(request):
+            raise httpx.ConnectError("[Errno 8] nodename nor servname provided")
+
+        def time_out(request):
+            raise httpx.ReadTimeout("The read operation timed out")
+
+        def reject_header(request):
+            # HTTPX quotes the invalid header value, including the token.
+            raise httpx.LocalProtocolError(f"Illegal header value {request.headers['Authorization'].encode()!r}")
+
+        cases = (
+            ("EXAMPLE-token", refuse, "Connection error. ConnectError: [Errno 8] nodename nor servname provided"),
+            ("EXAMPLE-token", time_out, "Request timed out. ReadTimeout: The read operation timed out"),
+            ("EXAMPLE-token\x7f", reject_header, "Connection error. LocalProtocolError"),
+        )
+        for token, respond, error in cases:
+            with (
+                self.subTest(error=error),
+                patch.object(cloudflare_utils, "Cloudflare", side_effect=make_client(httpx.MockTransport(respond))),
+                self.assertRaises(ModuleFail) as raised,
+                cloudflare_client(FakeModule({"api_token": token})) as client,
+            ):
+                client.zones.get(zone_id="zone")
+
+            values = raised.exception.values
+            self.assertEqual(values["msg"], "Cloudflare API connection failed")
+            self.assertEqual(values["error"], error)
+            self.assertNotIn("EXAMPLE", str(values))
+
     def test_client_reports_non_json_error_response_text(self):
         def respond(request):
             return httpx.Response(502, text="<html>502 Bad Gateway</html>")
@@ -1017,13 +1053,100 @@ class CreateOnceTests(TestCase):
     def test_rejected_create_is_not_looked_up(self):
         # Cloudflare answered, so the resource was not created.
         for status_code in (400, 409, 429):
-            with self.subTest(status_code=status_code):
+            with self.subTest(status_code=status_code), patch.object(cloudflare_utils.time, "sleep"):
                 find = Mock(return_value=[{"id": "one"}])
 
                 with self.assertRaises(cloudflare.APIStatusError):
                     create_once(Mock(side_effect=status_error(status_code)), find)
 
                 find.assert_not_called()
+
+    def test_only_conflicts_and_rate_limits_are_retried(self):
+        for status_code, attempts in ((400, 1), (403, 1), (404, 1), (409, 3), (429, 3)):
+            with self.subTest(status_code=status_code), patch.object(cloudflare_utils.time, "sleep") as sleep:
+                error = status_error(status_code)
+                create = Mock(side_effect=error)
+
+                with self.assertRaises(cloudflare.APIStatusError) as raised:
+                    create_once(create, Mock())
+
+                self.assertIs(raised.exception, error)
+                self.assertEqual(create.call_count, attempts)
+                self.assertEqual(sleep.call_count, attempts - 1)
+
+    def test_retried_create_returns_the_created_resource(self):
+        for status_code in (409, 429):
+            with self.subTest(status_code=status_code), patch.object(cloudflare_utils.time, "sleep") as sleep:
+                find = Mock()
+                create = Mock(side_effect=[status_error(status_code), status_error(status_code), {"id": "one"}])
+
+                self.assertEqual(create_once(create, find), {"id": "one"})
+
+                self.assertEqual(create.call_count, 3)
+                self.assertEqual([call.args for call in sleep.call_args_list], [(0.5,), (1.0,)])
+                find.assert_not_called()
+
+    def test_lost_response_after_a_retry_is_looked_up(self):
+        find = Mock(return_value=[{"id": "one"}])
+        create = Mock(side_effect=[status_error(429), timeout_error()])
+
+        with patch.object(cloudflare_utils.time, "sleep"):
+            self.assertEqual(create_once(create, find), {"id": "one"})
+
+        self.assertEqual(create.call_count, 2)
+        find.assert_called_once_with()
+
+    def test_retry_delay_honors_retry_after(self):
+        def rejected(headers):
+            response = httpx.Response(429, headers=headers, json={}, request=httpx.Request("POST", "https://x"))
+            return cloudflare.RateLimitError("Error code: 429", response=response, body={})
+
+        now = datetime(2026, 11, 17, tzinfo=timezone.utc)
+        cases = (
+            ({"Retry-After": "3"}, 0, 3.0),
+            ({"Retry-After": "1.5"}, 1, 1.5),
+            ({"Retry-After-Ms": "250", "Retry-After": "9"}, 0, 0.25),
+            ({"Retry-After": "Tue, 17 Nov 2026 00:00:07 GMT"}, 0, 7.0),
+            # A delay longer than the SDK's 60-second cap, or none, uses the backoff.
+            ({"Retry-After": "61"}, 0, 0.5),
+            ({"Retry-After": "0"}, 1, 1.0),
+            ({"Retry-After": "-1"}, 0, 0.5),
+            ({"Retry-After": "nan"}, 0, 0.5),
+            ({"Retry-After": "soon"}, 0, 0.5),
+            ({"Retry-After": "Tue, 17 Nov 2026 01:00:00 GMT"}, 0, 0.5),
+            ({}, 1, 1.0),
+        )
+        with patch.object(cloudflare_utils, "datetime", Mock(wraps=datetime, now=Mock(return_value=now))):
+            for headers, attempt, delay in cases:
+                with self.subTest(headers=headers, attempt=attempt):
+                    self.assertEqual(cloudflare_utils.retry_delay(rejected(headers), attempt), delay)
+
+    def test_rate_limited_create_is_retried_through_the_sdk(self):
+        requests = []
+
+        def respond(request):
+            requests.append(request)
+            if len(requests) == 1:
+                return httpx.Response(429, headers={"Retry-After": "2"}, json={"success": False, "errors": []})
+
+            return httpx.Response(200, json={"success": True, "result": {"id": "one", "name": "n"}})
+
+        with (
+            patch.object(cloudflare_utils.time, "sleep") as sleep,
+            cloudflare.Cloudflare(
+                api_token="EXAMPLE-token", http_client=httpx.Client(transport=httpx.MockTransport(respond))
+            ) as client,
+        ):
+            group = create_once(
+                lambda: without_retries(client).zero_trust.access.groups.create(
+                    account_id="account", name="n", include=[{"everyone": {}}]
+                ),
+                Mock(),
+            )
+
+        self.assertEqual(serialize_resource(group)["id"], "one")
+        self.assertEqual([request.method for request in requests], ["POST", "POST"])
+        sleep.assert_called_once_with(2.0)
 
     def test_matching_resources_compares_the_field_exactly(self):
         items = [{"id": "one", "name": "n"}, {"id": "two", "name": "N"}, {"id": "three"}, None]

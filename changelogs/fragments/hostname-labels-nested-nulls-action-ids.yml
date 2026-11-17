@@ -5,5 +5,5 @@ bugfixes:
     rejects the item.
   - access_apps - treat a null field nested in an inline policy's C(connection_rules), C(connection_rules.rdp), or
     C(mfa_config) as omitted, as documented, so the application converges instead of reporting a change on every run.
-  - pagerules - fail before any request when an action C(id) is not a non-empty string, instead of crashing with a
+  - pagerules - fail before any request when an action C(id) is a mapping or a list, instead of crashing with a
     TypeError when an existing page rule is compared.

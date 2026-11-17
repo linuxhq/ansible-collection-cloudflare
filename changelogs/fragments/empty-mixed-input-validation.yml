@@ -1,12 +1,5 @@
 ---
-breaking_changes:
-  - purge_cache - O(cache) suboptions are now mutually exclusive, so set exactly one of C(purge_everything),
-    C(files), C(tags), C(hosts), and C(prefixes) per task, before any request. Cloudflare accepted a request that
-    combined purge types although its API documents one type per request. As with any Ansible mutually exclusive
-    option, a suboption set to null counts as set.
 bugfixes:
-  - purge_cache - reject an empty C(files), C(tags), C(hosts), or C(prefixes) list before any request, including in
-    check mode. Cloudflare accepted it but purged nothing, while the module reported that the cache was purged.
   - access_groups, access_policies, access_apps - match a C(github-organization) selector whose C(id) is null with
     the stored selector that holds the id Cloudflare assigned. The module previously compared the assigned id with the
     null request, so the group, policy, or application was written and then failed on every run.

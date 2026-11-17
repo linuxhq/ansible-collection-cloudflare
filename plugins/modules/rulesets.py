@@ -59,6 +59,11 @@ options:
         replaces them, so omitting a parameter or a nested key, such as a
         C(headers) entry, removes it. The C(version) Cloudflare sets to
         V(latest) for an C(execute) rule that omits it is ignored.
+      - Other nested rule mappings, such as C(ratelimit) and
+        C(exposed_credential_check), are also compared on their complete key
+        sets, as an update replaces them, so omitting a nested key removes it.
+        Cloudflare drops C(ratelimit.requests_to_origin=false), so it matches a
+        stored rule without the key.
       - Use the Cloudflare API names for C(set_cache_control) directives, such as
         C(max-age) and C(no-cache); their snake_case spellings fail before any change.
       - When rules hold credentials, pass them from a vaulted variable and set
@@ -141,7 +146,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_absent,
     ensure_resource_present,
     get_or_none,
-    normalize_current_by_desired_fields,
     require_mapping,
     resource_field,
     serialize_resource,
@@ -243,6 +247,10 @@ ACTION_PARAMETER_DEFAULTS = {"execute": {"version": "latest"}}
 # Cloudflare drops these rule fields when they are empty.
 EMPTY_RULE_FIELDS = {"action_parameters": {}, "description": ""}
 
+# Keys of nested rule mappings Cloudflare drops when they hold these values, so
+# a stored mapping without the key matches a request that sets it to the value.
+DROPPED_NESTED_DEFAULTS = {"ratelimit": {"requests_to_origin": False}}
+
 
 def compared_rule_field(rule, key, desired):
     """Return whether a current rule field takes part in the comparison.
@@ -281,13 +289,29 @@ def comparable_action_parameters(rule, desired):
     }
 
 
+def comparable_nested_mapping(rule, key, desired):
+    """Return a rule's nested mapping with the dropped defaults that desired sets.
+
+    The update replaces the mapping, so it is compared on its complete key
+    set; a key Cloudflare drops when it holds its default is filled in with
+    that default when desired sets it.
+    """
+    value = rule[key]
+    requested = desired.get(key)
+    if not isinstance(value, dict) or not isinstance(requested, dict):
+        return value
+
+    defaults = DROPPED_NESTED_DEFAULTS.get(key, {})
+    return {**{name: item for name, item in defaults.items() if name in requested}, **value}
+
+
 def comparable_rules(rules, desired_rules):
     """Project current rules for comparison with the desired rules.
 
-    Each rule keeps every compared field. Its action_parameters are kept
-    whole, apart from defaults Cloudflare filled in, as Cloudflare stores them
-    exactly as sent; other nested mappings are projected onto the requested
-    fields.
+    Each rule keeps every compared field, and nested mappings are compared on
+    their complete key sets. Its action_parameters omit defaults Cloudflare
+    filled in, and other nested mappings gain the defaults Cloudflare drops
+    that the request sets.
     """
     comparable = []
     for index, rule in enumerate(rules):
@@ -298,9 +322,9 @@ def comparable_rules(rules, desired_rules):
                 key: (
                     comparable_action_parameters(rule, desired)
                     if key == "action_parameters"
-                    else normalize_current_by_desired_fields(value, desired[key]) if key in desired else value
+                    else comparable_nested_mapping(rule, key, desired)
                 )
-                for key, value in rule.items()
+                for key in rule
                 if compared_rule_field(rule, key, desired)
             }
         )
