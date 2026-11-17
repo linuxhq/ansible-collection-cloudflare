@@ -162,6 +162,8 @@ def ensure_present(module, client, current):
             module.fail_json(
                 msg=f"Cannot change config_src of the existing cloudflared tunnel from "
                 f"{current_config_src} to {params['config_src']}",
+                account_id=account_id,
+                resource_id=current_id,
                 cfd_tunnel_id=current_id,
                 current_config_src=current_config_src,
                 requested_config_src=params["config_src"],

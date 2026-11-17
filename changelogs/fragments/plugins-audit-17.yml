@@ -1,0 +1,15 @@
+---
+bugfixes:
+  - rulesets_info - name the zone and phase, as C(zone_id) and C(phase), when Cloudflare returns a malformed ruleset,
+    one for another phase, or malformed rules.
+  - cfd_tunnel - report C(account_id) and C(resource_id) when O(cfd_tunnel#module:config_src) differs from the existing
+    tunnel's, like the module's other failures. C(cfd_tunnel_id) is still returned.
+  - cfd_tunnel_configurations - name the account and tunnel when Cloudflare returns the wrong tunnel or a malformed
+    tunnel configuration before the update.
+  - zones - name the zone, and its account when O(zones#module:account_id) is set, when deleting the zone fails, and
+    omit C(account_id) from a failed create instead of reporting it as null when it is not set.
+  - warp_connector - when Cloudflare returns another connector after applying O(warp_connector#module:tunnel_secret)
+    to a created connector, report that response and say Cloudflare returned the wrong connector, instead of saying
+    the connector was created without the requested secret.
+  - access_service_tokens, access_service_tokens_info - use the collection's usual variable names and a literal token
+    name in the examples.

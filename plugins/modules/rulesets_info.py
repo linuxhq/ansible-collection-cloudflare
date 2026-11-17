@@ -95,16 +95,17 @@ def run(module, client):
         entry = {"name": zone["name"], "rules": [], "zone_id": zone["id"]}
         ruleset = get_entrypoint(client, zone["id"], phase)
         if ruleset is not None:
-            entry["id"] = resource_id(module, ruleset, "ruleset")
-            entry["phase"] = resource_field(module, ruleset, "phase", "ruleset", expected=phase)
+            context = {"zone_id": zone["id"], "phase": phase}
+            entry["id"] = resource_id(module, ruleset, "ruleset", context=context)
+            entry["phase"] = resource_field(module, ruleset, "phase", "ruleset", expected=phase, context=context)
             rules = ruleset.get("rules")
             if rules is None:
                 rules = []
             elif not isinstance(rules, list):
-                module.fail_json(msg="Cloudflare API returned malformed ruleset data")
+                module.fail_json(msg="Cloudflare API returned malformed ruleset data", **context)
 
             for rule in rules:
-                require_mapping(module, rule, "ruleset rule")
+                require_mapping(module, rule, "ruleset rule", context)
 
             entry["rules"] = rules
 

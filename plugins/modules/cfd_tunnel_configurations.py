@@ -219,7 +219,7 @@ def run(module, client):
     ):
         tunnel = serialize_resource(tunnels.get(params["tunnel_id"], account_id=params["account_id"]))
 
-    resource_id(module, tunnel, "cloudflared tunnel", expected=params["tunnel_id"])
+    resource_id(module, tunnel, "cloudflared tunnel", expected=params["tunnel_id"], context=identifiers)
     # Cloudflare still returns a deleted tunnel, with deleted_at set.
     if tunnel.get("deleted_at") is not None:
         module.fail_json(msg=f"Cloudflared tunnel {params['tunnel_id']} was deleted", **identifiers)
@@ -238,12 +238,12 @@ def run(module, client):
     ):
         current = serialize_resource(configurations.get(params["tunnel_id"], account_id=params["account_id"])) or {}
 
-    require_mapping(module, current, "tunnel configuration")
+    require_mapping(module, current, "tunnel configuration", identifiers)
     current_config = current.get("config")
     if current_config is None:
         current_config = {}
     else:
-        require_mapping(module, current_config, "tunnel configuration")
+        require_mapping(module, current_config, "tunnel configuration", identifiers)
 
     if not values_differ(
         comparable_config(current_config, params["config"]),

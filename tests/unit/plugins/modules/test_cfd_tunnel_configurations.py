@@ -335,6 +335,16 @@ class CfdTunnelConfigurationsTests(TestCase):
 
         client.zero_trust.tunnels.cloudflared.configurations.update.assert_not_called()
         self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned the wrong cloudflared tunnel")
+        self.assertEqual(raised.exception.values["account_id"], "account")
+        self.assertEqual(raised.exception.values["tunnel_id"], "tunnel")
+
+    def test_malformed_current_configuration_names_the_tunnel(self):
+        result, api = self.run_module(module_for({"warp": True}), {"config": "malformed"})
+
+        api.update.assert_not_called()
+        self.assertEqual(result.values["msg"], "Cloudflare API returned malformed tunnel configuration data")
+        self.assertEqual(result.values["account_id"], "account")
+        self.assertEqual(result.values["tunnel_id"], "tunnel")
 
     def test_malformed_update_response_reports_the_write(self):
         current = {"config": {"ingress": [{"service": "http_status:404"}]}}

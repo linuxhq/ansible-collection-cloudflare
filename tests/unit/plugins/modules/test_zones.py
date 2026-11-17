@@ -509,6 +509,29 @@ class ZonesTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertEqual(result["zone"], ZONE)
 
+    def test_failed_delete_names_the_zone(self):
+        for account_id, expected in (
+            ("account", {"resource_id": "zone", "name": "example.com", "account_id": "account"}),
+            (None, {"resource_id": "zone", "name": "example.com"}),
+        ):
+            with self.subTest(account_id=account_id):
+                client = client_with([ZONE])
+                client.zones.delete.side_effect = status_error(403)
+
+                with self.assertRaises(cloudflare.PermissionDeniedError) as raised:
+                    self.run_module(FakeModule(params(account_id=account_id, state="absent")), client)
+
+                self.assertEqual(raised.exception._cloudflare_context, expected)
+
+    def test_failed_create_without_account_omits_account_id(self):
+        client = client_with()
+        client.zones.create.side_effect = status_error(403)
+
+        with self.assertRaises(cloudflare.PermissionDeniedError) as raised:
+            self.run_module(FakeModule(params(account_id=None)), client)
+
+        self.assertEqual(raised.exception._cloudflare_context, {"name": "example.com"})
+
     def test_strips_trailing_dot_from_name(self):
         created = {**ZONE, "account": {"id": "account"}}
         for found in ([], [ZONE]):
