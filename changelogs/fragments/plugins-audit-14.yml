@@ -1,0 +1,31 @@
+---
+minor_changes:
+  - access_apps, access_groups, access_policies, access_service_tokens, cfd_tunnel, pagerules, pages_projects,
+    rules_lists, rulesets, warp_connector, zones - retry a create request Cloudflare rejects with a 409 or 429 status
+    up to twice, after the delay its C(Retry-After) header asks for when that is at most 60 seconds, or otherwise after
+    0.5 and then 1 second. Cloudflare created nothing, so the retry cannot add a duplicate; the module previously
+    failed at once. A create that fails without a response or with a 5xx status is still not retried.
+  - all modules - name the cause of a Cloudflare API connection failure or timeout in C(error), such as
+    C(Connection error. ConnectError) followed by its message. A request HTTPX refused to build is named without its
+    message, which can quote the API token.
+bugfixes:
+  - rulesets - compare nested rule mappings other than C(action_parameters), such as C(ratelimit) and
+    C(exposed_credential_check), on their complete key sets. An update replaces them, so a key the task removed, such
+    as C(ratelimit.requests_to_origin), was kept on Cloudflare and the module reported no change. A
+    C(ratelimit.requests_to_origin) of V(false), which Cloudflare drops, matches a rule without it.
+  - pages_projects - fail before any request when C(build_image_major_version) of a C(deployment_configs) environment
+    is null. Cloudflare accepted the null but kept the stored version, so the module wrote the project and then failed
+    because Cloudflare did not apply the request, on every run. Document that a C(services) entry's C(environment) set
+    to null is stored as an empty string and converges.
+  - rules_lists - include C(rules_list_id) in every failure while waiting for the items operation.
+  - pagerules - document that a higher O(pagerules#module:priority) number is a higher priority, and that only the
+    matching page rule with the highest priority applies.
+  - access_groups - document that a name with surrounding whitespace creates the trimmed group and then fails, and
+    that later runs fail because Cloudflare rejects the name as already in use.
+  - access_service_tokens - document that Cloudflare creates a token without O(access_service_tokens#module:duration)
+    with a duration of V(8760h), and that V(forever) makes a token that does not expire.
+trivial:
+  - Molecule scenarios - set C(no_log) and C(diff=false) on the access_policies role entries in the access_apps,
+    access_apps_info, access_policies, and access_policies_info converge playbooks, which also run
+    access_identity_providers_info as a dependency.
+  - Changelog fragments - drop or correct entries for checks that were later removed before release.

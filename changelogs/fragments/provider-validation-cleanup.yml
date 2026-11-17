@@ -53,9 +53,9 @@ minor_changes:
     of 0 fails early; Cloudflare rejects a negative one.
   - pages_projects - accept null C(wrangler_config_hash), C(placement.mode), C(limits.cpu_ms), and environment
     variable C(value), which Cloudflare clears, and send null values and binding entry keys whose handling by
-    Cloudflare is not verified, such as C(services) C(environment) or an C(r2_buckets) entry key. O(rotate_secrets)
+    Cloudflare is not verified, such as an C(r2_buckets) entry key. O(rotate_secrets)
     without a secret no longer fails.
-  - purge_cache - allow combined purge types in O(purge_cache#module:cache) again, and send an empty O(cache), empty
+  - purge_cache - allow combined purge types in O(purge_cache#module:cache), and send an empty O(cache), empty
     lists, and any file items to Cloudflare, which rejects them or purges nothing. The purge_cache role no longer
     skips an empty C(cache).
   - rules_lists - accept a C(redirect.target_url) with any scheme or without a host, such as C(ftp://example.com/)

@@ -60,7 +60,6 @@ bugfixes:
   - cfd_tunnel_configurations - document that C(configuration.config) is returned only when the tunnel has one.
   - pages_projects - clear build settings set to null, such as C(web_analytics_tag), treat requested empty binding maps
     as equal to null collections, and ignore an empty O(source).
-  - zones - document that O(account_id) is required when creating a zone.
   - zones_info - include internal zones, which Cloudflare omits unless the zone types are named.
   - zones, pages_projects - document that C(settings) and C(domains) are returned only when O(state=present) changes
     something outside check mode, and that C(domains) lists the domains added during the run.

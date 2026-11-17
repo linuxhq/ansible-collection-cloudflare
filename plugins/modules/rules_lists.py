@@ -437,7 +437,7 @@ def submit_items(module, client, account_id, list_id, items, deadline):
         return serialize_resource(operation)
 
 
-def wait_for_operation(module, client, account_id, operation, deadline):
+def wait_for_operation(module, client, account_id, list_id, operation, deadline):
     operation_id = None
     if isinstance(operation, dict):
         operation_id = operation.get("operation_id") or operation.get("id")
@@ -445,6 +445,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
     if not isinstance(operation_id, str) or not operation_id.strip() or operation_id != operation_id.strip():
         module.fail_json(
             msg="Rules list items submission did not return an operation id",
+            rules_list_id=list_id,
             operation=operation,
         )
 
@@ -454,6 +455,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
         if remaining <= 0:
             module.fail_json(
                 msg="Timed out waiting for the Rules list items operation to complete",
+                rules_list_id=list_id,
                 operation_id=operation_id,
                 operation=status,
             )
@@ -462,6 +464,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
             with cloudflare_error_context(
                 "Cloudflare API request failed while waiting for the Rules list items operation",
                 account_id=account_id,
+                rules_list_id=list_id,
                 operation_id=operation_id,
             ):
                 status = serialize_resource(
@@ -481,12 +484,14 @@ def wait_for_operation(module, client, account_id, operation, deadline):
         if not isinstance(status, dict) or not isinstance(status.get("status"), str):
             module.fail_json(
                 msg="Cloudflare API returned malformed Rules list operation data",
+                rules_list_id=list_id,
                 operation_id=operation_id,
             )
 
         if status.get("id") != operation_id:
             module.fail_json(
                 msg="Cloudflare API returned the wrong Rules list operation",
+                rules_list_id=list_id,
                 operation_id=operation_id,
                 operation=status,
             )
@@ -498,6 +503,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
         if operation_status == "failed":
             module.fail_json(
                 msg="Rules list items operation failed",
+                rules_list_id=list_id,
                 operation_id=operation_id,
                 operation=status,
             )
@@ -505,6 +511,7 @@ def wait_for_operation(module, client, account_id, operation, deadline):
         if operation_status not in ("pending", "running"):
             module.fail_json(
                 msg="Cloudflare API returned an unknown Rules list operation status",
+                rules_list_id=list_id,
                 operation_id=operation_id,
                 operation=status,
             )
@@ -964,6 +971,7 @@ def ensure_present(module, client, current):
                 module,
                 client,
                 account_id,
+                current_id,
                 submit_items(module, client, account_id, current_id, desired_items, deadline),
                 deadline,
             )

@@ -21,7 +21,7 @@ bugfixes:
     unrelated resource's name has surrounding whitespace, which Cloudflare can store for Access policies. Identifiers
     and the matched resource are still validated strictly, and malformed-data failures now include the resource's
     C(resource_id).
-  - pagerules - fail before any change when O(priority) is below 1. Cloudflare stored priority 0 as 1, so the module
+  - pagerules - fail before any change when O(priority) is 0. Cloudflare stored priority 0 as 1, so the module
     wrote on every run.
   - pages_projects - document that O(build_config) C(web_analytics_token), like C(web_analytics_tag), can be set to
     null to clear it.

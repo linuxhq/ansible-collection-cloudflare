@@ -59,11 +59,14 @@ options:
   priority:
     type: int
     description:
-      - Evaluation priority of the page rule, as an ordinal position from 1 to
-        the number of page rules in the zone, including a rule being created.
+      - Priority of the page rule, from 1 to the number of page rules in the
+        zone, including a rule being created.
+      - A higher number is a higher priority. When several page rules match a
+        request, only the matching rule with the highest priority applies, and
+        the Cloudflare dashboard lists it first.
       - A priority of 0 or above that number fails before any change, because
-        Cloudflare would store the rule at the first or last position instead.
-        Cloudflare rejects a negative priority.
+        Cloudflare would store the rule with the lowest or highest priority
+        instead. Cloudflare rejects a negative priority.
       - In check mode, the upper bound is not checked, because page rules that
         earlier tasks in the same run would create are not counted.
       - An existing rule's priority is preserved when omitted.
@@ -102,7 +105,7 @@ EXAMPLES = r"""
           operator: matches
           value: example.com/*
 
-- name: Ensure page rule is evaluated first but paused
+- name: Ensure page rule has the lowest priority but is paused
   linuxhq.cloudflare.pagerules:
     api_token: "{{ cloudflare_api_token }}"
     zone_id: "{{ zone_id }}"
@@ -146,7 +149,7 @@ pagerule:
       type: list
       elements: dict
     priority:
-      description: Evaluation priority of the page rule.
+      description: Priority of the page rule; a higher number is a higher priority.
       returned: when available
       type: int
     status:

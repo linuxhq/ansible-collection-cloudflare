@@ -33,8 +33,10 @@ options:
     type: str
   duration:
     description:
-      - Lifetime for the service token.
-      - When omitted for O(state=present), the module does not manage the token duration.
+      - Lifetime for the service token, such as V(8760h), or V(forever) for a
+        token that does not expire.
+      - When omitted for O(state=present), the module does not manage the token duration;
+        Cloudflare creates the token with a duration of V(8760h).
     type: str
   state:
     description:

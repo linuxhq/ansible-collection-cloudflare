@@ -10,8 +10,8 @@ bugfixes:
     policy C(approval_groups) entries before any request. Cloudflare accepted and dropped them, so the module wrote the
     application and then failed on every run.
   - pagerules - reject unknown fields in C(targets), their C(constraint), C(actions), and the C(value) of
-    C(forwarding_url) and C(cache_key_fields) actions before any request. Cloudflare accepted and dropped them, so the
+    C(forwarding_url) actions before any request. Cloudflare accepted and dropped them, so the
     module wrote the page rule and then failed on every run.
-  - zones - reject unknown fields in the object values of the C(aegis), C(automatic_platform_optimization), C(nel), and
-    C(security_header) settings before any request. Cloudflare accepted and dropped them, so the module wrote the
+  - zones - reject unknown fields in the object values of the C(aegis), C(nel), and C(security_header) settings
+    before any request. Cloudflare accepted and dropped them, so the module wrote the
     setting and then failed on every run.

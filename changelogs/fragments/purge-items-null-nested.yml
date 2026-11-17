@@ -1,7 +1,5 @@
 ---
 bugfixes:
-  - purge_cache - fail before any request when a C(files) item is neither a URL string nor a mapping, such as V(5) or
-    V(true). Cloudflare accepted the item but purged nothing for it, while the module reported the cache purged.
   - access_apps - treat a null field of C(cors_headers) or of a C(policies) entry, such as C(allow_credentials) or
     C(approval_required), as omitted. The module compared the stored default with the null, so it wrote the application
     and then failed because Cloudflare did not apply the request, on every run.

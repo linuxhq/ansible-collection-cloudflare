@@ -605,3 +605,45 @@ class RulesetRuleFieldTests(TestCase):
         result = self.run_module(FakeModule(params(rules=[requested]), check_mode=True), client)
 
         self.assertTrue(result["changed"])
+
+    def test_removing_a_nested_rule_key_is_a_change(self):
+        ratelimit = {"characteristics": ["ip.src", "cf.colo.id"], "period": 10, "requests_per_period": 5}
+        requested = {"action": "block", "expression": "true", "ratelimit": ratelimit}
+        stored = {**ASSIGNED, **requested, "enabled": True, "ratelimit": {**ratelimit, "requests_to_origin": True}}
+        client, api = make_client({**CURRENT, "rules": [stored]})
+
+        result = self.run_module(FakeModule(params(rules=[requested]), check_mode=True), client)
+
+        self.assertTrue(result["changed"])
+        api.phases.update.assert_not_called()
+
+    def test_requests_to_origin_false_matches_a_rule_without_it(self):
+        ratelimit = {"characteristics": ["ip.src", "cf.colo.id"], "period": 10, "requests_per_period": 5}
+        requested = {"action": "block", "expression": "true", "ratelimit": {**ratelimit, "requests_to_origin": False}}
+        # Cloudflare drops requests_to_origin=false.
+        stored = {**ASSIGNED, **requested, "enabled": True, "ratelimit": ratelimit}
+        with self.subTest(state="updated"):
+            current = {**CURRENT, "rules": [{**stored, "ratelimit": {**ratelimit, "requests_to_origin": True}}]}
+            client, api = make_client(current, updated={**CURRENT, "rules": [stored]})
+
+            result = self.run_module(FakeModule(params(rules=[requested])), client)
+
+            api.phases.update.assert_called_once()
+            self.assertTrue(result["changed"])
+            self.assertNotIn("msg", result)
+
+        with self.subTest(state="current"):
+            client, api = make_client({**CURRENT, "rules": [stored]})
+
+            result = self.run_module(FakeModule(params(rules=[requested])), client)
+
+            api.phases.update.assert_not_called()
+            self.assertFalse(result["changed"])
+
+        with self.subTest(state="true requested"):
+            client, _ignored = make_client({**CURRENT, "rules": [stored]})
+            rule = {**requested, "ratelimit": {**ratelimit, "requests_to_origin": True}}
+
+            result = self.run_module(FakeModule(params(rules=[rule]), check_mode=True), client)
+
+            self.assertTrue(result["changed"])

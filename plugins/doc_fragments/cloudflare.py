@@ -34,8 +34,12 @@ options:
     CREATE = r"""
 options: {}
 notes:
-  - Requests that create a resource are sent once, without the Cloudflare SDK's automatic retries, which could create
-    a duplicate. When one fails without a response, such as after a timeout, or with a 5xx status, Cloudflare may have
-    created the resource anyway, so the module looks it up again as it did before creating it. A single match is
-    treated as the created resource; otherwise the module fails with the original error.
+  - Requests that create a resource are sent without the Cloudflare SDK's automatic retries, which could create a
+    duplicate. When Cloudflare rejects one with a 409 or 429 status, it created nothing, so the request is retried up
+    to twice, after the delay the response's C(Retry-After) header asks for when that is at most 60 seconds, or
+    otherwise after 0.5 and then 1 second.
+  - When a create request fails without a response, such as after a timeout, or with a 5xx status, Cloudflare may
+    have created the resource anyway, so the request is not retried and the module looks the resource up again as it
+    did before creating it. A single match is treated as the created resource; otherwise the module fails with the
+    original error.
 """

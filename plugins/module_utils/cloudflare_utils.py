@@ -4,7 +4,10 @@
 
 import json
 import os
+import time
 from contextlib import contextmanager
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from ipaddress import ip_address
 from urllib.parse import quote
 
@@ -12,10 +15,12 @@ from ansible.module_utils.basic import missing_required_lib
 
 try:
     import cloudflare
+    import httpx
     import pydantic
     from cloudflare import BaseModel, Cloudflare
 except ImportError:
     cloudflare = None
+    httpx = None
     BaseModel = None
     Cloudflare = None
     PYDANTIC_V2 = False
@@ -37,6 +42,18 @@ DOT_SEGMENTS = (".", "..")
 # Items requested per page from a page-numbered list endpoint; Cloudflare's
 # default page size.
 PAGE_SIZE = 20
+
+# Retries of a create Cloudflare rejected with a 409 or 429 status, as many as
+# the SDK makes by default.
+CREATE_RETRIES = 2
+
+# Longest Retry-After delay honored before retrying a create, in seconds, as
+# in the SDK. A longer, invalid, or missing delay uses the backoff instead.
+MAX_RETRY_AFTER_SECONDS = 60
+
+# Delay before the first retry of a create without a usable Retry-After, in
+# seconds; it doubles for each later retry.
+CREATE_RETRY_BACKOFF_SECONDS = 0.5
 
 
 @contextmanager
@@ -142,6 +159,25 @@ def error_response_body(exc):
         return None
 
 
+def error_message(exc):
+    """Return the message of a failure, naming the cause of a connection failure.
+
+    The SDK reports every connection failure and timeout with the same
+    message, so the error it was raised from is appended. A request HTTPX
+    refused to build is named without its text, which can quote a header
+    value such as the API token.
+    """
+    message = str(exc)
+    cause = exc.__cause__
+    if not isinstance(exc, cloudflare.APIConnectionError) or cause is None:
+        return message
+
+    if isinstance(cause, httpx.LocalProtocolError) or not str(cause):
+        return f"{message} {type(cause).__name__}"
+
+    return f"{message} {type(cause).__name__}: {cause}"
+
+
 def cloudflare_error_details(exc):
     """Return the status code and response body of a failure, or its message.
 
@@ -155,7 +191,7 @@ def cloudflare_error_details(exc):
     details = {}
     # A response that failed validation carries the reason only in the message.
     if getattr(exc, "response", None) is None or isinstance(exc, cloudflare.APIResponseValidationError):
-        details["error"] = str(exc)
+        details["error"] = error_message(exc)
 
     if status_code is not None:
         details["status_code"] = status_code
@@ -253,7 +289,8 @@ def without_retries(client):
 
     The SDK retries a request after a connection failure, a timeout, or a 5xx
     status, so a retried create could add a second resource when the first
-    attempt reached Cloudflare.
+    attempt reached Cloudflare. create_once retries only the statuses that
+    show Cloudflare did not create it.
     """
     return client.with_options(max_retries=0)
 
@@ -269,19 +306,56 @@ def unique_match(resource):
     return [] if resource is None else [resource]
 
 
-def create_once(create, find):
-    """Return the resource create made with a single request.
+def retry_delay(exc, attempt):
+    """Return the seconds to wait before retrying a request Cloudflare rejected.
 
-    create must send its request without retries. After a connection failure,
-    a timeout, or a 5xx status, Cloudflare may have created the resource
-    anyway, so find is called to read the resources matching the requested
-    one. Exactly one match is returned as the created resource; otherwise, or
-    when find fails, the original error is raised.
+    The response's Retry-After-Ms or Retry-After header is honored when it
+    asks for more than zero and at most MAX_RETRY_AFTER_SECONDS; otherwise the
+    delay doubles from CREATE_RETRY_BACKOFF_SECONDS with each attempt.
     """
+    headers = getattr(getattr(exc, "response", None), "headers", None) or {}
+    delay = None
     try:
-        return create()
-    except (cloudflare.APIConnectionError, cloudflare.InternalServerError) as exc:
-        error = exc
+        if "retry-after-ms" in headers:
+            delay = float(headers["retry-after-ms"]) / 1000
+        elif "retry-after" in headers:
+            value = headers["retry-after"]
+            try:
+                delay = float(value)
+            except ValueError:
+                delay = (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds()
+    except (TypeError, ValueError):
+        delay = None
+
+    if delay is not None and 0 < delay <= MAX_RETRY_AFTER_SECONDS:
+        return delay
+
+    return CREATE_RETRY_BACKOFF_SECONDS * 2**attempt
+
+
+def create_once(create, find):
+    """Return the resource create made, sending each request without SDK retries.
+
+    create must send its request without retries. Cloudflare answered a 409 or
+    429 status without creating the resource, so create is retried up to
+    CREATE_RETRIES times, after the delay retry_delay returns. After a
+    connection failure, a timeout, or a 5xx status, Cloudflare may have
+    created the resource anyway, so create is not retried; find is called to
+    read the resources matching the requested one. Exactly one match is
+    returned as the created resource; otherwise, or when find fails, the
+    original error is raised.
+    """
+    for attempt in range(CREATE_RETRIES + 1):
+        try:
+            return create()
+        except (cloudflare.ConflictError, cloudflare.RateLimitError) as exc:
+            if attempt == CREATE_RETRIES:
+                raise
+
+            time.sleep(retry_delay(exc, attempt))
+        except (cloudflare.APIConnectionError, cloudflare.InternalServerError) as exc:
+            error = exc
+            break
 
     try:
         matches = list(find())
@@ -797,9 +871,9 @@ def ensure_resource_present(
 ):
     """Create the resource, or update it when the managed fields differ.
 
-    create must send its request without retries; when it fails without a
-    response or with a 5xx status, find_created reads the matching resources,
-    as described in create_once. The update replaces the resource, so
+    create must send its request without retries; it is retried after a 409
+    or 429 status, and when it fails without a response or with a 5xx status,
+    find_created reads the matching resources, as described in create_once. The update replaces the resource, so
     preserved_fields omitted from payload are carried over from current.
     exact_values are compared exactly. context names the resource's owner in
     failures. comparable optionally maps a

@@ -4,6 +4,5 @@ bugfixes:
     environment is empty. Cloudflare accepted the empty value but kept the previous one, so the module wrote the project
     and then failed because Cloudflare did not apply the request, on every run.
   - zones - fail before any request when a setting C(value) is null, or when a null appears at any level of the object
-    value of C(aegis), C(automatic_platform_optimization), C(nel), or C(security_header), such as a null C(enabled) of
-    C(nel). Cloudflare stored a different value, such as V(false), or rejected the null after an earlier zone or setting
-    write in the same run.
+    value of C(aegis), C(nel), or C(security_header), such as a null C(enabled) of C(nel). Cloudflare stored a
+    different value, such as V(false), or rejected the null after an earlier zone or setting write in the same run.
