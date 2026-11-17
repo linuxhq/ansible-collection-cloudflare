@@ -151,8 +151,8 @@ FIELDS = BOOLEAN_FIELDS + ("status",)
 PENDING_STATUSES = {"pending": "active", "pending-disabled": "disabled"}
 
 
-def comparable_settings(module, settings):
-    status = resource_field(module, settings, "status", "DNSSEC settings")
+def comparable_settings(module, settings, failure):
+    status = resource_field(module, settings, "status", "DNSSEC settings", context=failure)
     # Cloudflare omits these settings while DNSSEC is disabled, so an omitted
     # setting matches false.
     return {
@@ -177,7 +177,7 @@ def run(module, client):
         current,
         payload_from_params(module.params, FIELDS),
         edit=lambda payload: client.dns.dnssec.edit(zone_id=zone_id, **payload),
-        comparable=lambda settings: comparable_settings(module, settings),
+        comparable=lambda settings, failure: comparable_settings(module, settings, failure),
         context={"zone_id": zone_id},
     )
 

@@ -324,6 +324,32 @@ class RulesetsTests(TestCase):
 
         self.assertIn("did not apply", result["msg"])
 
+    def test_created_ruleset_in_another_phase_reports_the_write(self):
+        created = {**CURRENT, "phase": "http_request_late_transform"}
+        client, api = make_client(created=created)
+
+        result = self.run_module(FakeModule(params(rules=RULES)), client)
+
+        api.create.assert_called_once()
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong ruleset")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["ruleset"], created)
+        self.assertEqual(result["resource_id"], "ruleset")
+        self.assertEqual(result["zone_id"], "zone")
+
+    def test_updated_ruleset_with_malformed_rules_reports_the_write(self):
+        updated = {**CURRENT, "rules": "malformed"}
+        client, api = make_client(current={**CURRENT, "rules": []}, updated=updated)
+
+        result = self.run_module(FakeModule(params(rules=RULES)), client)
+
+        api.phases.update.assert_called_once()
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed ruleset data")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["ruleset"], updated)
+        self.assertEqual(result["resource_id"], "ruleset")
+        self.assertEqual(result["zone_id"], "zone")
+
 
 HEADER_RULE = {
     "enabled": True,

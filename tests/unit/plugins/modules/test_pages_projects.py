@@ -1046,7 +1046,7 @@ class PagesProjectsTests(TestCase):
         result = self.run_module(FakeModule(params(production_branch="release")), client)
 
         self.assertIn("did not apply", result["msg"])
-        self.assertNotIn("changed", result)
+        self.assertTrue(result["changed"])
         self.assertEqual(result["account_id"], "account")
         self.assertEqual(result["name"], "docs")
 
@@ -1333,3 +1333,82 @@ class PagesProjectsTests(TestCase):
             raised.exception._cloudflare_message,
             "Cloudflare API request failed while gathering the Pages project",
         )
+
+    def test_rejected_domain_after_create_reports_the_created_project(self):
+        body = {"success": False, "errors": [{"code": 8000018, "message": "Invalid domain"}], "messages": []}
+        client, api = client_with([None], created=PROJECT)
+        api.domains.create.side_effect = status_error(400, body)
+
+        with self.assertRaises(cloudflare.BadRequestError) as raised:
+            pages_projects.run(FakeModule(params(domains=[{"name": "docs.example.com"}])), client)
+
+        api.create.assert_called_once()
+        self.assertEqual(
+            raised.exception._cloudflare_context,
+            {
+                "account_id": "account",
+                "name": "docs",
+                "changed": True,
+                "pages_project": PROJECT,
+                "domains": [],
+                "domain": "docs.example.com",
+            },
+        )
+
+    def test_rejected_second_domain_reports_the_first(self):
+        first = {"name": "a.example.com"}
+        client, api = client_with([PROJECT])
+        api.domains.create.side_effect = [first, status_error(400)]
+
+        with self.assertRaises(cloudflare.BadRequestError) as raised:
+            pages_projects.run(
+                FakeModule(params(domains=[{"name": "a.example.com"}, {"name": "b.example.com"}])), client
+            )
+
+        context = raised.exception._cloudflare_context
+        self.assertTrue(context["changed"])
+        self.assertEqual(context["domains"], [first])
+        self.assertEqual(context["domain"], "b.example.com")
+        self.assertEqual(context["pages_project"], PROJECT)
+
+    def test_rejected_domain_without_a_write_reports_no_change(self):
+        client, api = client_with([PROJECT])
+        api.domains.create.side_effect = status_error(400)
+
+        with self.assertRaises(cloudflare.BadRequestError) as raised:
+            pages_projects.run(FakeModule(params(domains=[{"name": "a.example.com"}])), client)
+
+        self.assertNotIn("changed", raised.exception._cloudflare_context)
+
+    def test_created_project_with_another_name_reports_the_write(self):
+        created = {**PROJECT, "name": "other"}
+        client, _api = client_with([None], created=created)
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong Pages project")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["pages_project"], created)
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["name"], "docs")
+
+    def test_wrong_domain_response_reports_the_write(self):
+        client, _api = client_with([PROJECT], created_domain={"name": "other.example.com"})
+
+        result = self.run_module(FakeModule(params(domains=[{"name": "a.example.com"}])), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong Pages domain")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["domains"], [{"name": "other.example.com"}])
+        self.assertEqual(result["pages_project"], PROJECT)
+
+    def test_delete_answered_with_404_counts_as_deleted(self):
+        client, api = client_with([PROJECT])
+        api.delete.side_effect = status_error(404)
+
+        result = self.run_module(FakeModule(params(state="absent")), client)
+
+        api.delete.assert_called_once_with(project_name="docs", account_id="account")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["message"], "Pages project deleted")
+        self.assertEqual(result["pages_project"], PROJECT)

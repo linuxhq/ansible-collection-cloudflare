@@ -107,6 +107,10 @@ options:
     elements: dict
     description:
       - Custom domains that must exist on the project.
+      - A domain counts as present once it is attached to the project, whatever
+        its status. Cloudflare reports a new domain as C(pending) or
+        C(initializing) until it is verified; the module does not detect a
+        domain whose status is C(error), C(blocked), or C(deactivated).
       - With O(state=absent), domains are not deleted separately; Cloudflare
         detaches every custom domain when it deletes the project.
     suboptions:
@@ -661,22 +665,28 @@ def desired_domain_names(module):
     return names
 
 
-def checked_project(module, project):
+def checked_project(module, project, written=None):
+    """Serialize and validate a project response.
+
+    written holds the result fields a failure reports after a write in this
+    run, such as changed=True; the failure then also returns the project.
+    """
     project = serialize_resource(project)
-    resource_field(module, project, "name", "Pages project", expected=module.params["name"])
+    context = None if written is None else {**written, "pages_project": project}
+    resource_field(module, project, "name", "Pages project", expected=module.params["name"], context=context)
     return project
 
 
-def get_project(module, client):
+def get_project(module, client, written=None):
+    """Return the project, or None; written is passed to checked_project and to a request failure."""
     params = module.params
     with cloudflare_error_context(
         "Cloudflare API request failed while gathering the Pages project",
-        account_id=params["account_id"],
-        name=params["name"],
+        **{"account_id": params["account_id"], "name": params["name"], **(written or {})},
     ):
         project = get_or_none(client.pages.projects.get, project_name=params["name"], account_id=params["account_id"])
 
-    return None if project is None else checked_project(module, project)
+    return None if project is None else checked_project(module, project, written)
 
 
 def list_domains(module, client, project_name):
@@ -771,12 +781,11 @@ def update_project(module, client, current, payload, secrets_requested):
         account_id=params["account_id"],
         name=params["name"],
     ):
-        project = checked_project(
-            module,
-            client.pages.projects.edit(project_name=params["name"], account_id=params["account_id"], **payload),
-        )
+        project = client.pages.projects.edit(project_name=params["name"], account_id=params["account_id"], **payload)
 
-    context = {"account_id": params["account_id"], "name": params["name"]}
+    written = {"changed": True, "account_id": params["account_id"], "name": params["name"]}
+    project = checked_project(module, project, written)
+    context = {**written, "pages_project": project}
     require_applied(
         module,
         comparable_project(project, comparable_payload),
@@ -791,7 +800,13 @@ def update_project(module, client, current, payload, secrets_requested):
     return project, True
 
 
-def add_domains(module, client, project, existing_names, domain_names):
+def add_domains(module, client, project, existing_names, domain_names, changed):
+    """Add the missing domains and return them.
+
+    changed tells whether this run already wrote the project. A failure
+    reports the project and the domains added before it, and changed=True
+    after any write.
+    """
     missing_domains = [domain_name for domain_name in domain_names if domain_name not in existing_names]
     if module.check_mode and missing_domains:
         module.exit_json(
@@ -800,18 +815,23 @@ def add_domains(module, client, project, existing_names, domain_names):
             pages_project=project,
         )
 
-    return [add_domain(module, client, domain_name) for domain_name in missing_domains]
+    added_domains = []
+    for domain_name in missing_domains:
+        context = {"pages_project": project, "domains": list(added_domains)}
+        if changed or added_domains:
+            context["changed"] = True
+
+        added_domains.append(add_domain(module, client, domain_name, context))
+
+    return added_domains
 
 
-def add_domain(module, client, domain_name):
+def add_domain(module, client, domain_name, context):
+    """Add the domain; context adds result fields to a failure."""
     params = module.params
     query = {"project_name": params["name"], "account_id": params["account_id"]}
-    with cloudflare_error_context(
-        "Cloudflare API request failed while adding the Pages project domain",
-        account_id=params["account_id"],
-        name=params["name"],
-        domain=domain_name,
-    ):
+    context = {"account_id": params["account_id"], "name": params["name"], **context, "domain": domain_name}
+    with cloudflare_error_context("Cloudflare API request failed while adding the Pages project domain", **context):
         domain = serialize_resource(
             create_once(
                 lambda: without_retries(client).pages.projects.domains.create(**query, name=domain_name),
@@ -819,7 +839,8 @@ def add_domain(module, client, domain_name):
             )
         )
 
-    resource_field(module, domain, "name", "Pages domain", expected=domain_name)
+    context = {**context, "changed": True, "domains": [*context["domains"], domain]}
+    resource_field(module, domain, "name", "Pages domain", expected=domain_name, context=context)
     return domain
 
 
@@ -867,39 +888,36 @@ def ensure_present(module, client, domain_names):
             account_id=params["account_id"],
             name=params["name"],
         ):
-            current = checked_project(
-                module,
-                create_once(
-                    lambda: without_retries(client).pages.projects.create(account_id=params["account_id"], **payload),
-                    lambda: unique_match(get_project(module, client)),
-                ),
+            current = create_once(
+                lambda: without_retries(client).pages.projects.create(account_id=params["account_id"], **payload),
+                lambda: unique_match(get_project(module, client)),
             )
 
+        written = {"changed": True, "account_id": params["account_id"], "name": params["name"]}
+        current = checked_project(module, current, written)
         comparable_payload = comparable_pages_payload(payload)
         require_applied(
             module,
             comparable_project(current, comparable_payload),
             comparable_payload,
             "Pages project",
-            context={
-                "changed": True,
-                "account_id": params["account_id"],
-                "name": params["name"],
-                "pages_project": current,
-            },
+            context={**written, "pages_project": current},
         )
         changed = True
     else:
         current, changed = update_project(module, client, current, payload, secrets_requested)
 
-    added_domains = add_domains(module, client, current, existing_names, domain_names) if domain_names else []
+    added_domains = add_domains(module, client, current, existing_names, domain_names, changed) if domain_names else []
     if added_domains:
-        current = get_project(module, client)
+        written = {"changed": True, "account_id": params["account_id"], "name": params["name"]}
+        written_project = current
+        current = get_project(module, client, {**written, "domains": added_domains})
         if current is None:
             module.fail_json(
                 msg="Pages project was deleted while its domains were being added",
-                account_id=params["account_id"],
-                name=params["name"],
+                **written,
+                pages_project=written_project,
+                domains=added_domains,
             )
 
     if not changed and not added_domains:
@@ -935,7 +953,10 @@ def ensure_absent(module, client):
         account_id=params["account_id"],
         name=params["name"],
     ):
-        client.pages.projects.delete(project_name=params["name"], account_id=params["account_id"])
+        # As in ensure_resource_absent, a 404 status counts as deleted: the SDK
+        # retries a delete whose response was lost, and Cloudflare answers the
+        # retry with 404.
+        get_or_none(client.pages.projects.delete, project_name=params["name"], account_id=params["account_id"])
 
     module.exit_json(
         changed=True,

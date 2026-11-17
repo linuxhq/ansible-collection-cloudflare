@@ -290,7 +290,7 @@ def run(module, client):
         defaults={**dict.fromkeys(FALSE_FIELDS, False), "approval_groups": [], "purpose_justification_prompt": ""},
         preserved_fields=PRESERVED_FIELDS + UNMANAGED_FIELDS,
         exact_values=(*ACCESS_SELECTOR_FIELDS, "approval_groups"),
-        comparable=lambda resource: comparable_access_rules(resource, params),
+        comparable=lambda resource, failure: comparable_access_rules(resource, params),
         context={"account_id": account_id},
     )
 

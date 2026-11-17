@@ -384,31 +384,48 @@ def find_zone(module, client):
         return find_resource(module, list_zones(module, client), "zone", "name", name)
 
 
-def checked_zone(module, zone, payload, expected_id=None, changed=False):
-    """Serialize and validate a zone response.
+def written_context(zone, changed, updated_settings=()):
+    """Return the result fields a failure reports once this run has written to the zone, or {}.
 
-    changed reports that the zone was already created or updated, so a
-    failure includes changed=True and the zone.
+    changed reports that the zone was created or updated; updated_settings
+    lists the settings updated so far.
+    """
+    if not changed and not updated_settings:
+        return {}
+
+    return {"changed": True, "zone": zone, "settings": list(updated_settings)}
+
+
+def checked_zone(module, zone, payload, expected_id=None, written=None):
+    """Serialize and validate the zone a create or update returned.
+
+    A failure reports changed=True, the zone, its id, and written, the
+    result fields of earlier writes in this run.
     """
     zone = serialize_resource(zone)
-    zone_id = resource_id(module, zone, "zone", expected=expected_id)
-    resource_field(module, zone, "name", "zone", expected=module.params["name"])
-    context = {"zone_id": zone_id}
-    if changed:
-        context.update(changed=True, zone=zone)
+    failure = {**(written or {}), "changed": True, "zone": zone}
+    if module.params.get("account_id") is not None:
+        failure["account_id"] = module.params["account_id"]
 
-    require_applied(module, zone, payload, "zone", context=context)
+    if expected_id is not None:
+        failure["zone_id"] = expected_id
+
+    failure = {"zone_id": resource_id(module, zone, "zone", expected=expected_id, context=failure), **failure}
+    resource_field(module, zone, "name", "zone", expected=module.params["name"], context=failure)
+    require_applied(module, zone, payload, "zone", context=failure)
     return zone
 
 
-def edit_zone(module, client, zone_id, payload, changed):
+def edit_zone(module, client, zone, payload, written):
+    """Edit one zone property; written holds the result fields of earlier writes, as in written_context."""
     with cloudflare_error_context(
         "Cloudflare API request failed while updating the zone",
-        zone_id=zone_id,
+        zone_id=zone["id"],
+        **written,
     ):
-        zone = client.zones.edit(zone_id=zone_id, **payload)
+        edited = client.zones.edit(zone_id=zone["id"], **payload)
 
-    return checked_zone(module, zone, payload, expected_id=zone_id, changed=changed)
+    return checked_zone(module, edited, payload, expected_id=zone["id"], written=written)
 
 
 def create_zone(module, client):
@@ -434,7 +451,7 @@ def create_zone(module, client):
             lambda: matching_resources(list_zones(module, client), "name", params["name"]),
         )
 
-    return checked_zone(module, zone, payload, changed=True)
+    return checked_zone(module, zone, payload)
 
 
 def update_zone(module, client, zone, changed):
@@ -451,7 +468,7 @@ def update_zone(module, client, zone, changed):
         if module.check_mode:
             module.exit_json(changed=True, message="Zone would be updated", zone=zone)
 
-        zone = edit_zone(module, client, zone["id"], payload, changed)
+        zone = edit_zone(module, client, zone, payload, written_context(zone, changed))
         changed = True
 
     return zone, changed
@@ -466,37 +483,33 @@ def setting_field(setting):
     return None
 
 
-def pending_settings(module, client, zone_id):
+def pending_settings(module, client, zone, changed):
     """Return the requested settings that differ, with their current field.
 
     Every setting is read before the zone or any setting is updated, so a
     setting the zone's plan cannot edit fails first. A new zone has to be
-    created before its settings can be read.
+    created before its settings can be read; changed reports that it was, so
+    a failure reports the created zone.
     """
+    zone_id = zone["id"]
+    written = written_context(zone, changed)
     pending = []
     for setting in module.params.get("settings") or []:
         setting_id = setting["id"]
-        with cloudflare_error_context(
-            "Cloudflare API request failed while gathering the zone setting",
-            zone_id=zone_id,
-            setting_id=setting_id,
-        ):
+        context = {"zone_id": zone_id, "setting_id": setting_id, **written}
+        with cloudflare_error_context("Cloudflare API request failed while gathering the zone setting", **context):
             existing = serialize_resource(client.zones.settings.get(setting_id=setting_id, zone_id=zone_id))
 
         # Most settings hold a value; a few, such as ssl_recommender, an enabled flag.
         field = setting_field(existing)
         if field is None:
-            module.fail_json(msg="Cloudflare API returned malformed zone setting data")
+            module.fail_json(msg="Cloudflare API returned malformed zone setting data", **context)
 
         if setting_matches(existing[field], setting["value"]):
             continue
 
         if existing.get("editable") is False:
-            module.fail_json(
-                msg=f"Zone setting {setting_id} is not editable on this zone",
-                zone_id=zone_id,
-                setting_id=setting_id,
-            )
+            module.fail_json(msg=f"Zone setting {setting_id} is not editable on this zone", **context)
 
         pending.append((setting, field))
 
@@ -504,7 +517,12 @@ def pending_settings(module, client, zone_id):
 
 
 def update_settings(module, client, zone, pending, changed):
-    """Update the pending settings; changed reports that the zone was already created or updated."""
+    """Update the pending settings; changed reports that the zone was already created or updated.
+
+    A failure after a write in this run reports changed=True, the zone, and
+    the settings updated so far, including one Cloudflare returned malformed
+    or did not apply.
+    """
     zone_id = zone["id"]
     updated_settings = []
     for setting, field in pending:
@@ -516,20 +534,22 @@ def update_settings(module, client, zone, pending, changed):
             "Cloudflare API request failed while updating the zone setting",
             zone_id=zone_id,
             setting_id=setting_id,
+            **written_context(zone, changed, updated_settings),
         ):
             updated = serialize_resource(
                 client.zones.settings.edit(setting_id=setting_id, zone_id=zone_id, **{field: setting["value"]})
             )
 
-        resource_id(module, updated, "zone setting", expected=setting_id)
+        context = {
+            "zone_id": zone_id,
+            "setting_id": setting_id,
+            **written_context(zone, True, [*updated_settings, updated]),
+        }
+        resource_id(module, updated, "zone setting", expected=setting_id, context=context)
         if field not in updated:
-            module.fail_json(msg="Cloudflare API returned malformed zone setting data")
+            module.fail_json(msg="Cloudflare API returned malformed zone setting data", **context)
 
         if not setting_matches(updated[field], setting["value"]):
-            context = {"zone_id": zone_id, "setting_id": setting_id}
-            if changed or updated_settings:
-                context.update(changed=True, zone=zone, settings=updated_settings)
-
             fail_not_applied(
                 module,
                 "zone setting",
@@ -581,7 +601,7 @@ def run(module, client):
         zone = current
         resource_id(module, zone, "zone")
 
-    pending = pending_settings(module, client, zone["id"])
+    pending = pending_settings(module, client, zone, current is None)
     zone, changed = update_zone(module, client, zone, current is None)
     updated_settings = update_settings(module, client, zone, pending, changed)
     if not changed and not updated_settings:

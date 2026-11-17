@@ -74,7 +74,7 @@ class AccessServiceTokensTests(TestCase):
         result = self.run_module(FakeModule(params()), client)
 
         self.assertIn("did not apply", result["msg"])
-        self.assertNotIn("changed", result)
+        self.assertTrue(result["changed"])
         self.assertEqual(result["resource_id"], "token")
         self.assertEqual(result["account_id"], "account")
 
@@ -184,3 +184,16 @@ class AccessServiceTokensTests(TestCase):
 
         api.delete.assert_not_called()
         self.assertTrue(result["changed"])
+
+    def test_created_token_with_another_name_reports_the_write(self):
+        created = {"id": "token", "name": "automation", "duration": "1y", "client_secret": "secret"}
+        client, api = client_with(created=created)
+
+        result = self.run_module(FakeModule(params(name=" automation")), client)
+
+        api.create.assert_called_once()
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong service token")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["service_token"], created)
+        self.assertEqual(result["resource_id"], "token")
+        self.assertEqual(result["account_id"], "account")

@@ -1,0 +1,20 @@
+---
+bugfixes:
+  - access_apps, access_groups, access_policies, access_service_tokens, cfd_tunnel, cfd_tunnel_configurations,
+    devices_policy, devices_settings, dnssec, pagerules, pages_projects, purge_cache, rules_lists, rulesets,
+    warp_connector, zerotrust_connectivity_settings, zones - report C(changed=true), the resource Cloudflare returned
+    under the module's result key, its identifier, and its owner, such as C(account_id) or C(zone_id), in every
+    failure after a create, update, delete, or other write in the same run. Such a failure, for example the wrong
+    name returned for a padded Access group name, a rejected Pages domain after the project was written, a failed
+    Rules list items operation after the list was created, a rejected zone edit or setting after an earlier write,
+    or a failed WARP Connector secret after the connector was created, previously reported C(changed=false) and
+    did not return the written resource.
+  - access_apps - do not send null keys nested in O(access_apps#module:destinations) entries, their C(overrides),
+    the C(approval_groups) entries of O(access_apps#module:policies), and the configuration of an inline policy
+    selector; they count as omitted, like the nested fields of C(connection_rules) and C(mfa_config). They were sent
+    as JSON null.
+  - pages_projects - treat a 404 status from the delete request as deleted, as the other modules do. The SDK retries
+    a delete whose response was lost, and Cloudflare answers the retry with 404, so the module failed although the
+    project was deleted.
+  - pages_projects - document that a custom domain counts as present once it is attached to the project, whatever
+    its status, so a domain whose status is C(error), C(blocked), or C(deactivated) is not detected.

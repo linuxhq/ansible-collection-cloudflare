@@ -371,3 +371,31 @@ class AccessGroupsTests(TestCase):
 
         api.delete.assert_called_once_with("group", account_id="account")
         self.assertTrue(result["changed"])
+
+    def test_created_group_with_another_name_reports_the_write(self):
+        # Cloudflare strips a padded name, so the created group is not named as requested.
+        created = {"id": "group", "name": "admins", "include": INCLUDE}
+        client, api = client_with(created=created)
+
+        result = self.run_module(FakeModule(params(name=" admins")), client)
+
+        api.create.assert_called_once()
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong Access group")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["access_group"], created)
+        self.assertEqual(result["resource_id"], "group")
+        self.assertEqual(result["account_id"], "account")
+
+    def test_update_returning_another_group_reports_the_write(self):
+        current = {"id": "group", "name": "admins", "include": [{"everyone": {}}]}
+        updated = {"id": "other", "name": "admins", "include": INCLUDE}
+        client, api = client_with([current], updated=updated)
+
+        result = self.run_module(FakeModule(params()), client)
+
+        api.update.assert_called_once()
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong Access group")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["access_group"], updated)
+        self.assertEqual(result["resource_id"], "group")
+        self.assertEqual(result["account_id"], "account")

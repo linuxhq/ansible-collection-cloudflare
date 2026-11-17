@@ -225,12 +225,13 @@ def serialize_resource(resource):
     return resource
 
 
-def resource_field(module, resource, field, resource_name, expected=None, strict=True):
+def resource_field(module, resource, field, resource_name, expected=None, strict=True, context=None):
     """Return a string field of resource, failing when it is malformed.
 
     strict also rejects an empty value, and one that is blank or has
     surrounding whitespace unless field is a name, which Cloudflare can store
-    that way.
+    that way. context adds result fields to a failure, such as changed=True
+    and the resource after a write.
     """
     value = resource.get(field) if isinstance(resource, dict) else None
     if not isinstance(value, str):
@@ -240,26 +241,28 @@ def resource_field(module, resource, field, resource_name, expected=None, strict
     else:
         invalid = strict and (not value.strip() or value != value.strip())
 
+    context = context or {}
     if invalid:
         failure = {"msg": f"Cloudflare API returned malformed {resource_name} data"}
         if isinstance(resource, dict) and "id" in resource:
             failure["resource_id"] = resource["id"]
 
-        module.fail_json(**failure)
+        module.fail_json(**{**failure, **context})
 
     if expected is not None and value != expected:
-        module.fail_json(msg=f"Cloudflare API returned the wrong {resource_name}")
+        module.fail_json(msg=f"Cloudflare API returned the wrong {resource_name}", **context)
 
     return value
 
 
-def resource_id(module, resource, resource_name, expected=None):
-    return resource_field(module, resource, "id", resource_name, expected=expected)
+def resource_id(module, resource, resource_name, expected=None, context=None):
+    return resource_field(module, resource, "id", resource_name, expected=expected, context=context)
 
 
-def require_mapping(module, value, resource_name):
+def require_mapping(module, value, resource_name, context=None):
+    """Fail when value is not a mapping; context adds result fields to the failure."""
     if not isinstance(value, dict):
-        module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data")
+        module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data", **(context or {}))
 
 
 def resource_list(module, items, resource_name, required_fields=("id",)):
@@ -635,7 +638,7 @@ def require_applied(
 
     context adds result fields to the failure, as in fail_not_applied.
     """
-    require_mapping(module, resource, resource_name)
+    require_mapping(module, resource, resource_name, context)
     if differs(resource, desired, defaults, exact_fields, exact_values):
         projected = projected_current(resource, desired, defaults, exact_fields, exact_values)
         fail_not_applied(module, resource_name, applied_differences(projected, desired), **(context or {}))
@@ -845,26 +848,32 @@ def ensure_settings(
 ):
     """Converge settings that Cloudflare updates with PATCH semantics.
 
-    comparable optionally maps a settings mapping to its comparable form;
-    context names the settings' owner in failures. exact_values are compared
-    exactly, for settings that the PATCH replaces as a whole.
+    comparable optionally maps a settings mapping and the context of a failure
+    to its comparable form; context names the settings' owner in failures.
+    exact_values are compared exactly, for settings that the PATCH replaces as
+    a whole. A failure after the PATCH reports changed=True and the settings
+    it returned.
     """
-    comparable = comparable or (lambda settings: settings)
+    comparable = comparable or (lambda settings, failure: settings)
+    context = context or {}
     label = resource_name[0].upper() + resource_name[1:]
     current = serialize_resource(current) or {}
-    require_mapping(module, current, resource_name)
+    require_mapping(module, current, resource_name, context)
 
-    if not differs(comparable(current), payload, exact_values=exact_values):
+    if not differs(comparable(current, context), payload, exact_values=exact_values):
         module.exit_json(changed=False, message=f"{label} already present", **{result_key: current})
 
     if module.check_mode:
         module.exit_json(changed=True, message=f"{label} would be updated", **{result_key: current})
 
-    with cloudflare_error_context(f"Cloudflare API request failed while updating {resource_name}", **(context or {})):
+    with cloudflare_error_context(f"Cloudflare API request failed while updating {resource_name}", **context):
         settings = serialize_resource(edit(payload))
 
-    require_mapping(module, settings, resource_name)
-    require_applied(module, comparable(settings), payload, resource_name, exact_values=exact_values, context=context)
+    failure = {"changed": True, **context, result_key: settings}
+    require_mapping(module, settings, resource_name, failure)
+    require_applied(
+        module, comparable(settings, failure), payload, resource_name, exact_values=exact_values, context=failure
+    )
     module.exit_json(changed=True, message=f"{label} updated", **{result_key: settings})
 
 
@@ -892,19 +901,39 @@ def ensure_resource_present(
     find_created reads the matching resources, as described in create_once. The update replaces the resource, so
     preserved_fields omitted from payload are carried over from current.
     exact_values are compared exactly. context names the resource's owner in
-    failures. comparable optionally maps a
-    resource to its comparable form; the unmodified resource is returned.
+    failures. comparable optionally maps a resource and the context of a
+    failure to its comparable form; the unmodified resource is returned. A
+    failure after the create or update reports changed=True and the resource
+    Cloudflare returned.
     """
-    comparable = comparable or (lambda resource: resource)
+    comparable = comparable or (lambda resource, failure: resource)
     context = context or {}
     label = resource_name[0].upper() + resource_name[1:]
 
-    def checked(resource, expected_id=None):
-        resource = serialize_resource(resource)
-        resource_id(module, resource, resource_name, expected=expected_id)
-        if expected_name is not None:
-            resource_field(module, resource, "name", resource_name, expected=expected_name)
+    def require_written(resource, written_context, expected_id=None):
+        """Fail when the resource a write returned does not match payload.
 
+        Every failure reports the write, the resource, and its identifiers.
+        """
+        resource = serialize_resource(resource)
+        failure = {"changed": True, **written_context, result_key: resource}
+        failure = {
+            "resource_id": resource_id(module, resource, resource_name, expected=expected_id, context=failure),
+            **failure,
+        }
+        if expected_name is not None:
+            resource_field(module, resource, "name", resource_name, expected=expected_name, context=failure)
+
+        require_applied(
+            module,
+            comparable(resource, failure),
+            payload,
+            resource_name,
+            defaults,
+            exact_fields,
+            exact_values,
+            context=failure,
+        )
         return resource
 
     if current is None:
@@ -917,29 +946,14 @@ def ensure_resource_present(
             **name_context,
             **context,
         ):
-            resource = checked(create_once(lambda: create(payload), find_created))
+            created = create_once(lambda: create(payload), find_created)
 
-        require_applied(
-            module,
-            comparable(resource),
-            payload,
-            resource_name,
-            defaults,
-            exact_fields,
-            exact_values,
-            context={
-                "changed": True,
-                "resource_id": resource["id"],
-                **name_context,
-                **context,
-                result_key: resource,
-            },
-        )
+        resource = require_written(created, {**name_context, **context})
         module.exit_json(changed=True, message=f"{label} created", **{result_key: resource})
 
     current_id = resource_id(module, current, resource_name)
     payload = {**select_fields(current, preserved_fields), **payload}
-    if not differs(comparable(current), payload, defaults, exact_fields, exact_values):
+    if not differs(comparable(current, context), payload, defaults, exact_fields, exact_values):
         module.exit_json(
             changed=False,
             message=f"{label} already present",
@@ -958,18 +972,9 @@ def ensure_resource_present(
         resource_id=current_id,
         **context,
     ):
-        resource = checked(update(current_id, payload), expected_id=current_id)
+        updated = update(current_id, payload)
 
-    require_applied(
-        module,
-        comparable(resource),
-        payload,
-        resource_name,
-        defaults,
-        exact_fields,
-        exact_values,
-        context={"resource_id": current_id, **context},
-    )
+    resource = require_written(updated, {"resource_id": current_id, **context}, expected_id=current_id)
     module.exit_json(changed=True, message=f"{label} updated", **{result_key: resource})
 
 
@@ -999,6 +1004,12 @@ def ensure_resource_absent(module, result_key, resource_name, current, delete, c
             deleted = None
 
     if isinstance(deleted, dict) and "id" in deleted:
-        resource_id(module, deleted, resource_name, expected=current_id)
+        resource_id(
+            module,
+            deleted,
+            resource_name,
+            expected=current_id,
+            context={"changed": True, "resource_id": current_id, **(context or {}), result_key: current},
+        )
 
     module.exit_json(changed=True, message=f"{label} deleted", **{result_key: current})

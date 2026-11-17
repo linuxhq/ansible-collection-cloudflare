@@ -369,12 +369,10 @@ def canonical_item(item):
     return json.dumps(item, sort_keys=True, separators=(",", ":"))
 
 
-def list_items(module, client, account_id, list_id):
-    with cloudflare_error_context(
-        "Cloudflare API request failed while gathering Rules list items",
-        account_id=account_id,
-        rules_list_id=list_id,
-    ):
+def list_items(module, client, account_id, list_id, context=None):
+    """Return the items of the list; context adds result fields to a failure."""
+    context = {"account_id": account_id, "rules_list_id": list_id, **(context or {})}
+    with cloudflare_error_context("Cloudflare API request failed while gathering Rules list items", **context):
         items = [
             serialize_resource(item)
             for item in client.rules.lists.items.list(
@@ -385,7 +383,7 @@ def list_items(module, client, account_id, list_id):
         ]
 
     for item in items:
-        require_mapping(module, item, "Rules list item")
+        require_mapping(module, item, "Rules list item", context)
 
     return items
 
@@ -405,17 +403,17 @@ def transient_error(exc):
     return status_code == 429 or (isinstance(status_code, int) and status_code >= 500)
 
 
-def submit_items(module, client, account_id, list_id, items, deadline):
+def submit_items(module, client, account_id, list_id, items, deadline, context=None):
+    """Submit the items operation; context adds result fields to a failure."""
+    context = {"account_id": account_id, "rules_list_id": list_id, **(context or {})}
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            module.fail_json(msg="Timed out submitting the Rules list items operation", rules_list_id=list_id)
+            module.fail_json(msg="Timed out submitting the Rules list items operation", **context)
 
         try:
             with cloudflare_error_context(
-                "Cloudflare API request failed while submitting the Rules list items",
-                account_id=account_id,
-                rules_list_id=list_id,
+                "Cloudflare API request failed while submitting the Rules list items", **context
             ):
                 operation = client.with_options(timeout=remaining, max_retries=0).rules.lists.items.update(
                     list_id,
@@ -437,7 +435,9 @@ def submit_items(module, client, account_id, list_id, items, deadline):
         return serialize_resource(operation)
 
 
-def wait_for_operation(module, client, account_id, list_id, operation, deadline):
+def wait_for_operation(module, client, account_id, list_id, operation, deadline, context=None):
+    """Wait for the submitted items operation; context adds result fields to a failure."""
+    context = {"account_id": account_id, "rules_list_id": list_id, **(context or {})}
     operation_id = None
     if isinstance(operation, dict):
         operation_id = operation.get("operation_id") or operation.get("id")
@@ -445,27 +445,24 @@ def wait_for_operation(module, client, account_id, list_id, operation, deadline)
     if not isinstance(operation_id, str) or not operation_id.strip() or operation_id != operation_id.strip():
         module.fail_json(
             msg="Rules list items submission did not return an operation id",
-            rules_list_id=list_id,
+            **context,
             operation=operation,
         )
 
+    context["operation_id"] = operation_id
     status = {}
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             module.fail_json(
                 msg="Timed out waiting for the Rules list items operation to complete",
-                rules_list_id=list_id,
-                operation_id=operation_id,
+                **context,
                 operation=status,
             )
 
         try:
             with cloudflare_error_context(
-                "Cloudflare API request failed while waiting for the Rules list items operation",
-                account_id=account_id,
-                rules_list_id=list_id,
-                operation_id=operation_id,
+                "Cloudflare API request failed while waiting for the Rules list items operation", **context
             ):
                 status = serialize_resource(
                     client.with_options(timeout=remaining, max_retries=0).rules.lists.bulk_operations.get(
@@ -482,37 +479,22 @@ def wait_for_operation(module, client, account_id, list_id, operation, deadline)
             continue
 
         if not isinstance(status, dict) or not isinstance(status.get("status"), str):
-            module.fail_json(
-                msg="Cloudflare API returned malformed Rules list operation data",
-                rules_list_id=list_id,
-                operation_id=operation_id,
-            )
+            module.fail_json(msg="Cloudflare API returned malformed Rules list operation data", **context)
 
         if status.get("id") != operation_id:
-            module.fail_json(
-                msg="Cloudflare API returned the wrong Rules list operation",
-                rules_list_id=list_id,
-                operation_id=operation_id,
-                operation=status,
-            )
+            module.fail_json(msg="Cloudflare API returned the wrong Rules list operation", **context, operation=status)
 
         operation_status = status["status"]
         if operation_status == "completed":
             return status
 
         if operation_status == "failed":
-            module.fail_json(
-                msg="Rules list items operation failed",
-                rules_list_id=list_id,
-                operation_id=operation_id,
-                operation=status,
-            )
+            module.fail_json(msg="Rules list items operation failed", **context, operation=status)
 
         if operation_status not in ("pending", "running"):
             module.fail_json(
                 msg="Cloudflare API returned an unknown Rules list operation status",
-                rules_list_id=list_id,
-                operation_id=operation_id,
+                **context,
                 operation=status,
             )
 
@@ -560,11 +542,23 @@ def normalize_items(items):
     return sorted(normalized_items.values(), key=canonical_item)
 
 
-def checked_list(module, rules_list, name, kind, expected_id=None):
+def checked_list(module, rules_list, name, kind, context, expected_id=None):
+    """Serialize and validate a list Cloudflare returned after a write.
+
+    context adds result fields to a failure, which also reports the list and
+    its id.
+    """
     rules_list = serialize_resource(rules_list)
-    resource_id(module, rules_list, "Rules list", expected=expected_id)
-    resource_field(module, rules_list, "name", "Rules list", expected=name)
-    resource_field(module, rules_list, "kind", "Rules list", expected=kind)
+    failure = {**context, "rules_list": rules_list}
+    if expected_id is not None:
+        failure["rules_list_id"] = expected_id
+
+    failure = {
+        "rules_list_id": resource_id(module, rules_list, "Rules list", expected=expected_id, context=failure),
+        **failure,
+    }
+    resource_field(module, rules_list, "name", "Rules list", expected=name, context=failure)
+    resource_field(module, rules_list, "kind", "Rules list", expected=kind, context=failure)
     return rules_list
 
 
@@ -891,6 +885,8 @@ def ensure_present(module, client, current):
     created = False
     items_changed = False
     items_operation = None
+    # Result fields a failure reports once this run has written to the list.
+    written = {}
 
     if current is None:
         if module.check_mode:
@@ -910,22 +906,13 @@ def ensure_present(module, client, current):
                 lambda: without_retries(client).rules.lists.create(account_id=account_id, **payload),
                 lambda: matching_resources(lists.list(account_id=account_id), "name", params["name"]),
             )
-            current = checked_list(module, rules_list, params["name"], params["kind"])
 
-        current_id = current["id"]
-        require_applied(
-            module,
-            current,
-            payload,
-            "Rules list",
-            LIST_DEFAULTS,
-            context={
-                "changed": True,
-                "account_id": account_id,
-                "rules_list_id": current_id,
-                "rules_list": current,
-            },
+        current = checked_list(
+            module, rules_list, params["name"], params["kind"], {"changed": True, "account_id": account_id}
         )
+        current_id = current["id"]
+        written = {"changed": True, "account_id": account_id, "rules_list_id": current_id, "rules_list": current}
+        require_applied(module, current, payload, "Rules list", LIST_DEFAULTS, context=written)
         changed = True
         created = True
     else:
@@ -943,21 +930,19 @@ def ensure_present(module, client, current):
                 account_id=account_id,
                 rules_list_id=current_id,
             ):
-                current = checked_list(
-                    module,
-                    lists.update(current_id, account_id=account_id, description=desired_description),
-                    params["name"],
-                    current_kind,
-                    expected_id=current_id,
-                )
+                rules_list = lists.update(current_id, account_id=account_id, description=desired_description)
 
-            require_applied(
+            current = checked_list(
                 module,
-                current,
-                {"description": desired_description},
-                "Rules list",
-                LIST_DEFAULTS,
-                context={"account_id": account_id, "rules_list_id": current_id},
+                rules_list,
+                params["name"],
+                current_kind,
+                {"changed": True, "account_id": account_id},
+                expected_id=current_id,
+            )
+            written = {"changed": True, "account_id": account_id, "rules_list_id": current_id, "rules_list": current}
+            require_applied(
+                module, current, {"description": desired_description}, "Rules list", LIST_DEFAULTS, context=written
             )
             changed = True
 
@@ -971,13 +956,16 @@ def ensure_present(module, client, current):
             or current_count < 0
             or int(current_count) != current_count
         ):
-            module.fail_json(msg="Cloudflare API returned malformed Rules list data")
+            module.fail_json(
+                msg="Cloudflare API returned malformed Rules list data",
+                **{"account_id": account_id, "rules_list_id": current_id, **written},
+            )
 
         if current_count is not None and current_count != len(desired_items):
             items_changed = True
         else:
             items_changed = values_differ(
-                normalize_items(list_items(module, client, account_id, current_id)),
+                normalize_items(list_items(module, client, account_id, current_id, written)),
                 desired_items,
             )
 
@@ -990,35 +978,21 @@ def ensure_present(module, client, current):
 
         if items_changed:
             deadline = time.monotonic() + params["operation_timeout"]
-            items_operation = wait_for_operation(
-                module,
-                client,
-                account_id,
-                current_id,
-                submit_items(module, client, account_id, current_id, desired_items, deadline),
-                deadline,
-            )
-
+            operation = submit_items(module, client, account_id, current_id, desired_items, deadline, written)
+            # Cloudflare accepted the items, so every later failure reports a change.
+            written = {"changed": True, "account_id": account_id, "rules_list_id": current_id, "rules_list": current}
+            items_operation = wait_for_operation(module, client, account_id, current_id, operation, deadline, written)
+            written["items_operation"] = items_operation
             with cloudflare_error_context(
-                "Cloudflare API request failed while reading the updated Rules list",
-                account_id=account_id,
-                rules_list_id=current_id,
+                "Cloudflare API request failed while reading the updated Rules list", **written
             ):
-                current = checked_list(
-                    module,
-                    lists.get(current_id, account_id=account_id),
-                    params["name"],
-                    current_kind,
-                    expected_id=current_id,
-                )
+                rules_list = lists.get(current_id, account_id=account_id)
 
-            stored_items = normalize_items(list_items(module, client, account_id, current_id))
+            current = checked_list(module, rules_list, params["name"], current_kind, written, expected_id=current_id)
+            written["rules_list"] = current
+            stored_items = normalize_items(list_items(module, client, account_id, current_id, written))
             if values_differ(stored_items, desired_items):
-                context = {"account_id": account_id, "rules_list_id": current_id}
-                if created:
-                    context.update(changed=True, rules_list=current)
-
-                fail_not_applied(module, current_kind, desired_items, stored_items, **context)
+                fail_not_applied(module, current_kind, desired_items, stored_items, **written)
 
     if not changed and not items_changed:
         module.exit_json(
