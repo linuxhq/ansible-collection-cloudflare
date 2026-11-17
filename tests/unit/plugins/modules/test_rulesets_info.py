@@ -56,11 +56,25 @@ class RulesetsInfoTests(TestCase):
         result, _ignored = self.run_module({"id": "ruleset", "phase": PHASE, "rules": ["invalid"]})
 
         self.assertEqual(result["msg"], "Cloudflare API returned malformed ruleset rule data")
+        self.assertEqual((result["zone_id"], result["phase"]), ("zone", PHASE))
+
+    def test_rejects_non_list_rules_with_zone_context(self):
+        result, _ignored = self.run_module({"id": "ruleset", "phase": PHASE, "rules": "invalid"})
+
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed ruleset data")
+        self.assertEqual((result["zone_id"], result["phase"]), ("zone", PHASE))
+
+    def test_rejects_malformed_ruleset_id_with_zone_context(self):
+        result, _ignored = self.run_module({"id": "", "phase": PHASE})
+
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed ruleset data")
+        self.assertEqual((result["zone_id"], result["phase"]), ("zone", PHASE))
 
     def test_rejects_wrong_phase(self):
         result, _ignored = self.run_module({"id": "ruleset", "phase": "http_request_transform"})
 
         self.assertEqual(result["msg"], "Cloudflare API returned the wrong ruleset")
+        self.assertEqual((result["zone_id"], result["phase"]), ("zone", PHASE))
 
     def test_rejects_malformed_zone(self):
         result, _ignored = self.run_module(None, zones=[{"id": "zone"}])

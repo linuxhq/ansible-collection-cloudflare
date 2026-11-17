@@ -374,14 +374,18 @@ def list_zones(module, client):
     return client.zones.list(**query)
 
 
-def find_zone(module, client):
-    name = module.params["name"]
-    context = {"name": name}
+def zone_context(module):
+    """Return the zone's name, and its account_id when it is set, for failures."""
+    context = {"name": module.params["name"]}
     if module.params.get("account_id") is not None:
         context["account_id"] = module.params["account_id"]
 
-    with cloudflare_error_context("Cloudflare API request failed while finding the zone", **context):
-        return find_resource(module, list_zones(module, client), "zone", "name", name)
+    return context
+
+
+def find_zone(module, client):
+    with cloudflare_error_context("Cloudflare API request failed while finding the zone", **zone_context(module)):
+        return find_resource(module, list_zones(module, client), "zone", "name", module.params["name"])
 
 
 def written_context(zone, changed, updated_settings=()):
@@ -437,11 +441,7 @@ def create_zone(module, client):
     if params.get("account_id") is not None:
         payload["account"] = {"id": params["account_id"]}
 
-    with cloudflare_error_context(
-        "Cloudflare API request failed while creating the zone",
-        account_id=params.get("account_id"),
-        name=params["name"],
-    ):
+    with cloudflare_error_context("Cloudflare API request failed while creating the zone", **zone_context(module)):
         # The SDK requires an account; when it is omitted, Cloudflare uses the
         # account of the API token.
         zone = create_once(
@@ -585,6 +585,7 @@ def run(module, client):
             "zone",
             current,
             delete=lambda zone_id: client.zones.delete(zone_id=zone_id),
+            context=zone_context(module),
         )
 
     if current is None:

@@ -23,7 +23,6 @@ bugfixes:
   - access_policies - preserve an existing policy's omitted optional fields on update instead of clearing them.
   - access_apps - preserve an existing application's omitted optional settings, such as O(policies), on update instead of clearing them.
   - rules_lists - correct the RETURN documentation for the bulk items operation and document the O(description) default.
-  - plugins - document the minimum supported Cloudflare SDK version as 5.8.0 to match the collection requirements.
   - pages_projects - re-read the project after attaching custom domains so the returned C(pages_project.domains) includes them.
   - zones - update O(type) and O(vanity_name_servers) in separate requests because Cloudflare edits only one zone property per request.
   - zones - compare only the provided nested fields of object setting values so partial settings converge.

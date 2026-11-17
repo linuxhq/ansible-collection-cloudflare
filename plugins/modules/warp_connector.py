@@ -110,10 +110,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
-class CloudflareResponseError(Exception):
-    """A response that does not describe the WARP Connector the request named."""
-
-
 def validate_created_secret(module):
     """Fail when tunnel_secret is empty or not base64, which Cloudflare rejects only after the connector is created.
 
@@ -157,33 +153,49 @@ def checked_connector(module, connector, expected_id=None):
 
 
 def apply_created_secret(module, connectors, created):
-    """Apply tunnel_secret to the created connector; a failure reports changed=True and the created connector."""
+    """Apply tunnel_secret to the created connector.
+
+    A failure reports changed=True and the connector: the created one when the
+    edit failed, or the edit response when it names another connector.
+    """
     params = module.params
     account_id = params["account_id"]
     connector_id = created["id"]
+    failure = {
+        "changed": True,
+        "account_id": account_id,
+        "resource_id": connector_id,
+        "warp_connector_id": connector_id,
+    }
     try:
         connector = serialize_resource(
             connectors.edit(connector_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
         )
-        if (
-            not isinstance(connector, dict)
-            or connector.get("id") != connector_id
-            or connector.get("name") != params["name"]
-        ):
-            raise CloudflareResponseError("Cloudflare API returned the wrong WARP Connector")
-    except (cloudflare.APIError, CloudflareResponseError) as exc:
+    except cloudflare.APIError as exc:
         module.fail_json(
             msg=(
                 f"Failed to apply tunnel_secret to the created WARP Connector {connector_id}; it was created "
                 "without the requested secret. Later runs report it present and cannot detect the secret, "
                 "so rerun with rotate_secrets: true to apply it"
             ),
-            changed=True,
-            account_id=account_id,
-            resource_id=connector_id,
-            warp_connector_id=connector_id,
             warp_connector=created,
+            **failure,
             **cloudflare_error_details(exc),
+        )
+
+    if (
+        not isinstance(connector, dict)
+        or connector.get("id") != connector_id
+        or connector.get("name") != params["name"]
+    ):
+        module.fail_json(
+            msg=(
+                f"Cloudflare API returned the wrong WARP Connector after applying tunnel_secret to the created "
+                f"WARP Connector {connector_id}"
+            ),
+            error="Cloudflare API returned the wrong WARP Connector",
+            warp_connector=connector,
+            **failure,
         )
 
     return connector

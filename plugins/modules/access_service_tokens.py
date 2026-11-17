@@ -59,15 +59,15 @@ notes:
 EXAMPLES = r"""
 - name: Ensure a service token exists
   linuxhq.cloudflare.access_service_tokens:
-    account_id: "{{ access_service_tokens_account_id }}"
-    api_token: "{{ access_service_tokens_api_token }}"
-    name: "{{ cloudflare_domain }}"
+    account_id: "{{ account_id }}"
+    api_token: "{{ cloudflare_api_token }}"
+    name: automation
     duration: forever
 
 - name: Ensure a service token is absent
   linuxhq.cloudflare.access_service_tokens:
-    account_id: "{{ access_service_tokens_account_id }}"
-    api_token: "{{ access_service_tokens_api_token }}"
+    account_id: "{{ account_id }}"
+    api_token: "{{ cloudflare_api_token }}"
     name: old-token
     state: absent
 """

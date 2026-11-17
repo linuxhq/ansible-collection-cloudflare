@@ -21,8 +21,8 @@ options: {}
 EXAMPLES = r"""
 - name: Gather service token information
   linuxhq.cloudflare.access_service_tokens_info:
-    account_id: "{{ access_service_tokens_info_account_id }}"
-    api_token: "{{ access_service_tokens_info_api_token }}"
+    account_id: "{{ account_id }}"
+    api_token: "{{ cloudflare_api_token }}"
 """
 
 RETURN = r"""

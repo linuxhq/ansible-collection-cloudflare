@@ -133,6 +133,9 @@ class CfdTunnelTests(TestCase):
                 )
                 self.assertEqual(result["current_config_src"], "local")
                 self.assertEqual(result["requested_config_src"], "cloudflare")
+                self.assertEqual(result["account_id"], "account")
+                self.assertEqual(result["resource_id"], "tunnel-id")
+                self.assertEqual(result["cfd_tunnel_id"], "tunnel-id")
 
     def test_tunnel_without_config_source_is_local(self):
         # Cloudflare stores a tunnel created without config_src as null with remote_config false.
