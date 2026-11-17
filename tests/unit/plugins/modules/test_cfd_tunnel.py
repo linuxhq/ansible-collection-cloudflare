@@ -51,6 +51,26 @@ class CfdTunnelTests(TestCase):
 
         return raised.exception.values
 
+    def test_lookup_failures_name_the_account(self):
+        for found in ([{"name": "tunnel"}], [{"id": "one", "name": "tunnel"}, {"id": "two", "name": "tunnel"}]):
+            client, api = client_with(found)
+            with self.subTest(found=found):
+                result = self.run_module(FakeModule(params()), client)
+
+                api.create.assert_not_called()
+                self.assertEqual(result["account_id"], "account")
+                self.assertEqual(result["name"], "tunnel")
+
+    def test_malformed_create_response_names_the_account(self):
+        client, _ignored = client_with(created={"name": "tunnel"})
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed cloudflared tunnel data")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["name"], "tunnel")
+
     def test_create_recovers_the_tunnel_after_a_lost_response(self):
         recovered = {"id": "tunnel-id", "name": "tunnel", "config_src": "cloudflare"}
         client, api = client_with()

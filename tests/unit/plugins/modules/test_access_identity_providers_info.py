@@ -75,3 +75,4 @@ class AccessIdentityProvidersInfoTests(TestCase):
             raised.exception.values["msg"],
             "Cloudflare API returned malformed Access identity provider data",
         )
+        self.assertEqual(raised.exception.values["account_id"], "account")

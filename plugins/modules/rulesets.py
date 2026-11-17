@@ -352,26 +352,24 @@ def run(module, client):
     zone_id = params["zone_id"]
     phase = params["phase"]
     rulesets = client.rulesets
+    lookup = {"zone_id": zone_id, "phase": phase}
     if params["state"] == "present":
         validate_action_parameters(module)
         validate_assigned_fields(module)
 
-    with cloudflare_error_context(
-        "Cloudflare API request failed while gathering the ruleset entrypoint",
-        zone_id=zone_id,
-        phase=phase,
-    ):
+    with cloudflare_error_context("Cloudflare API request failed while gathering the ruleset entrypoint", **lookup):
         current = get_or_none(rulesets.phases.get, phase, zone_id=zone_id)
         if current is not None:
-            current = checked_ruleset(module, current, phase)
+            current = checked_ruleset(module, current, phase, lookup)
 
     if current is not None:
-        name = resource_field(module, current, "name", "ruleset")
+        name = resource_field(module, current, "name", "ruleset", context=lookup)
         if params.get("name") is not None and params["name"] != name:
+            failure = {**lookup, "ruleset": current}
             if params["state"] == "absent":
-                module.fail_json(msg="An existing ruleset with a different name cannot be deleted", ruleset=current)
+                module.fail_json(msg="An existing ruleset with a different name cannot be deleted", **failure)
 
-            module.fail_json(msg="An existing ruleset cannot be renamed", ruleset=current)
+            module.fail_json(msg="An existing ruleset cannot be renamed", **failure)
 
     if params["state"] == "absent":
         ensure_resource_absent(
@@ -380,7 +378,7 @@ def run(module, client):
             "ruleset",
             current,
             delete=lambda ruleset_id: rulesets.delete(ruleset_id, zone_id=zone_id),
-            context={"zone_id": zone_id},
+            context=lookup,
         )
 
     # The update replaces every rule, so give each rule Cloudflare's enabled
@@ -420,7 +418,7 @@ def run(module, client):
         expected_name=name,
         defaults={"rules": []},
         exact_values=("rules",),
-        context={"zone_id": zone_id},
+        context=lookup,
         comparable=lambda ruleset, failure: {
             **ruleset,
             "rules": comparable_rules(

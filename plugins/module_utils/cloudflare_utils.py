@@ -189,8 +189,7 @@ def cloudflare_error_details(exc):
         response_body = exc.body
 
     details = {}
-    # A response that failed validation carries the reason only in the message.
-    if getattr(exc, "response", None) is None or isinstance(exc, cloudflare.APIResponseValidationError):
+    if getattr(exc, "response", None) is None:
         details["error"] = error_message(exc)
 
     if status_code is not None:
@@ -265,16 +264,17 @@ def require_mapping(module, value, resource_name, context=None):
         module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data", **(context or {}))
 
 
-def resource_list(module, items, resource_name, required_fields=("id",)):
+def resource_list(module, items, resource_name, required_fields=("id",), context=None):
     """Serialize every item of an SDK list, validating its required fields.
 
     Names need only be strings: Cloudflare can store names with surrounding
-    whitespace, which must not fail a listing of every resource.
+    whitespace, which must not fail a listing of every resource. context adds
+    result fields to a failure, such as the list's owner.
     """
     resources = [serialize_resource(item) for item in items]
     for resource in resources:
         for field in required_fields:
-            resource_field(module, resource, field, resource_name, strict=field != "name")
+            resource_field(module, resource, field, resource_name, strict=field != "name", context=context)
 
     return resources
 
@@ -380,13 +380,13 @@ def create_once(create, find):
     return matches[0]
 
 
-def list_all_pages(module, client, path, resource_name):
+def list_all_pages(module, client, path, resource_name, context=None):
     """Return every item of a page-numbered Cloudflare list endpoint.
 
     Use it for an endpoint whose generated SDK method reads only the first
     page. Each path segment must be encoded with path_segment. Pages are read
     until result_info.total_pages, or, without it, until a page returns fewer
-    than PAGE_SIZE items.
+    than PAGE_SIZE items. context adds result fields to a failure.
     """
     items = []
     page = 1
@@ -394,7 +394,7 @@ def list_all_pages(module, client, path, resource_name):
         body = client.get(path, cast_to=object, options={"params": {"page": page, "per_page": PAGE_SIZE}})
         result = body.get("result") if isinstance(body, dict) else None
         if not isinstance(result, list):
-            module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data")
+            module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data", **(context or {}))
 
         items.extend(result)
         result_info = body.get("result_info")
@@ -413,30 +413,32 @@ def path_segment(value):
     return quote(value, safe="")
 
 
-def find_resource(module, items, resource_name, field, value):
+def find_resource(module, items, resource_name, field, value, context=None):
     """Return the serialized item whose field equals value, or None.
 
     Fail when more than one item matches, so an ambiguous name never selects
     an arbitrary resource. Only the matched items are validated strictly, so
     an unrelated item with surrounding whitespace in its field is skipped,
     and an item without the field, such as an Access policy Cloudflare stored
-    without a name, never matches.
+    without a name, never matches. context adds result fields to a failure,
+    such as the resource's owner; field and value are always reported.
     """
+    context = {**(context or {}), field: value}
     matches = []
     for item in items:
         resource = serialize_resource(item)
         if isinstance(resource, dict) and not isinstance(resource.get(field), str):
             continue
 
-        if resource_field(module, resource, field, resource_name, strict=False) == value:
-            resource_field(module, resource, field, resource_name)
+        if resource_field(module, resource, field, resource_name, strict=False, context=context) == value:
+            resource_field(module, resource, field, resource_name, context=context)
             matches.append(resource)
 
     if len(matches) > 1:
         module.fail_json(
             msg=f"Found more than one {resource_name} with {field} {value!r}",
-            **{field: value},
-            matching_ids=[resource_id(module, resource, resource_name) for resource in matches],
+            **context,
+            matching_ids=[resource_id(module, resource, resource_name, context=context) for resource in matches],
         )
 
     return matches[0] if matches else None
@@ -831,15 +833,17 @@ def validate_access_selectors(module, rules=None, prefix=""):
         )
 
 
-def exit_resource_list(module, result_key, items, resource_name, required_fields=("id", "name")):
-    """Exit an info module with the serialized and validated items."""
-    module.exit_json(changed=False, **{result_key: resource_list(module, items, resource_name, required_fields)})
+def exit_resource_list(module, result_key, items, resource_name, required_fields=("id", "name"), context=None):
+    """Exit an info module with the serialized and validated items; context names their owner in failures."""
+    module.exit_json(
+        changed=False, **{result_key: resource_list(module, items, resource_name, required_fields, context)}
+    )
 
 
-def exit_settings(module, result_key, settings, resource_name):
-    """Exit an info module with account-wide settings."""
+def exit_settings(module, result_key, settings, resource_name, context=None):
+    """Exit an info module with account-wide settings; context names their owner in failures."""
     settings = serialize_resource(settings) or {}
-    require_mapping(module, settings, resource_name)
+    require_mapping(module, settings, resource_name, context)
     module.exit_json(changed=False, **{result_key: settings})
 
 
@@ -909,6 +913,7 @@ def ensure_resource_present(
     comparable = comparable or (lambda resource, failure: resource)
     context = context or {}
     label = resource_name[0].upper() + resource_name[1:]
+    name_context = {} if expected_name is None else {"name": expected_name}
 
     def require_written(resource, written_context, expected_id=None):
         """Fail when the resource a write returned does not match payload.
@@ -940,7 +945,6 @@ def ensure_resource_present(
         if module.check_mode:
             module.exit_json(changed=True, message=f"{label} would be created")
 
-        name_context = {} if expected_name is None else {"name": expected_name}
         with cloudflare_error_context(
             f"Cloudflare API request failed while creating the {resource_name}",
             **name_context,
@@ -951,7 +955,7 @@ def ensure_resource_present(
         resource = require_written(created, {**name_context, **context})
         module.exit_json(changed=True, message=f"{label} created", **{result_key: resource})
 
-    current_id = resource_id(module, current, resource_name)
+    current_id = resource_id(module, current, resource_name, context={**name_context, **context})
     payload = {**select_fields(current, preserved_fields), **payload}
     if not differs(comparable(current, context), payload, defaults, exact_fields, exact_values):
         module.exit_json(
@@ -978,18 +982,30 @@ def ensure_resource_present(
     module.exit_json(changed=True, message=f"{label} updated", **{result_key: resource})
 
 
-def ensure_resource_absent(module, result_key, resource_name, current, delete, context=None):
+def has_error_code(exc, codes):
+    """Return whether the error response of exc lists an error with one of codes."""
+    body = error_response_body(exc)
+    errors = body.get("errors") if isinstance(body, dict) else None
+    return any(
+        isinstance(error, dict) and error.get("code") in codes for error in (errors if isinstance(errors, list) else ())
+    )
+
+
+def ensure_resource_absent(module, result_key, resource_name, current, delete, context=None, deleted_codes=()):
     """Delete the resource when it exists; context names its owner in failures.
 
     A 404 status from the delete counts as deleted: the SDK retries a delete
     whose response was lost, and Cloudflare answers the retry with 404 for
-    some resources, such as Access groups and applications.
+    some resources, such as Access groups and applications. Other resources,
+    such as zones and page rules, answer it with a 400 status and an error
+    code that marks the identifier invalid; deleted_codes lists those codes,
+    which count as deleted too.
     """
     label = resource_name[0].upper() + resource_name[1:]
     if current is None:
         module.exit_json(changed=False, message=f"{label} already absent")
 
-    current_id = resource_id(module, current, resource_name)
+    current_id = resource_id(module, current, resource_name, context=context)
     if module.check_mode:
         module.exit_json(changed=True, message=f"{label} would be deleted", **{result_key: current})
 
@@ -1001,6 +1017,11 @@ def ensure_resource_absent(module, result_key, resource_name, current, delete, c
         try:
             deleted = serialize_resource(delete(current_id))
         except cloudflare.NotFoundError:
+            deleted = None
+        except cloudflare.BadRequestError as exc:
+            if not has_error_code(exc, deleted_codes):
+                raise
+
             deleted = None
 
     if isinstance(deleted, dict) and "id" in deleted:

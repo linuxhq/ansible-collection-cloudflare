@@ -7,6 +7,7 @@ Manage cloudflare zones
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Zone`
+* Cloudflare api `Token` with `Read` permissions to `Account Settings`
 
 ## Role Variables
 

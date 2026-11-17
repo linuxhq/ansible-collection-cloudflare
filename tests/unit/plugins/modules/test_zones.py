@@ -509,6 +509,49 @@ class ZonesTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertEqual(result["zone"], ZONE)
 
+    def test_delete_answered_with_invalid_identifier_counts_as_deleted(self):
+        body = {"success": False, "errors": [{"code": 1001, "message": "Invalid zone identifier"}]}
+        client = client_with([ZONE])
+        client.zones.delete.side_effect = status_error(400, body)
+
+        result = self.run_module(FakeModule(params(state="absent")), client)
+
+        client.zones.delete.assert_called_once_with(zone_id="zone")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["message"], "Zone deleted")
+        self.assertEqual(result["zone"], ZONE)
+
+    def test_delete_rejected_with_another_400_error_fails(self):
+        for body in (
+            {"success": False, "errors": [{"code": 1002, "message": "Invalid request"}]},
+            {"success": False, "errors": "invalid"},
+            ["invalid"],
+        ):
+            client = client_with([ZONE])
+            client.zones.delete.side_effect = status_error(400, body)
+            with self.subTest(body=body), self.assertRaises(cloudflare.BadRequestError):
+                self.run_module(FakeModule(params(state="absent")), client)
+
+    def test_malformed_lookup_names_the_zone(self):
+        for found in ([{"name": "example.com"}], [ZONE, {**ZONE, "id": "other"}], ["invalid"]):
+            client = client_with(found)
+            with self.subTest(found=found):
+                result = self.run_module(FakeModule(params()), client)
+
+                client.zones.create.assert_not_called()
+                self.assertEqual(result["name"], "example.com")
+                self.assertEqual(result["account_id"], "account")
+
+    def test_malformed_create_response_names_the_zone(self):
+        client = client_with(created={"name": "example.com"})
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed zone data")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["name"], "example.com")
+        self.assertEqual(result["account_id"], "account")
+
     def test_failed_delete_names_the_zone(self):
         for account_id, expected in (
             ("account", {"resource_id": "zone", "name": "example.com", "account_id": "account"}),

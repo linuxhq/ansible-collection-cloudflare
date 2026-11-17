@@ -39,6 +39,15 @@ class WarpConnectorInfoTests(TestCase):
         result, _ignored = self.run_module([{"id": "connector", "name": "example"}], True, token="")
 
         self.assertIn("malformed WARP Connector token", result["msg"])
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["resource_id"], "connector")
+
+    def test_malformed_listing_names_the_account(self):
+        result, _ignored = self.run_module([{"id": "connector"}], False)
+
+        self.assertIn("malformed WARP Connector data", result["msg"])
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["resource_id"], "connector")
 
     def test_token_failure_names_resource(self):
         client = Mock()

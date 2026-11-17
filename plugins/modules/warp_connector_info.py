@@ -78,6 +78,7 @@ def run(module, client):
             connectors.list(account_id=account_id, is_deleted=False, per_page=1000),
             "WARP Connector",
             required_fields=("id", "name"),
+            context={"account_id": account_id},
         )
 
     if module.params["include_token"]:
@@ -89,7 +90,13 @@ def run(module, client):
             ):
                 token = connectors.token.get(connector["id"], account_id=account_id)
 
-            connector["token"] = resource_field(module, {"token": token}, "token", "WARP Connector token")
+            connector["token"] = resource_field(
+                module,
+                {"token": token},
+                "token",
+                "WARP Connector token",
+                context={"account_id": account_id, "resource_id": connector["id"]},
+            )
 
     module.exit_json(changed=False, warp_connectors=warp_connectors)
 

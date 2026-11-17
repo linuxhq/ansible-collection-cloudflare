@@ -140,7 +140,12 @@ def checked_connector(module, connector, expected_id=None):
     A failure reports changed=True, the connector, and its identifiers.
     """
     connector = serialize_resource(connector)
-    failure = {"changed": True, "account_id": module.params["account_id"], "warp_connector": connector}
+    failure = {
+        "changed": True,
+        "account_id": module.params["account_id"],
+        "name": module.params["name"],
+        "warp_connector": connector,
+    }
     if expected_id is not None:
         failure["resource_id"] = expected_id
 
@@ -207,7 +212,9 @@ def ensure_present(module, client, current):
     connectors = client.zero_trust.tunnels.warp_connector
 
     if current is not None:
-        current_id = resource_id(module, current, "WARP Connector")
+        current_id = resource_id(
+            module, current, "WARP Connector", context={"account_id": account_id, "name": params["name"]}
+        )
         if not params["rotate_secrets"]:
             module.exit_json(changed=False, message="WARP Connector already present", warp_connector=current)
 
@@ -256,7 +263,14 @@ def run(module, client):
         account_id=account_id,
         name=params["name"],
     ):
-        current = find_resource(module, list_connectors(module, connectors), "WARP Connector", "name", params["name"])
+        current = find_resource(
+            module,
+            list_connectors(module, connectors),
+            "WARP Connector",
+            "name",
+            params["name"],
+            context={"account_id": account_id},
+        )
 
     if params["state"] == "absent":
         ensure_resource_absent(

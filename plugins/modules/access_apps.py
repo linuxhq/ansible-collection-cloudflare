@@ -874,6 +874,7 @@ def run(module, client):
             "Access application",
             "name",
             params["name"],
+            context={"account_id": account_id},
         )
 
     if params["state"] == "absent":

@@ -12,6 +12,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     ModuleExit,
     ModuleFail,
     connection_error,
+    status_error,
 )
 
 ACTIONS = [{"id": "always_use_https"}]
@@ -100,6 +101,16 @@ class PageRulesTests(TestCase):
                 result = self.run_module(FakeModule(params()), client)
 
                 self.assertIn("malformed page rule", result["msg"])
+                self.assertEqual(result["zone_id"], "zone")
+                self.assertEqual(result["resource_id"], "rule")
+
+    def test_malformed_rule_names_the_zone(self):
+        client, _ignored = client_with(["invalid"])
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed page rule data")
+        self.assertEqual(result["zone_id"], "zone")
 
     def test_find_pagerule_ignores_target_keys_outside_the_identity(self):
         current = {"id": "match", "actions": ACTIONS, "targets": TARGETS}
@@ -425,6 +436,29 @@ class PageRulesTests(TestCase):
 
         api.delete.assert_not_called()
         self.assertTrue(result["changed"])
+
+    def test_delete_answered_with_invalid_identifier_counts_as_deleted(self):
+        current = {"id": "rule", "targets": TARGETS}
+        body = {"success": False, "errors": [{"code": 1002, "message": "Invalid Page Rule identifier"}]}
+        client, api = client_with([current])
+        api.delete.side_effect = status_error(400, body)
+
+        result = self.run_module(FakeModule(params(state="absent")), client)
+
+        api.delete.assert_called_once_with(pagerule_id="rule", zone_id="zone")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["message"], "Page rule deleted")
+        self.assertEqual(result["pagerule"], current)
+
+    def test_delete_rejected_with_another_400_error_fails(self):
+        for code in (1001, 1004):
+            body = {"success": False, "errors": [{"code": code, "message": "Invalid request"}]}
+            client, api = client_with([{"id": "rule", "targets": TARGETS}])
+            api.delete.side_effect = status_error(400, body)
+            with self.subTest(code=code), self.assertRaises(cloudflare.BadRequestError) as raised:
+                pagerules.run(FakeModule(params(state="absent")), client)
+
+            self.assertEqual(raised.exception._cloudflare_context, {"resource_id": "rule", "zone_id": "zone"})
 
     def test_deletes_matching_rule(self):
         client, api = client_with([{"id": "rule", "targets": TARGETS}], deleted={"id": "rule"})

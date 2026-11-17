@@ -101,7 +101,12 @@ def run(module, client):
                 "Cloudflare API request failed while gathering page rules",
                 zone_id=zone["id"],
             ):
-                rules = resource_list(module, client.page_rules.list(zone_id=zone["id"]) or [], "page rule")
+                rules = resource_list(
+                    module,
+                    client.page_rules.list(zone_id=zone["id"]) or [],
+                    "page rule",
+                    context={"zone_id": zone["id"]},
+                )
         except cloudflare.APIStatusError as exc:
             # Skip a zone deleted after it was listed.
             if not zone_missing(exc):
@@ -110,13 +115,14 @@ def run(module, client):
             continue
 
         for rule in rules:
+            context = {"zone_id": zone["id"], "resource_id": rule["id"]}
             for field in ("actions", "targets"):
                 values = rule.get(field)
                 if not isinstance(values, list):
-                    module.fail_json(msg="Cloudflare API returned malformed page rule data")
+                    module.fail_json(msg="Cloudflare API returned malformed page rule data", **context)
 
                 for value in values:
-                    require_mapping(module, value, f"page rule {field[:-1]}")
+                    require_mapping(module, value, f"page rule {field[:-1]}", context)
 
         pagerules.append({"id": zone["id"], "name": zone["name"], "pagerules": rules})
 

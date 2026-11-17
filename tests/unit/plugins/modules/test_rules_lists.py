@@ -425,6 +425,30 @@ class RulesListsTests(TestCase):
         result = self.run_module(FakeModule(params(kind="hostname", elements=[])), client)
 
         self.assertEqual(result["msg"], "An existing Rules list kind cannot be changed")
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["name"], "addresses")
+        self.assertEqual(result["rules_list_id"], "list")
+
+    def test_malformed_lookup_names_the_account_and_list(self):
+        for current, rules_list_id in (({**CURRENT, "id": None}, None), ({**CURRENT, "kind": None}, "list")):
+            client, api = make_client([current])
+            with self.subTest(current=current):
+                result = self.run_module(FakeModule(params()), client)
+
+                api.update.assert_not_called()
+                self.assertEqual(result["msg"], "Cloudflare API returned malformed Rules list data")
+                self.assertEqual(result["account_id"], "account")
+                self.assertEqual(result["name"], "addresses")
+                self.assertEqual(result.get("rules_list_id"), rules_list_id)
+
+    def test_ambiguous_lookup_names_the_account(self):
+        client, _ignored = make_client([CURRENT, {**CURRENT, "id": "other"}])
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertEqual(result["matching_ids"], ["list", "other"])
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["name"], "addresses")
 
     def test_elements_without_the_list_kind_fail_before_any_write(self):
         elements = [{"ip": "192.0.2.1"}, {"hostname": {"url_hostname": "example.com"}}]

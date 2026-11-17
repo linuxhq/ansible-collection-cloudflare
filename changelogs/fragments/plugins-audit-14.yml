@@ -1,10 +1,5 @@
 ---
 minor_changes:
-  - access_apps, access_groups, access_policies, access_service_tokens, cfd_tunnel, pagerules, pages_projects,
-    rules_lists, rulesets, warp_connector, zones - retry a create request Cloudflare rejects with a 409 or 429 status
-    up to twice, after the delay its C(Retry-After) header asks for when that is at most 60 seconds, or otherwise after
-    0.5 and then 1 second. Cloudflare created nothing, so the retry cannot add a duplicate; the module previously
-    failed at once. A create that fails without a response or with a 5xx status is still not retried.
   - all modules - name the cause of a Cloudflare API connection failure or timeout in C(error), such as
     C(Connection error. ConnectError) followed by its message. A request HTTPX refused to build is named without its
     message, which can quote the API token.

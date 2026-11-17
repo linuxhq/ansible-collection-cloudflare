@@ -64,5 +64,7 @@ class PagesProjectsInfoTests(TestCase):
         client = Mock()
         client.pages.projects.list.return_value = [{"id": "project"}]
 
-        with self.assertRaises(ModuleFail):
+        with self.assertRaises(ModuleFail) as raised:
             pages_projects_info.run(FakeModule({"account_id": "account"}), client)
+
+        self.assertEqual(raised.exception.values["account_id"], "account")

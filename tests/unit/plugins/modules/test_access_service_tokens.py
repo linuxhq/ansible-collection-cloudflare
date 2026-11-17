@@ -40,6 +40,29 @@ class AccessServiceTokensTests(TestCase):
 
         return raised.exception.values
 
+    def test_lookup_failures_name_the_account(self):
+        for found in (
+            [{"name": "automation"}],
+            [{"id": "one", "name": "automation"}, {"id": "two", "name": "automation"}],
+        ):
+            client, api = client_with(found)
+            with self.subTest(found=found):
+                result = self.run_module(FakeModule(params()), client)
+
+                api.create.assert_not_called()
+                self.assertEqual(result["account_id"], "account")
+                self.assertEqual(result["name"], "automation")
+
+    def test_malformed_create_response_names_the_account(self):
+        client, _ignored = client_with(created={"name": "automation"})
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed service token data")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["name"], "automation")
+
     def test_created_token_is_returned_when_its_check_fails(self):
         # The client secret is returned only in the create response.
         cases = (

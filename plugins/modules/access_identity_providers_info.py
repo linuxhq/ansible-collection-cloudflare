@@ -71,6 +71,7 @@ def run(module, client):
             client.zero_trust.identity_providers.list(account_id=account_id),
             "Access identity provider",
             required_fields=("id", "name", "type"),
+            context={"account_id": account_id},
         )
 
 

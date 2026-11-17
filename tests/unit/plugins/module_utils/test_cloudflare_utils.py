@@ -799,6 +799,29 @@ class InfoTests(TestCase):
         with self.assertRaises(ModuleFail):
             exit_settings(FakeModule({}), "settings", ["bad"], "settings")
 
+    def test_info_failures_carry_the_owner(self):
+        context = {"account_id": "account"}
+        for call in (
+            lambda: exit_resource_list(FakeModule({}), "things", [{"id": "one"}], "thing", context=context),
+            lambda: exit_settings(FakeModule({}), "settings", ["bad"], "settings", context),
+            lambda: resource_list(FakeModule({}), [{"id": ""}], "thing", context=context),
+        ):
+            with self.assertRaises(ModuleFail) as raised:
+                call()
+
+            self.assertEqual(raised.exception.values["account_id"], "account")
+
+    def test_find_resource_failures_carry_the_owner_and_value(self):
+        for items in (
+            [{"name": "n"}, {"name": "n", "id": "two"}],
+            [{"id": "one", "name": "n"}, {"id": "two", "name": "n"}],
+        ):
+            with self.subTest(items=items), self.assertRaises(ModuleFail) as raised:
+                find_resource(FakeModule({}), items, "thing", "name", "n", context={"account_id": "account"})
+
+            self.assertEqual(raised.exception.values["account_id"], "account")
+            self.assertEqual(raised.exception.values["name"], "n")
+
 
 class EnsureSettingsTests(TestCase):
     def run_settings(self, current, payload, edited=None, check_mode=False, comparable=None, exact_values=()):
@@ -1036,6 +1059,51 @@ class EnsureResourceTests(TestCase):
         self.assertEqual([request.method for request in requests], ["DELETE", "DELETE"])
         self.assertTrue(raised.exception.values["changed"])
         self.assertEqual(raised.exception.values["message"], "Access group deleted")
+
+    def test_delete_answered_with_a_deleted_code_counts_as_deleted(self):
+        body = {"success": False, "errors": [{"code": 1001, "message": "Invalid zone identifier"}]}
+        delete = Mock(side_effect=status_error(400, body))
+        with self.assertRaises(ModuleExit) as raised:
+            ensure_resource_absent(FakeModule({}), "thing", "thing", {"id": "one"}, delete, deleted_codes=(1001,))
+
+        delete.assert_called_once_with("one")
+        self.assertEqual(raised.exception.values, {"changed": True, "message": "Thing deleted", "thing": {"id": "one"}})
+
+    def test_delete_answered_with_another_400_error_is_raised(self):
+        for body in (
+            {"success": False, "errors": [{"code": 1002, "message": "other"}]},
+            {"success": False, "errors": None},
+            {"success": False},
+        ):
+            error = status_error(400, body)
+            with self.subTest(body=body), self.assertRaises(cloudflare.BadRequestError) as raised:
+                ensure_resource_absent(
+                    FakeModule({}),
+                    "thing",
+                    "thing",
+                    {"id": "one"},
+                    Mock(side_effect=error),
+                    context={"zone_id": "z"},
+                    deleted_codes=(1001,),
+                )
+
+            self.assertIs(raised.exception, error)
+            self.assertEqual(error._cloudflare_context, {"resource_id": "one", "zone_id": "z"})
+
+    def test_malformed_current_resource_carries_the_owner(self):
+        with self.assertRaises(ModuleFail) as raised:
+            ensure_resource_absent(FakeModule({}), "thing", "thing", {"id": ""}, Mock(), context={"zone_id": "z"})
+
+        self.assertEqual(raised.exception.values["zone_id"], "z")
+
+        result, create, update = self.present(
+            {"id": None, "name": "n"}, {"name": "n"}, expected_name="n", context={"account_id": "acc"}
+        )
+        create.assert_not_called()
+        update.assert_not_called()
+        self.assertEqual(result.values["msg"], "Cloudflare API returned malformed thing data")
+        self.assertEqual(result.values["account_id"], "acc")
+        self.assertEqual(result.values["name"], "n")
 
     def test_delete_failures_other_than_404_are_raised(self):
         for status_code in (400, 403, 409, 500):
@@ -1358,16 +1426,22 @@ class ListAllPagesTests(TestCase):
 
         self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed thing data")
 
+    def test_malformed_page_carries_the_context(self):
+        requests = []
 
-class ResponseValidationErrorTests(TestCase):
-    def test_details_include_the_validation_message(self):
-        response = httpx.Response(200, json={"result": None}, request=httpx.Request("GET", "https://example.test"))
-        error = cloudflare.APIResponseValidationError(response, {"result": None}, message="Expected a dict")
+        def respond(request):
+            requests.append(request)
+            return httpx.Response(200, json={"success": True, "errors": [], "messages": [], "result": {}})
 
-        details = cloudflare_error_details(error)
+        with (
+            cloudflare.Cloudflare(
+                api_token="EXAMPLE-token", http_client=httpx.Client(transport=httpx.MockTransport(respond))
+            ) as client,
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            list_all_pages(FakeModule({}), client, "/things", "thing", {"account_id": "account"})
 
-        self.assertEqual(details["error"], "Expected a dict")
-        self.assertEqual(details["status_code"], 200)
+        self.assertEqual(raised.exception.values["account_id"], "account")
 
 
 class WrittenFailureTests(TestCase):

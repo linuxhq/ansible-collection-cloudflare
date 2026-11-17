@@ -205,6 +205,10 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     without_retries,
 )
 
+# Cloudflare answers a request for a deleted zone with this error code and a
+# 400 status.
+INVALID_ZONE_CODE = 1001
+
 # Fields of the setting values the cloudflare SDK types as objects, by setting
 # id. Cloudflare accepts any other field but drops it.
 SETTING_VALUE_FIELDS = {
@@ -385,7 +389,9 @@ def zone_context(module):
 
 def find_zone(module, client):
     with cloudflare_error_context("Cloudflare API request failed while finding the zone", **zone_context(module)):
-        return find_resource(module, list_zones(module, client), "zone", "name", module.params["name"])
+        return find_resource(
+            module, list_zones(module, client), "zone", "name", module.params["name"], context=zone_context(module)
+        )
 
 
 def written_context(zone, changed, updated_settings=()):
@@ -407,9 +413,7 @@ def checked_zone(module, zone, payload, expected_id=None, written=None):
     result fields of earlier writes in this run.
     """
     zone = serialize_resource(zone)
-    failure = {**(written or {}), "changed": True, "zone": zone}
-    if module.params.get("account_id") is not None:
-        failure["account_id"] = module.params["account_id"]
+    failure = {**(written or {}), **zone_context(module), "changed": True, "zone": zone}
 
     if expected_id is not None:
         failure["zone_id"] = expected_id
@@ -586,6 +590,7 @@ def run(module, client):
             current,
             delete=lambda zone_id: client.zones.delete(zone_id=zone_id),
             context=zone_context(module),
+            deleted_codes=(INVALID_ZONE_CODE,),
         )
 
     if current is None:
@@ -600,7 +605,7 @@ def run(module, client):
         zone = create_zone(module, client)
     else:
         zone = current
-        resource_id(module, zone, "zone")
+        resource_id(module, zone, "zone", context=zone_context(module))
 
     pending = pending_settings(module, client, zone, current is None)
     zone, changed = update_zone(module, client, zone, current is None)

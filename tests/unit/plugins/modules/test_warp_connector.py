@@ -51,6 +51,29 @@ class WarpConnectorTests(TestCase):
 
         return raised.exception.values
 
+    def test_lookup_failures_name_the_account(self):
+        for found in (
+            [{"name": "connector"}],
+            [{"id": "one", "name": "connector"}, {"id": "two", "name": "connector"}],
+        ):
+            client, api = client_with(found)
+            with self.subTest(found=found):
+                result = self.run_module(FakeModule(params()), client)
+
+                api.create.assert_not_called()
+                self.assertEqual(result["account_id"], "account")
+                self.assertEqual(result["name"], "connector")
+
+    def test_malformed_create_response_names_the_account(self):
+        client, _ignored = client_with(created={"name": "connector"})
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed WARP Connector data")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["name"], "connector")
+
     def test_create_recovers_the_connector_after_a_lost_response(self):
         recovered = {"id": "connector-id", "name": "connector"}
         client, api = client_with()

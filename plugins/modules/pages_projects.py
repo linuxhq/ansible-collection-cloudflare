@@ -574,25 +574,32 @@ def remaining_removals(project, removed):
     return remaining
 
 
-def project_domain_names(module, project):
+def project_context(module):
+    """Return the project's account_id and name, which a failure reports."""
+    return {"account_id": module.params["account_id"], "name": module.params["name"]}
+
+
+def project_domain_names(module, project, context):
+    """Return the lowercased domain names of project; context adds result fields to a failure."""
     project_domains = project.get("domains")
     if project_domains is None:
         return set()
 
     if not isinstance(project_domains, list):
-        module.fail_json(msg="Cloudflare API returned malformed Pages domain data")
+        module.fail_json(msg="Cloudflare API returned malformed Pages domain data", **context)
 
     for name in project_domains:
         if not isinstance(name, str) or not name.strip() or name != name.strip():
-            module.fail_json(msg="Cloudflare API returned malformed Pages domain data")
+            module.fail_json(msg="Cloudflare API returned malformed Pages domain data", **context)
 
     # Domain names are case-insensitive, and Cloudflare stores them lowercased.
     return {name.lower() for name in project_domains}
 
 
-def current_domain_names(module, project, domains):
-    domain_names = [domain["name"] for domain in resource_list(module, domains, "Pages domain", ("name",))]
-    return project_domain_names(module, project) | {name.lower() for name in domain_names}
+def current_domain_names(module, project, domains, context):
+    """Return the domain names of project and domains; context adds result fields to a failure."""
+    domain_names = [domain["name"] for domain in resource_list(module, domains, "Pages domain", ("name",), context)]
+    return project_domain_names(module, project, context) | {name.lower() for name in domain_names}
 
 
 def valid_ace_label(label):
@@ -672,7 +679,7 @@ def checked_project(module, project, written=None):
     run, such as changed=True; the failure then also returns the project.
     """
     project = serialize_resource(project)
-    context = None if written is None else {**written, "pages_project": project}
+    context = project_context(module) if written is None else {**written, "pages_project": project}
     resource_field(module, project, "name", "Pages project", expected=module.params["name"], context=context)
     return project
 
@@ -689,24 +696,20 @@ def get_project(module, client, written=None):
     return None if project is None else checked_project(module, project, written)
 
 
-def list_domains(module, client, project_name):
-    """Return every custom domain of the project.
+def list_domains(module, client, project_name, context):
+    """Return every custom domain of the project; context adds result fields to a failure.
 
     The generated SDK method reads only the first page of domains.
     """
     path = f"/accounts/{path_segment(module.params['account_id'])}/pages/projects/{path_segment(project_name)}/domains"
-    return list_all_pages(module, client, path, "Pages domain")
+    return list_all_pages(module, client, path, "Pages domain", context)
 
 
 def existing_domain_names(module, client, project):
-    params = module.params
-    with cloudflare_error_context(
-        "Cloudflare API request failed while gathering Pages project domains",
-        account_id=params["account_id"],
-        name=params["name"],
-    ):
-        domains = list_domains(module, client, params["name"])
-        return current_domain_names(module, project, domains)
+    context = project_context(module)
+    with cloudflare_error_context("Cloudflare API request failed while gathering Pages project domains", **context):
+        domains = list_domains(module, client, module.params["name"], context)
+        return current_domain_names(module, project, domains, context)
 
 
 def check_domain_owners(module, client, existing_names, domain_names):
@@ -726,7 +729,11 @@ def check_domain_owners(module, client, existing_names, domain_names):
         name=params["name"],
     ):
         projects = resource_list(
-            module, client.pages.projects.list(account_id=params["account_id"]), "Pages project", ("name",)
+            module,
+            client.pages.projects.list(account_id=params["account_id"]),
+            "Pages project",
+            ("name",),
+            project_context(module),
         )
 
     for other in projects:
@@ -734,18 +741,19 @@ def check_domain_owners(module, client, existing_names, domain_names):
             continue
 
         # A project's domains field omits custom domains that are not active yet.
+        context = {**project_context(module), "project": other["name"]}
         with cloudflare_error_context(
             "Cloudflare API request failed while gathering Pages project domains",
             account_id=params["account_id"],
             name=other["name"],
         ):
-            domains = get_or_none(list_domains, module, client, other["name"])
+            domains = get_or_none(list_domains, module, client, other["name"], context)
 
         # A project deleted since it was listed has no domains.
         if domains is None:
             continue
 
-        other_domains = current_domain_names(module, other, domains)
+        other_domains = current_domain_names(module, other, domains, context)
 
         for domain_name in requested:
             if domain_name in other_domains:
@@ -875,7 +883,7 @@ def ensure_present(module, client, domain_names):
     current = get_project(module, client)
     created = current is None
     if created and params.get("production_branch") is None:
-        module.fail_json(msg="production_branch is required when creating a Pages project")
+        module.fail_json(msg="production_branch is required when creating a Pages project", **project_context(module))
 
     existing_names = existing_domain_names(module, client, current) if current is not None and domain_names else set()
     check_domain_owners(module, client, existing_names, domain_names)
@@ -911,7 +919,8 @@ def ensure_present(module, client, domain_names):
     if added_domains:
         written = {"changed": True, "account_id": params["account_id"], "name": params["name"]}
         written_project = current
-        current = get_project(module, client, {**written, "domains": added_domains})
+        # A failed re-read still reports the project this run wrote.
+        current = get_project(module, client, {**written, "pages_project": written_project, "domains": added_domains})
         if current is None:
             module.fail_json(
                 msg="Pages project was deleted while its domains were being added",

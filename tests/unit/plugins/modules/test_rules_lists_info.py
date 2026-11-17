@@ -33,3 +33,5 @@ class RulesListsInfoTests(TestCase):
         result, _ignored = self.run_module([{"id": "list", "name": "addresses"}])
 
         self.assertEqual(result["msg"], "Cloudflare API returned malformed Rules list data")
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["resource_id"], "list")

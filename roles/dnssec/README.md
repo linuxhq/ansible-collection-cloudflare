@@ -7,6 +7,7 @@ Manage cloudflare dnssec settings
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `DNS`
+* Cloudflare api `Token` with `Read` permissions to `Zone`
 
 ## Role Variables
 

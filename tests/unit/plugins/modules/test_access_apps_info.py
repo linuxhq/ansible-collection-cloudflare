@@ -37,5 +37,7 @@ class AccessAppsInfoTests(TestCase):
         client = Mock()
         client.zero_trust.access.applications.list.return_value = [{"id": "app-id"}]
 
-        with self.assertRaises(ModuleFail):
+        with self.assertRaises(ModuleFail) as raised:
             access_apps_info.run(FakeModule({"account_id": "account"}), client)
+
+        self.assertEqual(raised.exception.values["account_id"], "account")

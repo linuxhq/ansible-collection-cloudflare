@@ -21,9 +21,9 @@ bugfixes:
     rules_lists, rulesets, warp_connector, zones - send create requests once, without the Cloudflare SDK's automatic
     retries. A create retried after a timeout, a connection failure, or a 5xx status that Cloudflare had already
     processed made a duplicate resource. After such a failure, the module now looks the resource up again and treats
-    a single match as the created resource; otherwise it fails with the original error.
-  - all modules - include the validation message as C(error) when a Cloudflare response does not match the SDK's
-    expected schema. Only the status code and response were reported.
+    a single match as the created resource; otherwise it fails with the original error. A create Cloudflare rejects
+    with a 409 or 429 status is still retried up to twice, honoring its C(Retry-After) header; one rejected with a 408
+    status is no longer retried.
 minor_changes:
   - devices_settings - describe C(disable_for_time) as the time, in seconds, that a user can use an
     override code to bypass WARP.

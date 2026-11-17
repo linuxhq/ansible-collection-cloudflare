@@ -78,6 +78,7 @@ def run(module, client):
             tunnels.list(account_id=account_id, is_deleted=False, per_page=1000),
             "cloudflared tunnel",
             required_fields=("id", "name"),
+            context={"account_id": account_id},
         )
 
     if module.params["include_token"]:
@@ -89,7 +90,13 @@ def run(module, client):
             ):
                 token = tunnels.token.get(tunnel["id"], account_id=account_id)
 
-            tunnel["token"] = resource_field(module, {"token": token}, "token", "cloudflared tunnel token")
+            tunnel["token"] = resource_field(
+                module,
+                {"token": token},
+                "token",
+                "cloudflared tunnel token",
+                context={"account_id": account_id, "resource_id": tunnel["id"]},
+            )
 
     module.exit_json(changed=False, cfd_tunnels=cfd_tunnels)
 

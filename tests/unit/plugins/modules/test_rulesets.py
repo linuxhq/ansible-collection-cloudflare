@@ -95,6 +95,18 @@ class RulesetsTests(TestCase):
                 result = self.run_module(FakeModule(params()), client)
 
             self.assertIn("malformed ruleset", result["msg"])
+            self.assertEqual(result["zone_id"], "zone")
+            self.assertEqual(result["phase"], PHASE)
+
+    def test_malformed_entrypoint_names_the_zone_and_phase(self):
+        for current in (["invalid"], {**CURRENT, "phase": "other"}, {**CURRENT, "name": None}):
+            client, _ignored = make_client(current)
+            with self.subTest(current=current):
+                result = self.run_module(FakeModule(params()), client)
+
+                self.assertIn("ruleset", result["msg"])
+                self.assertEqual(result["zone_id"], "zone")
+                self.assertEqual(result["phase"], PHASE)
 
     def test_rejects_sdk_cache_control_spellings_before_any_request(self):
         for key in (
@@ -249,6 +261,8 @@ class RulesetsTests(TestCase):
 
         api.phases.update.assert_not_called()
         self.assertEqual(result["msg"], "An existing ruleset cannot be renamed")
+        self.assertEqual(result["zone_id"], "zone")
+        self.assertEqual(result["phase"], PHASE)
 
     def test_updates_rules_through_phase_entrypoint(self):
         client, api = make_client(CURRENT, updated={**CURRENT, "rules": []})
@@ -293,6 +307,8 @@ class RulesetsTests(TestCase):
                 api.delete.assert_not_called()
                 self.assertEqual(result["msg"], "An existing ruleset with a different name cannot be deleted")
                 self.assertEqual(result["ruleset"], {**CURRENT, "name": "existing"})
+                self.assertEqual(result["zone_id"], "zone")
+                self.assertEqual(result["phase"], PHASE)
 
     def test_absent_without_name_deletes_the_phase_entrypoint(self):
         client, api = make_client({**CURRENT, "name": "existing"})

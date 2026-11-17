@@ -38,5 +38,7 @@ class AccessGroupsInfoTests(TestCase):
         client = Mock()
         client.zero_trust.access.groups.list.return_value = [{"name": "admins"}]
 
-        with self.assertRaises(ModuleFail):
+        with self.assertRaises(ModuleFail) as raised:
             access_groups_info.run(FakeModule({"account_id": "account"}), client)
+
+        self.assertEqual(raised.exception.values["account_id"], "account")

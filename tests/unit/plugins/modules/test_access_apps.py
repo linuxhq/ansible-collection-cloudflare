@@ -56,6 +56,16 @@ class AccessAppsTests(TestCase):
 
         return raised.exception.values
 
+    def test_lookup_failures_name_the_account(self):
+        for found in ([{"name": "app"}], [{"id": "one", "name": "app"}, {"id": "two", "name": "app"}]):
+            client, api = client_with(found)
+            with self.subTest(found=found):
+                result = self.run_module(FakeModule(params()), client)
+
+                api.create.assert_not_called()
+                self.assertEqual(result["account_id"], "account")
+                self.assertEqual(result["name"], "app")
+
     def test_empty_or_whitespace_name_fails_before_any_request(self):
         # Cloudflare stores such a name as null or "", so the resource is never found again.
         for name in ("", "   "):

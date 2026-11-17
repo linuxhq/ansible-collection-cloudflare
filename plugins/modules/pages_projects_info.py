@@ -67,6 +67,7 @@ def run(module, client):
             client.pages.projects.list(account_id=account_id, per_page=10),
             "Pages project",
             required_fields=("name",),
+            context={"account_id": account_id},
         )
 
 
