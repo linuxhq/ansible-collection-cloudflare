@@ -476,3 +476,25 @@ class AccessPoliciesTests(TestCase):
 
         api.delete.assert_called_once_with("policy", account_id="account")
         self.assertTrue(result["changed"])
+
+    def test_null_selector_and_approval_group_fields_are_not_sent(self):
+        # A null key counts as omitted, so Cloudflare never receives it.
+        saml = {"attribute_name": "group", "attribute_value": "admins"}
+        group = {"approvals_needed": 1, "email_addresses": ["a@example.com"]}
+        requested = {
+            "include": [{"saml": {**saml, "identity_provider_id": None}}],
+            "approval_groups": [{**group, "email_list_uuid": None}],
+        }
+        sent = {"include": [{"saml": saml}], "approval_groups": [group]}
+        for current in (None, policy()):
+            with self.subTest(current=current):
+                found = [] if current is None else [current]
+                client, api = client_with(found, created=policy(**sent), updated=policy(**sent))
+
+                result = self.run_module(FakeModule(params(**requested)), client)
+
+                call = api.update if current else api.create
+                self.assertEqual(call.call_args.kwargs["include"], sent["include"])
+                self.assertEqual(call.call_args.kwargs["approval_groups"], sent["approval_groups"])
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)

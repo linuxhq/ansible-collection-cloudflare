@@ -357,3 +357,25 @@ class CfdTunnelConfigurationsTests(TestCase):
         self.assertEqual(result.values["configuration"], updated)
         self.assertEqual(result.values["tunnel_id"], "tunnel")
         self.assertEqual(result.values["account_id"], "account")
+
+    def test_null_keys_are_not_sent(self):
+        config = {
+            "ingress": [
+                {"hostname": "a.example.com", "path": None, "service": "http://localhost:80"},
+                {"service": "http_status:404", "originRequest": {"access": {"required": None}}},
+            ],
+            "originRequest": {"connectTimeout": None, "noTLSVerify": True},
+        }
+        sent = {
+            "ingress": [
+                {"hostname": "a.example.com", "service": "http://localhost:80"},
+                {"service": "http_status:404", "originRequest": {"access": {}}},
+            ],
+            "originRequest": {"noTLSVerify": True},
+        }
+
+        result, api = self.run_module(module_for(config), {"config": {}}, {"config": sent})
+
+        self.assertEqual(api.update.call_args.kwargs["config"], sent)
+        self.assertNotIn("msg", result.values)
+        self.assertTrue(result.values["changed"])

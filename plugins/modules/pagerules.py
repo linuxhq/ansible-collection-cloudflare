@@ -41,6 +41,7 @@ options:
       - The C(value) of a C(cache_ttl_by_status) action is compared on every
         key, so a status code removed from it is removed from the rule. Other
         action values are compared only on the keys given.
+      - A field set to null, at any level, is not sent and counts as omitted.
       - Required when O(state=present).
   targets:
     required: true
@@ -54,6 +55,7 @@ options:
         fails before making changes.
       - A page rule matches only when its stored targets equal the requested
         targets.
+      - A field set to null, at any level, is not sent and counts as omitted.
       - URL values are matched as Cloudflare stores them, with the host in
         lowercase and a slash after a bare host, before any trailing wildcard.
   priority:
@@ -182,6 +184,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     serialize_resource,
     unsupported_fields,
     values_differ,
+    without_nested_nulls,
     without_retries,
 )
 
@@ -435,8 +438,9 @@ def run(module, client):
 
     validate_priority(module, current, rule_count)
     payload = payload_from_params(module.params, FIELDS)
-    payload["targets"] = targets
-    payload["actions"] = ordered_actions(payload["actions"], current)
+    # A null target or action field, at any level, counts as omitted, so it is not sent.
+    payload["targets"] = without_nested_nulls(targets)
+    payload["actions"] = without_nested_nulls(ordered_actions(payload["actions"], current))
     if current is None:
         payload.setdefault("status", "active")
 

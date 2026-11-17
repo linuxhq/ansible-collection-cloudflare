@@ -39,6 +39,9 @@ MAX_DNS_LABEL_LENGTH = 63
 # Path segments the SDK refuses to put in a request path.
 DOT_SEGMENTS = (".", "..")
 
+# Cloudflare answers a request for a deleted zone with this error code.
+INVALID_ZONE_CODE = 1001
+
 # Items requested per page from a page-numbered list endpoint; Cloudflare's
 # default page size.
 PAGE_SIZE = 20
@@ -471,6 +474,17 @@ def payload_from_params(params, fields):
     return {field: params[field] for field in fields if params.get(field) is not None}
 
 
+def without_nested_nulls(value):
+    """Return value without the keys set to null at any level of its nested mappings and lists."""
+    if isinstance(value, list):
+        return [without_nested_nulls(item) for item in value]
+
+    if not isinstance(value, dict):
+        return value
+
+    return {key: without_nested_nulls(item) for key, item in value.items() if item is not None}
+
+
 def select_fields(value, fields):
     value = serialize_resource(value) or {}
     return {field: value[field] for field in fields if field in value}
@@ -766,6 +780,33 @@ def comparable_access_rules(rules, desired):
     return comparable
 
 
+def selectors_without_nulls(selectors):
+    """Return the selectors with null keys removed from each selector's configuration.
+
+    A selector set to null keeps its key, so Cloudflare receives the selector
+    the entry names.
+    """
+    if not isinstance(selectors, list):
+        return selectors
+
+    return [
+        (
+            {key: without_nested_nulls(config) for key, config in selector.items()}
+            if isinstance(selector, dict)
+            else selector
+        )
+        for selector in selectors
+    ]
+
+
+def access_rules_without_nulls(rules):
+    """Return rules with null keys removed from the configuration of each selector in ACCESS_SELECTOR_FIELDS."""
+    return {
+        field: selectors_without_nulls(value) if field in ACCESS_SELECTOR_FIELDS else value
+        for field, value in rules.items()
+    }
+
+
 def validate_access_selectors(module, rules=None, prefix=""):
     """Fail when an Access selector is not one rule, uses an SDK spelling, or holds a value Cloudflare drops.
 
@@ -989,6 +1030,15 @@ def has_error_code(exc, codes):
     return any(
         isinstance(error, dict) and error.get("code") in codes for error in (errors if isinstance(errors, list) else ())
     )
+
+
+def zone_missing(exc):
+    """Return whether the API error exc means the zone no longer exists.
+
+    Cloudflare answers a request for a deleted zone with a 400 status and
+    INVALID_ZONE_CODE, or a 404 status.
+    """
+    return exc.status_code == 404 or (exc.status_code == 400 and has_error_code(exc, (INVALID_ZONE_CODE,)))
 
 
 def ensure_resource_absent(module, result_key, resource_name, current, delete, context=None, deleted_codes=()):

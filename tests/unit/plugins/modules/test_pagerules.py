@@ -123,13 +123,16 @@ class PageRulesTests(TestCase):
         self.assertEqual(rule_count, 1)
 
     def test_partial_targets_reach_cloudflare(self):
-        # Cloudflare rejects partial targets on the only write.
-        for targets in (
-            [{"target": "url"}],
-            [{"constraint": TARGETS[0]["constraint"]}],
-            [{"target": "url", "constraint": {"value": "example.com/*"}}],
-            [TARGETS[0], {"target": "url", "constraint": {"operator": None}}],
-            [{"target": "url", "constraint": "example.com/*"}],
+        # Cloudflare rejects partial targets on the only write. A null key is not sent.
+        for targets, sent in (
+            ([{"target": "url"}], None),
+            ([{"constraint": TARGETS[0]["constraint"]}], None),
+            ([{"target": "url", "constraint": {"value": "example.com/*"}}], None),
+            (
+                [TARGETS[0], {"target": "url", "constraint": {"operator": None}}],
+                [TARGETS[0], {"target": "url", "constraint": {}}],
+            ),
+            ([{"target": "url", "constraint": "example.com/*"}], None),
         ):
             with self.subTest(targets=targets):
                 client, api = client_with([{"id": "other", "targets": TARGETS}], created={"id": "new"})
@@ -137,7 +140,7 @@ class PageRulesTests(TestCase):
                 self.run_module(FakeModule(params(targets=targets)), client)
 
                 api.create.assert_called_once()
-                self.assertEqual(api.create.call_args.kwargs["targets"], targets)
+                self.assertEqual(api.create.call_args.kwargs["targets"], targets if sent is None else sent)
 
                 client, api = client_with([{"id": "other", "targets": TARGETS}])
 
@@ -301,6 +304,30 @@ class PageRulesTests(TestCase):
         self.assertNotIn("msg", result)
         self.assertFalse(result["changed"])
         api.update.assert_not_called()
+
+    def test_null_fields_are_not_sent(self):
+        targets = [{**TARGETS[0], "foo": None, "constraint": {**TARGETS[0]["constraint"], "bar": None}}]
+        actions = [
+            {"id": "always_use_https", "value": None},
+            {"id": "forwarding_url", "value": {"url": "https://example.com", "status_code": 301, "x": None}},
+        ]
+        sent = [
+            {"id": "always_use_https"},
+            {"id": "forwarding_url", "value": {"url": "https://example.com", "status_code": 301}},
+        ]
+        current = {"id": "rule", "actions": [{"id": "always_use_https"}], "status": "active", "targets": TARGETS}
+        written = {**current, "actions": sent}
+        for found in ([], [current]):
+            with self.subTest(found=found):
+                client, api = client_with(found, created=written, updated=written)
+
+                result = self.run_module(FakeModule(params(actions=actions, targets=targets)), client)
+
+                call = api.update if found else api.create
+                self.assertEqual(call.call_args.kwargs["targets"], TARGETS)
+                self.assertEqual(call.call_args.kwargs["actions"], sent)
+                self.assertNotIn("msg", result)
+                self.assertTrue(result["changed"])
 
     def test_accepts_priority_up_to_rule_count(self):
         other = {"id": "other", "actions": ACTIONS, "priority": 1, "targets": []}

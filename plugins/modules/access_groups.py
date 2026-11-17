@@ -28,6 +28,8 @@ description:
     selector and the C(identity_provider_id) of a C(saml) selector must not
     be V(""). Cloudflare does not store the empty value, so such a selector
     fails before any change; omit the field instead.
+  - A field of a selector's configuration set to null, at any level, is not
+    sent and counts as omitted.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
@@ -123,6 +125,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     ACCESS_SELECTOR_FIELDS,
+    access_rules_without_nulls,
     cloudflare_client,
     cloudflare_error_context,
     comparable_access_rules,
@@ -179,7 +182,8 @@ def run(module, client):
         "access_group",
         "Access group",
         current,
-        payload_from_params(params, FIELDS),
+        # A null selector field counts as omitted, so it is not sent.
+        access_rules_without_nulls(payload_from_params(params, FIELDS)),
         create=lambda payload: without_retries(client).zero_trust.access.groups.create(
             account_id=account_id, **payload
         ),

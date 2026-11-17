@@ -363,6 +363,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     ACCESS_APPROVAL_GROUP_FIELDS,
     ACCESS_SELECTOR_FIELDS,
+    access_rules_without_nulls,
     cidr_from_address,
     cloudflare_client,
     cloudflare_error_context,
@@ -377,6 +378,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     serialize_resource,
     unsupported_fields,
     validate_access_selectors,
+    without_nested_nulls,
     without_retries,
 )
 
@@ -721,36 +723,6 @@ def without_nulls(value):
     return {key: item for key, item in value.items() if item is not None}
 
 
-def without_nested_nulls(value):
-    """Return value without the keys set to null at any level of its nested mappings and lists."""
-    if isinstance(value, list):
-        return [without_nested_nulls(item) for item in value]
-
-    if not isinstance(value, dict):
-        return value
-
-    return {key: without_nested_nulls(item) for key, item in value.items() if item is not None}
-
-
-def selectors_without_nulls(selectors):
-    """Return the selectors with null keys removed from each selector's configuration.
-
-    A selector set to null keeps its key, so Cloudflare receives the selector
-    the entry names.
-    """
-    if not isinstance(selectors, list):
-        return selectors
-
-    return [
-        (
-            {key: without_nested_nulls(config) for key, config in selector.items()}
-            if isinstance(selector, dict)
-            else selector
-        )
-        for selector in selectors
-    ]
-
-
 def policy_without_nulls(policy):
     """Return the policy entry without null fields, including those in its nested mappings."""
     policy = without_nulls(policy)
@@ -758,11 +730,7 @@ def policy_without_nulls(policy):
         if field in policy:
             policy[field] = without_nested_nulls(policy[field])
 
-    for field in ACCESS_SELECTOR_FIELDS:
-        if field in policy:
-            policy[field] = selectors_without_nulls(policy[field])
-
-    return policy
+    return access_rules_without_nulls(policy)
 
 
 def policy_link(policy):

@@ -90,3 +90,54 @@ class RulesetsInfoTests(TestCase):
         result, _client = self.run_module({"id": "ruleset", "phase": PHASE, "rules": [rule]})
 
         self.assertEqual(result["rulesets"][0]["rules"], [rule])
+
+
+class RulesetsInfoDeletedZoneTests(TestCase):
+    def run_module(self, zone_read):
+        client = Mock()
+        client.zones.list.return_value = [*ZONES, {"id": "kept", "name": "example.net"}]
+        client.rulesets.phases.get.side_effect = [
+            status_error(403, {"success": False, "errors": [{"code": 10000, "message": "Authentication error"}]}),
+            {"id": "ruleset", "phase": PHASE},
+        ]
+        if isinstance(zone_read, Exception):
+            client.zones.get.side_effect = zone_read
+        else:
+            client.zones.get.return_value = zone_read
+
+        with self.assertRaises((ModuleExit, ModuleFail)) as raised:
+            rulesets_info.run(FakeModule({"phase": PHASE}), client)
+
+        return raised.exception.values, client
+
+    def test_zone_deleted_after_listing_is_omitted(self):
+        # Cloudflare answers the entrypoint request for a deleted zone with 403
+        # and a read of the zone with 400 code 1001, or 404.
+        for zone_read in (
+            status_error(400, {"success": False, "errors": [{"code": 1001, "message": "Invalid zone identifier"}]}),
+            status_error(404),
+        ):
+            with self.subTest(status=zone_read.status_code):
+                result, client = self.run_module(zone_read)
+
+                client.zones.get.assert_called_once_with(zone_id="zone")
+                self.assertEqual(
+                    result["rulesets"],
+                    [{"id": "ruleset", "name": "example.net", "phase": PHASE, "rules": [], "zone_id": "kept"}],
+                )
+
+    def test_forbidden_entrypoint_of_an_existing_zone_fails(self):
+        # A zone that still exists, or a zone read that fails another way,
+        # reports the original 403.
+        for zone_read in (
+            {"id": "zone", "name": "example.com"},
+            status_error(400, {"success": False, "errors": [{"code": 7003, "message": "Could not route"}]}),
+            status_error(403),
+            status_error(500),
+        ):
+            with self.subTest(zone_read=zone_read):
+                with self.assertRaises(cloudflare.PermissionDeniedError) as raised:
+                    self.run_module(zone_read)
+
+                self.assertEqual(raised.exception.body["errors"][0]["code"], 10000)
+                self.assertEqual(raised.exception._cloudflare_context, {"zone_id": "zone", "phase": PHASE})

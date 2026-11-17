@@ -28,6 +28,8 @@ description:
     selector and the C(identity_provider_id) of a C(saml) selector must not
     be V(""). Cloudflare does not store the empty value, so such a selector
     fails before any change; omit the field instead.
+  - A field of a selector's configuration set to null, at any level, is not
+    sent and counts as omitted.
   - Settings this module does not manage, such as C(session_duration), are
     preserved on an existing policy.
 version_added: '2.0.0'
@@ -90,6 +92,7 @@ options:
         omit it instead.
       - Compared exactly, so a key removed from a group, such as
         C(approvals_needed), is a change.
+      - A group field set to null is not sent and counts as omitted.
       - An existing policy's value is preserved when omitted.
       - V([]) clears the groups; Cloudflare then omits them, so V([]) matches a
         policy without approval groups.
@@ -168,6 +171,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     ACCESS_APPROVAL_GROUP_FIELDS,
     ACCESS_SELECTOR_FIELDS,
+    access_rules_without_nulls,
     cloudflare_client,
     cloudflare_error_context,
     comparable_access_rules,
@@ -179,6 +183,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     unsupported_fields,
     validate_access_selectors,
+    without_nested_nulls,
     without_retries,
 )
 
@@ -275,12 +280,17 @@ def run(module, client):
             context={"account_id": account_id},
         )
 
+    # A null selector or approval group field counts as omitted, so it is not sent.
+    payload = access_rules_without_nulls(payload_from_params(params, FIELDS))
+    if "approval_groups" in payload:
+        payload["approval_groups"] = without_nested_nulls(payload["approval_groups"])
+
     ensure_resource_present(
         module,
         "access_policy",
         "Access policy",
         current,
-        payload_from_params(params, FIELDS),
+        payload,
         create=lambda payload: without_retries(client).zero_trust.access.policies.create(
             account_id=account_id, **payload
         ),

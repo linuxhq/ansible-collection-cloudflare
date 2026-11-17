@@ -68,6 +68,8 @@ options:
         stored rule without the key.
       - Use the Cloudflare API names for C(set_cache_control) directives, such as
         C(max-age) and C(no-cache); their snake_case spellings fail before any change.
+      - A rule field set to null, at any level, such as a key of
+        C(action_parameters), is not sent and counts as omitted.
       - When rules hold credentials, pass them from a vaulted variable and set
         C(no_log) on the task.
   phase:
@@ -153,6 +155,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     serialize_resource,
     unique_match,
     values_differ,
+    without_nested_nulls,
     without_retries,
 )
 
@@ -383,14 +386,11 @@ def run(module, client):
 
     # The update replaces every rule, so give each rule Cloudflare's enabled
     # default; an existing disabled rule is then a visible change, not re-enabled
-    # silently. A null rule field counts as omitted.
+    # silently. A null rule field, at any level, counts as omitted.
     rules = (
         None
         if params.get("rules") is None
-        else [
-            {"enabled": True, **{key: value for key, value in rule.items() if value is not None}}
-            for rule in params["rules"]
-        ]
+        else [{"enabled": True, **without_nested_nulls(rule)} for rule in params["rules"]]
     )
 
     if current is None:

@@ -55,6 +55,14 @@ pagerules:
           returned: always
           type: list
           elements: dict
+        priority:
+          description: Priority of the page rule; a higher number is a higher priority.
+          returned: when available
+          type: int
+        status:
+          description: Current page rule status.
+          returned: when available
+          type: str
         targets:
           description: Target constraints identifying the page rule.
           returned: always
@@ -69,25 +77,10 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
-    error_response_body,
     require_mapping,
     resource_list,
+    zone_missing,
 )
-
-# Cloudflare answers a request for a deleted zone with this error code.
-INVALID_ZONE_CODE = 1001
-
-
-def zone_missing(exc):
-    """Return whether an API error means the zone no longer exists."""
-    if exc.status_code == 404:
-        return True
-
-    body = error_response_body(exc)
-    errors = body.get("errors") if isinstance(body, dict) else None
-    return exc.status_code == 400 and any(
-        isinstance(error, dict) and error.get("code") == INVALID_ZONE_CODE for error in errors or ()
-    )
 
 
 def run(module, client):

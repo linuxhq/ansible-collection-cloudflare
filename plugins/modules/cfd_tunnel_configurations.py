@@ -33,6 +33,7 @@ options:
     description:
       - Complete remotely managed tunnel configuration.
       - Omitted optional settings are reset to their defaults.
+      - A key set to null, at any level, is not sent and counts as omitted.
       - Use the Cloudflare API field names, such as C(originRequest) and C(noTLSVerify).
         The module fails before any change when the configuration or an ingress
         rule uses C(origin_request).
@@ -83,6 +84,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     serialize_resource,
     values_differ,
     values_equal,
+    without_nested_nulls,
 )
 
 # https://developers.cloudflare.com/tunnel/reference/origin-parameters/
@@ -267,7 +269,9 @@ def run(module, client):
         **identifiers,
     ):
         configuration = serialize_resource(
-            configurations.update(params["tunnel_id"], account_id=params["account_id"], config=params["config"])
+            configurations.update(
+                params["tunnel_id"], account_id=params["account_id"], config=without_nested_nulls(params["config"])
+            )
         )
 
     written = {"changed": True, **identifiers, "configuration": configuration}
