@@ -110,3 +110,14 @@ class DnssecTests(TestCase):
             result["msg"],
             "Cloudflare did not apply the requested DNSSEC settings: dnssec_presigned requested true, stored false",
         )
+
+    def test_malformed_status_after_the_edit_reports_the_write(self):
+        edited = {"status": None}
+
+        result, api = self.run_module(FakeModule(params()), {"status": "disabled"}, edited=edited)
+
+        api.edit.assert_called_once()
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed DNSSEC settings data")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["dnssec"], {})
+        self.assertEqual(result["zone_id"], "zone")

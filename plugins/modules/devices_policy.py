@@ -226,7 +226,7 @@ def validate_field_names(module):
             unsupported_fields=unknown,
         )
 
-    # Cloudflare rejects a port without a mode.
+    # Cloudflare does not store a port for a mode other than proxy.
     service_mode_v2 = params.get("service_mode_v2") or {}
     if service_mode_v2.get("port") is not None and service_mode_v2.get("mode") not in (None, "proxy"):
         module.fail_json(
@@ -316,7 +316,7 @@ def run(module, client):
         current,
         payload,
         edit=lambda payload: policy.edit(account_id=account_id, **payload),
-        comparable=lambda settings: comparable_policy(settings, payload),
+        comparable=lambda settings, failure: comparable_policy(settings, payload),
         context={"account_id": account_id},
         exact_values=("exclude", "include"),
     )

@@ -1386,3 +1386,44 @@ class AccessAppsTests(TestCase):
         self.assertEqual(api.list.call_args.kwargs, {"account_id": "account", "name": "app", "exact": True})
         self.assertEqual(result["message"], "Access application created")
         self.assertEqual(result["access_app"], stored())
+
+    def test_created_app_with_another_name_reports_the_write(self):
+        created = stored()
+        client, api = client_with(created=created)
+
+        result = self.run_module(FakeModule(params(name=" app")), client)
+
+        api.create.assert_called_once()
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong Access application")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["access_app"], created)
+        self.assertEqual(result["resource_id"], "app-id")
+        self.assertEqual(result["account_id"], "account")
+
+    def test_nested_nulls_are_not_sent(self):
+        destination = {
+            "type": "public",
+            "uri": "app.example.com",
+            "overrides": [{"path_pattern": "/a", "behavior": None}],
+        }
+        policy = {
+            "name": "inline",
+            "decision": "allow",
+            "include": [{"email": {"email": "a@example.com", "extra": None}}],
+            "approval_groups": [{"approvals_needed": 1, "email_addresses": ["a@example.com"], "email_list_uuid": None}],
+        }
+        expected_destination = {"type": "public", "uri": "app.example.com", "overrides": [{"path_pattern": "/a"}]}
+        expected_policy = {
+            "name": "inline",
+            "decision": "allow",
+            "include": [{"email": {"email": "a@example.com"}}],
+            "approval_groups": [{"approvals_needed": 1, "email_addresses": ["a@example.com"]}],
+        }
+        created = stored(destinations=[expected_destination], policies=[expected_policy])
+        client, api = client_with(created=created)
+
+        result = self.run_module(FakeModule(params(destinations=[destination], policies=[policy])), client)
+
+        self.assertEqual(result["message"], "Access application created")
+        self.assertEqual(api.create.call_args.kwargs["destinations"], [expected_destination])
+        self.assertEqual(api.create.call_args.kwargs["policies"], [expected_policy])

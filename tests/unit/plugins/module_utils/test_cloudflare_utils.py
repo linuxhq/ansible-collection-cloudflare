@@ -872,7 +872,7 @@ class EnsureSettingsTests(TestCase):
         self.assertIn("did not apply", raised.exception.values["msg"])
 
     def test_comparable_normalizes_both_sides(self):
-        def comparable(settings):
+        def comparable(settings, failure):
             return {**settings, "status": {"pending": "active"}.get(settings.get("status"), settings.get("status"))}
 
         result, edit = self.run_settings({"status": "pending"}, {"status": "active"}, comparable=comparable)
@@ -923,7 +923,7 @@ class EnsureResourceTests(TestCase):
             created=created,
             expected_name="n",
             context={"account_id": "acc"},
-            comparable=lambda resource: {key: value for key, value in resource.items() if key != "token"},
+            comparable=lambda resource, failure: {key: value for key, value in resource.items() if key != "token"},
         )
 
         create.assert_called_once()
@@ -945,7 +945,7 @@ class EnsureResourceTests(TestCase):
         self.assertIn("did not apply", result.values["msg"])
         self.assertEqual(result.values["resource_id"], "one")
         self.assertEqual(result.values["zone_id"], "z")
-        self.assertNotIn("changed", result.values)
+        self.assertTrue(result.values["changed"])
 
     def test_check_mode_never_mutates(self):
         for current in (None, {"id": "one", "enabled": False}):
@@ -1368,3 +1368,104 @@ class ResponseValidationErrorTests(TestCase):
 
         self.assertEqual(details["error"], "Expected a dict")
         self.assertEqual(details["status_code"], 200)
+
+
+class WrittenFailureTests(TestCase):
+    """A failure after a write reports changed=True, the resource, and its identifiers."""
+
+    def present(self, current, payload, created=None, updated=None, **kwargs):
+        with self.assertRaises(ModuleFail) as raised:
+            ensure_resource_present(
+                FakeModule({}),
+                "thing",
+                "thing",
+                current,
+                payload,
+                Mock(return_value=created),
+                Mock(return_value=updated),
+                list,
+                context={"account_id": "acc"},
+                **kwargs,
+            )
+
+        return raised.exception.values
+
+    def test_created_resource_with_another_name(self):
+        created = {"id": "one", "name": "n"}
+        result = self.present(None, {"name": " n"}, created=created, expected_name=" n")
+
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong thing")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["thing"], created)
+        self.assertEqual(result["resource_id"], "one")
+        self.assertEqual(result["name"], " n")
+        self.assertEqual(result["account_id"], "acc")
+
+    def test_created_resource_without_an_id(self):
+        result = self.present(None, {"name": "n"}, created={"name": "n"}, expected_name="n")
+
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed thing data")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["thing"], {"name": "n"})
+        self.assertEqual(result["account_id"], "acc")
+
+    def test_updated_resource_with_another_id(self):
+        updated = {"id": "two", "enabled": True}
+        result = self.present({"id": "one", "enabled": False}, {"enabled": True}, updated=updated)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong thing")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["thing"], updated)
+        self.assertEqual(result["resource_id"], "one")
+        self.assertEqual(result["account_id"], "acc")
+
+    def test_comparable_receives_the_failure_context(self):
+        created = {"id": "one", "name": "n"}
+        seen = []
+        with self.assertRaises(ModuleExit):
+            ensure_resource_present(
+                FakeModule({}),
+                "thing",
+                "thing",
+                None,
+                {"name": "n"},
+                Mock(return_value=created),
+                Mock(),
+                list,
+                expected_name="n",
+                comparable=lambda resource, failure: seen.append(failure) or resource,
+            )
+
+        self.assertEqual(seen, [{"resource_id": "one", "changed": True, "name": "n", "thing": created}])
+
+    def test_malformed_settings_after_the_patch(self):
+        with self.assertRaises(ModuleFail) as raised:
+            ensure_settings(
+                FakeModule({}),
+                "settings",
+                "device settings",
+                {"enabled": False},
+                {"enabled": True},
+                Mock(return_value=["malformed"]),
+                context={"account_id": "acc"},
+            )
+
+        result = raised.exception.values
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed device settings data")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["settings"], ["malformed"])
+        self.assertEqual(result["account_id"], "acc")
+
+    def test_deleted_resource_with_another_id(self):
+        current = {"id": "one"}
+        with self.assertRaises(ModuleFail) as raised:
+            ensure_resource_absent(
+                FakeModule({}), "thing", "thing", current, Mock(return_value={"id": "two"}), context={"zone_id": "z"}
+            )
+
+        result = raised.exception.values
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong thing")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["thing"], current)
+        self.assertEqual(result["resource_id"], "one")
+        self.assertEqual(result["zone_id"], "z")

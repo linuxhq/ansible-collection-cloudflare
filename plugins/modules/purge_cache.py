@@ -144,7 +144,13 @@ def run(module, client):
     with cloudflare_error_context("Cloudflare API request failed while purging the cache", zone_id=zone_id):
         result = serialize_resource(client.cache.purge(zone_id=zone_id, **cache_payload(module)))
 
-    resource_id(module, result, "cache purge", expected=zone_id)
+    resource_id(
+        module,
+        result,
+        "cache purge",
+        expected=zone_id,
+        context={"changed": True, "zone_id": zone_id, "purge_cache": result},
+    )
     module.exit_json(changed=True, message="Cache purged", purge_cache=result)
 
 

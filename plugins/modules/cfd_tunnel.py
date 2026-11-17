@@ -125,9 +125,25 @@ def list_tunnels(module, tunnels):
 
 
 def checked_tunnel(module, tunnel, expected_id=None):
+    """Serialize and validate the tunnel a create or update returned.
+
+    A failure reports changed=True, the tunnel, and its identifiers.
+    """
     tunnel = serialize_resource(tunnel)
-    resource_id(module, tunnel, "cloudflared tunnel", expected=expected_id)
-    resource_field(module, tunnel, "name", "cloudflared tunnel", expected=module.params["name"])
+    failure = {"changed": True, "account_id": module.params["account_id"], "cfd_tunnel": tunnel}
+    if expected_id is not None:
+        failure["resource_id"] = expected_id
+
+    failure = {
+        "resource_id": resource_id(module, tunnel, "cloudflared tunnel", expected=expected_id, context=failure),
+        **failure,
+    }
+    resource_field(module, tunnel, "name", "cloudflared tunnel", expected=module.params["name"], context=failure)
+    if expected_id is None and module.params.get("config_src") is not None:
+        resource_field(
+            module, tunnel, "config_src", "cloudflared tunnel", expected=module.params["config_src"], context=failure
+        )
+
     return tunnel
 
 
@@ -183,9 +199,6 @@ def ensure_present(module, client, current):
         )
 
     cfd_tunnel = checked_tunnel(module, cfd_tunnel)
-    if params.get("config_src") is not None:
-        resource_field(module, cfd_tunnel, "config_src", "cloudflared tunnel", expected=params["config_src"])
-
     module.exit_json(changed=True, message="Cloudflared tunnel created", cfd_tunnel=cfd_tunnel)
 
 

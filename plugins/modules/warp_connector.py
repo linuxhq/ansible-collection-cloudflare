@@ -139,15 +139,28 @@ def list_connectors(module, connectors):
 
 
 def checked_connector(module, connector, expected_id=None):
+    """Serialize and validate the WARP Connector a create or update returned.
+
+    A failure reports changed=True, the connector, and its identifiers.
+    """
     connector = serialize_resource(connector)
-    resource_id(module, connector, "WARP Connector", expected=expected_id)
-    resource_field(module, connector, "name", "WARP Connector", expected=module.params["name"])
+    failure = {"changed": True, "account_id": module.params["account_id"], "warp_connector": connector}
+    if expected_id is not None:
+        failure["resource_id"] = expected_id
+
+    failure = {
+        "resource_id": resource_id(module, connector, "WARP Connector", expected=expected_id, context=failure),
+        **failure,
+    }
+    resource_field(module, connector, "name", "WARP Connector", expected=module.params["name"], context=failure)
     return connector
 
 
-def apply_created_secret(module, connectors, connector_id):
+def apply_created_secret(module, connectors, created):
+    """Apply tunnel_secret to the created connector; a failure reports changed=True and the created connector."""
     params = module.params
     account_id = params["account_id"]
+    connector_id = created["id"]
     try:
         connector = serialize_resource(
             connectors.edit(connector_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
@@ -165,8 +178,11 @@ def apply_created_secret(module, connectors, connector_id):
                 "without the requested secret. Later runs report it present and cannot detect the secret, "
                 "so rerun with rotate_secrets: true to apply it"
             ),
+            changed=True,
             account_id=account_id,
+            resource_id=connector_id,
             warp_connector_id=connector_id,
+            warp_connector=created,
             **cloudflare_error_details(exc),
         )
 
@@ -214,7 +230,7 @@ def ensure_present(module, client, current):
 
     warp_connector = checked_connector(module, warp_connector)
     if params.get("tunnel_secret") is not None:
-        warp_connector = apply_created_secret(module, connectors, warp_connector["id"])
+        warp_connector = apply_created_secret(module, connectors, warp_connector)
 
     module.exit_json(changed=True, message="WARP Connector created", warp_connector=warp_connector)
 

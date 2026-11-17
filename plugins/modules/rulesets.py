@@ -223,16 +223,17 @@ def validate_assigned_fields(module):
         )
 
 
-def rules_from_resource(module, ruleset):
+def rules_from_resource(module, ruleset, failure=None):
+    """Return the rules of ruleset; failure adds result fields to a malformed-data failure."""
     rules = ruleset.get("rules")
     if rules is None:
         return []
 
     if not isinstance(rules, list):
-        module.fail_json(msg="Cloudflare API returned malformed ruleset data")
+        module.fail_json(msg="Cloudflare API returned malformed ruleset data", **(failure or {}))
 
     for rule in rules:
-        require_mapping(module, rule, "ruleset rule")
+        require_mapping(module, rule, "ruleset rule", failure)
 
     return rules
 
@@ -334,12 +335,15 @@ def comparable_rules(rules, desired_rules):
     return comparable
 
 
-def checked_ruleset(module, ruleset, phase):
-    """Serialize a ruleset response and validate its phase and rules."""
+def checked_ruleset(module, ruleset, phase, failure=None):
+    """Serialize a ruleset response and validate its phase and rules.
+
+    failure adds result fields to a failure, such as changed=True after a write.
+    """
     ruleset = serialize_resource(ruleset)
-    require_mapping(module, ruleset, "ruleset")
-    resource_field(module, ruleset, "phase", "ruleset", expected=phase)
-    rules_from_resource(module, ruleset)
+    require_mapping(module, ruleset, "ruleset", failure)
+    resource_field(module, ruleset, "phase", "ruleset", expected=phase, context=failure)
+    rules_from_resource(module, ruleset, failure)
     return ruleset
 
 
@@ -409,23 +413,20 @@ def run(module, client):
         "ruleset",
         current,
         payload,
-        create=lambda payload: checked_ruleset(
-            module, without_retries(client).rulesets.create(zone_id=zone_id, **payload), phase
-        ),
-        update=lambda ruleset_id, payload: checked_ruleset(
-            module,
-            rulesets.phases.update(phase, zone_id=zone_id, **payload),
-            phase,
-        ),
+        create=lambda payload: without_retries(client).rulesets.create(zone_id=zone_id, **payload),
+        update=lambda ruleset_id, payload: rulesets.phases.update(phase, zone_id=zone_id, **payload),
         # A zone has at most one entrypoint ruleset per phase.
         find_created=lambda: unique_match(get_or_none(rulesets.phases.get, phase, zone_id=zone_id)),
         expected_name=name,
         defaults={"rules": []},
         exact_values=("rules",),
         context={"zone_id": zone_id},
-        comparable=lambda ruleset: {
+        comparable=lambda ruleset, failure: {
             **ruleset,
-            "rules": comparable_rules(rules_from_resource(module, ruleset), payload.get("rules", [])),
+            "rules": comparable_rules(
+                rules_from_resource(module, checked_ruleset(module, ruleset, phase, failure), failure),
+                payload.get("rules", []),
+            ),
         },
     )
 

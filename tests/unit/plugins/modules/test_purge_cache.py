@@ -139,3 +139,12 @@ class PurgeCacheTests(TestCase):
                 result, _ignored = self.run_module(FakeModule(params()), purged)
 
                 self.assertIn("cache purge", result["msg"])
+
+    def test_wrong_purge_response_reports_the_purge(self):
+        result, purge = self.run_module(FakeModule(params()), {"id": "other"})
+
+        purge.assert_called_once()
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong cache purge")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["purge_cache"], {"id": "other"})
+        self.assertEqual(result["zone_id"], "zone")

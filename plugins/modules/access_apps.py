@@ -129,6 +129,8 @@ options:
     elements: dict
     description:
       - Public destinations protected by the application.
+      - A field of an entry set to null is not sent and counts as omitted,
+        including a field of an C(overrides) entry.
       - Each entry must set C(type), such as C(public); Cloudflare stores an
         entry without one as a C(public) destination, so the module fails
         before making changes.
@@ -176,8 +178,9 @@ options:
     description:
       - Access policies attached to the application.
       - A field of an entry set to null is not sent and counts as omitted,
-        including a nested field of C(connection_rules), C(connection_rules.rdp),
-        or C(mfa_config).
+        including a nested field of C(approval_groups), C(connection_rules),
+        C(connection_rules.rdp), C(mfa_config), or a C(include), C(exclude),
+        or C(require) selector.
       - Each entry accepts only the fields of a reusable policy link, C(id)
         and C(precedence), or of an inline policy, such as
         C(name), C(decision), C(include), C(exclude), C(require), and
@@ -719,19 +722,45 @@ def without_nulls(value):
 
 
 def without_nested_nulls(value):
-    """Return value without the keys set to null at any level of its nested mappings."""
+    """Return value without the keys set to null at any level of its nested mappings and lists."""
+    if isinstance(value, list):
+        return [without_nested_nulls(item) for item in value]
+
     if not isinstance(value, dict):
         return value
 
     return {key: without_nested_nulls(item) for key, item in value.items() if item is not None}
 
 
+def selectors_without_nulls(selectors):
+    """Return the selectors with null keys removed from each selector's configuration.
+
+    A selector set to null keeps its key, so Cloudflare receives the selector
+    the entry names.
+    """
+    if not isinstance(selectors, list):
+        return selectors
+
+    return [
+        (
+            {key: without_nested_nulls(config) for key, config in selector.items()}
+            if isinstance(selector, dict)
+            else selector
+        )
+        for selector in selectors
+    ]
+
+
 def policy_without_nulls(policy):
     """Return the policy entry without null fields, including those in its nested mappings."""
     policy = without_nulls(policy)
-    for field in ("connection_rules", "mfa_config"):
+    for field in ("approval_groups", "connection_rules", "mfa_config"):
         if field in policy:
             policy[field] = without_nested_nulls(policy[field])
+
+    for field in ACCESS_SELECTOR_FIELDS:
+        if field in policy:
+            policy[field] = selectors_without_nulls(policy[field])
 
     return policy
 
@@ -873,9 +902,10 @@ def run(module, client):
 
     payload = payload_from_params(params, FIELDS)
     if "destinations" in payload:
+        destinations = [without_nested_nulls(destination) for destination in payload["destinations"]]
         payload["destinations"] = [
             {**destination, "cidr": cidr_from_address(destination["cidr"])} if "cidr" in destination else destination
-            for destination in payload["destinations"]
+            for destination in destinations
         ]
 
     if "cors_headers" in payload:
@@ -906,7 +936,7 @@ def run(module, client):
         preserved_fields=preserved_fields,
         exact_values=("cors_headers", "destinations", "policies"),
         context={"account_id": account_id},
-        comparable=lambda app: comparable_app(
+        comparable=lambda app, failure: comparable_app(
             app, params.get("allowed_idps"), payload.get("policies"), payload.get("cors_headers")
         ),
     )

@@ -270,15 +270,16 @@ def run(module, client):
             configurations.update(params["tunnel_id"], account_id=params["account_id"], config=params["config"])
         )
 
-    require_mapping(module, configuration, "tunnel configuration")
+    written = {"changed": True, **identifiers, "configuration": configuration}
+    require_mapping(module, configuration, "tunnel configuration", written)
     returned_config = configuration.get("config")
-    require_mapping(module, returned_config, "tunnel configuration")
+    require_mapping(module, returned_config, "tunnel configuration", written)
     differences = applied_differences(
         comparable_config(returned_config, params["config"]),
         comparable_config(params["config"]),
     )
     if differences:
-        fail_not_applied(module, "tunnel configuration", differences, **identifiers)
+        fail_not_applied(module, "tunnel configuration", differences, **written)
 
     module.exit_json(
         changed=True,

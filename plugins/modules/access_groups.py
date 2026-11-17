@@ -190,7 +190,7 @@ def run(module, client):
         defaults={"is_default": False},
         preserved_fields=PRESERVED_FIELDS,
         exact_values=ACCESS_SELECTOR_FIELDS,
-        comparable=lambda resource: comparable_access_rules(resource, params),
+        comparable=lambda resource, failure: comparable_access_rules(resource, params),
         context={"account_id": account_id},
     )
 

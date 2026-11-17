@@ -189,3 +189,39 @@ class WarpConnectorTests(TestCase):
 
         api.delete.assert_not_called()
         self.assertFalse(result["changed"])
+
+    def test_secret_failure_after_create_reports_the_created_connector(self):
+        client, api = client_with(created=CREATED)
+        api.edit.side_effect = status_error(400, APPLY_BODY)
+
+        result = self.run_module(FakeModule(params(tunnel_secret=SECRET)), client)
+
+        self.assertEqual(result["msg"], SECRET_FAILURE)
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["warp_connector"], CREATED)
+        self.assertEqual(result["resource_id"], "connector-id")
+        self.assertEqual(result["warp_connector_id"], "connector-id")
+        self.assertEqual(result["account_id"], "account")
+
+    def test_created_connector_with_another_name_reports_the_write(self):
+        created = {"id": "connector-id", "name": "other"}
+        client, _api = client_with(created=created)
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong WARP Connector")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["warp_connector"], created)
+        self.assertEqual(result["resource_id"], "connector-id")
+        self.assertEqual(result["account_id"], "account")
+
+    def test_rotated_connector_with_another_id_reports_the_write(self):
+        edited = {"id": "other", "name": "connector"}
+        client, _api = client_with([CREATED], edited=edited)
+
+        result = self.run_module(FakeModule(params(rotate_secrets=True, tunnel_secret=SECRET)), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong WARP Connector")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["warp_connector"], edited)
+        self.assertEqual(result["resource_id"], "connector-id")

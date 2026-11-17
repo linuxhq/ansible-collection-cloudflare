@@ -208,3 +208,44 @@ class CfdTunnelTests(TestCase):
 
         api.edit.assert_called_once_with("tunnel-id", account_id="account", tunnel_secret=SECRET)
         self.assertTrue(result["changed"])
+
+    def test_created_tunnel_with_another_config_src_reports_the_write(self):
+        created = {"id": "tunnel-id", "name": "tunnel", "config_src": "local", **CREDENTIALS}
+        client, api = client_with(created=created)
+
+        result = self.run_module(FakeModule(params()), client)
+
+        api.create.assert_called_once()
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong cloudflared tunnel")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["cfd_tunnel"], created)
+        self.assertEqual(result["resource_id"], "tunnel-id")
+        self.assertEqual(result["account_id"], "account")
+
+    def test_recovered_tunnel_with_another_config_src_reports_the_write(self):
+        recovered = {"id": "tunnel-id", "name": "tunnel", "config_src": "local"}
+        client, api = client_with()
+        api.create.side_effect = connection_error()
+        api.list.side_effect = [[], [recovered]]
+
+        result = self.run_module(FakeModule(params()), client)
+
+        api.create.assert_called_once()
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong cloudflared tunnel")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["cfd_tunnel"], recovered)
+        self.assertEqual(result["resource_id"], "tunnel-id")
+
+    def test_rotated_tunnel_with_another_id_reports_the_write(self):
+        current = {"id": "tunnel-id", "name": "tunnel", "config_src": "cloudflare"}
+        edited = {"id": "other", "name": "tunnel", "config_src": "cloudflare", **CREDENTIALS}
+        client, api = client_with([current], edited=edited)
+
+        result = self.run_module(FakeModule(params(rotate_secrets=True, tunnel_secret=SECRET)), client)
+
+        api.edit.assert_called_once()
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong cloudflared tunnel")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["cfd_tunnel"], edited)
+        self.assertEqual(result["resource_id"], "tunnel-id")
+        self.assertEqual(result["account_id"], "account")

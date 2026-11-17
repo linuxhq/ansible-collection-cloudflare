@@ -362,7 +362,7 @@ class RulesListsTests(TestCase):
         result = self.run_module(FakeModule(params(description="desired")), client)
 
         self.assertIn("did not apply", result["msg"])
-        self.assertNotIn("changed", result)
+        self.assertTrue(result["changed"])
         self.assertEqual(result["account_id"], "account")
         self.assertEqual(result["rules_list_id"], "list")
 
@@ -1187,7 +1187,10 @@ class RulesListsTests(TestCase):
         self.assertEqual(
             raised.exception._cloudflare_message, "Cloudflare API request failed while submitting the Rules list items"
         )
-        self.assertEqual(raised.exception._cloudflare_context, {"account_id": "account", "rules_list_id": "list"})
+        self.assertEqual(
+            raised.exception._cloudflare_context,
+            {"account_id": "account", "rules_list_id": "list", "changed": True, "rules_list": created},
+        )
 
     def test_created_list_is_kept_when_the_items_operation_fails(self):
         created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
@@ -1245,7 +1248,7 @@ class RulesListsTests(TestCase):
         self.assertEqual(result["missing_items"], [{"ip": "192.0.2.1"}])
         self.assertEqual(result["unexpected_items"], [])
         self.assertEqual(result["rules_list_id"], "list")
-        self.assertNotIn("changed", result)
+        self.assertTrue(result["changed"])
 
     def test_not_applied_failure_message_pairs_a_bounded_number_of_items(self):
         current = {**CURRENT, "num_items": 0}
@@ -1317,6 +1320,67 @@ class RulesListsTests(TestCase):
 
         api.delete.assert_not_called()
         self.assertTrue(result["changed"])
+
+    def test_failures_after_create_report_the_created_list(self):
+        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
+        written = {"changed": True, "account_id": "account", "rules_list_id": "list", "rules_list": created}
+        operations = {
+            "failed": {"id": "operation", "status": "failed"},
+            "wrong": {"id": "other", "status": "completed"},
+            "malformed": {"id": "operation"},
+            "unknown": {"id": "operation", "status": "lost"},
+        }
+        for case, operation in operations.items():
+            with self.subTest(case=case):
+                client, api = make_client(created=created)
+                api.bulk_operations.get.return_value = operation
+
+                with patch.object(rules_lists.time, "monotonic", return_value=1):
+                    result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
+
+                self.assertEqual({key: result[key] for key in written}, written)
+                self.assertEqual(result["operation_id"], "operation")
+
+        client, api = make_client(created=created)
+        api.items.update.return_value = {}
+        with patch.object(rules_lists.time, "monotonic", return_value=1):
+            result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
+
+        self.assertEqual(result["msg"], "Rules list items submission did not return an operation id")
+        self.assertEqual({key: result[key] for key in written}, written)
+
+        client, api = make_client(created=created)
+        with patch.object(rules_lists.time, "monotonic", side_effect=[1, 100]):
+            result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
+
+        self.assertEqual(result["msg"], "Timed out submitting the Rules list items operation")
+        self.assertEqual({key: result[key] for key in written}, written)
+
+    def test_created_list_of_another_kind_reports_the_write(self):
+        created = {"id": "list", "name": "addresses", "kind": "asn", "description": "addresses"}
+        client, api = make_client(created=created)
+
+        result = self.run_module(FakeModule(params()), client)
+
+        api.create.assert_called_once()
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong Rules list")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["rules_list"], created)
+        self.assertEqual(result["rules_list_id"], "list")
+        self.assertEqual(result["account_id"], "account")
+
+    def test_failure_after_items_update_reports_the_write(self):
+        fetched = {**CURRENT, "kind": "asn"}
+        client, api = make_client([CURRENT], fetched=fetched)
+
+        with patch.object(rules_lists.time, "monotonic", return_value=1):
+            result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
+
+        api.items.update.assert_called_once()
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong Rules list")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["rules_list"], fetched)
+        self.assertEqual(result["items_operation"], {"id": "operation", "status": "completed"})
 
 
 class CanonicalIpTests(TestCase):

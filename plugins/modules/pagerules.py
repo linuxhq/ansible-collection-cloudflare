@@ -440,7 +440,7 @@ def run(module, client):
         find_created=lambda: matching_pagerules(module, client, targets)[0],
         preserved_fields=PRESERVED_FIELDS,
         context={"zone_id": zone_id},
-        comparable=lambda pagerule: comparable_pagerule(pagerule, payload["actions"]),
+        comparable=lambda pagerule, failure: comparable_pagerule(pagerule, payload["actions"]),
     )
 
 

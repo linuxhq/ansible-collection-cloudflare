@@ -10,6 +10,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleExit,
     ModuleFail,
+    status_error,
     timeout_error,
 )
 
@@ -364,7 +365,7 @@ class ZonesTests(TestCase):
         result = self.run_module(FakeModule(params(type="partial")), client)
 
         self.assertIn("did not apply", result["msg"])
-        self.assertNotIn("changed", result)
+        self.assertTrue(result["changed"])
         self.assertEqual(result["zone_id"], "zone")
 
     def test_unmet_setting_after_create_reports_the_created_zone(self):
@@ -380,7 +381,7 @@ class ZonesTests(TestCase):
         self.assertIn("did not apply", result["msg"])
         self.assertTrue(result["changed"])
         self.assertEqual(result["zone"], created)
-        self.assertEqual(result["settings"], [])
+        self.assertEqual(result["settings"], [{"id": "min_tls_version", "value": "1.2"}])
         self.assertEqual(result["setting_id"], "min_tls_version")
 
     def test_updates_zone_fields_one_per_request(self):
@@ -481,7 +482,7 @@ class ZonesTests(TestCase):
         self.assertEqual(result["differences"], [{"field": "min_tls_version", "requested": 1.3, "stored": "1.2"}])
         self.assertEqual(result["zone_id"], "zone")
         self.assertEqual(result["setting_id"], "min_tls_version")
-        self.assertNotIn("changed", result)
+        self.assertTrue(result["changed"])
 
     def test_matches_zone_names_case_insensitively(self):
         client = client_with([ZONE], deleted={"id": "zone"})
@@ -591,3 +592,85 @@ class ZonesTests(TestCase):
 
         client.zones.settings.edit.assert_not_called()
         self.assertFalse(result["changed"])
+
+    def test_failures_after_create_report_the_created_zone(self):
+        created = {**ZONE, "account": {"id": "account"}}
+        settings = [{"id": "min_tls_version", "value": "1.3"}]
+        cases = {
+            "setting read": {"setting_error": timeout_error()},
+            "not editable": {"setting": {"id": "min_tls_version", "value": "1.2", "editable": False}},
+            "malformed setting": {"setting": {"id": "min_tls_version"}},
+        }
+        for case, kwargs in cases.items():
+            with self.subTest(case=case):
+                setting_error = kwargs.pop("setting_error", None)
+                client = client_with(created=created, **kwargs)
+                if setting_error is not None:
+                    client.zones.settings.get.side_effect = setting_error
+
+                try:
+                    result = self.run_module(FakeModule(params(settings=settings)), client)
+                except cloudflare.APIConnectionError as exc:
+                    result = exc._cloudflare_context
+
+                client.zones.create.assert_called_once()
+                self.assertTrue(result["changed"])
+                self.assertEqual(result["zone"], created)
+                self.assertEqual(result["zone_id"], "zone")
+                self.assertEqual(result["setting_id"], "min_tls_version")
+
+    def test_rejected_zone_edit_after_create_reports_the_created_zone(self):
+        created = {**ZONE, "account": {"id": "account"}}
+        client = client_with(created=created)
+        client.zones.edit.side_effect = status_error(400)
+
+        with self.assertRaises(cloudflare.BadRequestError) as raised:
+            zones.run(FakeModule(params(vanity_name_servers=["ns1.example.net", "ns2.example.net"])), client)
+
+        context = raised.exception._cloudflare_context
+        self.assertTrue(context["changed"])
+        self.assertEqual(context["zone"], created)
+        self.assertEqual(context["zone_id"], "zone")
+
+    def test_rejected_second_setting_reports_the_first(self):
+        first = {"id": "min_tls_version", "value": "1.3"}
+        client = client_with([ZONE], setting={"id": "any", "value": "off"})
+        client.zones.settings.get.side_effect = [
+            {"id": "min_tls_version", "value": "1.2"},
+            {"id": "always_use_https", "value": "off"},
+        ]
+        client.zones.settings.edit.side_effect = [first, status_error(400)]
+        settings = [{"id": "min_tls_version", "value": "1.3"}, {"id": "always_use_https", "value": "on"}]
+
+        with self.assertRaises(cloudflare.BadRequestError) as raised:
+            zones.run(FakeModule(params(settings=settings)), client)
+
+        context = raised.exception._cloudflare_context
+        self.assertTrue(context["changed"])
+        self.assertEqual(context["zone"], ZONE)
+        self.assertEqual(context["settings"], [first])
+        self.assertEqual(context["setting_id"], "always_use_https")
+
+    def test_malformed_edited_setting_reports_the_write(self):
+        client = client_with(
+            [ZONE], setting={"id": "min_tls_version", "value": "1.2"}, edited_setting={"id": "min_tls_version"}
+        )
+
+        result = self.run_module(FakeModule(params(settings=[{"id": "min_tls_version", "value": "1.3"}])), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed zone setting data")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["zone_id"], "zone")
+        self.assertEqual(result["setting_id"], "min_tls_version")
+        self.assertEqual(result["settings"], [{"id": "min_tls_version"}])
+
+    def test_edited_zone_with_another_id_reports_the_write(self):
+        edited = {**ZONE, "id": "other", "type": "partial"}
+        client = client_with([ZONE], edited=[edited])
+
+        result = self.run_module(FakeModule(params(type="partial")), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned the wrong zone")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["zone"], edited)
+        self.assertEqual(result["zone_id"], "zone")
