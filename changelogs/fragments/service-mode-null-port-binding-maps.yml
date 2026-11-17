@@ -1,0 +1,15 @@
+---
+bugfixes:
+  - devices_policy - treat a C(service_mode_v2) key set to null, such as C(port), as omitted, so the current port is
+    kept instead of being sent as null, which Cloudflare rejects when the run changes another field.
+  - pages_projects - fail before any request when a deployment configuration sets a whole binding map, such as
+    C(d1_databases), C(r2_buckets), or C(services), to null, because Cloudflare keeps the current bindings and the run
+    never converges.
+  - pagerules - include C(zone_id) and the C(matching_ids) of the page rules in the failure when more than one page rule
+    matches the requested targets.
+  - rules_lists - report a Rules list items operation that Cloudflare accepted after the operation timeout as a timeout
+    waiting for that operation, with its C(operation_id), instead of a timeout submitting it, and use an operation
+    status received after the timeout instead of discarding it.
+trivial:
+  - access_apps - correct the comment on empty names, which Cloudflare stores as the application domain.
+  - rules_lists - test that the item listing reads every cursor page through the Cloudflare SDK.

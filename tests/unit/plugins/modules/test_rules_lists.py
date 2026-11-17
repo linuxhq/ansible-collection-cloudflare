@@ -4,6 +4,7 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 import cloudflare
+import httpx
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import rules_lists
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
@@ -195,7 +196,7 @@ class RulesListsTests(TestCase):
         ]
 
         with (
-            patch.object(rules_lists.time, "monotonic", side_effect=[1, 2, 3, 4, 5, 29.7, 29.8, 29.9]),
+            patch.object(rules_lists.time, "monotonic", side_effect=[1, 2, 3, 4, 29.7, 29.8]),
             patch.object(rules_lists.time, "sleep") as sleep,
         ):
             result = rules_lists.wait_for_operation(FakeModule({}), client, "account", {"id": "operation"}, 30)
@@ -228,23 +229,51 @@ class RulesListsTests(TestCase):
 
         self.assertEqual(raised.exception._cloudflare_context, {"account_id": "account", "operation_id": "operation"})
 
-    def test_rejects_responses_received_after_deadline(self):
-        client, _ignored = make_client()
+    def test_late_submit_response_reports_the_submitted_operation(self):
+        # Cloudflare accepted the operation, so the timeout names it.
+        client, api = make_client([{**CURRENT, "num_items": 0}])
         with (
-            patch.object(rules_lists.time, "monotonic", side_effect=[0, 2]),
+            patch.object(rules_lists.time, "monotonic", side_effect=[0, 0, 31]),
             self.assertRaises(ModuleFail) as raised,
         ):
-            rules_lists.submit_items(FakeModule({}), client, "account", "list", [], 1)
+            rules_lists.run(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
 
-        self.assertIn("Timed out submitting", raised.exception.values["msg"])
+        api.items.update.assert_called_once()
+        api.bulk_operations.get.assert_not_called()
+        self.assertEqual(
+            raised.exception.values["msg"], "Timed out waiting for the Rules list items operation to complete"
+        )
+        self.assertEqual(raised.exception.values["operation_id"], "operation")
 
-        with (
-            patch.object(rules_lists.time, "monotonic", side_effect=[0, 2]),
-            self.assertRaises(ModuleFail) as raised,
-        ):
-            rules_lists.wait_for_operation(FakeModule({}), client, "account", {"id": "operation"}, 1)
+    def test_late_operation_status_is_used(self):
+        cases = (
+            ({"id": "operation", "status": "completed"}, None),
+            ({"id": "operation", "status": "failed"}, "Rules list items operation failed"),
+            (
+                {"id": "operation", "status": "running"},
+                "Timed out waiting for the Rules list items operation to complete",
+            ),
+        )
+        for status, msg in cases:
+            client, api = make_client()
+            api.bulk_operations.get.return_value = status
+            with (
+                self.subTest(status=status["status"]),
+                patch.object(rules_lists.time, "monotonic", side_effect=[0, 2, 2]),
+                patch.object(rules_lists.time, "sleep"),
+            ):
+                try:
+                    result = rules_lists.wait_for_operation(FakeModule({}), client, "account", {"id": "operation"}, 1)
+                except ModuleFail as exc:
+                    result = exc.values
 
-        self.assertIn("Timed out waiting", raised.exception.values["msg"])
+            api.bulk_operations.get.assert_called_once()
+            if msg is None:
+                self.assertEqual(result, status)
+            else:
+                self.assertEqual(result["msg"], msg)
+                self.assertEqual(result["operation_id"], "operation")
+                self.assertEqual(result["operation"], status)
 
     def test_wait_uses_remaining_subsecond_budget(self):
         client, _ignored = make_client()
@@ -1006,15 +1035,68 @@ class RulesListsTests(TestCase):
         api.items.update.assert_not_called()
         self.assertFalse(result["changed"])
 
-    def test_generated_sdk_iterator_reads_all_current_items(self):
-        current = {**CURRENT, "num_items": 2}
-        client, api = make_client([current], items=[{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}])
+    def test_list_items_reads_every_cursor_page_through_the_sdk(self):
+        stamps = {"created_on": "2024-01-01T00:00:00Z", "modified_on": "2024-01-01T00:00:00Z"}
+        redirect = {
+            "source_url": "example.com/",
+            "target_url": "https://example.net/",
+            "include_subdomains": False,
+            "preserve_path_suffix": True,
+            "preserve_query_string": False,
+            "status_code": 301,
+            "subpath_matching": False,
+        }
+        hostname = {"url_hostname": "*.example.com", "exclude_exact_hostname": False}
+        pages = {
+            None: (
+                [{"id": "a", **stamps, "redirect": redirect}, {"id": "b", **stamps, "hostname": hostname}],
+                {"cursors": {"after": "page2"}},
+            ),
+            "page2": (
+                [{"id": "c", **stamps, "asn": 13335, "comment": ""}, {"id": "d", **stamps, "ip": "10.0.0.0/8"}],
+                {"cursors": {}},
+            ),
+        }
+        requests = []
 
-        result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}])), client)
+        def respond(request):
+            requests.append(request)
+            result, result_info = pages[request.url.params.get("cursor")]
+            body = {"success": True, "errors": [], "messages": [], "result": result, "result_info": result_info}
+            return httpx.Response(200, json=body)
 
-        api.items.list.assert_called_once_with("list", account_id="account", per_page=rules_lists.ITEMS_PER_PAGE)
-        api.items.update.assert_not_called()
-        self.assertFalse(result["changed"])
+        client = cloudflare.Cloudflare(
+            api_token="EXAMPLE-token",
+            http_client=httpx.Client(transport=httpx.MockTransport(respond)),
+        )
+        with client:
+            items = rules_lists.list_items(FakeModule({}), client, "account", "list")
+
+        self.assertEqual(
+            [(request.url.path, dict(request.url.params)) for request in requests],
+            [
+                ("/client/v4/accounts/account/rules/lists/list/items", {"per_page": "500"}),
+                ("/client/v4/accounts/account/rules/lists/list/items", {"per_page": "500", "cursor": "page2"}),
+            ],
+        )
+        self.assertEqual(
+            items,
+            [
+                {"id": "a", **stamps, "redirect": redirect},
+                {"id": "b", **stamps, "hostname": hostname},
+                {"id": "c", **stamps, "asn": 13335, "comment": ""},
+                {"id": "d", **stamps, "ip": "10.0.0.0/8"},
+            ],
+        )
+        self.assertEqual(
+            rules_lists.normalize_items(items),
+            [
+                {"asn": 13335},
+                {"hostname": hostname},
+                {"ip": "10.0.0.0/8"},
+                {"redirect": {"source_url": "example.com/", "target_url": "https://example.net/"}},
+            ],
+        )
 
     def test_count_mismatch_skips_item_listing_in_check_mode(self):
         client, api = make_client([{**CURRENT, "num_items": 0}])

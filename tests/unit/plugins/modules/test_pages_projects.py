@@ -391,6 +391,37 @@ class PagesProjectsTests(TestCase):
                 ],
             ),
             (
+                # Cloudflare keeps a whole binding map set to null.
+                {
+                    "deployment_configs": {
+                        "preview": {
+                            "ai_bindings": None,
+                            "analytics_engine_datasets": None,
+                            "d1_databases": None,
+                            "durable_object_namespaces": None,
+                            "hyperdrive_bindings": None,
+                            "mtls_certificates": None,
+                            "queue_producers": None,
+                            "r2_buckets": None,
+                            "services": None,
+                            "vectorize_bindings": None,
+                        }
+                    }
+                },
+                [
+                    "deployment_configs.preview.ai_bindings",
+                    "deployment_configs.preview.analytics_engine_datasets",
+                    "deployment_configs.preview.d1_databases",
+                    "deployment_configs.preview.durable_object_namespaces",
+                    "deployment_configs.preview.hyperdrive_bindings",
+                    "deployment_configs.preview.mtls_certificates",
+                    "deployment_configs.preview.queue_producers",
+                    "deployment_configs.preview.r2_buckets",
+                    "deployment_configs.preview.services",
+                    "deployment_configs.preview.vectorize_bindings",
+                ],
+            ),
+            (
                 {
                     "deployment_configs": {
                         "production": {"env_vars": {"A": {"type": "plain_text", "value": None}, "B": {"type": None}}}
@@ -415,7 +446,6 @@ class PagesProjectsTests(TestCase):
         desired = {
             "production": {
                 "build_image_major_version": None,
-                "r2_buckets": None,
                 "kv_namespaces": {"NS": {"namespace_id": None}},
                 "services": {"S": {"service": "worker", "environment": None}},
             }

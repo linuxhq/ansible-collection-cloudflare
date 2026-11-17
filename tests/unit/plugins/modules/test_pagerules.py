@@ -145,6 +145,8 @@ class PageRulesTests(TestCase):
         result = self.run_module(FakeModule(params()), client)
 
         self.assertIn("Multiple page rules", result["msg"])
+        self.assertEqual(result["zone_id"], "zone")
+        self.assertEqual(result["matching_ids"], ["one", "two"])
 
     def test_check_mode_does_not_create(self):
         client, api = client_with()

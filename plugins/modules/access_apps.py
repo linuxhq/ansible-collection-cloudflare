@@ -740,7 +740,7 @@ def run(module, client):
     account_id = params["account_id"]
     applications = client.zero_trust.access.applications
     if params["state"] == "present":
-        # Cloudflare stores an empty name as null, so the resource is never found again.
+        # Cloudflare stores an empty name as the app's domain, so the app is never found by name again.
         if not params["name"].strip():
             module.fail_json(msg="name must not be empty or only whitespace")
 
