@@ -38,6 +38,7 @@ options:
           - URLs to purge.
           - Each item is a URL string, or a mapping with C(url) and the
             C(headers) the content was cached with.
+          - A key of a mapping item set to null, at any level, is not sent.
         type: list
         elements: raw
       tags:
@@ -130,13 +131,15 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     resource_id,
     serialize_resource,
     validate_cloudflare_params,
+    without_nested_nulls,
 )
 
 CACHE_KEYS = ("files", "hosts", "prefixes", "purge_everything", "tags")
 
 
 def cache_payload(module):
-    return payload_from_params(module.params["cache"], CACHE_KEYS)
+    """Return the purge payload; a null key in a files entry counts as omitted, so it is not sent."""
+    return without_nested_nulls(payload_from_params(module.params["cache"], CACHE_KEYS))
 
 
 def run(module, client):

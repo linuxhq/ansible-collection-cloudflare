@@ -37,6 +37,7 @@ provisioner:
           - zone: "{{ zones_list.0.name }}"
             records:
               - record: one
+                comment: molecule
                 proxied: true
                 type: A
                 value: 8.8.8.1

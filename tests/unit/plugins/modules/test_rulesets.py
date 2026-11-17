@@ -709,3 +709,35 @@ class RulesetRuleFieldTests(TestCase):
             result = self.run_module(FakeModule(params(rules=[rule]), check_mode=True), client)
 
             self.assertTrue(result["changed"])
+
+    def test_nested_null_rule_fields_are_not_sent(self):
+        nested = {
+            "action_parameters": {"headers": {"X-Keep": {"operation": "set", "value": "yes", "expression": None}}},
+            "ratelimit": None,
+        }
+        requested = {"action": "rewrite", "expression": "true", **nested}
+        sent = {
+            "enabled": True,
+            "action": "rewrite",
+            "expression": "true",
+            "action_parameters": {"headers": {"X-Keep": {"operation": "set", "value": "yes"}}},
+        }
+        written = {**CURRENT, "rules": [{**ASSIGNED, **sent}]}
+        for current in (None, CURRENT):
+            with self.subTest(current=current):
+                client, api = make_client(current, created=written, updated=written)
+
+                result = self.run_module(FakeModule(params(rules=[requested])), client)
+
+                call = api.phases.update if current else api.create
+                self.assertEqual(call.call_args.kwargs["rules"], [sent])
+                self.assertNotIn("msg", result)
+                self.assertTrue(result["changed"])
+
+            with self.subTest(current=current, rerun=True):
+                client, api = make_client(written)
+
+                result = self.run_module(FakeModule(params(rules=[requested])), client)
+
+                api.phases.update.assert_not_called()
+                self.assertFalse(result["changed"])

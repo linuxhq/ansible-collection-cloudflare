@@ -152,7 +152,8 @@ class AccessGroupsTests(TestCase):
 
         result = self.run_module(FakeModule(params(include=include)), client)
 
-        api.create.assert_called_once_with(account_id="account", include=include, name="admins")
+        sent = [{"github-organization": {"identity_provider_id": "idp", "name": "org"}}]
+        api.create.assert_called_once_with(account_id="account", include=sent, name="admins")
         self.assertTrue(result["changed"])
 
         client, api = client_with([current])
@@ -409,3 +410,32 @@ class AccessGroupsTests(TestCase):
         self.assertEqual(result["access_group"], updated)
         self.assertEqual(result["resource_id"], "group")
         self.assertEqual(result["account_id"], "account")
+
+    def test_null_selector_fields_are_not_sent(self):
+        # A null key counts as omitted, so Cloudflare never receives it.
+        requested = [{"github-organization": {"name": "org", "identity_provider_id": "idp", "team": None}}]
+        sent = [{"github-organization": {"name": "org", "identity_provider_id": "idp"}}]
+        exclude = [{"email": {"email": "blocked@example.com", "unknown": None}}]
+        sent_exclude = [{"email": {"email": "blocked@example.com"}}]
+        stored = {"id": "group", "name": "admins", "include": sent, "exclude": sent_exclude}
+        for current in (None, {"id": "group", "name": "admins", "include": [{"everyone": {}}]}):
+            with self.subTest(current=current):
+                client, api = client_with([] if current is None else [current], created=stored, updated=stored)
+
+                result = self.run_module(FakeModule(params(include=requested, exclude=exclude)), client)
+
+                call = api.update if current else api.create
+                self.assertEqual(call.call_args.kwargs["include"], sent)
+                self.assertEqual(call.call_args.kwargs["exclude"], sent_exclude)
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)
+
+    def test_null_selector_field_matches_stored_selector(self):
+        stored = [{"github-organization": {"name": "org", "identity_provider_id": "idp"}}]
+        requested = [{"github-organization": {"name": "org", "identity_provider_id": "idp", "team": None}}]
+        client, api = client_with([{"id": "group", "name": "admins", "include": stored}])
+
+        result = self.run_module(FakeModule(params(include=requested)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])

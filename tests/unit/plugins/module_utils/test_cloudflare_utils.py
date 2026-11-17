@@ -10,6 +10,7 @@ import httpx
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudflare_utils
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    access_rules_without_nulls,
     applied_differences,
     cloudflare_client,
     cloudflare_error_context,
@@ -38,7 +39,9 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     valid_dns_labels,
     validate_access_selectors,
     values_differ,
+    without_nested_nulls,
     without_retries,
+    zone_missing,
 )
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
@@ -776,6 +779,37 @@ class ValueTests(TestCase):
         ):
             with self.subTest(name=name):
                 self.assertIs(valid_dns_labels(name), expected)
+
+    def test_without_nested_nulls_drops_null_keys_at_every_level(self):
+        value = {"a": None, "b": [{"c": None, "d": 1}, None], "e": {"f": {"g": None}}}
+
+        self.assertEqual(without_nested_nulls(value), {"b": [{"d": 1}, None], "e": {"f": {}}})
+        self.assertEqual(value["b"][0], {"c": None, "d": 1})
+
+    def test_access_rules_without_nulls_keeps_null_selectors(self):
+        # A selector set to null keeps its key, so Cloudflare rejects it rather
+        # than dropping the empty selector.
+        rules = {
+            "include": [{"email": {"email": "a@example.com", "x": None}}, {"email": None}],
+            "exclude": None,
+            "name": "admins",
+        }
+
+        self.assertEqual(
+            access_rules_without_nulls(rules),
+            {"include": [{"email": {"email": "a@example.com"}}, {"email": None}], "exclude": None, "name": "admins"},
+        )
+
+    def test_zone_missing_matches_deleted_zone_answers(self):
+        invalid = {"success": False, "errors": [{"code": 1001, "message": "Invalid zone identifier"}]}
+        for exc, expected in (
+            (status_error(404), True),
+            (status_error(400, invalid), True),
+            (status_error(400), False),
+            (status_error(403, invalid), False),
+        ):
+            with self.subTest(status=exc.status_code, body=exc.body):
+                self.assertIs(zone_missing(exc), expected)
 
 
 class InfoTests(TestCase):

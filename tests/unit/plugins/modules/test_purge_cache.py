@@ -148,3 +148,14 @@ class PurgeCacheTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertEqual(result["purge_cache"], {"id": "other"})
         self.assertEqual(result["zone_id"], "zone")
+
+    def test_null_file_header_keys_are_not_sent(self):
+        files = ["https://example.com/a", {"url": "https://example.com/b", "headers": {"Origin": None, "X": "y"}}]
+
+        result, purge = self.run_module(FakeModule(params(cache={"files": files, "tags": None})), {"id": "zone"})
+
+        purge.assert_called_once_with(
+            zone_id="zone",
+            files=["https://example.com/a", {"url": "https://example.com/b", "headers": {"X": "y"}}],
+        )
+        self.assertTrue(result["changed"])

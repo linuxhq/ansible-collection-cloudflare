@@ -186,6 +186,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     DOT_SEGMENTS,
+    INVALID_ZONE_CODE,
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
@@ -204,10 +205,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     values_differ,
     without_retries,
 )
-
-# Cloudflare answers a request for a deleted zone with this error code and a
-# 400 status.
-INVALID_ZONE_CODE = 1001
 
 # Fields of the setting values the cloudflare SDK types as objects, by setting
 # id. Cloudflare accepts any other field but drops it.

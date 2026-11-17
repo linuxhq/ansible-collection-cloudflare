@@ -9,6 +9,10 @@ module: rulesets_info
 short_description: Gather information about Cloudflare rulesets
 description:
   - Gather a ruleset entrypoint phase for all accessible zones.
+  - A zone deleted after the zones are listed is omitted. Cloudflare answers
+    the entrypoint request for such a zone with a 403 status, so the zone is
+    read again and omitted only when Cloudflare reports that it no longer
+    exists; any other 403 fails the module.
   - Results include sensitive values returned by Cloudflare, such as header values set by rules; protect registered
     results and task output, for example with C(no_log).
 version_added: '2.0.0'
@@ -65,6 +69,7 @@ rulesets:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    cloudflare,
     cloudflare_client,
     cloudflare_error_context,
     get_or_none,
@@ -73,7 +78,23 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     resource_id,
     resource_list,
     serialize_resource,
+    zone_missing,
 )
+
+
+def zone_deleted(client, zone_id):
+    """Return whether reading the zone again shows it no longer exists.
+
+    Any other error status means it may still exist, so the caller reports its
+    original error instead.
+    """
+    with cloudflare_error_context("Cloudflare API request failed while gathering the zone", zone_id=zone_id):
+        try:
+            client.zones.get(zone_id=zone_id)
+        except cloudflare.APIStatusError as exc:
+            return zone_missing(exc)
+
+    return False
 
 
 def get_entrypoint(client, zone_id, phase):
@@ -93,7 +114,16 @@ def run(module, client):
     rulesets = []
     for zone in zones:
         entry = {"name": zone["name"], "rules": [], "zone_id": zone["id"]}
-        ruleset = get_entrypoint(client, zone["id"], phase)
+        try:
+            ruleset = get_entrypoint(client, zone["id"], phase)
+        except cloudflare.PermissionDeniedError:
+            # Cloudflare answers the request for a zone deleted after it was
+            # listed with 403, as it does a missing permission.
+            if not zone_deleted(client, zone["id"]):
+                raise
+
+            continue
+
         if ruleset is not None:
             context = {"zone_id": zone["id"], "phase": phase}
             entry["id"] = resource_id(module, ruleset, "ruleset", context=context)
