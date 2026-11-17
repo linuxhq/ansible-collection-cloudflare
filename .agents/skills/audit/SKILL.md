@@ -70,10 +70,9 @@ it for reviews, triage, or probes.
   reviews again on the final commit.
 - It opens a pull request describing only what was verified, and never
   merges.
-- Its title is a conventional commit: the type that fits each change (a
-  bug fix, docs, tests, refactoring, and so on), the affected modules as the
-  scope, and a summary of what changed. When the pull request mixes types,
-  the title names each. It never refers to the pass or audit.
+- Its title is a conventional commit under 50 characters, with one type
+  and no module list. Details go in the body. It never mentions the pass or
+  audit.
 
 ## 5. Merge
 
