@@ -148,6 +148,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_present,
     payload_from_params,
     require_mapping,
+    resource_id,
     serialize_resource,
     unsupported_fields,
     values_differ,
@@ -326,17 +327,21 @@ def find_pagerule(module, client, targets):
         pagerules = client.page_rules.list(zone_id=zone_id) or []
 
     identity = target_identity(targets)
-    found = None
+    matches = []
     for pagerule in pagerules:
         pagerule = serialize_resource(pagerule)
         stored = target_identity(pagerule_targets(module, pagerule))
         if not values_differ(stored, identity):
-            if found is not None:
-                module.fail_json(msg="Multiple page rules match the requested target constraints")
+            matches.append(pagerule)
 
-            found = pagerule
+    if len(matches) > 1:
+        module.fail_json(
+            msg="Multiple page rules match the requested target constraints",
+            zone_id=zone_id,
+            matching_ids=[resource_id(module, pagerule, "page rule") for pagerule in matches],
+        )
 
-    return found, len(pagerules)
+    return matches[0] if matches else None, len(pagerules)
 
 
 def validate_priority(module, current, rule_count):

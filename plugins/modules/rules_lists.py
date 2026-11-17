@@ -428,9 +428,8 @@ def submit_items(module, client, account_id, list_id, items, deadline):
             time.sleep(OPERATION_POLL_SECONDS)
             continue
 
-        if time.monotonic() >= deadline:
-            module.fail_json(msg="Timed out submitting the Rules list items operation", rules_list_id=list_id)
-
+        # Cloudflare accepted the operation, so a response received after the
+        # deadline is reported by wait_for_operation with its operation id.
         return serialize_resource(operation)
 
 
@@ -474,12 +473,6 @@ def wait_for_operation(module, client, account_id, operation, deadline):
             status = {}
             time.sleep(min(OPERATION_POLL_SECONDS, max(deadline - time.monotonic(), 0)))
             continue
-
-        if time.monotonic() >= deadline:
-            module.fail_json(
-                msg="Timed out waiting for the Rules list items operation to complete",
-                operation_id=operation_id,
-            )
 
         if not isinstance(status, dict) or not isinstance(status.get("status"), str):
             module.fail_json(

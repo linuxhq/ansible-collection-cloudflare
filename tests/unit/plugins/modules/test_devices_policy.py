@@ -297,7 +297,20 @@ class DevicesPolicyTests(TestCase):
                     {"service_mode_v2": {"mode": "warp"}},
                 )
 
-                api.edit.assert_called_once_with(account_id="account", service_mode_v2=requested)
+                api.edit.assert_called_once_with(account_id="account", service_mode_v2={"port": 3000})
+
+    def test_null_service_mode_port_keeps_stored_port(self):
+        # Cloudflare rejects a null port, so a null key counts as omitted.
+        current = {"auto_connect": 0.0, "service_mode_v2": {"mode": "proxy", "port": 3000}}
+        params = {"account_id": "account", "auto_connect": 5.0, "service_mode_v2": {"mode": "proxy", "port": None}}
+        edited = {"auto_connect": 5.0, "service_mode_v2": {"mode": "proxy", "port": 3000}}
+        result, api = self.run_module(FakeModule(params), current, edited)
+
+        api.edit.assert_called_once_with(
+            account_id="account", auto_connect=5.0, service_mode_v2={"mode": "proxy", "port": 3000}
+        )
+        self.assertTrue(result["changed"])
+        self.assertNotIn("msg", result)
 
     def test_null_unstored_fields_are_ignored(self):
         # Cloudflare drops null fields, and the comparison ignores them.

@@ -69,9 +69,10 @@ options:
       - Cloudflare keeps the current value of a whole C(preview) or
         C(production) configuration, C(always_use_latest_compatibility_date),
         C(compatibility_date), C(compatibility_flags), C(fail_open),
-        C(usage_model), a whole C(browsers), C(env_vars), C(kv_namespaces), C(limits), or
-        C(placement), and the C(type) of an environment variable set to null,
-        so the module fails before making changes.
+        C(usage_model), a whole C(env_vars), C(limits), C(placement), or
+        binding map, such as C(browsers), C(d1_databases), or C(kv_namespaces),
+        and the C(type) of an environment variable set to null, so the module
+        fails before making changes.
       - Keys under C(preview) and C(production) must be Pages deployment
         settings, such as C(compatibility_date), C(env_vars), or
         C(build_image_major_version). Cloudflare accepts any other key but does
@@ -277,16 +278,26 @@ NULLABLE_BUILD_SETTINGS = ("web_analytics_tag", "web_analytics_token")
 # Cloudflare keeps the current value of these deployment settings, and of an
 # environment variable's type or value, when they are set to null.
 NON_NULLABLE_DEPLOYMENT_SETTINGS = (
+    "ai_bindings",
     "always_use_latest_compatibility_date",
+    "analytics_engine_datasets",
     "browsers",
     "compatibility_date",
     "compatibility_flags",
+    "d1_databases",
+    "durable_object_namespaces",
     "env_vars",
     "fail_open",
+    "hyperdrive_bindings",
     "kv_namespaces",
     "limits",
+    "mtls_certificates",
     "placement",
+    "queue_producers",
+    "r2_buckets",
+    "services",
     "usage_model",
+    "vectorize_bindings",
 )
 
 

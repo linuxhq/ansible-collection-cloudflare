@@ -271,8 +271,10 @@ def service_mode(requested, current):
     Cloudflare replaces service_mode_v2 as a whole, so a write that omits the
     port of an unchanged mode would reset it. Keys are carried over only when
     the mode is unchanged, since another mode stores different keys, and the
-    port only for mode proxy, the only mode that stores one.
+    port only for mode proxy, the only mode that stores one. Null keys count
+    as omitted, as Cloudflare rejects a null port.
     """
+    requested = {key: value for key, value in requested.items() if value is not None}
     if not isinstance(current, dict) or current.get("mode") != requested.get("mode"):
         return requested
 
