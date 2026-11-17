@@ -196,6 +196,11 @@ options:
         C(purpose_justification_prompt) or C(session_duration) fail before
         making changes, because Cloudflare does not store them; omit them
         instead.
+      - An inline policy entry is the policy's complete definition, as
+        Cloudflare replaces the inline policy on every application update. A
+        setting the entry omits, such as C(approval_required),
+        C(session_duration), or C(mfa_config), is cleared, so a stored inline
+        policy that holds it differs from the entry.
       - Cloudflare omits V(false) for C(approval_required),
         C(isolation_required), and C(purpose_justification_required) of an
         inline policy, so V(false) matches a policy that does not return the
@@ -497,7 +502,19 @@ POLICY_CONNECTION_RULES_FIELDS = {
 }
 # Inline policy fields Cloudflare stores exactly as sent, so keys removed from
 # them count as differences.
-INLINE_POLICY_EXACT_FIELDS = ("approval_groups", "connection_rules")
+INLINE_POLICY_EXACT_FIELDS = ("approval_groups", "connection_rules", "mfa_config")
+# Cloudflare replaces an inline policy on every application update, so these
+# settings, when an inline policy entry omits them, are cleared.
+INLINE_POLICY_SETTINGS = (
+    "approval_groups",
+    "approval_required",
+    "connection_rules",
+    "isolation_required",
+    "mfa_config",
+    "purpose_justification_prompt",
+    "purpose_justification_required",
+    "session_duration",
+)
 # Fields Cloudflare drops when they hold an empty value.
 EMPTY_CORS_HEADERS_FIELDS = ("allowed_headers", "allowed_methods", "allowed_origins")
 EMPTY_DESTINATION_FIELDS = ("hostname", "port_range", "vnet_id")
@@ -672,9 +689,11 @@ def comparable_policy(policy, desired):
 
     The selectors of an inline policy, one that sets a selector or has no id,
     are kept whole, apart from keys Cloudflare assigns, so removed selector
-    keys and lists count as differences. Its requested approval_groups and
-    connection_rules are kept whole too. An omitted selector list matches an
-    empty one, and an omitted POLICY_FALSE_FIELDS field matches false.
+    keys and lists count as differences. Its requested INLINE_POLICY_EXACT_FIELDS
+    are kept whole too, and its stored INLINE_POLICY_SETTINGS are kept even when
+    omitted, as the entry is the policy's complete definition. An omitted
+    selector list matches an empty one, and an omitted POLICY_FALSE_FIELDS field
+    matches false.
     """
     if not isinstance(policy, dict) or not isinstance(desired, dict):
         return policy
@@ -696,6 +715,10 @@ def comparable_policy(policy, desired):
     for field in INLINE_POLICY_EXACT_FIELDS:
         if field in desired:
             comparable[field] = policy.get(field)
+
+    for field in INLINE_POLICY_SETTINGS:
+        if field not in desired and policy.get(field):
+            comparable[field] = policy[field]
 
     return comparable
 

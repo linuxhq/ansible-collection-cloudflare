@@ -287,6 +287,29 @@ class ClientTests(TestCase):
 
         self.assertEqual(raised.exception.values["msg"], "Cloudflare API connection failed")
 
+    def test_client_reports_non_json_error_response_text(self):
+        def respond(request):
+            return httpx.Response(502, text="<html>502 Bad Gateway</html>")
+
+        def make_client(**kwargs):
+            return cloudflare.Cloudflare(
+                **kwargs, max_retries=0, http_client=httpx.Client(transport=httpx.MockTransport(respond))
+            )
+
+        with (
+            patch.object(cloudflare_utils, "Cloudflare", side_effect=make_client),
+            self.assertRaises(ModuleFail) as raised,
+            cloudflare_client(FakeModule({"api_token": "secret"})) as client,
+            cloudflare_error_context("Reading the zone failed", zone_id="zone"),
+        ):
+            client.zones.get(zone_id="zone")
+
+        values = raised.exception.values
+        self.assertEqual(values["msg"], "Reading the zone failed")
+        self.assertEqual(values["zone_id"], "zone")
+        self.assertEqual(values["status_code"], 502)
+        self.assertEqual(values["response"], "<html>502 Bad Gateway</html>")
+
     def test_error_context_preserves_non_sdk_errors_without_sdk(self):
         with (
             patch.object(cloudflare_utils, "cloudflare", None),
