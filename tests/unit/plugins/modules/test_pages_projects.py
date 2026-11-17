@@ -1046,6 +1046,20 @@ class PagesProjectsTests(TestCase):
         result = self.run_module(FakeModule(params(production_branch="release")), client)
 
         self.assertIn("did not apply", result["msg"])
+        self.assertNotIn("changed", result)
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["name"], "docs")
+
+    def test_not_applied_after_create_reports_the_created_project(self):
+        client, _ignored = client_with([None], created=PROJECT)
+
+        result = self.run_module(FakeModule(params(production_branch="release")), client)
+
+        self.assertIn("did not apply", result["msg"])
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["pages_project"], PROJECT)
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["name"], "docs")
 
     def test_rejects_project_with_wrong_name(self):
         client, _ignored = client_with([{**PROJECT, "name": "other"}])

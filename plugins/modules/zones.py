@@ -384,20 +384,31 @@ def find_zone(module, client):
         return find_resource(module, list_zones(module, client), "zone", "name", name)
 
 
-def checked_zone(module, zone, payload, expected_id=None):
+def checked_zone(module, zone, payload, expected_id=None, changed=False):
+    """Serialize and validate a zone response.
+
+    changed reports that the zone was already created or updated, so a
+    failure includes changed=True and the zone.
+    """
     zone = serialize_resource(zone)
-    resource_id(module, zone, "zone", expected=expected_id)
+    zone_id = resource_id(module, zone, "zone", expected=expected_id)
     resource_field(module, zone, "name", "zone", expected=module.params["name"])
-    require_applied(module, zone, payload, "zone")
+    context = {"zone_id": zone_id}
+    if changed:
+        context.update(changed=True, zone=zone)
+
+    require_applied(module, zone, payload, "zone", context=context)
     return zone
 
 
-def edit_zone(module, client, zone_id, payload):
+def edit_zone(module, client, zone_id, payload, changed):
     with cloudflare_error_context(
         "Cloudflare API request failed while updating the zone",
         zone_id=zone_id,
     ):
-        return checked_zone(module, client.zones.edit(zone_id=zone_id, **payload), payload, expected_id=zone_id)
+        zone = client.zones.edit(zone_id=zone_id, **payload)
+
+    return checked_zone(module, zone, payload, expected_id=zone_id, changed=changed)
 
 
 def create_zone(module, client):
@@ -423,11 +434,11 @@ def create_zone(module, client):
             lambda: matching_resources(list_zones(module, client), "name", params["name"]),
         )
 
-    return checked_zone(module, zone, payload)
+    return checked_zone(module, zone, payload, changed=True)
 
 
-def update_zone(module, client, zone):
-    changed = False
+def update_zone(module, client, zone, changed):
+    """Update the zone's properties; changed reports that the zone was already created."""
     # Cloudflare edits only one zone property per request.
     for field in ("type", "vanity_name_servers"):
         if module.params.get(field) is None:
@@ -440,7 +451,7 @@ def update_zone(module, client, zone):
         if module.check_mode:
             module.exit_json(changed=True, message="Zone would be updated", zone=zone)
 
-        zone = edit_zone(module, client, zone["id"], payload)
+        zone = edit_zone(module, client, zone["id"], payload, changed)
         changed = True
 
     return zone, changed
@@ -492,7 +503,8 @@ def pending_settings(module, client, zone_id):
     return pending
 
 
-def update_settings(module, client, zone, pending):
+def update_settings(module, client, zone, pending, changed):
+    """Update the pending settings; changed reports that the zone was already created or updated."""
     zone_id = zone["id"]
     updated_settings = []
     for setting, field in pending:
@@ -514,6 +526,10 @@ def update_settings(module, client, zone, pending):
             module.fail_json(msg="Cloudflare API returned malformed zone setting data")
 
         if not setting_matches(updated[field], setting["value"]):
+            context = {"zone_id": zone_id, "setting_id": setting_id}
+            if changed or updated_settings:
+                context.update(changed=True, zone=zone, settings=updated_settings)
+
             fail_not_applied(
                 module,
                 "zone setting",
@@ -524,6 +540,7 @@ def update_settings(module, client, zone, pending):
                         "stored": normalize_current_by_desired_fields(updated[field], setting["value"]),
                     }
                 ],
+                **context,
             )
 
         updated_settings.append(updated)
@@ -565,9 +582,9 @@ def run(module, client):
         resource_id(module, zone, "zone")
 
     pending = pending_settings(module, client, zone["id"])
-    zone, changed = update_zone(module, client, zone)
-    updated_settings = update_settings(module, client, zone, pending)
-    if current is not None and not changed and not updated_settings:
+    zone, changed = update_zone(module, client, zone, current is None)
+    updated_settings = update_settings(module, client, zone, pending, changed)
+    if not changed and not updated_settings:
         module.exit_json(changed=False, message="Zone already present", zone=zone)
 
     module.exit_json(

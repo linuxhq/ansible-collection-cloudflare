@@ -278,7 +278,7 @@ def run(module, client):
         comparable_config(params["config"]),
     )
     if differences:
-        fail_not_applied(module, "tunnel configuration", differences)
+        fail_not_applied(module, "tunnel configuration", differences, **identifiers)
 
     module.exit_json(
         changed=True,

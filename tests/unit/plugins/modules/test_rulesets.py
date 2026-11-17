@@ -282,6 +282,26 @@ class RulesetsTests(TestCase):
         api.delete.assert_called_once_with("ruleset", zone_id="zone")
         self.assertTrue(result["changed"])
 
+    def test_absent_refuses_to_delete_a_ruleset_with_another_name(self):
+        for check_mode in (False, True):
+            client, api = make_client({**CURRENT, "name": "existing"})
+            with self.subTest(check_mode=check_mode):
+                result = self.run_module(
+                    FakeModule(params(name="other", state="absent"), check_mode=check_mode), client
+                )
+
+                api.delete.assert_not_called()
+                self.assertEqual(result["msg"], "An existing ruleset with a different name cannot be deleted")
+                self.assertEqual(result["ruleset"], {**CURRENT, "name": "existing"})
+
+    def test_absent_without_name_deletes_the_phase_entrypoint(self):
+        client, api = make_client({**CURRENT, "name": "existing"})
+
+        result = self.run_module(FakeModule(params(name=None, state="absent")), client)
+
+        api.delete.assert_called_once_with("ruleset", zone_id="zone")
+        self.assertTrue(result["changed"])
+
     def test_absent_ruleset_is_unchanged(self):
         client, api = make_client()
 

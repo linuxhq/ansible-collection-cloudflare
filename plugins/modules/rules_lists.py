@@ -832,8 +832,11 @@ def validate_elements(module, kind):
                 )
 
 
-def fail_not_applied(module, kind, desired_items, stored_items):
-    """Fail, naming each requested value Cloudflare did not store next to the most similar stored value."""
+def fail_not_applied(module, kind, desired_items, stored_items, **context):
+    """Fail, naming each requested value Cloudflare did not store next to the most similar stored value.
+
+    context adds result fields, as in the shared fail_not_applied.
+    """
     desired = {canonical_item(item) for item in desired_items}
     stored = {canonical_item(item) for item in stored_items}
     missing = [item for item in desired_items if canonical_item(item) not in stored]
@@ -860,6 +863,7 @@ def fail_not_applied(module, kind, desired_items, stored_items):
         msg=f"Cloudflare did not apply the requested Rules list items: {'; '.join(pairs)}",
         missing_items=missing,
         unexpected_items=unexpected,
+        **context,
     )
 
 
@@ -908,8 +912,20 @@ def ensure_present(module, client, current):
             )
             current = checked_list(module, rules_list, params["name"], params["kind"])
 
-        require_applied(module, current, payload, "Rules list", LIST_DEFAULTS)
         current_id = current["id"]
+        require_applied(
+            module,
+            current,
+            payload,
+            "Rules list",
+            LIST_DEFAULTS,
+            context={
+                "changed": True,
+                "account_id": account_id,
+                "rules_list_id": current_id,
+                "rules_list": current,
+            },
+        )
         changed = True
         created = True
     else:
@@ -935,7 +951,14 @@ def ensure_present(module, client, current):
                     expected_id=current_id,
                 )
 
-            require_applied(module, current, {"description": desired_description}, "Rules list", LIST_DEFAULTS)
+            require_applied(
+                module,
+                current,
+                {"description": desired_description},
+                "Rules list",
+                LIST_DEFAULTS,
+                context={"account_id": account_id, "rules_list_id": current_id},
+            )
             changed = True
 
     if params.get("elements") is not None:
@@ -991,7 +1014,11 @@ def ensure_present(module, client, current):
 
             stored_items = normalize_items(list_items(module, client, account_id, current_id))
             if values_differ(stored_items, desired_items):
-                fail_not_applied(module, current_kind, desired_items, stored_items)
+                context = {"account_id": account_id, "rules_list_id": current_id}
+                if created:
+                    context.update(changed=True, rules_list=current)
+
+                fail_not_applied(module, current_kind, desired_items, stored_items, **context)
 
     if not changed and not items_changed:
         module.exit_json(

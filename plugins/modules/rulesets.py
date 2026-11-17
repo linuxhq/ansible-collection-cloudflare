@@ -31,7 +31,9 @@ options:
     type: str
     description:
       - Ruleset name.
-      - Required when creating the ruleset; an existing ruleset cannot be renamed.
+      - Required when creating the ruleset.
+      - An existing ruleset cannot be renamed, because Cloudflare keeps the stored name of a phase entrypoint;
+        when O(name) differs from it, the module fails before any change, including with O(state=absent).
       - An existing ruleset's description is preserved.
   rules:
     type: list
@@ -359,6 +361,14 @@ def run(module, client):
         if current is not None:
             current = checked_ruleset(module, current, phase)
 
+    if current is not None:
+        name = resource_field(module, current, "name", "ruleset")
+        if params.get("name") is not None and params["name"] != name:
+            if params["state"] == "absent":
+                module.fail_json(msg="An existing ruleset with a different name cannot be deleted", ruleset=current)
+
+            module.fail_json(msg="An existing ruleset cannot be renamed", ruleset=current)
+
     if params["state"] == "absent":
         ensure_resource_absent(
             module,
@@ -386,10 +396,6 @@ def run(module, client):
         name = params.get("name")
         payload = {"kind": params["kind"], "name": name, "phase": phase, "rules": rules or []}
     else:
-        name = resource_field(module, current, "name", "ruleset")
-        if params.get("name") is not None and params["name"] != name:
-            module.fail_json(msg="An existing ruleset cannot be renamed", ruleset=current)
-
         # Omitted rules preserve the current rules, so there is nothing to compare.
         payload = {} if rules is None else {"rules": rules}
         # The update replaces the entrypoint and clears a description it omits,

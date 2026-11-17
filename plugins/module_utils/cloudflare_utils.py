@@ -309,23 +309,31 @@ def unique_match(resource):
 def retry_delay(exc, attempt):
     """Return the seconds to wait before retrying a request Cloudflare rejected.
 
-    The response's Retry-After-Ms or Retry-After header is honored when it
-    asks for more than zero and at most MAX_RETRY_AFTER_SECONDS; otherwise the
-    delay doubles from CREATE_RETRY_BACKOFF_SECONDS with each attempt.
+    As in the SDK, the response's Retry-After-Ms header is read first, and
+    Retry-After, in seconds or as an HTTP date, when Retry-After-Ms is missing
+    or unparseable; a date without a time zone is in UTC. The delay is honored
+    when it is more than zero and at most MAX_RETRY_AFTER_SECONDS; otherwise
+    it doubles from CREATE_RETRY_BACKOFF_SECONDS with each attempt.
     """
     headers = getattr(getattr(exc, "response", None), "headers", None) or {}
     delay = None
     try:
-        if "retry-after-ms" in headers:
-            delay = float(headers["retry-after-ms"]) / 1000
-        elif "retry-after" in headers:
-            value = headers["retry-after"]
-            try:
-                delay = float(value)
-            except ValueError:
-                delay = (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds()
+        delay = float(headers.get("retry-after-ms")) / 1000
     except (TypeError, ValueError):
-        delay = None
+        value = headers.get("retry-after")
+        try:
+            delay = float(value)
+        except (TypeError, ValueError):
+            try:
+                retry_at = parsedate_to_datetime(value)
+            except (TypeError, ValueError):
+                retry_at = None
+
+            if retry_at is not None:
+                if retry_at.tzinfo is None:
+                    retry_at = retry_at.replace(tzinfo=timezone.utc)
+
+                delay = (retry_at - datetime.now(timezone.utc)).total_seconds()
 
     if delay is not None and 0 < delay <= MAX_RETRY_AFTER_SECONDS:
         return delay
@@ -360,7 +368,8 @@ def create_once(create, find):
     try:
         matches = list(find())
     except cloudflare.APIError:
-        raise error from None
+        # Keep the connection failure error_message names, not the lookup error.
+        raise error from error.__cause__
 
     if len(matches) != 1:
         raise error
@@ -600,7 +609,8 @@ def message_value(module, value):
 def fail_not_applied(module, resource_name, differences, **context):
     """Fail, naming the requested and stored value of each field Cloudflare did not apply.
 
-    context adds result fields, such as a created resource the caller must not lose.
+    context adds result fields, such as the resource's identifiers, or, after
+    a create, changed=True and the created resource the caller must not lose.
     """
     pairs = [
         f"{difference['field']} requested {message_value(module, difference['requested'])}, "
@@ -618,11 +628,17 @@ def fail_not_applied(module, resource_name, differences, **context):
     )
 
 
-def require_applied(module, resource, desired, resource_name, defaults=None, exact_fields=(), exact_values=()):
+def require_applied(
+    module, resource, desired, resource_name, defaults=None, exact_fields=(), exact_values=(), context=None
+):
+    """Fail when the resource Cloudflare returned does not match desired.
+
+    context adds result fields to the failure, as in fail_not_applied.
+    """
     require_mapping(module, resource, resource_name)
     if differs(resource, desired, defaults, exact_fields, exact_values):
         projected = projected_current(resource, desired, defaults, exact_fields, exact_values)
-        fail_not_applied(module, resource_name, applied_differences(projected, desired))
+        fail_not_applied(module, resource_name, applied_differences(projected, desired), **(context or {}))
 
 
 # The SDK renames these snake_case selector keys to their API spellings on
@@ -848,7 +864,7 @@ def ensure_settings(
         settings = serialize_resource(edit(payload))
 
     require_mapping(module, settings, resource_name)
-    require_applied(module, comparable(settings), payload, resource_name, exact_values=exact_values)
+    require_applied(module, comparable(settings), payload, resource_name, exact_values=exact_values, context=context)
     module.exit_json(changed=True, message=f"{label} updated", **{result_key: settings})
 
 
@@ -903,7 +919,22 @@ def ensure_resource_present(
         ):
             resource = checked(create_once(lambda: create(payload), find_created))
 
-        require_applied(module, comparable(resource), payload, resource_name, defaults, exact_fields, exact_values)
+        require_applied(
+            module,
+            comparable(resource),
+            payload,
+            resource_name,
+            defaults,
+            exact_fields,
+            exact_values,
+            context={
+                "changed": True,
+                "resource_id": resource["id"],
+                **name_context,
+                **context,
+                result_key: resource,
+            },
+        )
         module.exit_json(changed=True, message=f"{label} created", **{result_key: resource})
 
     current_id = resource_id(module, current, resource_name)
@@ -929,12 +960,26 @@ def ensure_resource_present(
     ):
         resource = checked(update(current_id, payload), expected_id=current_id)
 
-    require_applied(module, comparable(resource), payload, resource_name, defaults, exact_fields, exact_values)
+    require_applied(
+        module,
+        comparable(resource),
+        payload,
+        resource_name,
+        defaults,
+        exact_fields,
+        exact_values,
+        context={"resource_id": current_id, **context},
+    )
     module.exit_json(changed=True, message=f"{label} updated", **{result_key: resource})
 
 
 def ensure_resource_absent(module, result_key, resource_name, current, delete, context=None):
-    """Delete the resource when it exists; context names its owner in failures."""
+    """Delete the resource when it exists; context names its owner in failures.
+
+    A 404 status from the delete counts as deleted: the SDK retries a delete
+    whose response was lost, and Cloudflare answers the retry with 404 for
+    some resources, such as Access groups and applications.
+    """
     label = resource_name[0].upper() + resource_name[1:]
     if current is None:
         module.exit_json(changed=False, message=f"{label} already absent")
@@ -948,7 +993,10 @@ def ensure_resource_absent(module, result_key, resource_name, current, delete, c
         resource_id=current_id,
         **(context or {}),
     ):
-        deleted = serialize_resource(delete(current_id))
+        try:
+            deleted = serialize_resource(delete(current_id))
+        except cloudflare.NotFoundError:
+            deleted = None
 
     if isinstance(deleted, dict) and "id" in deleted:
         resource_id(module, deleted, resource_name, expected=current_id)

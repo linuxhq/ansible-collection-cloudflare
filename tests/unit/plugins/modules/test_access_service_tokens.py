@@ -55,6 +55,29 @@ class AccessServiceTokensTests(TestCase):
                 self.assertIn(message, result["msg"])
                 self.assertEqual(result["service_token"], created)
 
+    def test_not_applied_after_create_reports_the_change(self):
+        created = {"id": "token", "name": "automation", "duration": "8760h", "client_secret": "secret"}
+        client, _ignored = client_with(created=created)
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertIn("did not apply", result["msg"])
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["resource_id"], "token")
+        self.assertEqual(result["service_token"], created)
+
+    def test_not_applied_after_update_names_the_token(self):
+        current = {"id": "token", "name": "automation", "duration": "1h"}
+        client, _ignored = client_with([current], updated=current)
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertIn("did not apply", result["msg"])
+        self.assertNotIn("changed", result)
+        self.assertEqual(result["resource_id"], "token")
+        self.assertEqual(result["account_id"], "account")
+
     def test_create_recovers_the_token_after_a_lost_response(self):
         recovered = {"id": "token", "name": "automation", "duration": "1y"}
         client, api = client_with()
