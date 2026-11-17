@@ -61,7 +61,8 @@ options:
       - Environment variables removed from C(env_vars) are deleted from the
         project.
       - Environment variables and bindings, such as C(kv_namespaces) entries, set
-        to null are deleted from the project. An empty binding map changes nothing.
+        to null are deleted from the project. An empty binding map, C(limits), or
+        C(placement) changes nothing.
         C(wrangler_config_hash), C(placement.mode), and C(limits.cpu_ms) set to
         null are cleared, and an environment variable C(value) or a C(services)
         entry's C(environment) set to null is stored as V(""), which matches the
@@ -157,6 +158,56 @@ EXAMPLES = r"""
     api_token: "{{ cloudflare_api_token }}"
     name: docs
     production_branch: main
+
+- name: Ensure Pages project has custom domains
+  linuxhq.cloudflare.pages_projects:
+    account_id: "{{ account_id }}"
+    api_token: "{{ cloudflare_api_token }}"
+    name: docs
+    domains:
+      - name: docs.example.com
+
+- name: Ensure Pages production environment variables
+  linuxhq.cloudflare.pages_projects:
+    account_id: "{{ account_id }}"
+    api_token: "{{ cloudflare_api_token }}"
+    name: docs
+    deployment_configs:
+      production:
+        env_vars:
+          API_URL:
+            type: plain_text
+            value: https://api.example.com
+          API_KEY:
+            type: secret_text
+            value: "{{ docs_api_key }}"
+          OLD_SETTING: null
+  no_log: true
+
+# env_vars lists every variable to keep; omitted variables are deleted.
+- name: Resend Pages secret values
+  linuxhq.cloudflare.pages_projects:
+    account_id: "{{ account_id }}"
+    api_token: "{{ cloudflare_api_token }}"
+    name: docs
+    rotate_secrets: true
+    deployment_configs:
+      production:
+        env_vars:
+          API_URL:
+            type: plain_text
+            value: https://api.example.com
+          API_KEY:
+            type: secret_text
+            value: "{{ docs_api_key }}"
+  no_log: true
+
+- name: Ensure Pages project is absent
+  linuxhq.cloudflare.pages_projects:
+    account_id: "{{ account_id }}"
+    api_token: "{{ cloudflare_api_token }}"
+    name: docs
+    state: absent
 """
 
 RETURN = r"""
@@ -175,7 +226,10 @@ pages_project:
       returned: when available
       type: str
     domains:
-      description: Domains assigned to the project.
+      description:
+        - Domains assigned to the project.
+        - Cloudflare omits a custom domain that is not active yet, such as one added during this run; the top-level
+          RV(domains) lists the custom domains added during this run.
       returned: when available
       type: list
       elements: str
@@ -722,10 +776,17 @@ def update_project(module, client, current, payload, secrets_requested):
             client.pages.projects.edit(project_name=params["name"], account_id=params["account_id"], **payload),
         )
 
-    require_applied(module, comparable_project(project, comparable_payload), comparable_payload, "Pages project")
+    context = {"account_id": params["account_id"], "name": params["name"]}
+    require_applied(
+        module,
+        comparable_project(project, comparable_payload),
+        comparable_payload,
+        "Pages project",
+        context=context,
+    )
     remaining = remaining_removals(project, removed)
     if remaining:
-        fail_not_applied(module, "Pages project", remaining)
+        fail_not_applied(module, "Pages project", remaining, **context)
 
     return project, True
 
@@ -815,7 +876,18 @@ def ensure_present(module, client, domain_names):
             )
 
         comparable_payload = comparable_pages_payload(payload)
-        require_applied(module, comparable_project(current, comparable_payload), comparable_payload, "Pages project")
+        require_applied(
+            module,
+            comparable_project(current, comparable_payload),
+            comparable_payload,
+            "Pages project",
+            context={
+                "changed": True,
+                "account_id": params["account_id"],
+                "name": params["name"],
+                "pages_project": current,
+            },
+        )
         changed = True
     else:
         current, changed = update_project(module, client, current, payload, secrets_requested)

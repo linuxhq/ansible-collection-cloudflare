@@ -855,6 +855,22 @@ class EnsureSettingsTests(TestCase):
         result, _ignored = self.run_settings({"enabled": False}, {"enabled": True}, edited={"enabled": False})
         self.assertIsInstance(result, ModuleFail)
 
+    def test_not_applied_failure_names_the_settings_owner(self):
+        edit = Mock(return_value={"enabled": False})
+        with self.assertRaises(ModuleFail) as raised:
+            ensure_settings(
+                FakeModule({}),
+                "settings",
+                "device settings",
+                {"enabled": False},
+                {"enabled": True},
+                edit,
+                context={"account_id": "acc"},
+            )
+
+        self.assertEqual(raised.exception.values["account_id"], "acc")
+        self.assertIn("did not apply", raised.exception.values["msg"])
+
     def test_comparable_normalizes_both_sides(self):
         def comparable(settings):
             return {**settings, "status": {"pending": "active"}.get(settings.get("status"), settings.get("status"))}
@@ -898,6 +914,38 @@ class EnsureResourceTests(TestCase):
             None, {"name": "n"}, created={"id": "one", "name": "other"}, expected_name="n"
         )
         self.assertEqual(result.values["msg"], "Cloudflare API returned the wrong thing")
+
+    def test_not_applied_after_create_reports_the_created_resource(self):
+        created = {"id": "one", "name": "n", "enabled": False, "token": "secret"}
+        result, create, _ignored = self.present(
+            None,
+            {"name": "n", "enabled": True},
+            created=created,
+            expected_name="n",
+            context={"account_id": "acc"},
+            comparable=lambda resource: {key: value for key, value in resource.items() if key != "token"},
+        )
+
+        create.assert_called_once()
+        self.assertIsInstance(result, ModuleFail)
+        self.assertIn("did not apply", result.values["msg"])
+        self.assertTrue(result.values["changed"])
+        self.assertEqual(result.values["thing"], created)
+        self.assertEqual(result.values["resource_id"], "one")
+        self.assertEqual(result.values["name"], "n")
+        self.assertEqual(result.values["account_id"], "acc")
+        self.assertEqual(result.values["differences"], [{"field": "enabled", "requested": True, "stored": False}])
+
+    def test_not_applied_after_update_names_the_resource(self):
+        current = {"id": "one", "enabled": False}
+        result, _ignored, update = self.present(current, {"enabled": True}, updated=current, context={"zone_id": "z"})
+
+        update.assert_called_once()
+        self.assertIsInstance(result, ModuleFail)
+        self.assertIn("did not apply", result.values["msg"])
+        self.assertEqual(result.values["resource_id"], "one")
+        self.assertEqual(result.values["zone_id"], "z")
+        self.assertNotIn("changed", result.values)
 
     def test_check_mode_never_mutates(self):
         for current in (None, {"id": "one", "enabled": False}):
@@ -948,6 +996,24 @@ class EnsureResourceTests(TestCase):
 
         result, _ignored = self.absent({"id": "one"}, deleted={"id": "two"})
         self.assertIsInstance(result, ModuleFail)
+
+    def test_delete_answered_with_404_counts_as_deleted(self):
+        # The SDK retries a delete whose response was lost; Cloudflare answers the retry with 404.
+        delete = Mock(side_effect=status_error(404))
+        with self.assertRaises(ModuleExit) as raised:
+            ensure_resource_absent(FakeModule({}), "thing", "thing", {"id": "one"}, delete)
+
+        delete.assert_called_once_with("one")
+        self.assertEqual(raised.exception.values, {"changed": True, "message": "Thing deleted", "thing": {"id": "one"}})
+
+    def test_delete_failures_other_than_404_are_raised(self):
+        for status_code in (400, 403, 409, 500):
+            with self.subTest(status_code=status_code):
+                error = status_error(status_code)
+                with self.assertRaises(cloudflare.APIStatusError) as raised:
+                    ensure_resource_absent(FakeModule({}), "thing", "thing", {"id": "one"}, Mock(side_effect=error))
+
+                self.assertIs(raised.exception, error)
 
     def test_mutation_errors_carry_context(self):
         error = status_error(400)
@@ -1050,6 +1116,20 @@ class CreateOnceTests(TestCase):
 
         self.assertIs(raised.exception, error)
 
+    def test_lookup_failure_keeps_the_connection_error_cause(self):
+        cause = httpx.ConnectError("connection refused")
+        error = connection_error()
+        error.__cause__ = cause
+
+        with self.assertRaises(cloudflare.APIConnectionError) as raised:
+            create_once(Mock(side_effect=error), Mock(side_effect=status_error(500)))
+
+        self.assertIs(raised.exception, error)
+        self.assertIs(raised.exception.__cause__, cause)
+        self.assertEqual(
+            cloudflare_error_details(raised.exception)["error"], "Connection error. ConnectError: connection refused"
+        )
+
     def test_rejected_create_is_not_looked_up(self):
         # Cloudflare answered, so the resource was not created.
         for status_code in (400, 409, 429):
@@ -1106,6 +1186,12 @@ class CreateOnceTests(TestCase):
             ({"Retry-After": "3"}, 0, 3.0),
             ({"Retry-After": "1.5"}, 1, 1.5),
             ({"Retry-After-Ms": "250", "Retry-After": "9"}, 0, 0.25),
+            # As in the SDK, an unparseable Retry-After-Ms falls through to Retry-After.
+            ({"Retry-After-Ms": "soon", "Retry-After": "4"}, 0, 4.0),
+            ({"Retry-After-Ms": "", "Retry-After": "Tue, 17 Nov 2026 00:00:05 GMT"}, 0, 5.0),
+            # An HTTP date without a time zone is in UTC.
+            ({"Retry-After": "Tue, 17 Nov 2026 00:00:06 -0000"}, 0, 6.0),
+            ({"Retry-After": "17 Nov 2026 00:00:08"}, 0, 8.0),
             ({"Retry-After": "Tue, 17 Nov 2026 00:00:07 GMT"}, 0, 7.0),
             # A delay longer than the SDK's 60-second cap, or none, uses the backoff.
             ({"Retry-After": "61"}, 0, 0.5),

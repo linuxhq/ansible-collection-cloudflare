@@ -137,14 +137,14 @@ def duration_matches(service_token, duration):
     return duration == "forever" and service_token.get("expires_at") in (None, "")
 
 
-def checked_token(module, service_token, expected_id=None):
+def checked_token(module, service_token, expected_id=None, created=False):
     """Serialize and validate a service token response.
 
     A failure includes the token, as a created token's client secret is
-    returned only once.
+    returned only once; after a create, it also reports changed=True.
     """
     service_token = serialize_resource(service_token)
-    resource_id(module, service_token, "service token", expected=expected_id)
+    token_id = resource_id(module, service_token, "service token", expected=expected_id)
     if resource_field(module, service_token, "name", "service token") != module.params["name"]:
         module.fail_json(msg="Cloudflare API returned the wrong service token", service_token=service_token)
 
@@ -153,6 +153,9 @@ def checked_token(module, service_token, expected_id=None):
             module,
             "service token",
             [{"field": "duration", "requested": module.params["duration"], "stored": service_token.get("duration")}],
+            **({"changed": True} if created else {}),
+            account_id=module.params["account_id"],
+            resource_id=token_id,
             service_token=service_token,
         )
 
@@ -214,7 +217,7 @@ def run(module, client):
         module.exit_json(
             changed=True,
             message="Service token created",
-            service_token=checked_token(module, service_token),
+            service_token=checked_token(module, service_token, created=True),
         )
 
     current_id = resource_id(module, current, "service token")

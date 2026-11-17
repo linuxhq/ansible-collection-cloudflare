@@ -347,6 +347,42 @@ class ZonesTests(TestCase):
 
         self.assertIn("did not apply", result["msg"])
 
+    def test_not_applied_after_create_reports_the_created_zone(self):
+        created = {**ZONE, "account": {"id": "other"}}
+        client = client_with(created=created)
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertIn("did not apply", result["msg"])
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["zone_id"], "zone")
+        self.assertEqual(result["zone"], created)
+
+    def test_not_applied_after_update_names_the_zone(self):
+        client = client_with([ZONE], edited=[ZONE])
+
+        result = self.run_module(FakeModule(params(type="partial")), client)
+
+        self.assertIn("did not apply", result["msg"])
+        self.assertNotIn("changed", result)
+        self.assertEqual(result["zone_id"], "zone")
+
+    def test_unmet_setting_after_create_reports_the_created_zone(self):
+        created = {**ZONE, "account": {"id": "account"}}
+        client = client_with(
+            created=created,
+            setting={"id": "min_tls_version", "value": "1.2"},
+            edited_setting={"id": "min_tls_version", "value": "1.2"},
+        )
+
+        result = self.run_module(FakeModule(params(settings=[{"id": "min_tls_version", "value": "1.3"}])), client)
+
+        self.assertIn("did not apply", result["msg"])
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["zone"], created)
+        self.assertEqual(result["settings"], [])
+        self.assertEqual(result["setting_id"], "min_tls_version")
+
     def test_updates_zone_fields_one_per_request(self):
         retyped = {**ZONE, "type": "partial"}
         updated = {**retyped, "vanity_name_servers": ["ns1.example.com"]}
@@ -443,6 +479,9 @@ class ZonesTests(TestCase):
             'Cloudflare did not apply the requested zone setting: min_tls_version requested 1.3, stored "1.2"',
         )
         self.assertEqual(result["differences"], [{"field": "min_tls_version", "requested": 1.3, "stored": "1.2"}])
+        self.assertEqual(result["zone_id"], "zone")
+        self.assertEqual(result["setting_id"], "min_tls_version")
+        self.assertNotIn("changed", result)
 
     def test_matches_zone_names_case_insensitively(self):
         client = client_with([ZONE], deleted={"id": "zone"})

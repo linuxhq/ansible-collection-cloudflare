@@ -362,6 +362,33 @@ class RulesListsTests(TestCase):
         result = self.run_module(FakeModule(params(description="desired")), client)
 
         self.assertIn("did not apply", result["msg"])
+        self.assertNotIn("changed", result)
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["rules_list_id"], "list")
+
+    def test_not_applied_after_create_reports_the_created_list(self):
+        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "other"}
+        client, _ignored = make_client(created=created)
+
+        result = self.run_module(FakeModule(params(description="desired")), client)
+
+        self.assertIn("did not apply", result["msg"])
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["rules_list"], created)
+        self.assertEqual(result["rules_list_id"], "list")
+        self.assertEqual(result["account_id"], "account")
+
+    def test_unapplied_items_after_create_report_the_created_list(self):
+        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses", "num_items": 0}
+        client, _ignored = make_client(created=created, fetched=created)
+
+        with patch.object(rules_lists.time, "monotonic", return_value=1):
+            result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
+
+        self.assertIn("did not apply", result["msg"])
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["rules_list"], created)
+        self.assertEqual(result["rules_list_id"], "list")
 
     def test_empty_description_matches_list_without_description(self):
         created = {"id": "list", "name": "addresses", "kind": "ip"}
@@ -1217,6 +1244,8 @@ class RulesListsTests(TestCase):
         )
         self.assertEqual(result["missing_items"], [{"ip": "192.0.2.1"}])
         self.assertEqual(result["unexpected_items"], [])
+        self.assertEqual(result["rules_list_id"], "list")
+        self.assertNotIn("changed", result)
 
     def test_not_applied_failure_message_pairs_a_bounded_number_of_items(self):
         current = {**CURRENT, "num_items": 0}

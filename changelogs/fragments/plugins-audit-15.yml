@@ -1,0 +1,25 @@
+---
+bugfixes:
+  - rulesets - fail before any change when O(rulesets#module:state=absent) and O(rulesets#module:name) differs from
+    the name of the zone's phase entrypoint, as O(rulesets#module:state=present) already does. The module deleted the
+    entrypoint whatever its name. Document that Cloudflare keeps the stored name of a phase entrypoint, so it cannot
+    be renamed.
+  - access_apps, access_groups, access_policies, access_service_tokens, cfd_tunnel_configurations, devices_policy,
+    devices_settings, dnssec, pagerules, pages_projects, rules_lists, rulesets, zerotrust_connectivity_settings, zones -
+    name the resource and its owner, such as C(resource_id) and C(account_id), in a failure because Cloudflare did not
+    apply the request. After a create, the failure also reports C(changed=true) and returns the created resource,
+    which previously was reported as unchanged and not returned.
+  - access_apps, access_groups, access_policies, access_service_tokens, cfd_tunnel, pagerules, pages_projects,
+    rules_lists, rulesets, warp_connector, zones - keep the cause of a connection failure or timeout of a create
+    request in C(error) when looking the resource up again also fails.
+  - access_apps, access_groups, access_policies, access_service_tokens, cfd_tunnel, pagerules, rules_lists, rulesets,
+    warp_connector, zones - treat a 404 status from the delete request as deleted. The SDK retries a delete whose
+    response was lost, and Cloudflare answers the retry for an Access group or application with 404, so the module
+    failed although the resource was deleted.
+  - access_apps, access_groups, access_policies, access_service_tokens, cfd_tunnel, pagerules, pages_projects,
+    rules_lists, rulesets, warp_connector, zones - as the SDK does, read the C(Retry-After) header of a rejected create
+    request when C(Retry-After-Ms) cannot be parsed, and read an HTTP date without a time zone in C(Retry-After) as
+    UTC; both previously used the backoff instead. Document C(Retry-After-Ms).
+  - pages_projects - document that an empty C(limits) or C(placement) changes nothing, that the returned
+    C(pages_project.domains) omits custom domains that are not active yet, and add examples for domains, environment
+    variables, O(pages_projects#module:rotate_secrets), and O(pages_projects#module:state=absent).

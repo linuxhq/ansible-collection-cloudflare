@@ -49,8 +49,9 @@ filter plugins under `plugins/`. Apply these with `ansible-plugins.md`.
 - Omit unset optional values; pass `None` only when the API documents JSON null
   as meaningful.
 - Use `client.with_options()` for an isolated timeout or retry override.
-- Use `api_request` and the shared result helpers when the generated resource
-  cannot represent a documented operation or response reliably.
+- Use the public client methods, such as `client.get(..., cast_to=object)`, with
+  `path_segment` when the generated resource cannot represent a documented
+  operation or response reliably.
 - Keep raw requests on public `get`, `post`, `put`, `patch`, and `delete`
   methods and provide an explicit `cast_to` value.
 - Encode path segments and query values; never interpolate untrusted values
@@ -79,7 +80,7 @@ filter plugins under `plugins/`. Apply these with `ansible-plugins.md`.
 - Do not read only the first page's `result` when the contract requires all
   items.
 - Use server-side filters when the generated list method supports them.
-- Use `iter_items` or `list_all` for raw request paths.
+- Use `list_all_pages` for raw request paths.
 - Do not implement another page loop inside an individual plugin.
 - Keep pagination output order only when the API documents it as stable.
 
