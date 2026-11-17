@@ -18,5 +18,3 @@ bugfixes:
     project was deleted.
   - pages_projects - document that a custom domain counts as present once it is attached to the project, whatever
     its status, so a domain whose status is C(error), C(blocked), or C(deactivated) is not detected.
-  - rulesets, rulesets_info roles - document the C(Zone WAF) and C(Zone) token permissions they require, instead of
-    C(Account WAF).
