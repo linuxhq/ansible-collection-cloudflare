@@ -61,6 +61,19 @@ class RulesListsTests(TestCase):
 
         return raised.exception.values
 
+    def test_create_recovers_the_list_after_a_lost_response(self):
+        recovered = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
+        client, api = make_client()
+        api.create.side_effect = timeout_error()
+        api.list.side_effect = [[], [recovered]]
+
+        result = self.run_module(FakeModule(params()), client)
+
+        client.with_options.assert_called_once_with(max_retries=0)
+        api.create.assert_called_once()
+        self.assertEqual(result["message"], "Rules list created")
+        self.assertEqual(result["rules_list"], recovered)
+
     def test_normalizes_metadata_defaults_and_duplicates(self):
         items = [
             {

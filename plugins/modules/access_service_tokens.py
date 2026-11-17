@@ -18,6 +18,7 @@ author:
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
   - linuxhq.cloudflare.cloudflare.account
+  - linuxhq.cloudflare.cloudflare.create
 options:
   name:
     description:
@@ -44,7 +45,10 @@ options:
       - absent
     default: present
 notes:
-  - Cloudflare only returns the client secret when a token is created.
+  - Cloudflare only returns the client secret when a token is created. A token found by name again after a failed
+    create request is returned without it.
+  - When a token is created but Cloudflare stores another name or duration, the failure includes the created token
+    in C(service_token), with its client secret.
   - Cloudflare may store a requested value in a canonical form that differs from the request. The module then
     fails after the write, naming the requested and stored value of each differing field in the message and in
     C(differences), so the stored form can be requested instead.
@@ -107,13 +111,16 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_error_context,
+    create_once,
     ensure_resource_absent,
     fail_not_applied,
     find_resource,
+    matching_resources,
     payload_from_params,
     resource_field,
     resource_id,
     serialize_resource,
+    without_retries,
 )
 
 
@@ -129,14 +136,22 @@ def duration_matches(service_token, duration):
 
 
 def checked_token(module, service_token, expected_id=None):
+    """Serialize and validate a service token response.
+
+    A failure includes the token, as a created token's client secret is
+    returned only once.
+    """
     service_token = serialize_resource(service_token)
     resource_id(module, service_token, "service token", expected=expected_id)
-    resource_field(module, service_token, "name", "service token", expected=module.params["name"])
+    if resource_field(module, service_token, "name", "service token") != module.params["name"]:
+        module.fail_json(msg="Cloudflare API returned the wrong service token", service_token=service_token)
+
     if not duration_matches(service_token, module.params["duration"]):
         fail_not_applied(
             module,
             "service token",
             [{"field": "duration", "requested": module.params["duration"], "stored": service_token.get("duration")}],
+            service_token=service_token,
         )
 
     return service_token
@@ -184,7 +199,14 @@ def run(module, client):
             account_id=account_id,
             name=params["name"],
         ):
-            service_token = service_tokens.create(account_id=account_id, **payload)
+            service_token = create_once(
+                lambda: without_retries(client).zero_trust.access.service_tokens.create(
+                    account_id=account_id, **payload
+                ),
+                lambda: matching_resources(
+                    service_tokens.list(account_id=account_id, name=params["name"]), "name", params["name"]
+                ),
+            )
 
         # The client secret is only returned on creation and is part of the result.
         module.exit_json(

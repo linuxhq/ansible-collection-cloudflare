@@ -9,6 +9,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     ModuleExit,
     ModuleFail,
     status_error,
+    timeout_error,
 )
 
 
@@ -38,6 +39,8 @@ def stored(**updates):
 
 def client_with(apps=(), created=None, updated=None, deleted=None):
     client = Mock()
+    # Retry overrides return the same client so their calls are observable.
+    client.with_options.return_value = client
     api = client.zero_trust.access.applications
     api.list.return_value = list(apps)
     api.create.return_value = created
@@ -1327,3 +1330,59 @@ class AccessAppsTests(TestCase):
             raised.exception._cloudflare_message,
             "Cloudflare API request failed while finding the Access application",
         )
+
+    def test_omitted_policies_are_kept_as_links(self):
+        # Sending an inline policy whole replaces it, and Cloudflare assigns it a
+        # new updated_at, so the update would fail as not applied.
+        policies = [
+            {
+                "id": "reusable",
+                "precedence": 1,
+                "name": "shared",
+                "decision": "allow",
+                "reusable": True,
+                "include": [{"everyone": {}}],
+                "updated_at": "2026-01-01T00:00:00Z",
+            },
+            {
+                "id": "inline",
+                "precedence": 2,
+                "name": "admins",
+                "decision": "allow",
+                "include": [{"email": {"email": "admin@example.com"}}],
+                "updated_at": "2026-01-01T00:00:00Z",
+            },
+        ]
+        rewritten = [policies[0], {**policies[1], "updated_at": "2026-02-02T00:00:00Z"}]
+        current = {**stored(), "policies": policies}
+        updated = {**stored(session_duration="12h"), "policies": rewritten}
+        client, api = client_with([current], updated=updated)
+
+        result = self.run_module(FakeModule(params(session_duration="12h")), client)
+
+        self.assertNotIn("msg", result)
+        self.assertEqual(result["message"], "Access application updated")
+        self.assertEqual(
+            api.update.call_args.kwargs["policies"],
+            [{"id": "reusable", "precedence": 1}, {"id": "inline", "precedence": 2}],
+        )
+
+        client, api = client_with([updated])
+        result = self.run_module(FakeModule(params(session_duration="12h")), client)
+
+        self.assertFalse(result["changed"])
+        api.update.assert_not_called()
+
+    def test_create_recovers_the_app_after_a_lost_response(self):
+        client, api = client_with()
+        api.create.side_effect = timeout_error()
+        api.list.side_effect = [[], [stored()]]
+
+        result = self.run_module(FakeModule(params()), client)
+
+        client.with_options.assert_called_once_with(max_retries=0)
+        api.create.assert_called_once()
+        self.assertEqual(api.list.call_count, 2)
+        self.assertEqual(api.list.call_args.kwargs, {"account_id": "account", "name": "app", "exact": True})
+        self.assertEqual(result["message"], "Access application created")
+        self.assertEqual(result["access_app"], stored())

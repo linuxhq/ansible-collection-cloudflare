@@ -18,6 +18,7 @@ notes:
     C(differences), so the stored form can be requested instead.
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.create
 options:
   zone_id:
     required: true
@@ -100,6 +101,32 @@ EXAMPLES = r"""
         constraint:
           operator: matches
           value: example.com/*
+
+- name: Ensure page rule is evaluated first but paused
+  linuxhq.cloudflare.pagerules:
+    api_token: "{{ cloudflare_api_token }}"
+    zone_id: "{{ zone_id }}"
+    priority: 1
+    status: disabled
+    actions:
+      - id: cache_level
+        value: bypass
+    targets:
+      - target: url
+        constraint:
+          operator: matches
+          value: example.com/admin/*
+
+- name: Ensure page rule is absent
+  linuxhq.cloudflare.pagerules:
+    api_token: "{{ cloudflare_api_token }}"
+    zone_id: "{{ zone_id }}"
+    state: absent
+    targets:
+      - target: url
+        constraint:
+          operator: matches
+          value: example.com/*
 """
 
 RETURN = r"""
@@ -152,6 +179,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     serialize_resource,
     unsupported_fields,
     values_differ,
+    without_retries,
 )
 
 FIELDS = ("actions", "priority", "status", "targets")
@@ -316,8 +344,8 @@ def target_identity(targets):
     return identity
 
 
-def find_pagerule(module, client, targets):
-    """Return the page rule matching targets, or None, and the zone's rule count."""
+def matching_pagerules(module, client, targets):
+    """Return the page rules matching targets and the zone's rule count."""
     zone_id = module.params["zone_id"]
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the page rule",
@@ -334,6 +362,13 @@ def find_pagerule(module, client, targets):
         if not values_differ(stored, identity):
             matches.append(pagerule)
 
+    return matches, len(pagerules)
+
+
+def find_pagerule(module, client, targets):
+    """Return the page rule matching targets, or None, and the zone's rule count."""
+    zone_id = module.params["zone_id"]
+    matches, rule_count = matching_pagerules(module, client, targets)
     if len(matches) > 1:
         module.fail_json(
             msg="Multiple page rules match the requested target constraints",
@@ -341,7 +376,7 @@ def find_pagerule(module, client, targets):
             matching_ids=[resource_id(module, pagerule, "page rule") for pagerule in matches],
         )
 
-    return matches[0] if matches else None, len(pagerules)
+    return matches[0] if matches else None, rule_count
 
 
 def validate_priority(module, current, rule_count):
@@ -397,8 +432,9 @@ def run(module, client):
         "page rule",
         current,
         payload,
-        create=lambda payload: page_rules.create(zone_id=zone_id, **payload),
+        create=lambda payload: without_retries(client).page_rules.create(zone_id=zone_id, **payload),
         update=lambda pagerule_id, payload: page_rules.update(pagerule_id=pagerule_id, zone_id=zone_id, **payload),
+        find_created=lambda: matching_pagerules(module, client, targets)[0],
         preserved_fields=PRESERVED_FIELDS,
         context={"zone_id": zone_id},
         comparable=lambda pagerule: comparable_pagerule(pagerule, payload["actions"]),

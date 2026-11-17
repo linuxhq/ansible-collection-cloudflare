@@ -20,6 +20,7 @@ author:
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
   - linuxhq.cloudflare.cloudflare.account
+  - linuxhq.cloudflare.cloudflare.create
 options:
   name:
     required: true
@@ -103,15 +104,24 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_error_context,
+    create_once,
     ensure_resource_absent,
     find_resource,
+    matching_resources,
     payload_from_params,
     resource_field,
     resource_id,
     serialize_resource,
+    without_retries,
 )
 
 FIELDS = ("config_src", "name", "tunnel_secret")
+
+
+def list_tunnels(module, tunnels):
+    """Return the tunnels that are not deleted and whose name matches the requested one."""
+    params = module.params
+    return tunnels.list(account_id=params["account_id"], name=params["name"], is_deleted=False)
 
 
 def checked_tunnel(module, tunnel, expected_id=None):
@@ -121,9 +131,10 @@ def checked_tunnel(module, tunnel, expected_id=None):
     return tunnel
 
 
-def ensure_present(module, tunnels, current):
+def ensure_present(module, client, current):
     params = module.params
     account_id = params["account_id"]
+    tunnels = client.zero_trust.tunnels.cloudflared
 
     if current is not None:
         current_id = resource_id(module, current, "cloudflared tunnel")
@@ -164,7 +175,12 @@ def ensure_present(module, tunnels, current):
         account_id=account_id,
         name=params["name"],
     ):
-        cfd_tunnel = tunnels.create(account_id=account_id, **payload_from_params(params, FIELDS))
+        cfd_tunnel = create_once(
+            lambda: without_retries(client).zero_trust.tunnels.cloudflared.create(
+                account_id=account_id, **payload_from_params(params, FIELDS)
+            ),
+            lambda: matching_resources(list_tunnels(module, tunnels), "name", params["name"]),
+        )
 
     cfd_tunnel = checked_tunnel(module, cfd_tunnel)
     if params.get("config_src") is not None:
@@ -182,13 +198,7 @@ def run(module, client):
         account_id=account_id,
         name=params["name"],
     ):
-        current = find_resource(
-            module,
-            tunnels.list(account_id=account_id, name=params["name"], is_deleted=False),
-            "cloudflared tunnel",
-            "name",
-            params["name"],
-        )
+        current = find_resource(module, list_tunnels(module, tunnels), "cloudflared tunnel", "name", params["name"])
 
     if params["state"] == "absent":
         ensure_resource_absent(
@@ -200,7 +210,7 @@ def run(module, client):
             context={"account_id": account_id},
         )
 
-    ensure_present(module, tunnels, current)
+    ensure_present(module, client, current)
 
 
 def main():

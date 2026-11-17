@@ -20,6 +20,7 @@ notes:
     C(differences), so the stored form can be requested instead.
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.create
 options:
   zone_id:
     required: true
@@ -53,8 +54,11 @@ options:
         because Cloudflare does not store it; omit the parameter instead.
       - An empty C(id) or C(ref) fails before any change, because Cloudflare
         assigns the rule its own value instead; omit the field instead.
-      - A rule's C(action_parameters.headers) and C(action_parameters.rules) mappings
-        are compared on their complete key sets, so omitting an entry removes it.
+      - A rule's C(action_parameters) are compared on their complete key sets
+        at every level, as Cloudflare stores them exactly as sent and an update
+        replaces them, so omitting a parameter or a nested key, such as a
+        C(headers) entry, removes it. The C(version) Cloudflare sets to
+        V(latest) for an C(execute) rule that omits it is ignored.
       - Use the Cloudflare API names for C(set_cache_control) directives, such as
         C(max-age) and C(no-cache); their snake_case spellings fail before any change.
       - When rules hold credentials, pass them from a vaulted variable and set
@@ -141,7 +145,9 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     require_mapping,
     resource_field,
     serialize_resource,
+    unique_match,
     values_differ,
+    without_retries,
 )
 
 # The SDK renames these snake_case action parameters to their API spellings on
@@ -231,11 +237,11 @@ ASSIGNED_RULE_FIELDS = ("id", "last_updated", "ref", "version")
 # Rule fields Cloudflare fills in when a rule with this action omits them.
 RULE_DEFAULTS = {"skip": {"logging": {"enabled": True}}}
 
+# Action parameters Cloudflare fills in when a rule with this action omits them.
+ACTION_PARAMETER_DEFAULTS = {"execute": {"version": "latest"}}
+
 # Cloudflare drops these rule fields when they are empty.
 EMPTY_RULE_FIELDS = {"action_parameters": {}, "description": ""}
-
-# Header and skip-rule maps are compared whole, so removed entries count.
-EXACT_RULE_FIELDS = ("headers", "rules")
 
 
 def compared_rule_field(rule, key, desired):
@@ -255,11 +261,33 @@ def compared_rule_field(rule, key, desired):
     return key not in defaults or values_differ(rule[key], defaults[key])
 
 
+def comparable_action_parameters(rule, desired):
+    """Return the rule's action_parameters without the defaults Cloudflare filled in that desired omits.
+
+    Cloudflare stores the other action parameters exactly as sent, so they are
+    kept whole.
+    """
+    value = rule.get("action_parameters")
+    requested = desired.get("action_parameters")
+    requested = requested if isinstance(requested, dict) else {}
+    defaults = ACTION_PARAMETER_DEFAULTS.get(rule.get("action"), {})
+    if not isinstance(value, dict):
+        return value
+
+    return {
+        key: item
+        for key, item in value.items()
+        if key in requested or key not in defaults or values_differ(item, defaults[key])
+    }
+
+
 def comparable_rules(rules, desired_rules):
     """Project current rules for comparison with the desired rules.
 
-    Each rule keeps every compared field; nested mappings are projected onto
-    the requested fields.
+    Each rule keeps every compared field. Its action_parameters are kept
+    whole, apart from defaults Cloudflare filled in, as Cloudflare stores them
+    exactly as sent; other nested mappings are projected onto the requested
+    fields.
     """
     comparable = []
     for index, rule in enumerate(rules):
@@ -268,9 +296,9 @@ def comparable_rules(rules, desired_rules):
         comparable.append(
             {
                 key: (
-                    normalize_current_by_desired_fields(value, desired[key], EXACT_RULE_FIELDS)
-                    if key in desired
-                    else value
+                    comparable_action_parameters(rule, desired)
+                    if key == "action_parameters"
+                    else normalize_current_by_desired_fields(value, desired[key]) if key in desired else value
                 )
                 for key, value in rule.items()
                 if compared_rule_field(rule, key, desired)
@@ -351,12 +379,16 @@ def run(module, client):
         "ruleset",
         current,
         payload,
-        create=lambda payload: checked_ruleset(module, rulesets.create(zone_id=zone_id, **payload), phase),
+        create=lambda payload: checked_ruleset(
+            module, without_retries(client).rulesets.create(zone_id=zone_id, **payload), phase
+        ),
         update=lambda ruleset_id, payload: checked_ruleset(
             module,
             rulesets.phases.update(phase, zone_id=zone_id, **payload),
             phase,
         ),
+        # A zone has at most one entrypoint ruleset per phase.
+        find_created=lambda: unique_match(get_or_none(rulesets.phases.get, phase, zone_id=zone_id)),
         expected_name=name,
         defaults={"rules": []},
         exact_values=("rules",),

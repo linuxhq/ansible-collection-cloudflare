@@ -20,6 +20,7 @@ author:
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
   - linuxhq.cloudflare.cloudflare.account
+  - linuxhq.cloudflare.cloudflare.create
 options:
   name:
     required: true
@@ -94,17 +95,23 @@ from base64 import b64decode
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
-    CloudflareResponseError,
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
     cloudflare_error_details,
+    create_once,
     ensure_resource_absent,
     find_resource,
+    matching_resources,
     resource_field,
     resource_id,
     serialize_resource,
+    without_retries,
 )
+
+
+class CloudflareResponseError(Exception):
+    """A response that does not describe the WARP Connector the request named."""
 
 
 def validate_created_secret(module):
@@ -123,6 +130,12 @@ def validate_created_secret(module):
 
     if not secret:
         module.fail_json(msg="tunnel_secret must be non-empty and base64-encoded")
+
+
+def list_connectors(module, connectors):
+    """Return the WARP Connectors that are not deleted and whose name matches the requested one."""
+    params = module.params
+    return connectors.list(account_id=params["account_id"], name=params["name"], is_deleted=False)
 
 
 def checked_connector(module, connector, expected_id=None):
@@ -160,9 +173,10 @@ def apply_created_secret(module, connectors, connector_id):
     return connector
 
 
-def ensure_present(module, connectors, current):
+def ensure_present(module, client, current):
     params = module.params
     account_id = params["account_id"]
+    connectors = client.zero_trust.tunnels.warp_connector
 
     if current is not None:
         current_id = resource_id(module, current, "WARP Connector")
@@ -191,7 +205,12 @@ def ensure_present(module, connectors, current):
         account_id=account_id,
         name=params["name"],
     ):
-        warp_connector = connectors.create(account_id=account_id, name=params["name"])
+        warp_connector = create_once(
+            lambda: without_retries(client).zero_trust.tunnels.warp_connector.create(
+                account_id=account_id, name=params["name"]
+            ),
+            lambda: matching_resources(list_connectors(module, connectors), "name", params["name"]),
+        )
 
     warp_connector = checked_connector(module, warp_connector)
     if params.get("tunnel_secret") is not None:
@@ -209,13 +228,7 @@ def run(module, client):
         account_id=account_id,
         name=params["name"],
     ):
-        current = find_resource(
-            module,
-            connectors.list(account_id=account_id, name=params["name"], is_deleted=False),
-            "WARP Connector",
-            "name",
-            params["name"],
-        )
+        current = find_resource(module, list_connectors(module, connectors), "WARP Connector", "name", params["name"])
 
     if params["state"] == "absent":
         ensure_resource_absent(
@@ -227,7 +240,7 @@ def run(module, client):
             context={"account_id": account_id},
         )
 
-    ensure_present(module, connectors, current)
+    ensure_present(module, client, current)
 
 
 def main():

@@ -30,3 +30,12 @@ options:
     required: true
     type: str
 """
+
+    CREATE = r"""
+options: {}
+notes:
+  - Requests that create a resource are sent once, without the Cloudflare SDK's automatic retries, which could create
+    a duplicate. When one fails without a response, such as after a timeout, or with a 5xx status, Cloudflare may have
+    created the resource anyway, so the module looks it up again as it did before creating it. A single match is
+    treated as the created resource; otherwise the module fails with the original error.
+"""

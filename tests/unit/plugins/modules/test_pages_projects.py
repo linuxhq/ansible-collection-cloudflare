@@ -1,7 +1,11 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, call
+from urllib.parse import unquote
+
+import cloudflare
+import httpx
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import pages_projects
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
@@ -9,6 +13,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     ModuleExit,
     ModuleFail,
     status_error,
+    timeout_error,
 )
 
 PROJECT = {"name": "docs", "production_branch": "main"}
@@ -38,6 +43,8 @@ def client_with(
     other_domains maps another project's name to its domain list.
     """
     client = Mock()
+    # Retry overrides return the same client so their calls are observable.
+    client.with_options.return_value = client
     api = client.pages.projects
     api.list.return_value = list(account_projects)
     api.get.side_effect = [status_error(404) if project is None else project for project in projects]
@@ -47,6 +54,15 @@ def client_with(
         (other_domains or {}).get(project_name, domains)
     )
     api.domains.create.return_value = created_domain
+
+    def get(path, cast_to, options):
+        # Domains are read page by page with raw requests; serve them from
+        # api.domains.list as one page, so the calls stay observable there.
+        _ignored, _accounts, account_id, _pages, _projects, project_name, _domains = path.split("/")
+        result = api.domains.list(project_name=unquote(project_name), account_id=unquote(account_id))
+        return {"result": list(result), "result_info": {"page": options["params"]["page"], "total_pages": 1}}
+
+    client.get.side_effect = get
     return client, api
 
 
@@ -1025,6 +1041,54 @@ class PagesProjectsTests(TestCase):
         self.assertEqual(result["pages_project"], refreshed)
         self.assertEqual(result["domains"], [{"name": "new.example.com"}])
 
+    def test_reads_every_page_of_domains(self):
+        # Cloudflare returns 20 domains per page, and a project's domains
+        # field omits pending custom domains.
+        names = [f"d{index}.example.com" for index in range(25)]
+        requests = []
+
+        def respond(request):
+            requests.append(request)
+            path = request.url.path
+            if path.endswith("/pages/projects/docs"):
+                return httpx.Response(200, json={"success": True, "result": PROJECT})
+
+            if path.endswith("/pages/projects/docs/domains"):
+                page = int(request.url.params["page"])
+                per_page = int(request.url.params["per_page"])
+                result = [{"name": name} for name in names[(page - 1) * per_page : page * per_page]]
+                result_info = {"page": page, "per_page": per_page, "total_pages": 2, "total_count": len(names)}
+                return httpx.Response(200, json={"success": True, "result": result, "result_info": result_info})
+
+            return httpx.Response(500, json={"success": False, "errors": [], "messages": []})
+
+        with cloudflare.Cloudflare(
+            api_token="EXAMPLE-token", max_retries=0, http_client=httpx.Client(transport=httpx.MockTransport(respond))
+        ) as client:
+            result = self.run_module(FakeModule(params(domains=[{"name": names[-1]}])), client)
+
+        self.assertNotIn("msg", result)
+        self.assertFalse(result["changed"])
+        self.assertEqual([request.method for request in requests], ["GET", "GET", "GET"])
+        self.assertEqual([request.url.params.get("page") for request in requests], [None, "1", "2"])
+
+    def test_create_recovers_the_project_and_domain_after_lost_responses(self):
+        refreshed = {**PROJECT, "domains": ["new.example.com"]}
+        client, api = client_with([None, PROJECT, refreshed])
+        api.create.side_effect = timeout_error()
+        api.domains.create.side_effect = status_error(502)
+        api.domains.get.return_value = {"name": "new.example.com"}
+
+        result = self.run_module(FakeModule(params(domains=[{"name": "new.example.com"}])), client)
+
+        self.assertEqual(client.with_options.call_args_list, [call(max_retries=0), call(max_retries=0)])
+        api.create.assert_called_once()
+        api.domains.create.assert_called_once()
+        api.domains.get.assert_called_once_with("new.example.com", project_name="docs", account_id="account")
+        self.assertEqual(result["message"], "Pages project created")
+        self.assertEqual(result["pages_project"], refreshed)
+        self.assertEqual(result["domains"], [{"name": "new.example.com"}])
+
     def test_domain_names_compare_case_insensitively(self):
         current = {**PROJECT, "domains": ["docs.example.com"]}
         client, api = client_with([current], domains=[{"name": "docs.example.com"}])
@@ -1212,6 +1276,8 @@ class PagesProjectsTests(TestCase):
 
     def test_lookup_errors_other_than_not_found_propagate(self):
         client = Mock()
+        # Retry overrides return the same client so their calls are observable.
+        client.with_options.return_value = client
         client.pages.projects.get.side_effect = status_error(403)
 
         with self.assertRaises(Exception) as raised:

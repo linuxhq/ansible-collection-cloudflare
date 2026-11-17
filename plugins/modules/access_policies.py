@@ -40,6 +40,7 @@ notes:
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
   - linuxhq.cloudflare.cloudflare.account
+  - linuxhq.cloudflare.cloudflare.create
 options:
   name:
     required: true
@@ -174,9 +175,11 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_absent,
     ensure_resource_present,
     find_resource,
+    matching_resources,
     payload_from_params,
     unsupported_fields,
     validate_access_selectors,
+    without_retries,
 )
 
 FIELDS = (
@@ -277,8 +280,11 @@ def run(module, client):
         "Access policy",
         current,
         payload_from_params(params, FIELDS),
-        create=lambda payload: policies.create(account_id=account_id, **payload),
+        create=lambda payload: without_retries(client).zero_trust.access.policies.create(
+            account_id=account_id, **payload
+        ),
         update=lambda policy_id, payload: policies.update(policy_id, account_id=account_id, **payload),
+        find_created=lambda: matching_resources(policies.list(account_id=account_id), "name", params["name"]),
         expected_name=params["name"],
         # Cloudflare omits a prompt cleared with "" and approval groups cleared with [].
         defaults={**dict.fromkeys(FALSE_FIELDS, False), "approval_groups": [], "purpose_justification_prompt": ""},

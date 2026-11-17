@@ -25,6 +25,7 @@ notes:
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
   - linuxhq.cloudflare.cloudflare.account
+  - linuxhq.cloudflare.cloudflare.create
 options:
   name:
     required: true
@@ -249,8 +250,10 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
+    create_once,
     ensure_resource_absent,
     find_resource,
+    matching_resources,
     require_applied,
     require_mapping,
     resource_field,
@@ -259,6 +262,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     unsupported_fields,
     valid_dns_labels,
     values_differ,
+    without_retries,
 )
 
 ITEMS_PER_PAGE = 500
@@ -891,9 +895,11 @@ def ensure_present(module, client, current):
             account_id=account_id,
             name=params["name"],
         ):
-            current = checked_list(
-                module, lists.create(account_id=account_id, **payload), params["name"], params["kind"]
+            rules_list = create_once(
+                lambda: without_retries(client).rules.lists.create(account_id=account_id, **payload),
+                lambda: matching_resources(lists.list(account_id=account_id), "name", params["name"]),
             )
+            current = checked_list(module, rules_list, params["name"], params["kind"])
 
         require_applied(module, current, payload, "Rules list", LIST_DEFAULTS)
         current_id = current["id"]

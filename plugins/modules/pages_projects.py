@@ -24,6 +24,7 @@ notes:
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
   - linuxhq.cloudflare.cloudflare.account
+  - linuxhq.cloudflare.cloudflare.create
 options:
   name:
     required: true
@@ -204,16 +205,21 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     DOT_SEGMENTS,
     cloudflare_client,
     cloudflare_error_context,
+    create_once,
     differs,
     fail_not_applied,
     get_or_none,
+    list_all_pages,
+    path_segment,
     payload_from_params,
     require_applied,
     resource_field,
     resource_list,
     serialize_resource,
+    unique_match,
     valid_dns_labels,
     values_differ,
+    without_retries,
 )
 
 FIELDS = ("build_config", "deployment_configs", "name", "production_branch", "source")
@@ -616,6 +622,15 @@ def get_project(module, client):
     return None if project is None else checked_project(module, project)
 
 
+def list_domains(module, client, project_name):
+    """Return every custom domain of the project.
+
+    The generated SDK method reads only the first page of domains.
+    """
+    path = f"/accounts/{path_segment(module.params['account_id'])}/pages/projects/{path_segment(project_name)}/domains"
+    return list_all_pages(module, client, path, "Pages domain")
+
+
 def existing_domain_names(module, client, project):
     params = module.params
     with cloudflare_error_context(
@@ -623,7 +638,7 @@ def existing_domain_names(module, client, project):
         account_id=params["account_id"],
         name=params["name"],
     ):
-        domains = client.pages.projects.domains.list(project_name=params["name"], account_id=params["account_id"])
+        domains = list_domains(module, client, params["name"])
         return current_domain_names(module, project, domains)
 
 
@@ -657,9 +672,7 @@ def check_domain_owners(module, client, existing_names, domain_names):
             account_id=params["account_id"],
             name=other["name"],
         ):
-            domains = get_or_none(
-                client.pages.projects.domains.list, project_name=other["name"], account_id=params["account_id"]
-            )
+            domains = get_or_none(list_domains, module, client, other["name"])
 
         # A project deleted since it was listed has no domains.
         if domains is None:
@@ -715,7 +728,6 @@ def update_project(module, client, current, payload, secrets_requested):
 
 
 def add_domains(module, client, project, existing_names, domain_names):
-    params = module.params
     missing_domains = [domain_name for domain_name in domain_names if domain_name not in existing_names]
     if module.check_mode and missing_domains:
         module.exit_json(
@@ -724,24 +736,27 @@ def add_domains(module, client, project, existing_names, domain_names):
             pages_project=project,
         )
 
-    added_domains = []
-    for domain_name in missing_domains:
-        with cloudflare_error_context(
-            "Cloudflare API request failed while adding the Pages project domain",
-            account_id=params["account_id"],
-            name=params["name"],
-            domain=domain_name,
-        ):
-            domain = serialize_resource(
-                client.pages.projects.domains.create(
-                    project_name=params["name"], account_id=params["account_id"], name=domain_name
-                )
+    return [add_domain(module, client, domain_name) for domain_name in missing_domains]
+
+
+def add_domain(module, client, domain_name):
+    params = module.params
+    query = {"project_name": params["name"], "account_id": params["account_id"]}
+    with cloudflare_error_context(
+        "Cloudflare API request failed while adding the Pages project domain",
+        account_id=params["account_id"],
+        name=params["name"],
+        domain=domain_name,
+    ):
+        domain = serialize_resource(
+            create_once(
+                lambda: without_retries(client).pages.projects.domains.create(**query, name=domain_name),
+                lambda: unique_match(get_or_none(client.pages.projects.domains.get, domain_name, **query)),
             )
+        )
 
-        resource_field(module, domain, "name", "Pages domain", expected=domain_name)
-        added_domains.append(domain)
-
-    return added_domains
+    resource_field(module, domain, "name", "Pages domain", expected=domain_name)
+    return domain
 
 
 def ensure_present(module, client, domain_names):
@@ -788,7 +803,13 @@ def ensure_present(module, client, domain_names):
             account_id=params["account_id"],
             name=params["name"],
         ):
-            current = checked_project(module, client.pages.projects.create(account_id=params["account_id"], **payload))
+            current = checked_project(
+                module,
+                create_once(
+                    lambda: without_retries(client).pages.projects.create(account_id=params["account_id"], **payload),
+                    lambda: unique_match(get_project(module, client)),
+                ),
+            )
 
         comparable_payload = comparable_pages_payload(payload)
         require_applied(module, comparable_project(current, comparable_payload), comparable_payload, "Pages project")

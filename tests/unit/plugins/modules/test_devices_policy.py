@@ -342,10 +342,24 @@ class DevicesPolicyTests(TestCase):
         self.assertNotIn("msg", result)
 
     def test_known_route_and_service_mode_fields_are_sent(self):
-        routes = [{"address": "192.0.2.0/24", "description": None}, {"host": "example.com", "description": "kept"}]
+        routes = [{"address": "192.0.2.0/24"}, {"host": "example.com", "description": "kept"}]
         sent = {"exclude": routes, "service_mode_v2": {"mode": "proxy", "port": 3000}}
         result, api = self.run_module(FakeModule({"account_id": "account", **sent}), {"exclude": []}, sent)
 
         api.edit.assert_called_once_with(account_id="account", **sent)
         self.assertTrue(result["changed"])
         self.assertNotIn("msg", result)
+
+    def test_null_route_fields_are_not_sent(self):
+        # A null route field counts as omitted, so it is not sent.
+        for field in ("exclude", "include"):
+            with self.subTest(field=field):
+                requested = [{"address": "192.0.2.1", "host": None, "description": None}]
+                stored = [{"address": "192.0.2.1/32"}]
+                result, api = self.run_module(
+                    FakeModule({"account_id": "account", field: requested}), {field: []}, {field: stored}
+                )
+
+                api.edit.assert_called_once_with(account_id="account", **{field: stored})
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)

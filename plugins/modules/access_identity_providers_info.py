@@ -55,7 +55,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_error_context,
-    resource_list,
+    exit_resource_list,
 )
 
 
@@ -65,17 +65,13 @@ def run(module, client):
         "Cloudflare API request failed while gathering Access identity providers",
         account_id=account_id,
     ):
-        providers = resource_list(
+        exit_resource_list(
             module,
+            "access_identity_providers",
             client.zero_trust.identity_providers.list(account_id=account_id),
             "Access identity provider",
             required_fields=("id", "name", "type"),
         )
-
-    module.exit_json(
-        changed=False,
-        access_identity_providers=providers,
-    )
 
 
 def main():

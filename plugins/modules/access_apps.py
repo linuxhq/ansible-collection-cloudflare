@@ -24,6 +24,7 @@ notes:
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
   - linuxhq.cloudflare.cloudflare.account
+  - linuxhq.cloudflare.cloudflare.create
 options:
   name:
     description:
@@ -236,6 +237,9 @@ options:
         the C(approvals_needed) of a group, is a change. Other entries, such as
         C(id) and C(precedence) links to reusable policies, are compared only
         on the keys they set.
+      - When omitted, the stored reusable and inline policies are kept; the
+        update sends each one as its C(id) and C(precedence) link, which
+        changes neither.
   same_site_cookie_attribute:
     type: str
     description:
@@ -281,6 +285,52 @@ EXAMPLES = r"""
     name: app
     domain: app.example.com
     type: self_hosted
+
+- name: Ensure Access application uses a reusable policy
+  linuxhq.cloudflare.access_apps:
+    account_id: "{{ account_id }}"
+    api_token: "{{ cloudflare_api_token }}"
+    name: app
+    domain: app.example.com
+    type: self_hosted
+    policies:
+      - id: "{{ access_policy_id }}"
+        precedence: 1
+
+- name: Ensure Access application has an inline policy
+  linuxhq.cloudflare.access_apps:
+    account_id: "{{ account_id }}"
+    api_token: "{{ cloudflare_api_token }}"
+    name: app
+    domain: app.example.com
+    type: self_hosted
+    session_duration: 12h
+    policies:
+      - name: admins
+        decision: allow
+        include:
+          - email_domain:
+              domain: example.com
+
+- name: Ensure Access application protects several hostnames
+  linuxhq.cloudflare.access_apps:
+    account_id: "{{ account_id }}"
+    api_token: "{{ cloudflare_api_token }}"
+    name: app
+    domain: app.example.com
+    type: self_hosted
+    destinations:
+      - type: public
+        uri: app.example.com
+      - type: public
+        uri: app.example.com/admin
+
+- name: Ensure Access application is absent
+  linuxhq.cloudflare.access_apps:
+    account_id: "{{ account_id }}"
+    api_token: "{{ cloudflare_api_token }}"
+    name: app
+    state: absent
 """
 
 RETURN = r"""
@@ -318,11 +368,13 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_absent,
     ensure_resource_present,
     find_resource,
+    matching_resources,
     normalize_current_by_desired_fields,
     payload_from_params,
     serialize_resource,
     unsupported_fields,
     validate_access_selectors,
+    without_retries,
 )
 
 FIELDS = (
@@ -684,6 +736,14 @@ def policy_without_nulls(policy):
     return policy
 
 
+def policy_link(policy):
+    """Return the link to a stored reusable or inline policy: its id and precedence."""
+    if not isinstance(policy, dict):
+        return policy
+
+    return {key: policy[key] for key in ("id", "precedence") if key in policy}
+
+
 def comparable_policy(policy, desired):
     """Return policy projected onto the fields of desired.
 
@@ -823,6 +883,10 @@ def run(module, client):
 
     if "policies" in payload:
         payload["policies"] = [policy_without_nulls(policy) for policy in payload["policies"]]
+    elif current is not None and "policies" in preserved_fields and isinstance(current.get("policies"), list):
+        # Cloudflare replaces inline policies sent whole, and assigns them a new
+        # updated_at, so stored policies are kept as links, which change none.
+        payload["policies"] = [policy_link(policy) for policy in current["policies"]]
 
     ensure_resource_present(
         module,
@@ -830,8 +894,13 @@ def run(module, client):
         "Access application",
         current,
         payload,
-        create=lambda payload: applications.create(account_id=account_id, **payload),
+        create=lambda payload: without_retries(client).zero_trust.access.applications.create(
+            account_id=account_id, **payload
+        ),
         update=lambda app_id, payload: applications.update(app_id, account_id=account_id, **payload),
+        find_created=lambda: matching_resources(
+            applications.list(account_id=account_id, name=params["name"], exact=True), "name", params["name"]
+        ),
         expected_name=params["name"],
         defaults=FIELD_DEFAULTS,
         preserved_fields=preserved_fields,

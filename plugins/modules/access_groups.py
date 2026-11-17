@@ -38,6 +38,7 @@ notes:
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
   - linuxhq.cloudflare.cloudflare.account
+  - linuxhq.cloudflare.cloudflare.create
 options:
   name:
     required: true
@@ -127,8 +128,10 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_absent,
     ensure_resource_present,
     find_resource,
+    matching_resources,
     payload_from_params,
     validate_access_selectors,
+    without_retries,
 )
 
 FIELDS = ("exclude", "include", "is_default", "name", "require")
@@ -175,8 +178,13 @@ def run(module, client):
         "Access group",
         current,
         payload_from_params(params, FIELDS),
-        create=lambda payload: groups.create(account_id=account_id, **payload),
+        create=lambda payload: without_retries(client).zero_trust.access.groups.create(
+            account_id=account_id, **payload
+        ),
         update=lambda group_id, payload: groups.update(group_id, account_id=account_id, **payload),
+        find_created=lambda: matching_resources(
+            groups.list(account_id=account_id, name=params["name"]), "name", params["name"]
+        ),
         expected_name=params["name"],
         defaults={"is_default": False},
         preserved_fields=PRESERVED_FIELDS,

@@ -3,11 +3,15 @@
 from unittest import TestCase
 from unittest.mock import Mock
 
+import cloudflare
+
 from ansible_collections.linuxhq.cloudflare.plugins.modules import access_service_tokens
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
     ModuleFail,
+    status_error,
+    timeout_error,
 )
 
 
@@ -19,6 +23,8 @@ def params(**updates):
 
 def client_with(tokens=(), created=None, updated=None, deleted=None):
     client = Mock()
+    # Retry overrides return the same client so their calls are observable.
+    client.with_options.return_value = client
     api = client.zero_trust.access.service_tokens
     api.list.return_value = list(tokens)
     api.create.return_value = created
@@ -33,6 +39,47 @@ class AccessServiceTokensTests(TestCase):
             access_service_tokens.run(module, client)
 
         return raised.exception.values
+
+    def test_created_token_is_returned_when_its_check_fails(self):
+        # The client secret is returned only in the create response.
+        cases = (
+            ({"id": "token", "name": "other", "duration": "1y", "client_secret": "secret"}, "wrong service token"),
+            ({"id": "token", "name": "automation", "duration": "8760h", "client_secret": "secret"}, "did not apply"),
+        )
+        for created, message in cases:
+            with self.subTest(created=created):
+                client, _ignored = client_with(created=created)
+
+                result = self.run_module(FakeModule(params()), client)
+
+                self.assertIn(message, result["msg"])
+                self.assertEqual(result["service_token"], created)
+
+    def test_create_recovers_the_token_after_a_lost_response(self):
+        recovered = {"id": "token", "name": "automation", "duration": "1y"}
+        client, api = client_with()
+        api.create.side_effect = timeout_error()
+        api.list.side_effect = [[], [recovered]]
+
+        result = self.run_module(FakeModule(params()), client)
+
+        client.with_options.assert_called_once_with(max_retries=0)
+        api.create.assert_called_once()
+        self.assertEqual(result["message"], "Service token created")
+        self.assertEqual(result["service_token"], recovered)
+
+    def test_create_failure_is_reported_without_a_single_match(self):
+        for found in ([], [{"id": "one", "name": "automation"}, {"id": "two", "name": "automation"}]):
+            with self.subTest(found=found):
+                client, api = client_with()
+                error = status_error(503)
+                api.create.side_effect = error
+                api.list.side_effect = [[], found]
+
+                with self.assertRaises(cloudflare.InternalServerError) as raised:
+                    self.run_module(FakeModule(params()), client)
+
+                self.assertIs(raised.exception, error)
 
     def test_empty_or_whitespace_name_fails_before_any_request(self):
         # Cloudflare stores such a name as null or "", so the resource is never found again.

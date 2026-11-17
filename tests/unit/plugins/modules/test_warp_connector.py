@@ -34,6 +34,8 @@ def params(**updates):
 
 def client_with(connectors=(), created=None, edited=None):
     client = Mock()
+    # Retry overrides return the same client so their calls are observable.
+    client.with_options.return_value = client
     api = client.zero_trust.tunnels.warp_connector
     api.list.return_value = list(connectors)
     api.create.return_value = created
@@ -48,6 +50,19 @@ class WarpConnectorTests(TestCase):
             warp_connector.run(module, client)
 
         return raised.exception.values
+
+    def test_create_recovers_the_connector_after_a_lost_response(self):
+        recovered = {"id": "connector-id", "name": "connector"}
+        client, api = client_with()
+        api.create.side_effect = status_error(500)
+        api.list.side_effect = [[], [recovered]]
+
+        result = self.run_module(FakeModule(params()), client)
+
+        client.with_options.assert_called_once_with(max_retries=0)
+        api.create.assert_called_once()
+        self.assertEqual(result["message"], "WARP Connector created")
+        self.assertEqual(result["warp_connector"], recovered)
 
     def test_looks_up_active_connector_by_name(self):
         client, api = client_with()

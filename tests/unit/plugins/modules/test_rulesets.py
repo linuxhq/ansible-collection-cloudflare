@@ -11,6 +11,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     ModuleExit,
     ModuleFail,
     status_error,
+    timeout_error,
 )
 
 PHASE = "http_request_firewall_custom"
@@ -33,6 +34,8 @@ def params(**updates):
 
 def make_client(current=None, created=None, updated=None):
     client = Mock()
+    # Retry overrides return the same client so their calls are observable.
+    client.with_options.return_value = client
     api = client.rulesets
     if current is None:
         api.phases.get.side_effect = status_error(404)
@@ -51,6 +54,18 @@ class RulesetsTests(TestCase):
             rulesets.run(module, client)
 
         return raised.exception.values
+
+    def test_create_recovers_the_entrypoint_after_a_lost_response(self):
+        client, api = make_client()
+        api.create.side_effect = timeout_error()
+        api.phases.get.side_effect = [status_error(404), CURRENT]
+
+        result = self.run_module(FakeModule(params(rules=RULES)), client)
+
+        client.with_options.assert_called_once_with(max_retries=0)
+        api.create.assert_called_once()
+        self.assertEqual(result["message"], "Ruleset created")
+        self.assertEqual(result["ruleset"], CURRENT)
 
     def test_unsupported_kinds_fail_before_opening_client(self):
         for kind in ("custom", "managed", "root"):
@@ -343,6 +358,64 @@ class RulesetHeaderTests(TestCase):
 
         api.phases.update.assert_called_once()
         self.assertTrue(result["changed"])
+
+    def test_removing_a_nested_action_parameter_is_a_change(self):
+        # Cloudflare stores action_parameters exactly as sent and an update
+        # replaces them, so a key the request omits at any level is removed.
+        cases = (
+            ({"cache": True, "edge_ttl": {"mode": "override_origin", "default": 60}}, {"cache": True}),
+            (
+                {"cache": True, "edge_ttl": {"mode": "override_origin", "default": 60}},
+                {"cache": True, "edge_ttl": {"mode": "override_origin"}},
+            ),
+            ({"phases": ["http_ratelimit"], "products": ["waf"]}, {"phases": ["http_ratelimit"]}),
+        )
+        for stored, requested in cases:
+            with self.subTest(requested=requested):
+                rule = {"enabled": True, "action": "set_cache_settings", "expression": "true"}
+                desired = [{**rule, "action_parameters": requested}]
+                client, api = make_client(
+                    {**CURRENT, "rules": [{**rule, "action_parameters": stored}]},
+                    updated={**CURRENT, "rules": desired},
+                )
+
+                result = self.run_module(FakeModule(params(rules=desired)), client)
+
+                api.phases.update.assert_called_once()
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)
+
+    def test_execute_rule_matches_the_version_cloudflare_assigns(self):
+        # Cloudflare stores an execute rule without a version as version latest.
+        rule = {"enabled": True, "action": "execute", "expression": "true"}
+        requested = [{**rule, "action_parameters": {"id": "managed"}}]
+        stored = [{**rule, "action_parameters": {"id": "managed", "version": "latest"}}]
+        client, api = make_client({**CURRENT, "rules": stored})
+
+        result = self.run_module(FakeModule(params(rules=requested)), client)
+
+        api.phases.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+        for version in ("1", None):
+            with self.subTest(version=version):
+                pinned = [{**rule, "action_parameters": {"id": "managed", "version": "1"}}]
+                client, api = make_client({**CURRENT, "rules": pinned}, updated={**CURRENT, "rules": stored})
+                desired = requested if version is None else pinned
+
+                result = self.run_module(FakeModule(params(rules=desired)), client)
+
+                self.assertEqual(api.phases.update.called, version is None)
+
+    def test_kept_nested_action_parameter_fails_postcondition(self):
+        rule = {"enabled": True, "action": "set_cache_settings", "expression": "true"}
+        stored = [{**rule, "action_parameters": {"cache": True, "edge_ttl": {"mode": "respect_origin"}}}]
+        desired = [{**rule, "action_parameters": {"cache": True}}]
+        client, _ignored = make_client({**CURRENT, "rules": stored}, updated={**CURRENT, "rules": stored})
+
+        result = self.run_module(FakeModule(params(rules=desired)), client)
+
+        self.assertIn("did not apply", result["msg"])
 
     def test_rule_without_enabled_does_not_match_a_disabled_rule(self):
         disabled = {"ref": "keep", "action": "block", "expression": "true", "enabled": False}
