@@ -8,6 +8,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleExit,
     ModuleFail,
+    connection_error,
 )
 
 SECRET = "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg="
@@ -33,6 +34,8 @@ def params(**updates):
 
 def client_with(tunnels=(), created=None, edited=None):
     client = Mock()
+    # Retry overrides return the same client so their calls are observable.
+    client.with_options.return_value = client
     api = client.zero_trust.tunnels.cloudflared
     api.list.return_value = list(tunnels)
     api.create.return_value = created
@@ -47,6 +50,20 @@ class CfdTunnelTests(TestCase):
             cfd_tunnel.run(module, client)
 
         return raised.exception.values
+
+    def test_create_recovers_the_tunnel_after_a_lost_response(self):
+        recovered = {"id": "tunnel-id", "name": "tunnel", "config_src": "cloudflare"}
+        client, api = client_with()
+        api.create.side_effect = connection_error()
+        api.list.side_effect = [[], [recovered]]
+
+        result = self.run_module(FakeModule(params()), client)
+
+        client.with_options.assert_called_once_with(max_retries=0)
+        api.create.assert_called_once()
+        self.assertEqual(api.list.call_args.kwargs, {"account_id": "account", "name": "tunnel", "is_deleted": False})
+        self.assertEqual(result["message"], "Cloudflared tunnel created")
+        self.assertEqual(result["cfd_tunnel"], recovered)
 
     def test_looks_up_active_tunnel_by_name(self):
         client, api = client_with()

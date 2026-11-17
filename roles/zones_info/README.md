@@ -11,7 +11,6 @@ Gather information about cloudflare zones
 ## Role Variables
 
     zones_info_api_token: null
-    zones_info_match: all
 
 ## Dependencies
 

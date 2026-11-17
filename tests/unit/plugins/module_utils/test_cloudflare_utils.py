@@ -13,6 +13,8 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     applied_differences,
     cloudflare_client,
     cloudflare_error_context,
+    cloudflare_error_details,
+    create_once,
     differs,
     ensure_resource_absent,
     ensure_resource_present,
@@ -22,6 +24,8 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     fail_not_applied,
     find_resource,
     get_or_none,
+    list_all_pages,
+    matching_resources,
     normalize_current_by_desired_fields,
     payload_from_params,
     require_applied,
@@ -34,6 +38,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     valid_dns_labels,
     validate_access_selectors,
     values_differ,
+    without_retries,
 )
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
@@ -41,6 +46,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     ModuleFail,
     connection_error,
     status_error,
+    timeout_error,
 )
 
 
@@ -824,7 +830,7 @@ class EnsureSettingsTests(TestCase):
 
 
 class EnsureResourceTests(TestCase):
-    def present(self, current, payload, created=None, updated=None, check_mode=False, **kwargs):
+    def present(self, current, payload, created=None, updated=None, check_mode=False, found=(), **kwargs):
         create = Mock(return_value=created)
         update = Mock(return_value=updated)
         with self.assertRaises((ModuleExit, ModuleFail)) as raised:
@@ -836,6 +842,7 @@ class EnsureResourceTests(TestCase):
                 payload,
                 create,
                 update,
+                lambda: list(found),
                 **kwargs,
             )
 
@@ -911,7 +918,7 @@ class EnsureResourceTests(TestCase):
         create = Mock(side_effect=error)
 
         with self.assertRaises(cloudflare.BadRequestError):
-            ensure_resource_present(FakeModule({}), "thing", "thing", None, {"a": 1}, create, Mock())
+            ensure_resource_present(FakeModule({}), "thing", "thing", None, {"a": 1}, create, Mock(), list)
 
         self.assertEqual(error._cloudflare_message, "Cloudflare API request failed while creating the thing")
         self.assertEqual(error._cloudflare_context, {})
@@ -926,6 +933,7 @@ class EnsureResourceTests(TestCase):
                 {"a": 1},
                 Mock(side_effect=error),
                 Mock(),
+                list,
                 expected_name="n",
                 context={"account_id": "acc"},
             )
@@ -939,3 +947,184 @@ class EnsureResourceTests(TestCase):
             )
 
         self.assertEqual(error._cloudflare_context, {"resource_id": "one", "zone_id": "z"})
+
+    def test_create_recovers_the_resource_after_a_lost_response(self):
+        created = {"id": "one", "name": "n", "enabled": True}
+        for error in (connection_error(), timeout_error(), status_error(500), status_error(503)):
+            with self.subTest(error=type(error).__name__, status=getattr(error, "status_code", None)):
+                create = Mock(side_effect=error)
+                find = Mock(return_value=[created])
+                with self.assertRaises(ModuleExit) as raised:
+                    ensure_resource_present(
+                        FakeModule({}),
+                        "thing",
+                        "thing",
+                        None,
+                        {"name": "n", "enabled": True},
+                        create,
+                        Mock(),
+                        find,
+                        expected_name="n",
+                    )
+
+                create.assert_called_once_with({"name": "n", "enabled": True})
+                find.assert_called_once_with()
+                self.assertEqual(raised.exception.values["message"], "Thing created")
+                self.assertEqual(raised.exception.values["thing"], created)
+
+    def test_recovered_resource_is_checked_like_a_created_one(self):
+        with self.assertRaises(ModuleFail) as raised:
+            ensure_resource_present(
+                FakeModule({}),
+                "thing",
+                "thing",
+                None,
+                {"name": "n", "enabled": True},
+                Mock(side_effect=timeout_error()),
+                Mock(),
+                lambda: [{"id": "one", "name": "n", "enabled": False}],
+                expected_name="n",
+            )
+
+        self.assertIn("did not apply", raised.exception.values["msg"])
+
+
+class CreateOnceTests(TestCase):
+    def test_returns_the_created_resource_without_reading_it_again(self):
+        find = Mock()
+
+        self.assertEqual(create_once(lambda: {"id": "one"}, find), {"id": "one"})
+        find.assert_not_called()
+
+    def test_original_error_is_raised_unless_exactly_one_resource_matches(self):
+        for matches in ([], [{"id": "one"}, {"id": "two"}]):
+            with self.subTest(matches=matches):
+                error = timeout_error()
+
+                with self.assertRaises(cloudflare.APITimeoutError) as raised:
+                    create_once(Mock(side_effect=error), Mock(return_value=matches))
+
+                self.assertIs(raised.exception, error)
+
+    def test_original_error_is_raised_when_the_lookup_fails(self):
+        error = status_error(502)
+
+        with self.assertRaises(cloudflare.InternalServerError) as raised:
+            create_once(Mock(side_effect=error), Mock(side_effect=connection_error()))
+
+        self.assertIs(raised.exception, error)
+
+    def test_rejected_create_is_not_looked_up(self):
+        # Cloudflare answered, so the resource was not created.
+        for status_code in (400, 409, 429):
+            with self.subTest(status_code=status_code):
+                find = Mock(return_value=[{"id": "one"}])
+
+                with self.assertRaises(cloudflare.APIStatusError):
+                    create_once(Mock(side_effect=status_error(status_code)), find)
+
+                find.assert_not_called()
+
+    def test_matching_resources_compares_the_field_exactly(self):
+        items = [{"id": "one", "name": "n"}, {"id": "two", "name": "N"}, {"id": "three"}, None]
+
+        self.assertEqual(matching_resources(iter(items), "name", "n"), [{"id": "one", "name": "n"}])
+
+    def test_create_request_is_sent_once(self):
+        # The SDK would retry the 500 twice, creating up to three resources.
+        requests = []
+
+        def respond(request):
+            requests.append(request)
+            if request.method == "POST":
+                return httpx.Response(500, json={"success": False, "errors": [], "messages": []})
+
+            # The list paginates until a page is empty.
+            result = [{"id": "one", "name": "n"}] if request.url.params.get("page", "1") == "1" else []
+            return httpx.Response(200, json={"success": True, "result": result})
+
+        with cloudflare.Cloudflare(
+            api_token="EXAMPLE-token", http_client=httpx.Client(transport=httpx.MockTransport(respond))
+        ) as client:
+            groups = client.zero_trust.access.groups
+            group = create_once(
+                lambda: without_retries(client).zero_trust.access.groups.create(
+                    account_id="account", name="n", include=[{"everyone": {}}]
+                ),
+                lambda: matching_resources(groups.list(account_id="account", name="n"), "name", "n"),
+            )
+
+        self.assertEqual(group, {"id": "one", "name": "n"})
+        self.assertEqual([request.method for request in requests].count("POST"), 1)
+        self.assertEqual(requests[0].method, "POST")
+
+
+class ListAllPagesTests(TestCase):
+    def run_pages(self, pages):
+        requests = []
+
+        def respond(request):
+            requests.append(request)
+            page = int(request.url.params["page"])
+            return httpx.Response(200, json={"success": True, "errors": [], "messages": [], **pages[page - 1]})
+
+        with cloudflare.Cloudflare(
+            api_token="EXAMPLE-token", http_client=httpx.Client(transport=httpx.MockTransport(respond))
+        ) as client:
+            items = list_all_pages(FakeModule({}), client, "/accounts/a%2Fb/things", "thing")
+
+        return items, requests
+
+    def test_reads_every_page_until_total_pages(self):
+        first = [{"name": f"item-{index}"} for index in range(20)]
+        pages = [
+            {"result": first, "result_info": {"page": 1, "per_page": 20, "total_pages": 2}},
+            {"result": [{"name": "last"}], "result_info": {"page": 2, "per_page": 20, "total_pages": 2}},
+        ]
+
+        items, requests = self.run_pages(pages)
+
+        self.assertEqual(items, [*first, {"name": "last"}])
+        self.assertEqual(
+            [dict(request.url.params) for request in requests],
+            [
+                {"page": "1", "per_page": "20"},
+                {"page": "2", "per_page": "20"},
+            ],
+        )
+        self.assertEqual(requests[0].url.raw_path.split(b"?")[0], b"/client/v4/accounts/a%2Fb/things")
+
+    def test_total_pages_wins_over_a_short_page(self):
+        pages = [
+            {"result": [{"name": "a"}], "result_info": {"total_pages": 2}},
+            {"result": [{"name": "b"}], "result_info": {"total_pages": 2}},
+        ]
+
+        items, _ignored = self.run_pages(pages)
+
+        self.assertEqual(items, [{"name": "a"}, {"name": "b"}])
+
+    def test_without_total_pages_stops_at_a_short_page(self):
+        pages = [{"result": [{"name": str(index)} for index in range(20)]}, {"result": []}]
+
+        items, requests = self.run_pages(pages)
+
+        self.assertEqual(len(items), 20)
+        self.assertEqual(len(requests), 2)
+
+    def test_rejects_a_malformed_page(self):
+        with self.assertRaises(ModuleFail) as raised:
+            self.run_pages([{"result": {"name": "a"}}])
+
+        self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed thing data")
+
+
+class ResponseValidationErrorTests(TestCase):
+    def test_details_include_the_validation_message(self):
+        response = httpx.Response(200, json={"result": None}, request=httpx.Request("GET", "https://example.test"))
+        error = cloudflare.APIResponseValidationError(response, {"result": None}, message="Expected a dict")
+
+        details = cloudflare_error_details(error)
+
+        self.assertEqual(details["error"], "Expected a dict")
+        self.assertEqual(details["status_code"], 200)

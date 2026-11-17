@@ -23,7 +23,7 @@ options:
   disable_for_time:
     type: float
     description:
-      - Number of seconds users may temporarily disable the WARP client.
+      - Time limit, in seconds, that a user can use an override code to bypass WARP.
       - When omitted, the current value is left unchanged.
   gateway_proxy_enabled:
     type: bool

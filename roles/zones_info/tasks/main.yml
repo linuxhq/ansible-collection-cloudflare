@@ -4,7 +4,6 @@
     - zones_info
   linuxhq.cloudflare.zones_info:
     api_token: "{{ zones_info_api_token }}"
-    match: "{{ zones_info_match }}"
   register: __zones_info_query
   when:
     - zones_info_api_token is not none

@@ -11,6 +11,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleExit,
     ModuleFail,
+    connection_error,
 )
 
 ACTIONS = [{"id": "always_use_https"}]
@@ -32,6 +33,8 @@ def params(**updates):
 
 def client_with(rules=(), created=None, updated=None, deleted=None):
     client = Mock()
+    # Retry overrides return the same client so their calls are observable.
+    client.with_options.return_value = client
     api = client.page_rules
     api.list.return_value = list(rules)
     api.create.return_value = created
@@ -46,6 +49,24 @@ class PageRulesTests(TestCase):
             pagerules.run(module, client)
 
         return raised.exception.values
+
+    def test_create_recovers_the_rule_after_a_lost_response(self):
+        recovered = {"id": "rule", "targets": TARGETS, "actions": ACTIONS, "priority": 1, "status": "active"}
+        unrelated = {
+            **recovered,
+            "id": "other",
+            "targets": [{**TARGETS[0], "constraint": {"operator": "matches", "value": "example.net/*"}}],
+        }
+        client, api = client_with()
+        api.create.side_effect = connection_error()
+        api.list.side_effect = [[unrelated], [unrelated, recovered]]
+
+        result = self.run_module(FakeModule(params()), client)
+
+        client.with_options.assert_called_once_with(max_retries=0)
+        api.create.assert_called_once()
+        self.assertEqual(result["message"], "Page rule created")
+        self.assertEqual(result["pagerule"], recovered)
 
     def test_dot_segment_zone_id_fails_before_any_request(self):
         for zone_id in (".", ".."):

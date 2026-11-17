@@ -18,6 +18,7 @@ notes:
     C(differences), so the stored form can be requested instead.
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
+  - linuxhq.cloudflare.cloudflare.create
 options:
   name:
     required: true
@@ -112,6 +113,24 @@ EXAMPLES = r"""
     account_id: "{{ account_id }}"
     name: example.com
     type: full
+
+- name: Ensure zone settings are applied
+  linuxhq.cloudflare.zones:
+    api_token: "{{ cloudflare_api_token }}"
+    account_id: "{{ account_id }}"
+    name: example.com
+    settings:
+      - id: always_use_https
+        value: "on"
+      - id: min_tls_version
+        value: "1.2"
+
+- name: Ensure zone is absent
+  linuxhq.cloudflare.zones:
+    api_token: "{{ cloudflare_api_token }}"
+    account_id: "{{ account_id }}"
+    name: example.com
+    state: absent
 """
 
 RETURN = r"""
@@ -170,9 +189,11 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
+    create_once,
     ensure_resource_absent,
     fail_not_applied,
     find_resource,
+    matching_resources,
     normalize_current_by_desired_fields,
     require_applied,
     resource_field,
@@ -181,6 +202,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     serialize_resource,
     unsupported_fields,
     values_differ,
+    without_retries,
 )
 
 # Fields of the setting values the cloudflare SDK types as objects, by setting
@@ -343,17 +365,23 @@ def validate_settings(module):
         )
 
 
+def list_zones(module, client):
+    """Return the zones named name, in account_id when it is set."""
+    query = {"name": module.params["name"]}
+    if module.params.get("account_id") is not None:
+        query["account"] = {"id": module.params["account_id"]}
+
+    return client.zones.list(**query)
+
+
 def find_zone(module, client):
     name = module.params["name"]
-    account_id = module.params.get("account_id")
-    query = {"name": name}
     context = {"name": name}
-    if account_id is not None:
-        query["account"] = {"id": account_id}
-        context["account_id"] = account_id
+    if module.params.get("account_id") is not None:
+        context["account_id"] = module.params["account_id"]
 
     with cloudflare_error_context("Cloudflare API request failed while finding the zone", **context):
-        return find_resource(module, client.zones.list(**query), "zone", "name", name)
+        return find_resource(module, list_zones(module, client), "zone", "name", name)
 
 
 def checked_zone(module, zone, payload, expected_id=None):
@@ -388,8 +416,11 @@ def create_zone(module, client):
     ):
         # The SDK requires an account; when it is omitted, Cloudflare uses the
         # account of the API token.
-        zone = client.zones.create(
-            account=payload.get("account", cloudflare.omit), name=payload["name"], type=payload["type"]
+        zone = create_once(
+            lambda: without_retries(client).zones.create(
+                account=payload.get("account", cloudflare.omit), name=payload["name"], type=payload["type"]
+            ),
+            lambda: matching_resources(list_zones(module, client), "name", params["name"]),
         )
 
     return checked_zone(module, zone, payload)

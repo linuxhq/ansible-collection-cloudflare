@@ -10,6 +10,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleExit,
     ModuleFail,
+    timeout_error,
 )
 
 ZONE = {"id": "zone", "name": "example.com", "type": "full"}
@@ -30,6 +31,8 @@ def params(**updates):
 
 def client_with(zones_found=(), created=None, edited=(), setting=None, edited_setting=None, deleted=None):
     client = Mock()
+    # Retry overrides return the same client so their calls are observable.
+    client.with_options.return_value = client
     client.zones.list.return_value = list(zones_found)
     client.zones.create.return_value = created
     client.zones.edit.side_effect = list(edited)
@@ -45,6 +48,20 @@ class ZonesTests(TestCase):
             zones.run(module, client)
 
         return raised.exception.values
+
+    def test_create_recovers_the_zone_after_a_lost_response(self):
+        recovered = {**ZONE, "account": {"id": "account"}}
+        client = client_with()
+        client.zones.create.side_effect = timeout_error()
+        client.zones.list.side_effect = [[], [recovered]]
+
+        result = self.run_module(FakeModule(params()), client)
+
+        client.with_options.assert_called_once_with(max_retries=0)
+        client.zones.create.assert_called_once()
+        self.assertEqual(client.zones.list.call_args.kwargs, {"name": "example.com", "account": {"id": "account"}})
+        self.assertEqual(result["message"], "Zone created")
+        self.assertEqual(result["zone"], recovered)
 
     def test_setting_scalar_values_match_recursively(self):
         self.assertTrue(

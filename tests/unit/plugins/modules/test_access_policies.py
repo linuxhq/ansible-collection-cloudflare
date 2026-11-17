@@ -8,6 +8,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleExit,
     ModuleFail,
+    timeout_error,
 )
 
 INCLUDE = [{"email_domain": {"domain": "example.com"}}]
@@ -36,6 +37,8 @@ def policy(**updates):
 
 def client_with(policies=(), created=None, updated=None, deleted=None):
     client = Mock()
+    # Retry overrides return the same client so their calls are observable.
+    client.with_options.return_value = client
     api = client.zero_trust.access.policies
     api.list.return_value = list(policies)
     api.create.return_value = created
@@ -50,6 +53,18 @@ class AccessPoliciesTests(TestCase):
             access_policies.run(module, client)
 
         return raised.exception.values
+
+    def test_create_recovers_the_policy_after_a_lost_response(self):
+        client, api = client_with()
+        api.create.side_effect = timeout_error()
+        api.list.side_effect = [[], [policy(name="other", id="other"), policy()]]
+
+        result = self.run_module(FakeModule(params()), client)
+
+        client.with_options.assert_called_once_with(max_retries=0)
+        api.create.assert_called_once()
+        self.assertEqual(result["message"], "Access policy created")
+        self.assertEqual(result["access_policy"], policy())
 
     def test_empty_name_fails_before_any_request(self):
         # Cloudflare stores an empty name as null, so the policy is never found again.

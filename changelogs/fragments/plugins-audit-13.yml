@@ -1,0 +1,32 @@
+---
+breaking_changes:
+  - zones_info - remove the C(match) option, which had no effect because the module sends no zone filter. Remove it
+    from tasks that set it.
+  - zones_info role - remove the C(zones_info_match) variable, which only set the removed C(match) option.
+bugfixes:
+  - access_apps - keep the stored policies as C(id) and C(precedence) links when C(policies) is omitted.
+    The update sent each stored policy whole, so Cloudflare rewrote inline policies with a new C(updated_at), and the
+    module wrote the application and then failed because Cloudflare did not apply the requested policies.
+  - access_service_tokens - include the created token, with its client secret, in the failure when Cloudflare stores
+    another name or duration. The client secret is returned only when the token is created, so it was lost.
+  - devices_policy - do not send null fields of C(include) or C(exclude) routes; they count as omitted.
+  - pages_projects - read every page of a project's custom domains. Cloudflare returns 20 domains per page, so a
+    pending domain past the first page was treated as missing and added again, and a domain already attached to
+    another project was not detected before the write.
+  - rulesets - compare rule C(action_parameters) on their complete key sets at every level. Cloudflare stores them
+    exactly as sent and an update replaces them, so a parameter the task removed, such as C(edge_ttl), was kept on
+    Cloudflare and the module reported no change, while any other change to the ruleset removed it. The C(version)
+    Cloudflare sets to C(latest) for an C(execute) rule that omits it still matches.
+  - access_apps, access_groups, access_policies, access_service_tokens, cfd_tunnel, pagerules, pages_projects,
+    rules_lists, rulesets, warp_connector, zones - send create requests once, without the Cloudflare SDK's automatic
+    retries. A create retried after a timeout, a connection failure, or a 5xx status that Cloudflare had already
+    processed made a duplicate resource. After such a failure, the module now looks the resource up again and treats
+    a single match as the created resource; otherwise it fails with the original error.
+  - all modules - include the validation message as C(error) when a Cloudflare response does not match the SDK's
+    expected schema. Only the status code and response were reported.
+minor_changes:
+  - devices_settings - describe C(disable_for_time) as the time, in seconds, that a user can use an
+    override code to bypass WARP.
+  - zones_info - document the C(type) and C(account) fields of each returned zone.
+  - access_apps, pagerules, zones - add examples for absent resources, reusable and inline policies, destinations,
+    page rule priority and status, and zone settings.

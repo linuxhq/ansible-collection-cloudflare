@@ -15,17 +15,6 @@ author:
   - Taylor Kimball (@tkimball83)
 extends_documentation_fragment:
   - linuxhq.cloudflare.cloudflare
-options:
-  match:
-    type: str
-    choices:
-      - any
-      - all
-    default: all
-    description:
-      - Whether all or any supplied filters must match.
-      - This module exposes no zone filters, so this option currently has no
-        effect on the returned zones.
 """
 
 EXAMPLES = r"""
@@ -54,6 +43,23 @@ zones:
       description: Current zone activation status.
       returned: when available
       type: str
+    type:
+      description: DNS setup type used by the zone, such as C(full), C(partial), C(secondary), or C(internal).
+      returned: when available
+      type: str
+    account:
+      description: Account that owns the zone.
+      returned: when available
+      type: dict
+      contains:
+        id:
+          description: Cloudflare account identifier.
+          returned: when available
+          type: str
+        name:
+          description: Cloudflare account name.
+          returned: when available
+          type: str
 
 """
 
@@ -76,7 +82,7 @@ def run(module, client):
         exit_resource_list(
             module,
             "zones",
-            client.zones.list(match=module.params["match"], type=ZONE_TYPES),
+            client.zones.list(type=ZONE_TYPES),
             "zone",
         )
 
@@ -85,7 +91,6 @@ def main():
     module = AnsibleModule(
         argument_spec={
             "api_token": {"required": True, "type": "str", "no_log": True},
-            "match": {"type": "str", "choices": ["any", "all"], "default": "all"},
         },
         supports_check_mode=True,
     )

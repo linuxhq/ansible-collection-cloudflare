@@ -59,6 +59,7 @@ options:
       - Each route accepts only C(address), C(host), and C(description).
         Cloudflare accepts any other field but does not store it, so the
         module fails before making changes.
+      - A route field set to null is not sent and counts as omitted.
       - A route C(description) of V("") matches a route without a description,
         since Cloudflare drops an empty description.
       - A bare IP address in a route's C(address) is compared and sent as a
@@ -79,6 +80,7 @@ options:
       - Each route accepts only C(address), C(host), and C(description).
         Cloudflare accepts any other field but does not store it, so the
         module fails before making changes.
+      - A route field set to null is not sent and counts as omitted.
       - A route C(description) of V("") matches a route without a description,
         since Cloudflare drops an empty description.
       - A bare IP address in a route's C(address) is compared and sent as a
@@ -233,11 +235,12 @@ def validate_field_names(module):
 
 
 def split_tunnel_route(route):
-    """Return route with a bare IP address written as Cloudflare stores it."""
-    if "address" not in route:
-        return route
+    """Return route without null fields, which count as omitted, and with a bare IP address as Cloudflare stores it."""
+    route = {key: value for key, value in route.items() if value is not None}
+    if "address" in route:
+        route["address"] = cidr_from_address(route["address"])
 
-    return {**route, "address": cidr_from_address(route["address"])}
+    return route
 
 
 def comparable_policy(policy, payload):

@@ -8,6 +8,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleExit,
     ModuleFail,
+    timeout_error,
 )
 
 INCLUDE = [{"email": {"email": "admin@example.com"}}]
@@ -29,6 +30,8 @@ def params(**updates):
 
 def client_with(groups=(), created=None, updated=None, deleted=None):
     client = Mock()
+    # Retry overrides return the same client so their calls are observable.
+    client.with_options.return_value = client
     api = client.zero_trust.access.groups
     api.list.return_value = list(groups)
     api.create.return_value = created
@@ -43,6 +46,19 @@ class AccessGroupsTests(TestCase):
             access_groups.run(module, client)
 
         return raised.exception.values
+
+    def test_create_recovers_the_group_after_a_lost_response(self):
+        recovered = {"id": "group", "name": "admins", "include": INCLUDE}
+        client, api = client_with()
+        api.create.side_effect = timeout_error()
+        api.list.side_effect = [[], [recovered]]
+
+        result = self.run_module(FakeModule(params()), client)
+
+        client.with_options.assert_called_once_with(max_retries=0)
+        api.create.assert_called_once()
+        self.assertEqual(api.list.call_args.kwargs, {"account_id": "account", "name": "admins"})
+        self.assertEqual(result["message"], "Access group created")
 
     def test_empty_or_whitespace_name_fails_before_any_request(self):
         # Cloudflare stores such a name as null or "", so the resource is never found again.

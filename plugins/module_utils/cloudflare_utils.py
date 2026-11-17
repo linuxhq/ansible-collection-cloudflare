@@ -6,6 +6,7 @@ import json
 import os
 from contextlib import contextmanager
 from ipaddress import ip_address
+from urllib.parse import quote
 
 from ansible.module_utils.basic import missing_required_lib
 
@@ -33,9 +34,9 @@ MAX_DNS_LABEL_LENGTH = 63
 # Path segments the SDK refuses to put in a request path.
 DOT_SEGMENTS = (".", "..")
 
-
-class CloudflareResponseError(Exception):
-    pass
+# Items requested per page from a page-numbered list endpoint; Cloudflare's
+# default page size.
+PAGE_SIZE = 20
 
 
 @contextmanager
@@ -110,8 +111,6 @@ def cloudflare_client(module):
             exc,
             **getattr(exc, "_cloudflare_context", {}),
         )
-    except CloudflareResponseError as exc:
-        module.fail_json(msg=str(exc))
 
 
 def validate_cloudflare_params(module):
@@ -154,7 +153,8 @@ def cloudflare_error_details(exc):
         response_body = exc.body
 
     details = {}
-    if getattr(exc, "response", None) is None:
+    # A response that failed validation carries the reason only in the message.
+    if getattr(exc, "response", None) is None or isinstance(exc, cloudflare.APIResponseValidationError):
         details["error"] = str(exc)
 
     if status_code is not None:
@@ -246,6 +246,85 @@ def get_or_none(get, *args, **kwargs):
         return get(*args, **kwargs)
     except cloudflare.NotFoundError:
         return None
+
+
+def without_retries(client):
+    """Return a copy of client that sends each request once.
+
+    The SDK retries a request after a connection failure, a timeout, or a 5xx
+    status, so a retried create could add a second resource when the first
+    attempt reached Cloudflare.
+    """
+    return client.with_options(max_retries=0)
+
+
+def matching_resources(items, field, value):
+    """Return the serialized items whose field equals value."""
+    resources = [serialize_resource(item) for item in items]
+    return [resource for resource in resources if isinstance(resource, dict) and resource.get(field) == value]
+
+
+def unique_match(resource):
+    """Return the matches of a lookup by a unique key: [resource], or [] when it is None."""
+    return [] if resource is None else [resource]
+
+
+def create_once(create, find):
+    """Return the resource create made with a single request.
+
+    create must send its request without retries. After a connection failure,
+    a timeout, or a 5xx status, Cloudflare may have created the resource
+    anyway, so find is called to read the resources matching the requested
+    one. Exactly one match is returned as the created resource; otherwise, or
+    when find fails, the original error is raised.
+    """
+    try:
+        return create()
+    except (cloudflare.APIConnectionError, cloudflare.InternalServerError) as exc:
+        error = exc
+
+    try:
+        matches = list(find())
+    except cloudflare.APIError:
+        raise error from None
+
+    if len(matches) != 1:
+        raise error
+
+    return matches[0]
+
+
+def list_all_pages(module, client, path, resource_name):
+    """Return every item of a page-numbered Cloudflare list endpoint.
+
+    Use it for an endpoint whose generated SDK method reads only the first
+    page. Each path segment must be encoded with path_segment. Pages are read
+    until result_info.total_pages, or, without it, until a page returns fewer
+    than PAGE_SIZE items.
+    """
+    items = []
+    page = 1
+    while True:
+        body = client.get(path, cast_to=object, options={"params": {"page": page, "per_page": PAGE_SIZE}})
+        result = body.get("result") if isinstance(body, dict) else None
+        if not isinstance(result, list):
+            module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data")
+
+        items.extend(result)
+        result_info = body.get("result_info")
+        total_pages = result_info.get("total_pages") if isinstance(result_info, dict) else None
+        if isinstance(total_pages, int) and not isinstance(total_pages, bool):
+            if page >= total_pages:
+                return items
+        elif len(result) < PAGE_SIZE:
+            return items
+
+        page += 1
+
+
+def path_segment(value):
+    """Return value encoded as one segment of a request path."""
+    return quote(value, safe="")
 
 
 def find_resource(module, items, resource_name, field, value):
@@ -444,8 +523,11 @@ def message_value(module, value):
     return text
 
 
-def fail_not_applied(module, resource_name, differences):
-    """Fail, naming the requested and stored value of each field Cloudflare did not apply."""
+def fail_not_applied(module, resource_name, differences, **context):
+    """Fail, naming the requested and stored value of each field Cloudflare did not apply.
+
+    context adds result fields, such as a created resource the caller must not lose.
+    """
     pairs = [
         f"{difference['field']} requested {message_value(module, difference['requested'])}, "
         f"stored {message_value(module, difference['stored'])}"
@@ -458,6 +540,7 @@ def fail_not_applied(module, resource_name, differences):
     module.fail_json(
         msg=f"Cloudflare did not apply the requested {resource_name}{details}",
         differences=differences,
+        **context,
     )
 
 
@@ -703,6 +786,7 @@ def ensure_resource_present(
     payload,
     create,
     update,
+    find_created,
     expected_name=None,
     defaults=None,
     preserved_fields=(),
@@ -713,9 +797,12 @@ def ensure_resource_present(
 ):
     """Create the resource, or update it when the managed fields differ.
 
-    The update replaces the resource, so preserved_fields omitted from payload
-    are carried over from current. exact_values are compared exactly. context
-    names the resource's owner in failures. comparable optionally maps a
+    create must send its request without retries; when it fails without a
+    response or with a 5xx status, find_created reads the matching resources,
+    as described in create_once. The update replaces the resource, so
+    preserved_fields omitted from payload are carried over from current.
+    exact_values are compared exactly. context names the resource's owner in
+    failures. comparable optionally maps a
     resource to its comparable form; the unmodified resource is returned.
     """
     comparable = comparable or (lambda resource: resource)
@@ -740,7 +827,7 @@ def ensure_resource_present(
             **name_context,
             **context,
         ):
-            resource = checked(create(payload))
+            resource = checked(create_once(lambda: create(payload), find_created))
 
         require_applied(module, comparable(resource), payload, resource_name, defaults, exact_fields, exact_values)
         module.exit_json(changed=True, message=f"{label} created", **{result_key: resource})
