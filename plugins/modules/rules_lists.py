@@ -55,7 +55,8 @@ options:
     description:
       - Complete set of entries that the Rules list must contain.
       - Each entry must set the field named by the list kind, such as C(ip) or
-        C(hostname), and may also set C(comment); no other keys are accepted.
+        C(hostname), and may also set C(comment). Any other key must be null,
+        or one of C(id), C(created_on), and C(modified_on), which are not sent.
       - A C(comment) must be a string of at most 500 characters.
       - A C(hostname) entry must be a mapping with a non-empty string
         C(url_hostname).
@@ -694,7 +695,11 @@ def validate_elements(module, kind):
         if element.get(kind) is None:
             module.fail_json(msg=f"elements[{index}] must set {kind!r} for a Rules list of kind {kind!r}")
 
-        unexpected = sorted(key for key in element if key not in (kind, "comment"))
+        unexpected = sorted(
+            key
+            for key, value in element.items()
+            if key not in (kind, "comment", *ITEM_META_FIELDS) and value is not None
+        )
         if unexpected:
             module.fail_json(
                 msg=f"elements[{index}] supports only {kind!r} and 'comment' for a Rules list of kind {kind!r}",

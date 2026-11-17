@@ -69,7 +69,7 @@ options:
       - Cloudflare keeps the current value of a whole C(preview) or
         C(production) configuration, C(always_use_latest_compatibility_date),
         C(compatibility_date), C(compatibility_flags), C(fail_open),
-        C(usage_model), a whole C(env_vars), C(kv_namespaces), C(limits), or
+        C(usage_model), a whole C(browsers), C(env_vars), C(kv_namespaces), C(limits), or
         C(placement), and the C(type) of an environment variable set to null,
         so the module fails before making changes.
       - Keys under C(preview) and C(production) must be Pages deployment
@@ -278,6 +278,7 @@ NULLABLE_BUILD_SETTINGS = ("web_analytics_tag", "web_analytics_token")
 # environment variable's type or value, when they are set to null.
 NON_NULLABLE_DEPLOYMENT_SETTINGS = (
     "always_use_latest_compatibility_date",
+    "browsers",
     "compatibility_date",
     "compatibility_flags",
     "env_vars",

@@ -117,6 +117,23 @@ class CfdTunnelTests(TestCase):
                 self.assertEqual(result["current_config_src"], "local")
                 self.assertEqual(result["requested_config_src"], "cloudflare")
 
+    def test_tunnel_without_config_source_is_local(self):
+        # Cloudflare stores a tunnel created without config_src as null with remote_config false.
+        current = {"id": "tunnel-id", "name": "tunnel", "config_src": None, "remote_config": False}
+        client, api = client_with([current], edited=current)
+
+        result = self.run_module(FakeModule(params(config_src="cloudflare")), client)
+
+        api.edit.assert_not_called()
+        self.assertEqual(result["current_config_src"], "local")
+        self.assertEqual(result["requested_config_src"], "cloudflare")
+
+        client, api = client_with([current], edited=current)
+        result = self.run_module(FakeModule(params(config_src="local")), client)
+
+        api.edit.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_creates_tunnel_without_config_source(self):
         # Cloudflare creates a tunnel without a configuration source.
         created = {"id": "tunnel-id", "name": "tunnel"}

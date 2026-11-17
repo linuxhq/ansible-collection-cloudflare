@@ -268,6 +268,14 @@ class AccessPoliciesTests(TestCase):
         api.list.assert_not_called()
         api.create.assert_not_called()
 
+    def test_null_unknown_approval_group_fields_are_ignored(self):
+        approval_groups = [{"approvals_needed": 1, "email_addresses": ["a@example.com"], "foo": None}]
+        client, _api = client_with([policy()])
+
+        result = self.run_module(FakeModule(params(approval_groups=approval_groups), check_mode=True), client)
+
+        self.assertNotIn("msg", result)
+
     def test_rejects_unstored_approval_group_fields_before_any_request(self):
         approval_groups = [
             {"approvals_needed": 1, "email_addresses": ["a@example.com"]},

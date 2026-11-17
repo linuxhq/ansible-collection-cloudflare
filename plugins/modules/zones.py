@@ -312,9 +312,8 @@ def validate_settings(module):
             fields = SETTING_VALUE_FIELDS[setting["id"]]
             null.extend(found for found in null_values(setting["value"], path, fields) if found not in nullable)
             not_mapping.extend(non_mappings(setting["value"], fields, path))
-            # Cloudflare drops a null unknown field, so it is ignored.
-            unknown.extend(unsupported_fields(serialize_resource(setting["value"]), fields, path))
-            empty.extend(empty_mappings(serialize_resource(setting["value"]), path))
+            unknown.extend(unsupported_fields(setting["value"], fields, path))
+            empty.extend(empty_mappings(setting["value"], path))
 
     # Cloudflare rejects a null value or stores a different one, such as false.
     if null:

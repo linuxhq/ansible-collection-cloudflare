@@ -367,6 +367,7 @@ class PagesProjectsTests(TestCase):
                     "deployment_configs": {
                         "production": {
                             "always_use_latest_compatibility_date": None,
+                            "browsers": None,
                             "compatibility_flags": None,
                             "env_vars": None,
                             "fail_open": None,
@@ -379,6 +380,7 @@ class PagesProjectsTests(TestCase):
                 },
                 [
                     "deployment_configs.production.always_use_latest_compatibility_date",
+                    "deployment_configs.production.browsers",
                     "deployment_configs.production.compatibility_flags",
                     "deployment_configs.production.env_vars",
                     "deployment_configs.production.fail_open",

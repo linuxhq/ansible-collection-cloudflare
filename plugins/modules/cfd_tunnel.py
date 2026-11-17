@@ -34,7 +34,7 @@ options:
     description:
       - Location from which the tunnel receives its configuration.
       - When omitted on create, Cloudflare creates a tunnel without a
-        configuration source.
+        configuration source, which is treated as V(local).
       - An existing tunnel's configuration source is not changed; the module
         fails before making changes when it differs from the requested value.
   tunnel_secret:
@@ -128,6 +128,9 @@ def ensure_present(module, tunnels, current):
     if current is not None:
         current_id = resource_id(module, current, "cloudflared tunnel")
         current_config_src = current.get("config_src")
+        if current_config_src is None and current.get("remote_config") is False:
+            current_config_src = "local"
+
         if params.get("config_src") is not None and current_config_src not in (None, params["config_src"]):
             module.fail_json(
                 msg=f"Cannot change config_src of the existing cloudflared tunnel from "

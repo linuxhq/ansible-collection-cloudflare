@@ -231,6 +231,16 @@ class ZonesTests(TestCase):
         self.assertNotIn("msg", result)
         self.assertFalse(result["changed"])
 
+    def test_all_null_mapping_setting_values_are_not_empty(self):
+        # Cloudflare accepts aegis {pool_id: null} and does not store pool_id.
+        client = client_with([ZONE], setting={"id": "aegis", "value": {"enabled": False}})
+
+        result = self.run_module(FakeModule(params(settings=[{"id": "aegis", "value": {"pool_id": None}}])), client)
+
+        self.assertNotIn("msg", result)
+        self.assertFalse(result["changed"])
+        client.zones.settings.edit.assert_not_called()
+
     def test_null_security_header_policy_fails_before_any_request(self):
         settings = [{"id": "security_header", "value": {"strict_transport_security": None}}]
         for check_mode in (True, False):

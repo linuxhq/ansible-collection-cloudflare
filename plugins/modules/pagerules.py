@@ -190,11 +190,10 @@ def validate_field_names(module):
 
     unknown = []
     for index, target in enumerate(params["targets"]):
-        unknown.extend(unsupported_fields(serialize_resource(target), TARGET_FIELDS, f"targets[{index}]"))
+        unknown.extend(unsupported_fields(target, TARGET_FIELDS, f"targets[{index}]"))
 
     for index, action in enumerate(params["actions"]):
         path = f"actions[{index}]"
-        action = serialize_resource(action)
         action_id = action.get("id")
         fields = ("id",) if action_id in ID_ONLY_ACTIONS else ACTION_FIELDS
         unknown.extend(unsupported_fields(action, fields, path))

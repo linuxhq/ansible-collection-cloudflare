@@ -1,0 +1,14 @@
+---
+bugfixes:
+  - access_apps, access_groups, access_policies - accept a nested key set to null that the module does not otherwise
+    accept, such as an unknown Access selector field, C(cors_headers) or destination field, or approval group field, as
+    omitted instead of failing, because a null key is not stored and the run converges.
+  - cfd_tunnel - treat a tunnel created without C(config_src), which Cloudflare stores with a null C(config_src) and
+    C(remote_config) false, as V(local), so a later run with C(config_src=cloudflare) fails before any change instead of
+    reporting the tunnel as already present.
+  - pages_projects - fail before any request when a deployment configuration sets C(browsers) to null, because Cloudflare
+    keeps the current browser bindings and the run never converges.
+  - rules_lists - accept an element key set to null, and the C(id), C(created_on), and C(modified_on) keys that are not
+    sent, instead of failing before any change.
+  - zones - accept an object setting value whose fields are all null, such as C(aegis) with C(pool_id) null, instead
+    of rejecting it as an empty mapping; a literal empty mapping is still rejected.
