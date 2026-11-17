@@ -1006,6 +1006,37 @@ class EnsureResourceTests(TestCase):
         delete.assert_called_once_with("one")
         self.assertEqual(raised.exception.values, {"changed": True, "message": "Thing deleted", "thing": {"id": "one"}})
 
+    def test_retried_delete_answered_with_404_counts_as_deleted_through_the_sdk(self):
+        requests = []
+
+        def respond(request):
+            requests.append(request)
+            if len(requests) == 1:
+                # The first delete reaches Cloudflare, but its response is lost.
+                raise httpx.ConnectError("connection reset", request=request)
+
+            return httpx.Response(404, json={"success": False, "errors": [{"code": 12152, "message": "not found"}]})
+
+        with (
+            cloudflare.Cloudflare(
+                api_token="EXAMPLE-token",
+                max_retries=1,
+                http_client=httpx.Client(transport=httpx.MockTransport(respond)),
+            ) as client,
+            self.assertRaises(ModuleExit) as raised,
+        ):
+            ensure_resource_absent(
+                FakeModule({}),
+                "access_group",
+                "Access group",
+                {"id": "one"},
+                lambda group_id: client.zero_trust.access.groups.delete(group_id, account_id="account"),
+            )
+
+        self.assertEqual([request.method for request in requests], ["DELETE", "DELETE"])
+        self.assertTrue(raised.exception.values["changed"])
+        self.assertEqual(raised.exception.values["message"], "Access group deleted")
+
     def test_delete_failures_other_than_404_are_raised(self):
         for status_code in (400, 403, 409, 500):
             with self.subTest(status_code=status_code):
