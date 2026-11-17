@@ -16,6 +16,8 @@ build_ignore:
   - .ansible
   - .ansible-lint
   - .ansible/**
+  - .claude
+  - .claude/**
   - .config
   - .config/**
   - .github
