@@ -144,9 +144,14 @@ def error_response_body(exc):
 
 
 def cloudflare_error_details(exc):
-    """Return the status code and response body of a failure, or its message."""
+    """Return the status code and response body of a failure, or its message.
+
+    A response body that is not JSON is returned as the text the SDK read.
+    """
     status_code = getattr(exc, "status_code", None)
     response_body = error_response_body(exc)
+    if response_body is None and isinstance(getattr(exc, "body", None), str) and exc.body:
+        response_body = exc.body
 
     details = {}
     if getattr(exc, "response", None) is None:

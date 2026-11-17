@@ -974,6 +974,55 @@ class AccessAppsTests(TestCase):
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_removed_inline_policy_settings_are_a_change(self):
+        # Cloudflare replaces the inline policy on update, so omitted settings are cleared.
+        inline = {"name": "inline", "decision": "allow", "include": [{"everyone": {}}]}
+        stored_policy = {"id": "policy-id", "precedence": 1, **inline, "exclude": [], "require": []}
+        mfa = {"allowed_authenticators": ["totp"], "session_duration": "24h"}
+        cases = (
+            ({}, {"approval_required": True}),
+            ({}, {"isolation_required": True}),
+            ({}, {"purpose_justification_required": True}),
+            ({}, {"purpose_justification_prompt": "why"}),
+            ({}, {"session_duration": "8h"}),
+            ({}, {"approval_groups": [{"email_addresses": ["a@example.com"], "approvals_needed": 1}]}),
+            ({}, {"connection_rules": {"rdp": {"allowed_clipboard_local_to_remote_formats": ["text"]}}}),
+            ({}, {"mfa_config": mfa}),
+            ({"mfa_config": {"allowed_authenticators": ["totp"]}}, {"mfa_config": mfa}),
+        )
+        for requested, extra in cases:
+            with self.subTest(requested=requested, stored=extra):
+                desired = {**inline, **requested}
+                current = stored(policies=[{**stored_policy, **extra}])
+                client, api = client_with([current], updated=stored(policies=[{**stored_policy, **requested}]))
+
+                result = self.run_module(FakeModule(params(policies=[desired]), check_mode=True), client)
+
+                self.assertNotIn("msg", result)
+                self.assertTrue(result["changed"])
+                api.update.assert_not_called()
+
+                result = self.run_module(FakeModule(params(policies=[desired])), client)
+
+                self.assertNotIn("msg", result)
+                self.assertTrue(result["changed"])
+                self.assertEqual(api.update.call_args.kwargs["policies"], [desired])
+
+        settings = {
+            "approval_required": True,
+            "purpose_justification_required": True,
+            "purpose_justification_prompt": "why",
+            "session_duration": "8h",
+            "mfa_config": mfa,
+        }
+        client, api = client_with([stored(policies=[{**stored_policy, **settings}])])
+
+        result = self.run_module(FakeModule(params(policies=[{**inline, **settings}])), client)
+
+        self.assertNotIn("msg", result)
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_inline_policy_matches_assigned_github_organization_id(self):
         github = {"identity_provider_id": "idp", "name": "org"}
         inline = {"name": "inline", "decision": "allow", "include": [{"github-organization": github}]}
