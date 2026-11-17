@@ -130,7 +130,12 @@ def checked_tunnel(module, tunnel, expected_id=None):
     A failure reports changed=True, the tunnel, and its identifiers.
     """
     tunnel = serialize_resource(tunnel)
-    failure = {"changed": True, "account_id": module.params["account_id"], "cfd_tunnel": tunnel}
+    failure = {
+        "changed": True,
+        "account_id": module.params["account_id"],
+        "name": module.params["name"],
+        "cfd_tunnel": tunnel,
+    }
     if expected_id is not None:
         failure["resource_id"] = expected_id
 
@@ -153,7 +158,9 @@ def ensure_present(module, client, current):
     tunnels = client.zero_trust.tunnels.cloudflared
 
     if current is not None:
-        current_id = resource_id(module, current, "cloudflared tunnel")
+        current_id = resource_id(
+            module, current, "cloudflared tunnel", context={"account_id": account_id, "name": params["name"]}
+        )
         current_config_src = current.get("config_src")
         if current_config_src is None and current.get("remote_config") is False:
             current_config_src = "local"
@@ -213,7 +220,14 @@ def run(module, client):
         account_id=account_id,
         name=params["name"],
     ):
-        current = find_resource(module, list_tunnels(module, tunnels), "cloudflared tunnel", "name", params["name"])
+        current = find_resource(
+            module,
+            list_tunnels(module, tunnels),
+            "cloudflared tunnel",
+            "name",
+            params["name"],
+            context={"account_id": account_id},
+        )
 
     if params["state"] == "absent":
         ensure_resource_absent(

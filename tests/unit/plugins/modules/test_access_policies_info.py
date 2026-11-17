@@ -48,5 +48,7 @@ class AccessPoliciesInfoTests(TestCase):
         client = Mock()
         client.zero_trust.access.policies.list.return_value = [{"name": "admins"}]
 
-        with self.assertRaises(ModuleFail):
+        with self.assertRaises(ModuleFail) as raised:
             access_policies_info.run(FakeModule({"account_id": "account"}), client)
+
+        self.assertEqual(raised.exception.values["account_id"], "account")

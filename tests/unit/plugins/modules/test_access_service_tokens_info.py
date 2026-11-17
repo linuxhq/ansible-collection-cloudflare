@@ -39,5 +39,7 @@ class AccessServiceTokensInfoTests(TestCase):
         client = Mock()
         client.zero_trust.access.service_tokens.list.return_value = [{"name": "token"}]
 
-        with self.assertRaises(ModuleFail):
+        with self.assertRaises(ModuleFail) as raised:
             access_service_tokens_info.run(FakeModule({"account_id": "account"}), client)
+
+        self.assertEqual(raised.exception.values["account_id"], "account")

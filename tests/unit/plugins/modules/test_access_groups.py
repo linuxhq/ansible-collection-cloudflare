@@ -47,6 +47,16 @@ class AccessGroupsTests(TestCase):
 
         return raised.exception.values
 
+    def test_lookup_failures_name_the_account(self):
+        for found in ([{"name": "admins"}], [{"id": "one", "name": "admins"}, {"id": "two", "name": "admins"}]):
+            client, api = client_with(found)
+            with self.subTest(found=found):
+                result = self.run_module(FakeModule(params()), client)
+
+                api.create.assert_not_called()
+                self.assertEqual(result["account_id"], "account")
+                self.assertEqual(result["name"], "admins")
+
     def test_create_recovers_the_group_after_a_lost_response(self):
         recovered = {"id": "group", "name": "admins", "include": INCLUDE}
         client, api = client_with()

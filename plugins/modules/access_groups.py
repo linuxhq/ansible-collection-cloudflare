@@ -161,6 +161,7 @@ def run(module, client):
             "Access group",
             "name",
             params["name"],
+            context={"account_id": account_id},
         )
 
     if params["state"] == "absent":

@@ -66,6 +66,9 @@ class PageRulesInfoTests(TestCase):
                     pagerules_info.run(FakeModule({}), client)
 
                 self.assertIn("malformed page rule", raised.exception.values["msg"])
+                self.assertEqual(raised.exception.values["zone_id"], "zone")
+                if "id" in rule:
+                    self.assertEqual(raised.exception.values["resource_id"], "rule")
 
     def test_skips_zones_deleted_after_listing(self):
         invalid_zone = {"success": False, "errors": [{"code": 1001, "message": "Invalid zone identifier"}]}

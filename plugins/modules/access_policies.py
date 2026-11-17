@@ -262,6 +262,7 @@ def run(module, client):
             "Access policy",
             "name",
             params["name"],
+            context={"account_id": account_id},
         )
 
     if params["state"] == "absent":

@@ -60,7 +60,7 @@ def run(module, client):
     ):
         policy = client.zero_trust.devices.policies.default.get(account_id=account_id)
 
-    exit_settings(module, "devices_policy", policy, "device policy")
+    exit_settings(module, "devices_policy", policy, "device policy", {"account_id": account_id})
 
 
 def main():

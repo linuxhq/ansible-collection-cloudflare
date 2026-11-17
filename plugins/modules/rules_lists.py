@@ -870,11 +870,14 @@ def ensure_present(module, client, current):
         # Cloudflare rejects a new list without a kind.
         current_kind = params.get("kind")
     else:
-        current_id = resource_id(module, current, "Rules list")
-        current_kind = resource_field(module, current, "kind", "Rules list")
+        lookup = {"account_id": account_id, "name": params["name"]}
+        current_id = resource_id(module, current, "Rules list", context=lookup)
+        lookup["rules_list_id"] = current_id
+        current_kind = resource_field(module, current, "kind", "Rules list", context=lookup)
         if params.get("kind") is not None and params["kind"] != current_kind:
             module.fail_json(
                 msg="An existing Rules list kind cannot be changed",
+                **lookup,
                 rules_list=current,
             )
 
@@ -908,7 +911,11 @@ def ensure_present(module, client, current):
             )
 
         current = checked_list(
-            module, rules_list, params["name"], params["kind"], {"changed": True, "account_id": account_id}
+            module,
+            rules_list,
+            params["name"],
+            params["kind"],
+            {"changed": True, "account_id": account_id, "name": params["name"]},
         )
         current_id = current["id"]
         written = {"changed": True, "account_id": account_id, "rules_list_id": current_id, "rules_list": current}
@@ -1025,7 +1032,14 @@ def run(module, client):
         account_id=account_id,
         name=params["name"],
     ):
-        current = find_resource(module, lists.list(account_id=account_id), "Rules list", "name", params["name"])
+        current = find_resource(
+            module,
+            lists.list(account_id=account_id),
+            "Rules list",
+            "name",
+            params["name"],
+            context={"account_id": account_id},
+        )
 
     if params["state"] == "absent":
         ensure_resource_absent(

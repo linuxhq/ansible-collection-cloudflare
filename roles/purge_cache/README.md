@@ -7,6 +7,7 @@ Manage cloudflare purging of cache
 ## Requirements
 
 * Cloudflare api `Token` with `Purge` permissions to `Cache Purge`
+* Cloudflare api `Token` with `Read` permissions to `Zone`
 
 ## Role Variables
 

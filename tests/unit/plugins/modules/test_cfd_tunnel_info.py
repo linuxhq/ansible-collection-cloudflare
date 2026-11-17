@@ -39,6 +39,15 @@ class CfdTunnelInfoTests(TestCase):
         result, _ignored = self.run_module([{"id": "tunnel", "name": "example"}], True, token="")
 
         self.assertIn("malformed cloudflared tunnel token", result["msg"])
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["resource_id"], "tunnel")
+
+    def test_malformed_listing_names_the_account(self):
+        result, _ignored = self.run_module([{"id": "tunnel"}], False)
+
+        self.assertIn("malformed cloudflared tunnel data", result["msg"])
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["resource_id"], "tunnel")
 
     def test_token_failure_names_resource(self):
         client = Mock()

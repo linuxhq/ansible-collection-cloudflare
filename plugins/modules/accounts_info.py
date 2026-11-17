@@ -82,7 +82,7 @@ def run(module, client):
         account = find_resource(module, client.accounts.list(name=name), "account", "name", name)
 
     if account is not None:
-        resource_id(module, account, "account")
+        resource_id(module, account, "account", context={"name": name})
 
     module.exit_json(changed=False, account=account or {})
 

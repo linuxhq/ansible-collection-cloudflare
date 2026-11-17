@@ -65,6 +65,7 @@ def run(module, client):
             client.zero_trust.access.policies.list(account_id=account_id),
             "Access policy",
             required_fields=("id",),
+            context={"account_id": account_id},
         )
 
 

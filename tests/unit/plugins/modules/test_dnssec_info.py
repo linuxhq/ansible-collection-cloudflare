@@ -7,6 +7,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.modules import dnssec_info
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
+    ModuleFail,
     connection_error,
     status_error,
 )
@@ -79,3 +80,11 @@ class DnssecInfoTests(TestCase):
                 "Cloudflare API request failed while gathering DNSSEC information",
             )
             self.assertEqual(error._cloudflare_context, {"zone_id": "zone"})
+
+    def test_malformed_settings_name_the_zone(self):
+        for dnssec in (["malformed"], {"status": None}):
+            with self.subTest(dnssec=dnssec), self.assertRaises(ModuleFail) as raised:
+                dnssec_info.run(FakeModule({}), client_with(dnssec))
+
+            self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed DNSSEC settings data")
+            self.assertEqual(raised.exception.values["zone_id"], "zone")

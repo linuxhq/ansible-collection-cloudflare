@@ -186,6 +186,10 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 FIELDS = ("actions", "priority", "status", "targets")
+
+# Cloudflare answers a request for a deleted page rule with this error code
+# and a 400 status.
+INVALID_PAGERULE_CODE = 1002
 PRESERVED_FIELDS = ("priority", "status")
 
 # Actions whose value mapping is compared on every key, not only those requested.
@@ -240,13 +244,17 @@ def validate_field_names(module):
 
 
 def pagerule_targets(module, pagerule):
-    require_mapping(module, pagerule, "page rule")
+    context = {"zone_id": module.params["zone_id"]}
+    require_mapping(module, pagerule, "page rule", context)
+    if "id" in pagerule:
+        context["resource_id"] = pagerule["id"]
+
     targets = pagerule.get("targets")
     if not isinstance(targets, list):
-        module.fail_json(msg="Cloudflare API returned malformed page rule data")
+        module.fail_json(msg="Cloudflare API returned malformed page rule data", **context)
 
     for target in targets:
-        require_mapping(module, target, "page rule target")
+        require_mapping(module, target, "page rule target", context)
 
     return targets
 
@@ -376,7 +384,9 @@ def find_pagerule(module, client, targets):
         module.fail_json(
             msg="Multiple page rules match the requested target constraints",
             zone_id=zone_id,
-            matching_ids=[resource_id(module, pagerule, "page rule") for pagerule in matches],
+            matching_ids=[
+                resource_id(module, pagerule, "page rule", context={"zone_id": zone_id}) for pagerule in matches
+            ],
         )
 
     return matches[0] if matches else None, rule_count
@@ -420,6 +430,7 @@ def run(module, client):
             current,
             delete=lambda pagerule_id: page_rules.delete(pagerule_id=pagerule_id, zone_id=zone_id),
             context={"zone_id": zone_id},
+            deleted_codes=(INVALID_PAGERULE_CODE,),
         )
 
     validate_priority(module, current, rule_count)

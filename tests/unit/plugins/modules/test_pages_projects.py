@@ -113,6 +113,8 @@ class PagesProjectsTests(TestCase):
         api.get.assert_called_once_with(project_name="docs", account_id="account")
         api.create.assert_not_called()
         self.assertEqual(result["msg"], "production_branch is required when creating a Pages project")
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["name"], "docs")
 
     def test_check_mode_does_not_create(self):
         client, api = client_with([None])
@@ -1067,6 +1069,26 @@ class PagesProjectsTests(TestCase):
         result = self.run_module(FakeModule(params()), client)
 
         self.assertEqual(result["msg"], "Cloudflare API returned the wrong Pages project")
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["name"], "docs")
+        self.assertNotIn("changed", result)
+
+    def test_failed_reread_after_adding_domains_reports_the_written_project(self):
+        domain = {"name": "new.example.com"}
+        for error in (status_error(500), timeout_error()):
+            with self.subTest(error=type(error).__name__):
+                client, api = client_with([PROJECT, error], created_domain=domain)
+
+                with self.assertRaises(type(error)) as raised:
+                    pages_projects.run(FakeModule(params(domains=[domain])), client)
+
+                api.domains.create.assert_called_once()
+                context = raised.exception._cloudflare_context
+                self.assertTrue(context["changed"])
+                self.assertEqual(context["account_id"], "account")
+                self.assertEqual(context["name"], "docs")
+                self.assertEqual(context["pages_project"], PROJECT)
+                self.assertEqual(context["domains"], [domain])
 
     def test_adds_only_missing_unique_domains(self):
         domains = [{"name": "docs.example.com"}, {"name": "new.example.com"}, {"name": "new.example.com"}]
@@ -1286,6 +1308,45 @@ class PagesProjectsTests(TestCase):
                 result = self.run_module(FakeModule(params(domains=[{"name": "new.example.com"}])), client)
 
                 self.assertEqual(result["msg"], "Cloudflare API returned malformed Pages domain data")
+                self.assertEqual(result["account_id"], "account")
+                self.assertEqual(result["name"], "docs")
+
+    def test_malformed_domain_listing_names_the_account_and_project(self):
+        for page in (None, {"result": "invalid"}):
+            with self.subTest(page=page):
+                client, _ignored = client_with([PROJECT], domains=[{"name": None}])
+                if page is not None:
+                    client.get.side_effect = None
+                    client.get.return_value = page
+
+                result = self.run_module(FakeModule(params(domains=[{"name": "new.example.com"}])), client)
+
+                self.assertEqual(result["msg"], "Cloudflare API returned malformed Pages domain data")
+                self.assertEqual(result["account_id"], "account")
+                self.assertEqual(result["name"], "docs")
+
+    def test_malformed_project_of_the_account_names_the_owner(self):
+        client, _ignored = client_with([PROJECT], account_projects=[{"name": None}])
+
+        result = self.run_module(FakeModule(params(domains=[{"name": "new.example.com"}])), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed Pages project data")
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["name"], "docs")
+
+    def test_malformed_domains_of_another_project_name_it(self):
+        client, _ignored = client_with(
+            [PROJECT],
+            account_projects=[PROJECT, {"name": "other", "domains": "invalid"}],
+            other_domains={"other": []},
+        )
+
+        result = self.run_module(FakeModule(params(domains=[{"name": "new.example.com"}])), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed Pages domain data")
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["name"], "docs")
+        self.assertEqual(result["project"], "other")
 
     def test_absent_project_is_unchanged(self):
         client, api = client_with([None])

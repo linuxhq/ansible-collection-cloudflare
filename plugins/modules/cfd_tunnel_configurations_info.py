@@ -76,6 +76,7 @@ def run(module, client):
             tunnels.list(account_id=account_id, is_deleted=False, per_page=1000),
             "cloudflared tunnel",
             required_fields=("id", "name"),
+            context={"account_id": account_id},
         )
 
     configurations = []
@@ -99,12 +100,13 @@ def run(module, client):
         if configuration is None:
             continue
 
-        require_mapping(module, configuration, "tunnel configuration")
+        context = {"account_id": account_id, "tunnel_id": tunnel["id"]}
+        require_mapping(module, configuration, "tunnel configuration", context)
         config = configuration.get("config")
         if config is None:
             config = {}
         else:
-            require_mapping(module, config, "tunnel configuration")
+            require_mapping(module, config, "tunnel configuration", context)
 
         configurations.append({"id": tunnel["id"], "name": tunnel["name"], "config": config})
 

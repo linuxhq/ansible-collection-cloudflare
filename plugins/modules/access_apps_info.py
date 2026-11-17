@@ -66,6 +66,7 @@ def run(module, client):
             "access_apps",
             client.zero_trust.access.applications.list(account_id=account_id),
             "Access application",
+            context={"account_id": account_id},
         )
 
 

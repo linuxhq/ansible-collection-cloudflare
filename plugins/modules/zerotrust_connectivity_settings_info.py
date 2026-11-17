@@ -60,7 +60,7 @@ def run(module, client):
     ):
         settings = client.zero_trust.connectivity_settings.get(account_id=account_id)
 
-    exit_settings(module, "connectivity_settings", settings, "connectivity settings")
+    exit_settings(module, "connectivity_settings", settings, "connectivity settings", {"account_id": account_id})
 
 
 def main():

@@ -7,6 +7,7 @@ Manage cloudflare pagerules
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Page Rules`
+* Cloudflare api `Token` with `Read` permissions to `Zone`
 
 ## Role Variables
 

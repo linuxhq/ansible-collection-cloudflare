@@ -65,6 +65,7 @@ def run(module, client):
             client.zero_trust.access.groups.list(account_id=account_id),
             "Access group",
             required_fields=("id",),
+            context={"account_id": account_id},
         )
 
 

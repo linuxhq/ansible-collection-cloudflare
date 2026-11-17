@@ -144,7 +144,12 @@ def checked_token(module, service_token, expected_id=None):
     token's client secret is returned only once.
     """
     service_token = serialize_resource(service_token)
-    failure = {"changed": True, "account_id": module.params["account_id"], "service_token": service_token}
+    failure = {
+        "changed": True,
+        "account_id": module.params["account_id"],
+        "name": module.params["name"],
+        "service_token": service_token,
+    }
     if expected_id is not None:
         failure["resource_id"] = expected_id
 
@@ -184,6 +189,7 @@ def run(module, client):
             "service token",
             "name",
             params["name"],
+            context={"account_id": account_id},
         )
 
     if params["state"] == "absent":
@@ -223,7 +229,9 @@ def run(module, client):
             service_token=checked_token(module, service_token),
         )
 
-    current_id = resource_id(module, current, "service token")
+    current_id = resource_id(
+        module, current, "service token", context={"account_id": account_id, "name": params["name"]}
+    )
     if duration_matches(current, params["duration"]):
         module.exit_json(changed=False, message="Service token already present", service_token=current)
 

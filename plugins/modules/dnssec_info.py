@@ -190,8 +190,9 @@ def run(module, client):
             continue
 
         dnssec_settings = serialize_resource(dnssec_settings)
-        require_mapping(module, dnssec_settings, "DNSSEC settings")
-        resource_field(module, dnssec_settings, "status", "DNSSEC settings")
+        context = {"zone_id": zone["id"]}
+        require_mapping(module, dnssec_settings, "DNSSEC settings", context)
+        resource_field(module, dnssec_settings, "status", "DNSSEC settings", context=context)
 
         dnssec.append(
             {

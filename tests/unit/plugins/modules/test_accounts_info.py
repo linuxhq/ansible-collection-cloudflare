@@ -50,9 +50,11 @@ class AccountsInfoTests(TestCase):
             accounts_info.run(FakeModule({"name": "wanted"}), client_with(["account"]))
 
         self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed account data")
+        self.assertEqual(raised.exception.values["name"], "wanted")
 
     def test_rejects_matching_account_without_id(self):
         with self.assertRaises(ModuleFail) as raised:
             accounts_info.run(FakeModule({"name": "wanted"}), client_with([{"name": "wanted"}]))
 
         self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed account data")
+        self.assertEqual(raised.exception.values["name"], "wanted")

@@ -69,6 +69,7 @@ def run(module, client):
             client.zero_trust.access.service_tokens.list(account_id=account_id),
             "Access service token",
             required_fields=("id",),
+            context={"account_id": account_id},
         )
 
 
