@@ -7,7 +7,7 @@ Gather information about cloudflare cfd tunnels
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Cloudflare Tunnel`
-* Cloudflare api `Token` with `Write` permissions to `Cloudflare Tunnel` when `cfd_tunnel_info_include_token` is `true`
+* Cloudflare api `Token` with `Write` permissions to `Cloudflare Tunnel`
 
 ## Role Variables
 

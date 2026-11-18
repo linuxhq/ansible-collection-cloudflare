@@ -7,7 +7,7 @@ Gather information about cloudflare warp connectors
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Cloudflare One Connector: WARP`
-* Cloudflare api `Token` with `Write` permissions to `Cloudflare One Connectors` when `warp_connector_info_include_token` is `true`
+* Cloudflare api `Token` with `Write` permissions to `Cloudflare One Connectors`
 
 ## Role Variables
 
