@@ -28,4 +28,4 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.pagerules_info
-          pagerules_info_api_token: '{{ accounts_info_api_token }}'
+          pagerules_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"

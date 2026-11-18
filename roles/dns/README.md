@@ -36,9 +36,9 @@ has its comment or tags cleared, as `community.general.cloudflare_dns` does.
       connection: local
       roles:
         - role: linuxhq.cloudflare.dns
-          dns_api_token: '{{ accounts_info_api_token }}'
+          dns_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
           dns_records:
-            - zone: '{{ zones_list.0.name }}'
+            - zone: molecule.com
               records:
                 - record: one
                   comment: Managed by Ansible

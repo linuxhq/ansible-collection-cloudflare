@@ -29,4 +29,4 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.rulesets_info
-          rulesets_info_api_token: '{{ accounts_info_api_token }}'
+          rulesets_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
