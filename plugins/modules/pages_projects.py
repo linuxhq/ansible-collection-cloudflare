@@ -45,8 +45,8 @@ options:
       - Pages build command, output directory, and related settings.
       - An empty mapping leaves the existing build configuration unchanged.
       - Set C(web_analytics_tag) or C(web_analytics_token) to null to clear it.
-        Cloudflare keeps the value of any other build setting set to null, so the
-        module fails before making changes.
+        Cloudflare keeps the value of any other supported build setting set to
+        null, so the module fails before making changes.
       - Only C(build_caching), C(build_command), C(destination_dir), C(root_dir),
         C(web_analytics_tag), and C(web_analytics_token) are supported. Cloudflare
         accepts any other key, such as C(build_image_major_version), but does not

@@ -50,8 +50,8 @@ minor_changes:
   - pagerules - no longer check the C(value) keys of a C(cache_key_fields) action or that each target sets
     C(target), C(constraint.operator), and C(constraint.value); an action C(id) fails early only when it is a
     mapping or a list. Null target, constraint, action, and value keys are ignored. Only a O(pagerules#module:priority)
-    of 0, or one above the number of page rules in the zone outside check mode, fails early; Cloudflare rejects a
-    negative one.
+    of 0, or, outside check mode, one above the number of page rules the zone will have after the change, fails
+    early; Cloudflare rejects a negative one.
   - pages_projects - accept null C(wrangler_config_hash), C(placement.mode), C(limits.cpu_ms), and environment
     variable C(value), which Cloudflare clears, and send null values and binding entry keys whose handling by
     Cloudflare is not verified, such as an C(r2_buckets) entry key. O(rotate_secrets)
