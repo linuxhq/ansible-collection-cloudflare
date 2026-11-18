@@ -26,5 +26,7 @@
       tags:
         - molecule-idempotence-notest
 
-    - access_apps
+    - role: access_apps
+      diff: false
+      no_log: true
 ...

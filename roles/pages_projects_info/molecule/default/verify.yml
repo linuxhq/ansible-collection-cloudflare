@@ -3,7 +3,9 @@
   hosts: all
 
   roles:
-    - pages_projects_info
+    - role: pages_projects_info
+      diff: false
+      no_log: true
 
   post_tasks:
     - name: Ensure info is verified
@@ -31,6 +33,8 @@
         name: "{{ _project.name }}"
       register: __pages_projects_info_domains
       check_mode: true
+      diff: false
+      no_log: true
       loop: "{{ pages_projects_list }}"
       loop_control:
         label: "{{ _project.name | d(none) }}"
@@ -50,6 +54,9 @@
     - name: Ensure roles are included
       ansible.builtin.include_role:
         name: "{{ _role }}"
+        apply:
+          diff: false
+          no_log: true
       loop:
         - pages_projects
       loop_control:

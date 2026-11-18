@@ -25,6 +25,8 @@ Manage cloudflare zerotrust connectivity settings
       connection: local
       roles:
         - role: linuxhq.cloudflare.zerotrust_connectivity_settings
+          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
           zerotrust_connectivity_settings_account_id: '{{ _accounts_info_id }}'
           zerotrust_connectivity_settings_api_token: '{{ accounts_info_api_token }}'
           zerotrust_connectivity_settings_icmp_proxy_enabled: true

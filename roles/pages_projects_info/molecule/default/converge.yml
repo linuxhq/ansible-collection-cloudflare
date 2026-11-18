@@ -6,6 +6,10 @@
       tags:
         - molecule-idempotence-notest
       check_mode: false
+      diff: false
+      no_log: true
 
-    - pages_projects_info
+    - role: pages_projects_info
+      diff: false
+      no_log: true
 ...

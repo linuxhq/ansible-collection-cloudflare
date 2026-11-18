@@ -204,7 +204,8 @@ def validate_config(module, config):
     ingress_rules = config.get("ingress")
     rules = ingress_rules if isinstance(ingress_rules, list) else []
     for item in [config, *rules]:
-        if isinstance(item, dict) and "origin_request" in item:
+        # A key set to null is not sent, so it counts as omitted.
+        if isinstance(item, dict) and item.get("origin_request") is not None:
             module.fail_json(msg="config key 'origin_request' must use the Cloudflare API key 'originRequest'")
 
 
@@ -221,7 +222,11 @@ def run(module, client):
     ):
         tunnel = serialize_resource(tunnels.get(params["tunnel_id"], account_id=params["account_id"]))
 
-    resource_id(module, tunnel, "cloudflared tunnel", expected=params["tunnel_id"], context=identifiers)
+    tunnel_id = resource_id(module, tunnel, "cloudflared tunnel", context=identifiers)
+    # Cloudflare resolves tunnel ids case-insensitively and returns them in lowercase.
+    if tunnel_id.lower() != params["tunnel_id"].lower():
+        module.fail_json(msg="Cloudflare API returned the wrong cloudflared tunnel", **identifiers)
+
     # Cloudflare still returns a deleted tunnel, with deleted_at set.
     if tunnel.get("deleted_at") is not None:
         module.fail_json(msg=f"Cloudflared tunnel {params['tunnel_id']} was deleted", **identifiers)
@@ -238,7 +243,7 @@ def run(module, client):
         "Cloudflare API request failed while gathering the tunnel configuration",
         **identifiers,
     ):
-        current = serialize_resource(configurations.get(params["tunnel_id"], account_id=params["account_id"])) or {}
+        current = serialize_resource(configurations.get(tunnel_id, account_id=params["account_id"])) or {}
 
     require_mapping(module, current, "tunnel configuration", identifiers)
     current_config = current.get("config")
@@ -270,7 +275,7 @@ def run(module, client):
     ):
         configuration = serialize_resource(
             configurations.update(
-                params["tunnel_id"], account_id=params["account_id"], config=without_nested_nulls(params["config"])
+                tunnel_id, account_id=params["account_id"], config=without_nested_nulls(params["config"])
             )
         )
 

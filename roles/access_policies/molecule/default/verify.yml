@@ -30,7 +30,9 @@
               map('combine', {'state': 'absent'}) }}"
 
   roles:
-    - access_policies
+    - role: access_policies
+      diff: false
+      no_log: true
     - access_groups
     - access_service_tokens
 ...

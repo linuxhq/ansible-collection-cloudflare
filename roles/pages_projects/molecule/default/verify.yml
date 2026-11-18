@@ -10,5 +10,7 @@
               map('combine', {'state': 'absent'}) }}"
 
   roles:
-    - pages_projects
+    - role: pages_projects
+      diff: false
+      no_log: true
 ...

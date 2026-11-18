@@ -28,5 +28,7 @@ Gather information about cloudflare rules lists
       connection: local
       roles:
         - role: linuxhq.cloudflare.rules_lists_info
+          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
           rules_lists_info_account_id: '{{ _accounts_info_id }}'
           rules_lists_info_api_token: '{{ accounts_info_api_token }}'

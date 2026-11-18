@@ -25,6 +25,8 @@
       tags:
         - molecule-idempotence-notest
       check_mode: false
+      diff: false
+      no_log: true
 
     - role: access_apps_info
       access_apps_info_account_id: null
@@ -32,5 +34,7 @@
       tags:
         - molecule-idempotence-notest
 
-    - access_apps_info
+    - role: access_apps_info
+      diff: false
+      no_log: true
 ...

@@ -24,6 +24,10 @@
                   (ip.geoip.country ne "US")
       tags:
         - molecule-idempotence-notest
+      diff: false
+      no_log: true
 
-    - rulesets
+    - role: rulesets
+      diff: false
+      no_log: true
 ...

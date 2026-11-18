@@ -10,8 +10,6 @@ breaking_changes:
   - pagerules role - stop sending C(status=active) for rules that omit C(status), so a rule disabled outside Ansible
     stays disabled. New rules still default to C(active).
 bugfixes:
-  - module_utils - serialize SDK models on managed nodes with Pydantic v1, which the Cloudflare SDK supports, instead
-    of failing after the API request.
   - module_utils - compare Booleans and numbers as different values, so changing C(1) to V(true) is applied.
   - zones - match whole-number float setting values, such as C(min_tls_version) V(1.0), against the string Cloudflare
     stores, so the setting converges instead of failing after the update.

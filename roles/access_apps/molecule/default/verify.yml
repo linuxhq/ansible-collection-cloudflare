@@ -34,8 +34,12 @@
               map('combine', {'state': 'absent'}) }}"
 
   roles:
-    - access_apps
-    - access_policies
+    - role: access_apps
+      diff: false
+      no_log: true
+    - role: access_policies
+      diff: false
+      no_log: true
     - access_groups
     - access_service_tokens
 ...

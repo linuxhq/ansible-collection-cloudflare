@@ -7,6 +7,7 @@ Manage cloudflare zones
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Zone`
+* Cloudflare api `Token` with `Write` permissions to `Zone Settings`
 * Cloudflare api `Token` with `Read` permissions to `Account Settings`
 
 ## Role Variables
@@ -30,6 +31,8 @@ Manage cloudflare zones
       connection: local
       roles:
         - role: linuxhq.cloudflare.zones
+          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
           zones_account_id: '{{ _accounts_info_id }}'
           zones_api_token: '{{ accounts_info_api_token }}'
           zones_list:

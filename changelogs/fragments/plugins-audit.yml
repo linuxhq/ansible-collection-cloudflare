@@ -17,7 +17,6 @@ breaking_changes:
   - rules_lists - O(operation_timeout) now bounds each submission and polling request by the remaining budget instead of
     enforcing a hard wall-clock deadline with an alarm signal.
 bugfixes:
-  - module_utils - treat a null list result from Cloudflare as an empty list instead of failing with malformed list data.
   - zones - scope zone lookups to O(account_id) when provided, so a same-named zone in another account is never updated or deleted.
   - access_groups - preserve an existing group's O(exclude) and O(require) selectors when they are omitted, instead of clearing them on update.
   - access_policies - preserve an existing policy's omitted optional fields on update instead of clearing them.
@@ -36,7 +35,6 @@ bugfixes:
   - zones - manage settings Cloudflare exposes as an C(enabled) flag, such as C(ssl_recommender).
   - zerotrust_connectivity_settings, zerotrust_connectivity_settings_info - describe O(offramp_warp_enabled) as WARP-to-WARP
     traffic, matching Cloudflare's API.
-  - pagerules, pagerules_info - treat a null page rules list as empty.
   - pages_projects - delete environment variables set explicitly to null, as Cloudflare documents, instead of ignoring them.
   - zones - document the C(enabled) field returned for flag-style settings.
   - cfd_tunnel, access_apps, access_groups, access_policies - name the account and resource in create and update failures.

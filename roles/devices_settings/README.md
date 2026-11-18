@@ -28,6 +28,8 @@ Manage cloudflare devices settings
       connection: local
       roles:
         - role: linuxhq.cloudflare.devices_settings
+          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
           devices_settings_account_id: '{{ _accounts_info_id }}'
           devices_settings_api_token: '{{ accounts_info_api_token }}'
           devices_settings_gateway_proxy_enabled: true

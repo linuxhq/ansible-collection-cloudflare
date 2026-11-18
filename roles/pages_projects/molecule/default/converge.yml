@@ -7,5 +7,7 @@
       tags:
         - molecule-idempotence-notest
 
-    - pages_projects
+    - role: pages_projects
+      diff: false
+      no_log: true
 ...
