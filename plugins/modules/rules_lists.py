@@ -55,6 +55,8 @@ options:
     elements: dict
     description:
       - Complete set of entries that the Rules list must contain.
+      - When omitted, the existing items are preserved.
+      - An explicit empty list removes every item.
       - Each entry must set the field named by the list kind, such as C(ip) or
         C(hostname), and may also set C(comment). Any other key must be null,
         or one of C(id), C(created_on), and C(modified_on), which are not sent.
