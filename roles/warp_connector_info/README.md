@@ -7,6 +7,7 @@ Gather information about cloudflare warp connectors
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Cloudflare One Connector: WARP`
+* Cloudflare api `Token` with `Write` permissions to `Cloudflare One Connectors`
 
 ## Role Variables
 
@@ -29,6 +30,8 @@ Gather information about cloudflare warp connectors
       connection: local
       roles:
         - role: linuxhq.cloudflare.warp_connector_info
+          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
           warp_connector_info_account_id: '{{ _accounts_info_id }}'
           warp_connector_info_api_token: '{{ accounts_info_api_token }}'
           warp_connector_info_include_token: false

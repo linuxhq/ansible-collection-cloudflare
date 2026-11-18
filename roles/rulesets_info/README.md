@@ -7,6 +7,7 @@ Gather information about cloudflare rulesets
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Account WAF`
+* Cloudflare api `Token` with `Read` permissions to `Zone`
 
 ## Role Variables
 
@@ -28,4 +29,4 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.rulesets_info
-          rulesets_info_api_token: '{{ accounts_info_api_token }}'
+          rulesets_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"

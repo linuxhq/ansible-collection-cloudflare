@@ -29,11 +29,12 @@ Manage cloudflare dnssec settings
       connection: local
       roles:
         - role: linuxhq.cloudflare.dnssec
-          dnssec_api_token: '{{ accounts_info_api_token }}'
+          zones_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          dnssec_api_token: '{{ zones_info_api_token }}'
           dnssec_list:
-            - zone_id: '{{ _zones_info_dict[zones_list.0.name].id }}'
+            - zone_id: "{{ _zones_info_dict['molecule.com'].id }}"
               status: active
-            - zone_id: '{{ _zones_info_dict[zones_list.1.name].id }}'
+            - zone_id: "{{ _zones_info_dict['molecule.net'].id }}"
               status: active
-            - zone_id: '{{ _zones_info_dict[zones_list.2.name].id }}'
+            - zone_id: "{{ _zones_info_dict['molecule.org'].id }}"
               status: active

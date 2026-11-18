@@ -277,6 +277,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     resource_list,
     serialize_resource,
     unique_match,
+    unsupported_fields,
     valid_dns_labels,
     values_differ,
     without_retries,
@@ -379,25 +380,30 @@ def contains_null(value):
 
 
 def validate_setting_names(module):
-    """Fail when a setting Cloudflare accepts but never stores is requested."""
+    """Fail when a setting Cloudflare accepts but never stores is requested.
+
+    Null values are ignored, as Cloudflare drops an unknown setting set to
+    null; validate_null_settings checks known settings set to null.
+    """
     params = module.params
-    unknown = [f"build_config.{key}" for key in params.get("build_config") or {} if key not in BUILD_SETTINGS]
+    unknown = unsupported_fields(params.get("build_config"), BUILD_SETTINGS, "build_config")
     for environment in ("preview", "production"):
         config = (params.get("deployment_configs") or {}).get(environment)
         for key, value in config.items() if isinstance(config, dict) else ():
+            if value is None:
+                continue
+
             path = f"deployment_configs.{environment}.{key}"
             # Cloudflare drops wrangler_config_hash on create and update.
-            if key not in DEPLOYMENT_SETTINGS or key == "wrangler_config_hash" and value is not None:
+            if key not in DEPLOYMENT_SETTINGS or key == "wrangler_config_hash":
                 unknown.append(path)
 
-            if key in DEPLOYMENT_OBJECT_FIELDS and isinstance(value, dict):
-                unknown.extend(f"{path}.{field}" for field in value if field not in DEPLOYMENT_OBJECT_FIELDS[key])
+            if key in DEPLOYMENT_OBJECT_FIELDS:
+                unknown.extend(unsupported_fields(value, DEPLOYMENT_OBJECT_FIELDS[key], path))
 
             # Entries may be null, which deletes them.
             for name, entry in value.items() if key in DEPLOYMENT_ENTRY_FIELDS and isinstance(value, dict) else ():
-                for field in entry if isinstance(entry, dict) else ():
-                    if field not in DEPLOYMENT_ENTRY_FIELDS[key]:
-                        unknown.append(f"{path}.{name}.{field}")
+                unknown.extend(unsupported_fields(entry, DEPLOYMENT_ENTRY_FIELDS[key], f"{path}.{name}"))
 
     if unknown:
         module.fail_json(
@@ -412,7 +418,7 @@ def validate_null_settings(module):
     unsupported = [
         f"build_config.{key}"
         for key, value in (params.get("build_config") or {}).items()
-        if key not in NULLABLE_BUILD_SETTINGS and contains_null(value)
+        if key in BUILD_SETTINGS and key not in NULLABLE_BUILD_SETTINGS and contains_null(value)
     ]
     for environment, config in (params.get("deployment_configs") or {}).items():
         path = f"deployment_configs.{environment}"

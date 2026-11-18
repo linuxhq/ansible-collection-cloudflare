@@ -29,9 +29,10 @@ Manage cloudflare rulesets
       connection: local
       roles:
         - role: linuxhq.cloudflare.rulesets
-          rulesets_api_token: '{{ accounts_info_api_token }}'
+          zones_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          rulesets_api_token: '{{ zones_info_api_token }}'
           rulesets_list:
-            - zone_id: '{{ _zones_info_dict[zones_list.0.name].id }}'
+            - zone_id: "{{ _zones_info_dict['molecule.com'].id }}"
               name: default
               rules:
                 - action: block

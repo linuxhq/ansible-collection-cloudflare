@@ -130,8 +130,41 @@ class RulesetsTests(TestCase):
             api.phases.get.assert_not_called()
             api.phases.update.assert_not_called()
             self.assertEqual(
-                result["msg"], f"action_parameters key {key!r} must use the Cloudflare API key {api_key!r}"
+                result["msg"], f"rules[0].action_parameters.{key} must use the Cloudflare API key {api_key!r}"
             )
+
+    def test_null_sdk_cache_control_spellings_count_as_omitted(self):
+        # A key set to null is not sent, so it is not rejected.
+        action_parameters = {"cache": True}
+        stored = [{"action": "set_cache_settings", "expression": "true", "action_parameters": action_parameters}]
+        rules = [
+            RULES[0],
+            {**stored[0], "action_parameters": {**action_parameters, "max_age": None, "s_maxage": None}},
+        ]
+        current = {**CURRENT, "rules": [RULES[0], {**stored[0], "enabled": True}]}
+        client, api = make_client({**CURRENT, "rules": RULES}, updated=current)
+
+        result = self.run_module(FakeModule(params(rules=rules)), client)
+
+        self.assertNotIn("msg", result)
+        self.assertTrue(result["changed"])
+        self.assertEqual(api.phases.update.call_args.kwargs["rules"][1]["action_parameters"], action_parameters)
+
+        client, api = make_client(current)
+
+        result = self.run_module(FakeModule(params(rules=rules)), client)
+
+        self.assertFalse(result["changed"])
+        api.phases.update.assert_not_called()
+
+    def test_sdk_cache_control_spelling_names_the_rule(self):
+        rules = [RULES[0], {"action": "set_cache_control", "expression": "true", "action_parameters": {"max_age": 1}}]
+        client, api = make_client(CURRENT)
+
+        result = self.run_module(FakeModule(params(rules=rules)), client)
+
+        api.phases.get.assert_not_called()
+        self.assertEqual(result["msg"], "rules[1].action_parameters.max_age must use the Cloudflare API key 'max-age'")
 
     def test_rejects_empty_skip_parameters_before_any_request(self):
         rules = [

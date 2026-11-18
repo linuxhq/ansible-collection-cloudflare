@@ -190,9 +190,12 @@ def validate_action_parameters(module):
         if not isinstance(action_parameters, dict):
             continue
 
+        # A key set to null is not sent, so it counts as omitted.
         for key, api_key in ACTION_PARAMETER_API_KEYS.items():
-            if key in action_parameters:
-                module.fail_json(msg=f"action_parameters key {key!r} must use the Cloudflare API key {api_key!r}")
+            if action_parameters.get(key) is not None:
+                module.fail_json(
+                    msg=f"rules[{index}].action_parameters.{key} must use the Cloudflare API key {api_key!r}"
+                )
 
         empty.extend(
             f"rules[{index}].action_parameters.{key}"

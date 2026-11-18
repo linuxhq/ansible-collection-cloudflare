@@ -7,6 +7,7 @@ Gather information about cloudflare cfd tunnels
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Cloudflare Tunnel`
+* Cloudflare api `Token` with `Write` permissions to `Cloudflare Tunnel`
 
 ## Role Variables
 
@@ -29,6 +30,8 @@ Gather information about cloudflare cfd tunnels
       connection: local
       roles:
         - role: linuxhq.cloudflare.cfd_tunnel_info
+          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
           cfd_tunnel_info_account_id: '{{ _accounts_info_id }}'
           cfd_tunnel_info_api_token: '{{ accounts_info_api_token }}'
           cfd_tunnel_info_include_token: false

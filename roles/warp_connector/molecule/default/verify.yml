@@ -10,7 +10,5 @@
               map('combine', {'state': 'absent'}) }}"
 
   roles:
-    - role: warp_connector
-      diff: false
-      no_log: true
+    - warp_connector
 ...

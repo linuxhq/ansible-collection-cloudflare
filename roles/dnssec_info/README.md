@@ -28,4 +28,4 @@ None
       connection: local
       roles:
         - role: linuxhq.cloudflare.dnssec_info
-          dnssec_info_api_token: '{{ accounts_info_api_token }}'
+          dnssec_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"

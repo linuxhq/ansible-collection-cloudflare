@@ -24,9 +24,10 @@ Manage cloudflare pagerules
       connection: local
       roles:
         - role: linuxhq.cloudflare.pagerules
-          pagerules_api_token: '{{ accounts_info_api_token }}'
+          zones_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          pagerules_api_token: '{{ zones_info_api_token }}'
           pagerules_list:
-            - zone_id: '{{ _zones_info_dict[zones_list.0.name].id }}'
+            - zone_id: "{{ _zones_info_dict['molecule.org'].id }}"
               pagerules:
                 - actions:
                     - id: forwarding_url

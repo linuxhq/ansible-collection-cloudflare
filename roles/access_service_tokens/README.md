@@ -30,6 +30,8 @@ Manage cloudflare access service tokens
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_service_tokens
+          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
           access_service_tokens_account_id: '{{ _accounts_info_id }}'
           access_service_tokens_api_token: '{{ accounts_info_api_token }}'
           access_service_tokens_list:

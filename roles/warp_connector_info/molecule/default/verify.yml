@@ -3,9 +3,7 @@
   hosts: all
 
   roles:
-    - role: warp_connector_info
-      diff: false
-      no_log: true
+    - warp_connector_info
 
   post_tasks:
     - name: Ensure info is verified
@@ -24,8 +22,6 @@
       loop_control:
         label: "{{ _item | d(none) }}"
         loop_var: _item
-      diff: false
-      no_log: true
 
     - name: Ensure inventory lists are formatted
       ansible.builtin.set_fact:
@@ -36,9 +32,6 @@
     - name: Ensure roles are included
       ansible.builtin.include_role:
         name: "{{ _role }}"
-        apply:
-          diff: false
-          no_log: true
       loop:
         - warp_connector
       loop_control:

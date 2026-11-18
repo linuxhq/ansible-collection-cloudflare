@@ -30,6 +30,12 @@ Manage cloudflare access policies
       connection: local
       roles:
         - role: linuxhq.cloudflare.access_policies
+          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+          access_groups_info_account_id: '{{ _accounts_info_id }}'
+          access_groups_info_api_token: '{{ accounts_info_api_token }}'
+          access_identity_providers_info_account_id: '{{ _accounts_info_id }}'
+          access_identity_providers_info_api_token: '{{ accounts_info_api_token }}'
           access_policies_account_id: '{{ _accounts_info_id }}'
           access_policies_api_token: '{{ accounts_info_api_token }}'
           access_policies_list:

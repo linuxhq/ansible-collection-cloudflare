@@ -651,6 +651,47 @@ class PagesProjectsTests(TestCase):
                     api.create.assert_not_called()
                     api.edit.assert_not_called()
 
+    def test_unstored_setting_names_set_to_null_count_as_omitted(self):
+        # Cloudflare drops an unknown setting set to null, so it is not rejected.
+        build_config = {"build_command": "true", "bogus_key": None}
+        deployment = {
+            "compatibility_date": "2024-01-01",
+            "bogus_key": None,
+            "placement": {"mode": "smart", "bogus": None},
+            "env_vars": {"A": {"type": "plain_text", "value": "x", "extra": None}},
+            "kv_namespaces": {"KV": {"namespace_id": "id", "bogus": None}},
+        }
+        stored = {
+            "compatibility_date": "2024-01-01",
+            "placement": {"mode": "smart"},
+            "env_vars": {"A": {"type": "plain_text", "value": "x"}},
+            "kv_namespaces": {"KV": {"namespace_id": "id"}},
+        }
+        project = {
+            **PROJECT,
+            "build_config": {"build_command": "true"},
+            "deployment_configs": {"preview": stored, "production": stored},
+        }
+        options = params(
+            build_config=build_config, deployment_configs={"preview": deployment, "production": deployment}
+        )
+        for check_mode in (False, True):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with([PROJECT], edited=project)
+
+                result = self.run_module(FakeModule(options, check_mode=check_mode), client)
+
+                self.assertNotIn("msg", result)
+                self.assertTrue(result["changed"])
+
+        client, api = client_with([project])
+
+        result = self.run_module(FakeModule(options), client)
+
+        self.assertNotIn("msg", result)
+        self.assertFalse(result["changed"])
+        api.edit.assert_not_called()
+
     def test_stored_setting_names_are_sent(self):
         build_config = dict.fromkeys(pages_projects.BUILD_SETTINGS, "value")
         build_config.pop("web_analytics_token")

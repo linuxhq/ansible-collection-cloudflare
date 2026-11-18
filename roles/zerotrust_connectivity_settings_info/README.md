@@ -27,5 +27,7 @@ Gather information about cloudflare zerotrust connectivity settings
       connection: local
       roles:
         - role: linuxhq.cloudflare.zerotrust_connectivity_settings_info
+          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
           zerotrust_connectivity_settings_info_account_id: '{{ _accounts_info_id }}'
           zerotrust_connectivity_settings_info_api_token: '{{ accounts_info_api_token }}'

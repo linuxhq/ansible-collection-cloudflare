@@ -93,8 +93,10 @@ Using every role in the collection requires the following permissions:
 | Account | Cloudflare Pages                                      | Write |
 | Account | Cloudflare Tunnel                                     | Write |
 | Account | Cloudflare One Connector: WARP                        | Write |
+| Account | Cloudflare One Connectors                             | Write |
 | Account | Zero Trust                                            | Write |
 | Zone    | Cache Purge                                           | Purge |
 | Zone    | DNS                                                   | Write |
 | Zone    | Page Rules                                            | Write |
 | Zone    | Zone                                                  | Write |
+| Zone    | Zone Settings                                         | Write |

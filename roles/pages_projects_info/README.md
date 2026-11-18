@@ -28,5 +28,7 @@ Gather information about cloudflare pages projects
       connection: local
       roles:
         - role: linuxhq.cloudflare.pages_projects_info
+          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
           pages_projects_info_account_id: '{{ _accounts_info_id }}'
           pages_projects_info_api_token: '{{ accounts_info_api_token }}'

@@ -40,6 +40,8 @@ Manage cloudflare devices policy
       connection: local
       roles:
         - role: linuxhq.cloudflare.devices_policy
+          accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+          accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
           devices_policy_account_id: '{{ _accounts_info_id }}'
           devices_policy_api_token: '{{ accounts_info_api_token }}'
           devices_policy_auto_connect: 60

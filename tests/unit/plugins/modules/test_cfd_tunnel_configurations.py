@@ -255,6 +255,22 @@ class CfdTunnelConfigurationsTests(TestCase):
                     self.assertIn("'originRequest'", raised.exception.values["msg"])
                     self.assertEqual(client.mock_calls, [])
 
+    def test_null_sdk_origin_request_spelling_counts_as_omitted(self):
+        # A key set to null is not sent, so it is not rejected.
+        sent = {"ingress": [{"service": "http_status:404"}]}
+        config = {"origin_request": None, "ingress": [{"service": "http_status:404", "origin_request": None}]}
+
+        result, api = self.run_module(module_for(config), {"config": {}}, {"config": sent})
+
+        self.assertNotIn("msg", result.values)
+        self.assertTrue(result.values["changed"])
+        self.assertEqual(api.update.call_args.kwargs["config"], sent)
+
+        result, api = self.run_module(module_for(config), {"config": sent})
+
+        self.assertFalse(result.values["changed"])
+        api.update.assert_not_called()
+
     def test_check_mode_does_not_update(self):
         raised, api = self.run_module(module_for({"warp": True}, check_mode=True), {"config": {"warp": False}})
 
@@ -337,6 +353,30 @@ class CfdTunnelConfigurationsTests(TestCase):
         self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned the wrong cloudflared tunnel")
         self.assertEqual(raised.exception.values["account_id"], "account")
         self.assertEqual(raised.exception.values["tunnel_id"], "tunnel")
+
+    def test_tunnel_id_is_compared_case_insensitively(self):
+        # Cloudflare resolves an uppercase tunnel id and returns it in lowercase.
+        tunnel_id = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+        config = {"ingress": [{"service": "http_status:404"}]}
+        for current, changed in (({"config": {}}, True), ({"config": config}, False)):
+            with self.subTest(changed=changed):
+                client = Mock()
+                tunnels = client.zero_trust.tunnels.cloudflared
+                tunnels.get.return_value = {**REMOTE_TUNNEL, "id": tunnel_id}
+                tunnels.configurations.get.return_value = current
+                tunnels.configurations.update.return_value = {"config": config}
+                module = FakeModule({"account_id": "account", "tunnel_id": tunnel_id.upper(), "config": config})
+                with self.assertRaises(ModuleExit) as raised:
+                    cfd_tunnel_configurations.run(module, client)
+
+                self.assertEqual(raised.exception.values["changed"], changed)
+                tunnels.configurations.get.assert_called_once_with(tunnel_id, account_id="account")
+                if changed:
+                    tunnels.configurations.update.assert_called_once_with(
+                        tunnel_id, account_id="account", config=config
+                    )
+                else:
+                    tunnels.configurations.update.assert_not_called()
 
     def test_malformed_current_configuration_names_the_tunnel(self):
         result, api = self.run_module(module_for({"warp": True}), {"config": "malformed"})

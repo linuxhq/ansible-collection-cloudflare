@@ -20,7 +20,4 @@ bugfixes:
   - access_service_tokens - document that Cloudflare creates a token without O(access_service_tokens#module:duration)
     with a duration of V(8760h), and that V(forever) makes a token that does not expire.
 trivial:
-  - Molecule scenarios - set C(no_log) and C(diff=false) on the access_policies role entries in the access_apps,
-    access_apps_info, access_policies, and access_policies_info converge playbooks, which also run
-    access_identity_providers_info as a dependency.
   - Changelog fragments - drop or correct entries for checks that were later removed before release.

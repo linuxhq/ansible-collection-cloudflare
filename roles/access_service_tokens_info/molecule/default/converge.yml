@@ -7,8 +7,6 @@
       tags:
         - molecule-idempotence-notest
       check_mode: false
-      diff: false
-      no_log: true
 
     - role: access_service_tokens_info
       access_service_tokens_info_account_id: null
