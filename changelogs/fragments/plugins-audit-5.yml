@@ -12,7 +12,8 @@ bugfixes:
   - devices_policy - compare O(include) and O(exclude) routes on all of their fields, so removing a field such as
     C(description) from a route is applied instead of reported as unchanged.
   - access_apps - when changing an existing application to O(type=proxy_endpoint), carry over only the fields proxy
-    endpoints store (C(allowed_idps), C(auto_redirect_to_identity), C(policies), C(session_duration), and C(tags)).
+    endpoints store (C(allowed_idps), C(auto_redirect_to_identity), C(custom_deny_url),
+    C(custom_non_identity_deny_url), C(custom_pages), C(policies), C(session_duration), and C(tags)).
     Cloudflare dropped the others, so the type change wrote and then failed.
   - access_apps - treat V(false) as Cloudflare's default for O(skip_interstitial) and O(service_auth_401_redirect),
     which Cloudflare omits when false. An explicit V(false) wrote and then failed on every run, and was rejected for

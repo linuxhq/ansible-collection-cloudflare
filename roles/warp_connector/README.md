@@ -7,6 +7,7 @@ Manage cloudflare warp connectors
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Cloudflare One Connector: WARP`
+* Cloudflare api `Token` with `Read` permissions to `Account Settings`
 
 ## Role Variables
 

@@ -7,6 +7,7 @@ Gather information about cloudflare rules lists
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Account Filter Lists`
+* Cloudflare api `Token` with `Read` permissions to `Account Settings`
 
 ## Role Variables
 

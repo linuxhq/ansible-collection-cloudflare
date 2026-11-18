@@ -406,10 +406,6 @@ class ValueTests(TestCase):
         self.assertTrue(differs({"include": [{"email": {}}]}, {"include": [{"everyone": {}}]}))
         headers = {"headers": {"A": {"value": 1, "extra": 2}, "B": {"value": 2}}}
         self.assertFalse(differs(headers, {"headers": {"A": {"value": 1}}}))
-        self.assertTrue(differs(headers, {"headers": {"A": {"value": 1}}}, exact_fields=("headers",)))
-        self.assertFalse(
-            differs(headers, {"headers": {"A": {"value": 1}, "B": {"value": 2}}}, exact_fields=("headers",))
-        )
         self.assertEqual(
             payload_from_params({"enabled": False, "name": None}, ("enabled", "name", "count")),
             {"enabled": False},

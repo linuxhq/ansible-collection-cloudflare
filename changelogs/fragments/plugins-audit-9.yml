@@ -18,7 +18,7 @@ bugfixes:
   - dnssec - treat V(false) in O(dnssec_multi_signer), O(dnssec_presigned), and O(dnssec_use_nsec3) as matching a
     zone that does not return the setting. Cloudflare omits these settings while DNSSEC is disabled, so every run
     wrote the setting again and then failed because Cloudflare did not apply it.
-  - rules_lists - reject a C(hostname.url_hostname) element with a scheme, a path, or a C(*) wildcard not followed
-    by a period, and an C(asn) element that is not a non-negative integer, before creating the list or updating its
+  - rules_lists - reject a C(hostname.url_hostname) element with a scheme, a path, or a C(*) wildcard not followed by a
+    period, and an C(asn) element that is not an integer from 1 to 4294967295, before creating the list or updating its
     description.
   - cfd_tunnel_configurations - document that O(tunnel_id) must not name a locally managed tunnel.

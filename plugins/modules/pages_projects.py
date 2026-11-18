@@ -50,7 +50,9 @@ options:
       - Only C(build_caching), C(build_command), C(destination_dir), C(root_dir),
         C(web_analytics_tag), and C(web_analytics_token) are supported. Cloudflare
         accepts any other key, such as C(build_image_major_version), but does not
-        store it, so the module fails before making changes.
+        store it, so the module fails before making changes. Any other key set
+        to null counts as omitted and is not rejected, because Cloudflare drops
+        it.
   deployment_configs:
     type: dict
     description:
@@ -80,11 +82,15 @@ options:
       - Keys under C(preview) and C(production) must be Pages deployment
         settings, such as C(compatibility_date), C(env_vars), or
         C(build_image_major_version). Cloudflare accepts any other key but does
-        not store it, so the module fails before making changes.
+        not store it, so the module fails before making changes. Any other key
+        set to null counts as omitted and is not rejected, because Cloudflare
+        drops it.
       - The same applies to fields of C(limits), C(placement), and each
         C(browsers), C(env_vars), C(kv_namespaces), or C(vectorize_bindings)
         entry, such as C(type) and C(value) of an environment variable or
-        C(namespace_id) of a C(kv_namespaces) entry.
+        C(namespace_id) of a C(kv_namespaces) entry. Any other field fails
+        before making changes, and any other field set to null counts as
+        omitted and is not rejected.
       - An empty C(compatibility_date), C(usage_model), or C(placement.mode)
         fails before making changes, because Cloudflare does not store it; omit
         it instead.

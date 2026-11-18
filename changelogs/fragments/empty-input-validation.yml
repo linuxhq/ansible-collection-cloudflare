@@ -4,10 +4,10 @@ bugfixes:
     entry in O(include), O(exclude), or O(require), before any request, naming the entry.
   - access_groups, access_policies, access_apps - reject an empty Access selector V({}) before any request. Cloudflare
     dropped it, so the module wrote the group, policy, or application and then failed on every run.
-  - access_groups, access_policies, access_apps - reject an empty string in a nested field of an Access selector of a
-    known type, such as the C(account_id) of a C(device_posture) selector, before any request. Cloudflare dropped the
-    field, so the module wrote the group, policy, or application and then failed on every run.
-  - devices_policy - reject O(service_mode_v2) C(port) unless C(mode) is C(proxy) before any request, and stop
+  - access_groups, access_policies, access_apps - reject an empty C(account_id) of a C(cloudflare_account_member) or
+    C(device_posture) selector, or an empty C(identity_provider_id) of a C(saml) selector, before any request.
+    Cloudflare dropped the field, so the module wrote the group, policy, or application and then failed on every run.
+  - devices_policy - reject O(service_mode_v2) C(port) with a C(mode) other than C(proxy) before any request, and stop
     carrying the current port into a mode other than C(proxy). Cloudflare stores a port only for C(proxy), so the
     module wrote the policy and then failed on every run.
   - rulesets - reject an empty C(phases), C(products), or C(rules) in the C(action_parameters) of a rule before any

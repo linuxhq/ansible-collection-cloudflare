@@ -10,5 +10,5 @@ bugfixes:
     keeps the current browser bindings and the run never converges.
   - rules_lists - accept an element key set to null, and the C(id), C(created_on), and C(modified_on) keys that are not
     sent, instead of failing before any change.
-  - zones - accept an object setting value whose fields are all null, such as C(aegis) with C(pool_id) null, instead
-    of rejecting it as an empty mapping; a literal empty mapping is still rejected.
+  - zones - accept an C(aegis) setting value whose only field is a null C(pool_id), which Cloudflare does not store,
+    instead of rejecting it as an empty mapping; a literal empty mapping is still rejected.

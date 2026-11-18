@@ -7,6 +7,8 @@ Manage cloudflare access groups
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Access: Organizations, Identity Providers, and Groups`
+* Cloudflare api `Token` with `Read` permissions to `Access: Service Tokens`
+* Cloudflare api `Token` with `Read` permissions to `Account Settings`
 
 ## Role Variables
 

@@ -7,6 +7,7 @@ Gather information about cloudflare pages projects
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Cloudflare Pages`
+* Cloudflare api `Token` with `Read` permissions to `Account Settings`
 
 ## Role Variables
 

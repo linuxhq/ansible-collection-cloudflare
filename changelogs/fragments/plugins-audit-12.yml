@@ -4,8 +4,8 @@ bugfixes:
     binding named C(env_vars), such as a C(services) or C(r2_buckets) entry, had every omitted stored field, such as
     C(environment) or C(jurisdiction), sent as null; Cloudflare kept them, so every run wrote the project and then
     failed because Cloudflare did not apply the change.
-  - rules_lists - fail before any request when an C(asn) element is greater than 4294967295. Cloudflare accepts only
+  - rules_lists - fail before any change when an C(asn) element is greater than 4294967295. Cloudflare accepts only
     32-bit ASNs, and rejected the items after the module had created the list or written its description.
-  - rules_lists - fail before any request when a C(redirect.status_code) element is not the integer 301, 302, 307,
+  - rules_lists - fail before any change when a C(redirect.status_code) element is not the integer 301, 302, 307,
     or 308. Cloudflare rejected other values, such as V(303) or V("301"), after the module had created the list or
     written its description.

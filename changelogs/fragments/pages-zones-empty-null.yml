@@ -3,6 +3,7 @@ bugfixes:
   - pages_projects - fail before any request when C(compatibility_date) or C(usage_model) of a C(deployment_configs)
     environment is empty. Cloudflare accepted the empty value but kept the previous one, so the module wrote the project
     and then failed because Cloudflare did not apply the request, on every run.
-  - zones - fail before any request when a setting C(value) is null, or when a null appears at any level of the object
-    value of C(aegis), C(nel), or C(security_header), such as a null C(enabled) of C(nel). Cloudflare stored a
-    different value, such as V(false), or rejected the null after an earlier zone or setting write in the same run.
+  - zones - fail before any request when a setting C(value) is null, or when a field Cloudflare stores in the object
+    value of C(aegis), C(nel), or C(security_header) is null at any level, such as a null C(enabled) of C(nel), other
+    than the C(pool_id) of C(aegis). Cloudflare stored a different value, such as V(false), or rejected the null after
+    an earlier zone or setting write in the same run.
