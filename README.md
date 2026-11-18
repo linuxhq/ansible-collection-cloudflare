@@ -9,7 +9,14 @@ An Ansible collection of Cloudflare modules, plugins, and roles.
 
 ## Requirements
 
-See [requirements.yml](requirements.yml).
+See [requirements.yml](requirements.yml) for collection dependencies.
+
+Modules require Python 3.9 or later and the `cloudflare` SDK `>=5.10.0,<6`
+on the host that runs them:
+
+```shell
+pip install 'cloudflare>=5.10.0,<6'
+```
 
 ## Installation
 

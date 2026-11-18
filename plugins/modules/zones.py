@@ -49,6 +49,8 @@ options:
     elements: str
     description:
       - Custom authoritative name servers assigned to the zone.
+      - An existing zone's name servers are only changed when explicitly
+        provided.
   settings:
     type: list
     elements: dict
