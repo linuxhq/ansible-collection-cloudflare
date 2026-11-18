@@ -8,6 +8,4 @@
         - molecule-idempotence-notest
 
     - role: access_service_tokens
-      diff: false
-      no_log: true
 ...

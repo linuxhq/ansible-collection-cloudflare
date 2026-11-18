@@ -11,6 +11,4 @@
 
   roles:
     - role: cfd_tunnel
-      diff: false
-      no_log: true
 ...

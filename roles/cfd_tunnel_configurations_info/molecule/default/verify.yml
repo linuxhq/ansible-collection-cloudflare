@@ -4,8 +4,6 @@
 
   roles:
     - role: cfd_tunnel_info
-      diff: false
-      no_log: true
     - cfd_tunnel_configurations_info
 
   post_tasks:
@@ -26,9 +24,6 @@
     - name: Ensure roles are included
       ansible.builtin.include_role:
         name: "{{ _role }}"
-        apply:
-          diff: false
-          no_log: true
       loop:
         - cfd_tunnel
       loop_control:

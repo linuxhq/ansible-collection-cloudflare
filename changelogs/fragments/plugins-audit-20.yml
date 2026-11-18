@@ -13,5 +13,3 @@ bugfixes:
     C(access_policies_info), and define every other variable the examples use, so they run as written.
   - cfd_tunnel_info, rulesets_info, warp_connector_info, zones roles - list the API token permissions the role's own
     module needs in the README, such as C(Zone Settings) write for zone settings and C(Zone) read for zone lookups.
-trivial:
-  - Molecule scenarios - protect calls whose results include secrets with C(no_log) and C(diff=false).

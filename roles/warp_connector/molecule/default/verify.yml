@@ -11,6 +11,4 @@
 
   roles:
     - role: warp_connector
-      diff: false
-      no_log: true
 ...

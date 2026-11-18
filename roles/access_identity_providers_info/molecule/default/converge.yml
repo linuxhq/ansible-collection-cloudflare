@@ -9,6 +9,4 @@
         - molecule-idempotence-notest
 
     - role: access_identity_providers_info
-      diff: false
-      no_log: true
 ...

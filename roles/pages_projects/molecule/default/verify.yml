@@ -11,6 +11,4 @@
 
   roles:
     - role: pages_projects
-      diff: false
-      no_log: true
 ...

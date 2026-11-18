@@ -20,8 +20,6 @@ MOLECULE_ROLE={{ role }} tox run -e molecule -- test -s default
 - `test` runs the full create / converge / verify / destroy cycle.
 - `converge` applies the converge playbook without teardown.
 - `destroy` removes resources created by the scenario.
-- Use `no_log: true` and `diff: false` on tasks that handle credentials, even when
-  scenario-level `diff: true` is enabled.
 - If a test fails or is interrupted before cleanup, run the command below unless
   the user asks to preserve resources for diagnosis.
 

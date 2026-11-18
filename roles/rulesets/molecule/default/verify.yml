@@ -18,9 +18,6 @@
     - name: Ensure roles are included
       ansible.builtin.include_role:
         name: "{{ _role }}"
-        apply:
-          diff: false
-          no_log: true
       loop:
         - rulesets
         - zones

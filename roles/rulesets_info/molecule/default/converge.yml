@@ -11,8 +11,6 @@
       tags:
         - molecule-idempotence-notest
       check_mode: false
-      diff: false
-      no_log: true
 
     - role: rulesets_info
       rulesets_info_api_token: null
@@ -20,6 +18,4 @@
         - molecule-idempotence-notest
 
     - role: rulesets_info
-      diff: false
-      no_log: true
 ...

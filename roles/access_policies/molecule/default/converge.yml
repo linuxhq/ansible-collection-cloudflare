@@ -6,8 +6,6 @@
       tags:
         - molecule-idempotence-notest
       check_mode: false
-      diff: false
-      no_log: true
 
     - role: access_groups
       tags:
@@ -18,10 +16,6 @@
       access_policies_list: []
       tags:
         - molecule-idempotence-notest
-      diff: false
-      no_log: true
 
     - role: access_policies
-      diff: false
-      no_log: true
 ...
