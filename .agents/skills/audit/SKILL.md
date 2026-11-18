@@ -11,6 +11,9 @@ passes in a row find nothing. The repository's rules win over this skill.
 Work without asking. Ask the user only when a finding has two valid paths;
 name the one you recommend. Make breaking changes only with explicit approval.
 
+Run at most four subagents at a time, including reviewers, probes, and the
+fix subagent; queue the rest and start one as another finishes.
+
 The second agent is the other coding agent: Codex when Claude is primary,
 Claude when Codex is primary. It reviews committed changes only; never start
 it for reviews, triage, or probes.
@@ -33,7 +36,7 @@ it for reviews, triage, or probes.
 
 ## 2. Review
 
-- Start one new read-only subagent per group, all at once.
+- Start one new read-only subagent per group, up to four at a time.
 - Give each one its group, the brief, and the ledger, never earlier findings.
 - Each reads every file in full: docs, examples, returns, helpers, and tests.
 - Each checks the checklist, the provider's API reference and guides, and the
