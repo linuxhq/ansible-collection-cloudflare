@@ -514,39 +514,20 @@ def unsupported_fields(value, fields, path):
     return unknown
 
 
-def normalize_current_by_desired_fields(current, desired, exact_fields=()):
-    """Project current onto the fields of desired.
-
-    Mappings under a key in exact_fields keep every current key, so entries the
-    caller omitted still count as differences.
-    """
+def normalize_current_by_desired_fields(current, desired):
+    """Project current onto the fields of desired."""
     if isinstance(current, dict) and isinstance(desired, dict):
         if not desired:
             return current
 
-        projected = {}
-        for key, value in desired.items():
-            item = current.get(key)
-            if key in exact_fields and isinstance(item, dict) and isinstance(value, dict):
-                projected[key] = {
-                    name: (
-                        normalize_current_by_desired_fields(entry, value[name], exact_fields)
-                        if name in value
-                        else entry
-                    )
-                    for name, entry in item.items()
-                }
-            else:
-                projected[key] = normalize_current_by_desired_fields(item, value, exact_fields)
-
-        return projected
+        return {key: normalize_current_by_desired_fields(current.get(key), value) for key, value in desired.items()}
 
     if isinstance(current, list) and isinstance(desired, list):
         if len(current) != len(desired):
             return current
 
         return [
-            normalize_current_by_desired_fields(current_item, desired_item, exact_fields)
+            normalize_current_by_desired_fields(current_item, desired_item)
             for current_item, desired_item in zip(current, desired)
         ]
 
@@ -571,10 +552,10 @@ def values_differ(current, desired):
     return not values_equal(serialize_resource(current), serialize_resource(desired))
 
 
-def projected_current(current, desired, defaults=None, exact_fields=(), exact_values=()):
+def projected_current(current, desired, defaults=None, exact_values=()):
     """Return current in the form differs compares with desired."""
     current = {**(defaults or {}), **(serialize_resource(current) or {})}
-    projected = normalize_current_by_desired_fields(current, desired, exact_fields)
+    projected = normalize_current_by_desired_fields(current, desired)
     for field in exact_values:
         if field in desired:
             projected[field] = current.get(field)
@@ -582,17 +563,16 @@ def projected_current(current, desired, defaults=None, exact_fields=(), exact_va
     return projected
 
 
-def differs(current, desired, defaults=None, exact_fields=(), exact_values=()):
+def differs(current, desired, defaults=None, exact_values=()):
     """Return whether current differs from desired on the desired fields only.
 
-    Fields the API omits are filled from defaults before comparing. Mappings
-    under exact_fields are compared on their complete key sets. Top-level
+    Fields the API omits are filled from defaults before comparing. Top-level
     fields in exact_values are compared exactly, at every nesting level.
     """
     if not desired:
         return False
 
-    return values_differ(projected_current(current, desired, defaults, exact_fields, exact_values), desired)
+    return values_differ(projected_current(current, desired, defaults, exact_values), desired)
 
 
 def applied_differences(stored, requested):
@@ -647,16 +627,14 @@ def fail_not_applied(module, resource_name, differences, **context):
     )
 
 
-def require_applied(
-    module, resource, desired, resource_name, defaults=None, exact_fields=(), exact_values=(), context=None
-):
+def require_applied(module, resource, desired, resource_name, defaults=None, exact_values=(), context=None):
     """Fail when the resource Cloudflare returned does not match desired.
 
     context adds result fields to the failure, as in fail_not_applied.
     """
     require_mapping(module, resource, resource_name, context)
-    if differs(resource, desired, defaults, exact_fields, exact_values):
-        projected = projected_current(resource, desired, defaults, exact_fields, exact_values)
+    if differs(resource, desired, defaults, exact_values):
+        projected = projected_current(resource, desired, defaults, exact_values)
         fail_not_applied(module, resource_name, applied_differences(projected, desired), **(context or {}))
 
 
@@ -934,7 +912,6 @@ def ensure_resource_present(
     expected_name=None,
     defaults=None,
     preserved_fields=(),
-    exact_fields=(),
     exact_values=(),
     context=None,
     comparable=None,
@@ -976,7 +953,6 @@ def ensure_resource_present(
             payload,
             resource_name,
             defaults,
-            exact_fields,
             exact_values,
             context=failure,
         )
@@ -998,7 +974,7 @@ def ensure_resource_present(
 
     current_id = resource_id(module, current, resource_name, context={**name_context, **context})
     payload = {**select_fields(current, preserved_fields), **payload}
-    if not differs(comparable(current, context), payload, defaults, exact_fields, exact_values):
+    if not differs(comparable(current, context), payload, defaults, exact_values):
         module.exit_json(
             changed=False,
             message=f"{label} already present",

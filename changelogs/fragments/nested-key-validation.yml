@@ -6,7 +6,8 @@ bugfixes:
     on every run.
   - access_policies - reject unknown fields in C(approval_groups) entries before any request. Cloudflare accepted and
     dropped them, so the module wrote the policy and then failed on every run.
-  - access_apps - reject unknown fields in C(cors_headers), C(destinations) entries, C(policies) entries, and inline
+  - access_apps - reject unknown fields in C(cors_headers), C(public) and C(private) C(destinations) entries,
+    C(policies) entries, and inline
     policy C(approval_groups) entries before any request. Cloudflare accepted and dropped them, so the module wrote the
     application and then failed on every run.
   - pagerules - reject unknown fields in C(targets), their C(constraint), C(actions), and the C(value) of

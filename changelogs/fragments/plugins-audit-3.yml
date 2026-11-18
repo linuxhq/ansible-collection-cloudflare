@@ -16,8 +16,9 @@ bugfixes:
     O(app_launcher_visible=false) for V(mcp_portal). Cloudflare accepted and dropped the value, so the module wrote
     and then failed on every run.
   - pages_projects - fail before any change when null is requested for a setting Cloudflare keeps, such as
-    C(build_caching) or C(compatibility_date); only C(web_analytics_tag), C(web_analytics_token), environment
-    variables, and bindings are cleared with null. The module previously updated the project and then failed.
+    C(build_caching) or C(compatibility_date). Settings Cloudflare clears with null, such as C(web_analytics_tag),
+    C(wrangler_config_hash), an environment variable, a binding entry, or a service binding C(entrypoint), are
+    accepted. The module previously updated the project and then failed.
   - pages_projects - compare custom domain names case-insensitively, so a mixed-case O(domains[].name) converges
     instead of failing after Cloudflare stores it in lowercase.
   - pagerules - match target URL values as Cloudflare stores them, with a lowercase host and a slash after a bare host,
@@ -33,4 +34,4 @@ trivial:
   - devices_policy - document that omitted options leave the current value unchanged.
   - warp_connector - document that results include sensitive values to protect with C(no_log).
   - Molecule - assert accounts_info, purge_cache, pages_projects_info custom domains, and dnssec omitted-status
-    behavior; use no_log for tunnel and connector credentials.
+    behavior.

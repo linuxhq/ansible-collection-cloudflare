@@ -8,6 +8,7 @@ Gather information about cloudflare warp connectors
 
 * Cloudflare api `Token` with `Read` permissions to `Cloudflare One Connector: WARP`
 * Cloudflare api `Token` with `Write` permissions to `Cloudflare One Connectors`
+* Cloudflare api `Token` with `Read` permissions to `Account Settings`
 
 ## Role Variables
 

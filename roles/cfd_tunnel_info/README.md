@@ -8,6 +8,7 @@ Gather information about cloudflare cfd tunnels
 
 * Cloudflare api `Token` with `Read` permissions to `Cloudflare Tunnel`
 * Cloudflare api `Token` with `Write` permissions to `Cloudflare Tunnel`
+* Cloudflare api `Token` with `Read` permissions to `Account Settings`
 
 ## Role Variables
 

@@ -8,6 +8,11 @@ Manage cloudflare dns records
 
 * Cloudflare api `Token` with `Write` permissions to `DNS`
 * Cloudflare api `Token` with `Read` permissions to `Zone`
+* Cloudflare api `Token` with `Read` permissions to `Cloudflare Tunnel`
+* Cloudflare api `Token` with `Write` permissions to `Cloudflare Tunnel`
+* Cloudflare api `Token` with `Read` permissions to `Account Settings`
+* Cloudflare api `Token` with `Read` permissions to `Cloudflare One Connector: WARP`
+* Cloudflare api `Token` with `Write` permissions to `Cloudflare One Connectors`
 
 ## Role Variables
 

@@ -7,6 +7,7 @@ Manage cloudflare access apps
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Access: Apps and Policies`
+* Cloudflare api `Token` with `Read` permissions to `Account Settings`
 
 ## Role Variables
 

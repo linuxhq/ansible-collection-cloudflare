@@ -7,6 +7,7 @@ Manage cloudflare devices settings
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Zero Trust`
+* Cloudflare api `Token` with `Read` permissions to `Account Settings`
 
 ## Role Variables
 

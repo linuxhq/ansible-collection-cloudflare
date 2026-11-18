@@ -11,7 +11,5 @@ bugfixes:
     is removed from the rule. The module reported no change.
   - rules_lists - reject an invalid IP address, or a CIDR prefix length outside 8 to 32 for IPv4 or 12 to 128 for IPv6,
     before creating the list or updating its description. Cloudflare rejected the items only after those writes.
-  - rules_lists - keep redirect values such as C(0) or C(1) instead of dropping them as the C(false) and C(true)
-    defaults.
   - pages_projects - fail naming the account and project when the project is deleted while its domains are being
     added, instead of reporting malformed project data.

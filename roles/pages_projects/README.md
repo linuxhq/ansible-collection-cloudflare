@@ -7,6 +7,7 @@ Manage cloudflare pages projects
 ## Requirements
 
 * Cloudflare api `Token` with `Write` permissions to `Cloudflare Pages`
+* Cloudflare api `Token` with `Read` permissions to `Account Settings`
 
 ## Role Variables
 

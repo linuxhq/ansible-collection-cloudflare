@@ -7,6 +7,7 @@ Gather information about cloudflare devices policy
 ## Requirements
 
 * Cloudflare api `Token` with `Read` permissions to `Zero Trust`
+* Cloudflare api `Token` with `Read` permissions to `Account Settings`
 
 ## Role Variables
 

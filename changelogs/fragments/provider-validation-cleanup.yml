@@ -50,7 +50,8 @@ minor_changes:
   - pagerules - no longer check the C(value) keys of a C(cache_key_fields) action or that each target sets
     C(target), C(constraint.operator), and C(constraint.value); an action C(id) fails early only when it is a
     mapping or a list. Null target, constraint, action, and value keys are ignored. Only a O(pagerules#module:priority)
-    of 0 fails early; Cloudflare rejects a negative one.
+    of 0, or, outside check mode, one above the number of page rules the zone will have after the change, fails
+    early; Cloudflare rejects a negative one.
   - pages_projects - accept null C(wrangler_config_hash), C(placement.mode), C(limits.cpu_ms), and environment
     variable C(value), which Cloudflare clears, and send null values and binding entry keys whose handling by
     Cloudflare is not verified, such as an C(r2_buckets) entry key. O(rotate_secrets)
@@ -65,6 +66,6 @@ minor_changes:
   - warp_connector - check O(warp_connector#module:tunnel_secret) only when creating a connector, and only that it
     is non-empty base64 with or without padding; Cloudflare rejects other values only after the connector is created.
   - zones - accept a null C(pool_id) in the C(aegis) setting, which converges, ignore null unknown setting value
-    keys, no longer check C(automatic_platform_optimization) values or the setting ids of an existing zone for whitespace, send a
-    O(zones#module:name) of C(.) to Cloudflare, and create a zone without O(zones#module:account_id) in the API
-    token's account.
+    keys, no longer check C(automatic_platform_optimization) values or the setting ids of an existing zone for
+    whitespace, send a O(zones#module:name) of C(.) to Cloudflare as an empty name, and create a zone without
+    O(zones#module:account_id) in the API token's account.

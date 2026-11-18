@@ -22,7 +22,8 @@ bugfixes:
   - access_policies - preserve an existing policy's omitted optional fields on update instead of clearing them.
   - access_apps - preserve an existing application's omitted optional settings, such as O(policies), on update instead of clearing them.
   - rules_lists - correct the RETURN documentation for the bulk items operation and document the O(description) default.
-  - pages_projects - re-read the project after attaching custom domains so the returned C(pages_project.domains) includes them.
+  - pages_projects - re-read the project after attaching custom domains, and return the added domains in C(domains),
+    because Cloudflare omits a custom domain from C(pages_project.domains) until it is active.
   - zones - update O(type) and O(vanity_name_servers) in separate requests because Cloudflare edits only one zone property per request.
   - zones - compare only the provided nested fields of object setting values so partial settings converge.
   - rules_lists - compare IP items in canonical form so equivalent IPv6 notations do not cause repeated updates or false failures.
@@ -43,11 +44,9 @@ bugfixes:
   - pages_projects - treat null O(deployment_configs) environment variables from Cloudflare as the requested empty map,
     so clearing every variable converges.
   - warp_connector - name the account and connector in create and update failures.
-  - pages_projects - document that O(domains) are removed before the project is deleted with O(state=absent).
   - rulesets - compare each rule's headers on their complete set, so removing a header is applied.
   - zones - compare integer settings that the SDK decodes as floats, such as C(browser_cache_ttl), as integers.
-  - pages_projects - ignore empty O(deployment_configs) mappings, and require an actual secret value for
-    O(rotate_secrets).
+  - pages_projects - ignore empty O(deployment_configs) mappings.
   - cfd_tunnel_info, warp_connector_info, cfd_tunnel_configurations_info - describe results as tunnels that have not been
     deleted, rather than active tunnels.
   - pages_projects - delete bindings set to null, such as O(deployment_configs) C(kv_namespaces) entries, and compare
