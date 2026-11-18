@@ -6,6 +6,4 @@ bugfixes:
   - dnssec - document that a stored C(pending) status matches O(status=active) and a stored C(pending-disabled) status
     matches O(status=disabled).
 trivial:
-  - purge_cache role - document that the role is not idempotent, since each run outside check mode submits its purges
-    again.
   - galaxy.yml - describe the collection as an Ansible collection of Cloudflare modules, plugins, and roles.

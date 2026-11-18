@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg?style=flat)](https://www.gnu.org/licenses/gpl-3.0.txt)
 
-Manage cloudflare purging of cache. The role is not idempotent: each run outside check mode submits the purges it performs again and, with the default asynchronous settings, reports a change.
+Manage cloudflare purging of cache
 
 ## Requirements
 
