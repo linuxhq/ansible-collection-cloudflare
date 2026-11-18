@@ -3,9 +3,9 @@
   hosts: all
 
   roles:
-    - role: access_apps_info
+    - access_apps_info
     - access_groups_info
-    - role: access_identity_providers_info
+    - access_identity_providers_info
     - access_policies_info
     - access_service_tokens_info
 

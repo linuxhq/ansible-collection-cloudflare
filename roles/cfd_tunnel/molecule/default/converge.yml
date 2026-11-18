@@ -7,5 +7,5 @@
       tags:
         - molecule-idempotence-notest
 
-    - role: cfd_tunnel
+    - cfd_tunnel
 ...

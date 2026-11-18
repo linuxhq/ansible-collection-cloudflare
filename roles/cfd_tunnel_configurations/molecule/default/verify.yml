@@ -10,5 +10,5 @@
               map('combine', {'state': 'absent'}) }}"
 
   roles:
-    - role: cfd_tunnel
+    - cfd_tunnel
 ...

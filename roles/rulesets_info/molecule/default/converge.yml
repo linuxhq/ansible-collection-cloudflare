@@ -17,5 +17,5 @@
       tags:
         - molecule-idempotence-notest
 
-    - role: rulesets_info
+    - rulesets_info
 ...

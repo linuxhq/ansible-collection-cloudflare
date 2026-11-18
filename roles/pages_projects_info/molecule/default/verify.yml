@@ -3,7 +3,7 @@
   hosts: all
 
   roles:
-    - role: pages_projects_info
+    - pages_projects_info
 
   post_tasks:
     - name: Ensure info is verified

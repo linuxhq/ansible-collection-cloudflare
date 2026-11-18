@@ -3,7 +3,7 @@
   hosts: all
 
   roles:
-    - role: cfd_tunnel_info
+    - cfd_tunnel_info
     - cfd_tunnel_configurations_info
 
   post_tasks:

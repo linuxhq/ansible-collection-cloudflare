@@ -8,5 +8,5 @@
       tags:
         - molecule-idempotence-notest
 
-    - role: access_identity_providers_info
+    - access_identity_providers_info
 ...

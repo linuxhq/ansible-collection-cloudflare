@@ -7,5 +7,5 @@
       tags:
         - molecule-idempotence-notest
 
-    - role: access_service_tokens
+    - access_service_tokens
 ...

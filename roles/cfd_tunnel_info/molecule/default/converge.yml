@@ -13,5 +13,5 @@
       tags:
         - molecule-idempotence-notest
 
-    - role: cfd_tunnel_info
+    - cfd_tunnel_info
 ...

@@ -28,5 +28,5 @@
       tags:
         - molecule-idempotence-notest
 
-    - role: access_apps_info
+    - access_apps_info
 ...

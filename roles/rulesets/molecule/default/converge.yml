@@ -25,5 +25,5 @@
       tags:
         - molecule-idempotence-notest
 
-    - role: rulesets
+    - rulesets
 ...

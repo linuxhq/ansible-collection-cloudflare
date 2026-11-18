@@ -3,7 +3,7 @@
   hosts: all
 
   roles:
-    - role: warp_connector_info
+    - warp_connector_info
 
   post_tasks:
     - name: Ensure info is verified

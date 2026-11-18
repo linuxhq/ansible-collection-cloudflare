@@ -7,5 +7,5 @@
         - molecule-idempotence-notest
       check_mode: false
 
-    - role: pages_projects_info
+    - pages_projects_info
 ...

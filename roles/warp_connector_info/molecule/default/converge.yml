@@ -13,5 +13,5 @@
       tags:
         - molecule-idempotence-notest
 
-    - role: warp_connector_info
+    - warp_connector_info
 ...
