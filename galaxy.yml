@@ -44,7 +44,7 @@ build_ignore:
   - tox.ini
   - venv
   - venv/**
-description: A collection of cloudflare roles
+description: An Ansible collection of Cloudflare modules, plugins, and roles
 dependencies:
   community.general: '>=12.0.0,<14.0.0'
 documentation: https://github.com/linuxhq/ansible-collection-cloudflare/blob/main/README.md

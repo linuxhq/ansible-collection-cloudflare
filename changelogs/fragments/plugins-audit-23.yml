@@ -1,0 +1,11 @@
+---
+bugfixes:
+  - access_apps - compare C(allowed_headers), C(allowed_methods), and C(allowed_origins) of O(cors_headers) without
+    regard to order. Cloudflare does not keep their order, so a request such as C(allowed_methods) of V([POST, GET])
+    could write the application and then fail because Cloudflare did not apply it, or report a change on a later run.
+  - dnssec - document that a stored C(pending) status matches O(status=active) and a stored C(pending-disabled) status
+    matches O(status=disabled).
+trivial:
+  - purge_cache role - document that the role is not idempotent, since each run outside check mode submits its purges
+    again.
+  - galaxy.yml - describe the collection as an Ansible collection of Cloudflare modules, plugins, and roles.
