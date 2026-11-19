@@ -153,7 +153,8 @@ def normalize_origin(origin, defaults):
             if not value:
                 continue
 
-        elif key in defaults and values_equal(value, defaults[key]):
+        # cloudflared treats empty ipRules as unset, so an ingress rule inherits the global rules.
+        elif (key in defaults and values_equal(value, defaults[key])) or (key == "ipRules" and value == []):
             continue
 
         normalized[key] = value

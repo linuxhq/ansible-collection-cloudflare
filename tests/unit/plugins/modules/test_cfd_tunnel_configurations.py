@@ -170,26 +170,39 @@ class CfdTunnelConfigurationsTests(TestCase):
     def test_removed_ip_rules_are_updated_and_then_idempotent(self):
         rules = [{"prefix": "192.0.2.0/24", "ports": [443], "allow": True}]
         config = {"ingress": [{"service": "https://localhost:443"}, {"service": "http_status:404"}]}
-        current = {
-            "config": {
-                "originRequest": {"ipRules": rules},
-                "ingress": [
-                    {"service": "https://localhost:443", "originRequest": {"ipRules": rules}},
-                    {"service": "http_status:404"},
-                ],
-            }
-        }
+        ingress = [
+            {"service": "https://localhost:443", "originRequest": {"ipRules": rules}},
+            {"service": "http_status:404"},
+        ]
+        for current in (
+            {"config": {"originRequest": {"ipRules": rules}, "ingress": ingress}},
+            {"config": {"ingress": ingress}},
+        ):
+            with self.subTest(current=current):
+                raised, api = self.run_module(module_for(config), current, {"config": config})
 
-        raised, api = self.run_module(module_for(config), current, {"config": config})
-
-        self.assertTrue(raised.values["changed"])
-        api.update.assert_called_once_with("tunnel", account_id="account", config=config)
+                self.assertTrue(raised.values["changed"])
+                api.update.assert_called_once_with("tunnel", account_id="account", config=config)
 
         stored = {"config": {**config, "originRequest": {"ipRules": []}}}
         raised, api = self.run_module(module_for(config), stored)
 
         self.assertFalse(raised.values["changed"])
         api.update.assert_not_called()
+
+    def test_empty_ingress_ip_rules_inherit_global_ip_rules(self):
+        rules = [{"prefix": "192.0.2.0/24", "ports": [443], "allow": True}]
+        omitted = {"originRequest": {"ipRules": rules}, "ingress": [{"service": "http_status:404"}]}
+        empty = {
+            "originRequest": {"ipRules": rules},
+            "ingress": [{"service": "http_status:404", "originRequest": {"ipRules": []}}],
+        }
+        for current, desired in ((empty, omitted), (omitted, empty)):
+            with self.subTest(current=current):
+                self.assertEqual(
+                    cfd_tunnel_configurations.comparable_config(current, desired),
+                    cfd_tunnel_configurations.comparable_config(desired),
+                )
 
     def test_ingress_ip_rules_matching_global_ip_rules_do_not_cause_change(self):
         rules = [{"prefix": "192.0.2.0/24", "ports": [443], "allow": True}]

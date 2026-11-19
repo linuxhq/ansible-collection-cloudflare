@@ -2,4 +2,5 @@
 bugfixes:
   - cfd_tunnel_configurations - reset an omitted C(ipRules) origin setting, at the top level or in an ingress rule, to
     its default. The module did not compare C(ipRules) unless the configuration set it, so it reported no change and
-    left stored IP rules in place.
+    left stored IP rules in place. An empty ingress C(ipRules) list matches an omitted one, because cloudflared then
+    uses the top-level C(ipRules).
