@@ -96,6 +96,7 @@ ORIGIN_DEFAULTS = {
     "disableChunkedEncoding": False,
     "http2Origin": False,
     "httpHostHeader": "",
+    "ipRules": [],
     "keepAliveConnections": 100,
     "keepAliveTimeout": 90,
     "matchSNItoHost": False,
