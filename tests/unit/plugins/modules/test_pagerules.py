@@ -373,6 +373,7 @@ class PageRulesTests(TestCase):
             ("http://*.Example.com/Path*", "http://*.example.com/Path*"),
             ("Example.com/to/https://Other.COM/Path", "example.com/to/https://Other.COM/Path"),
             ("https://example.com?Token=ABC", "https://example.com?Token=ABC"),
+            ("example.com?u=https://Other.example", "example.com?u=https://Other.example"),
         )
         for requested, stored in cases:
             with self.subTest(requested=requested):
@@ -395,6 +396,17 @@ class PageRulesTests(TestCase):
         result = self.run_module(FakeModule(params(targets=targets)), client)
 
         self.assertEqual(api.create.call_args.kwargs["targets"], stored_targets)
+        self.assertTrue(result["changed"])
+
+    def test_creates_rule_with_query_url_exactly_as_requested(self):
+        value = "example.com?u=https://other.example"
+        targets = [{"target": "url", "constraint": {"operator": "matches", "value": value}}]
+        created = {"id": "rule", "actions": ACTIONS, "status": "active", "targets": targets}
+        client, api = client_with(created=created)
+
+        result = self.run_module(FakeModule(params(targets=targets)), client)
+
+        self.assertEqual(api.create.call_args.kwargs["targets"][0]["constraint"]["value"], value)
         self.assertTrue(result["changed"])
 
     def test_action_order_is_not_significant(self):

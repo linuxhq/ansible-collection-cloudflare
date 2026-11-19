@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - cfd_tunnel_configurations - compare each C(ipRules) entry on its C(prefix), C(ports) and C(allow) keys, at the top
+    level or in an ingress rule. The module compared a stored entry only on the keys the requested entry set, so it
+    reported no change and left a stored C(allow) or port limit in place when the entry omitted it. An omitted
+    C(allow) matches C(false) and omitted C(ports) match an empty list, as in cloudflared.
+  - pagerules - keep a target URL whose bare host is followed by a query containing C(://) exactly as requested. The
+    module took the text before C(://) as a scheme and added a slash to the end of the query, so it created a rule for
+    a different pattern.
