@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - access_apps - compare an omitted O(allowed_idps) or O(cors_headers) list in any order after an update. The stored
+    value is sent back with the update, and Cloudflare may return its lists reordered, so a task that omitted them
+    and changed another setting could write the application and then fail because Cloudflare did not apply it.

@@ -206,6 +206,23 @@ class AccessAppsTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertNotIn("msg", result)
 
+    def test_preserved_lists_match_in_any_order_after_an_update(self):
+        # Omitted lists are sent from the stored app, and Cloudflare may return them reordered.
+        for field, value, reordered in (
+            ("cors_headers", {"allowed_methods": ["GET", "POST", "PUT"]}, {"allowed_methods": ["PUT", "GET", "POST"]}),
+            ("allowed_idps", ["idp-a", "idp-b"], ["idp-b", "idp-a"]),
+        ):
+            with self.subTest(field=field):
+                current = stored(session_duration="24h", **{field: value})
+                updated = {**current, "session_duration": "12h", field: reordered}
+                client, api = client_with([current], updated=updated)
+
+                result = self.run_module(FakeModule(params(session_duration="12h")), client)
+
+                self.assertEqual(api.update.call_args.kwargs[field], value)
+                self.assertTrue(result["changed"])
+                self.assertEqual(result["message"], "Access application updated")
+
     def test_changed_cors_header_lists_are_a_change(self):
         current = stored(cors_headers={"allowed_methods": ["GET", "POST"]})
         for methods in (["GET"], ["GET", "POST", "PUT"], ["GET", "GET"]):
