@@ -3,11 +3,6 @@ provisioner:
   inventory:
     group_vars:
       all:
-        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: linuxhq-dev
-
-        rules_lists_account_id: "{{ _accounts_info_id }}"
-        rules_lists_api_token: "{{ accounts_info_api_token }}"
         rules_lists_hetrixtools:
           "{{ lookup('ansible.builtin.url',
                      'https://hetrixtools.com/resources/uptime-monitor-only-ips.txt',
@@ -25,7 +20,4 @@ provisioner:
             name: molecule_rules_lists_monitoring
             elements:
               "{{ rules_lists_hetrixtools }}"
-
-        rules_lists_info_account_id: "{{ _accounts_info_id }}"
-        rules_lists_info_api_token: "{{ accounts_info_api_token }}"
 ...

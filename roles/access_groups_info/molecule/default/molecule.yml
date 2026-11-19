@@ -3,14 +3,6 @@ provisioner:
   inventory:
     group_vars:
       all:
-        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: linuxhq-dev
-
-        access_groups_info_account_id: "{{ _accounts_info_id }}"
-        access_groups_info_api_token: "{{ accounts_info_api_token }}"
-
-        access_groups_account_id: "{{ _accounts_info_id }}"
-        access_groups_api_token: "{{ accounts_info_api_token }}"
         access_groups_list:
           - name: molecule-access-groups-info-00
             include:
@@ -30,11 +22,6 @@ provisioner:
                   token_id: "{{ _access_service_tokens_info_dict['molecule-access-groups-info-02'].id }}"
             is_default: false
 
-        access_service_tokens_info_account_id: "{{ _accounts_info_id }}"
-        access_service_tokens_info_api_token: "{{ accounts_info_api_token }}"
-
-        access_service_tokens_account_id: "{{ _accounts_info_id }}"
-        access_service_tokens_api_token: "{{ accounts_info_api_token }}"
         access_service_tokens_list:
           - name: molecule-access-groups-info-00
             duration: forever

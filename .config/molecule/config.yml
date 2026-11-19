@@ -27,6 +27,107 @@ provisioner:
   log: true
   options:
     diff: true
+  inventory:
+    group_vars:
+      all:
+        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+        accounts_info_name: linuxhq-dev
+
+        access_apps_account_id: "{{ _accounts_info_id }}"
+        access_apps_api_token: "{{ accounts_info_api_token }}"
+
+        access_apps_info_account_id: "{{ _accounts_info_id }}"
+        access_apps_info_api_token: "{{ accounts_info_api_token }}"
+
+        access_groups_account_id: "{{ _accounts_info_id }}"
+        access_groups_api_token: "{{ accounts_info_api_token }}"
+
+        access_groups_info_account_id: "{{ _accounts_info_id }}"
+        access_groups_info_api_token: "{{ accounts_info_api_token }}"
+
+        access_identity_providers_info_account_id: "{{ _accounts_info_id }}"
+        access_identity_providers_info_api_token: "{{ accounts_info_api_token }}"
+
+        access_policies_account_id: "{{ _accounts_info_id }}"
+        access_policies_api_token: "{{ accounts_info_api_token }}"
+
+        access_policies_info_account_id: "{{ _accounts_info_id }}"
+        access_policies_info_api_token: "{{ accounts_info_api_token }}"
+
+        access_service_tokens_account_id: "{{ _accounts_info_id }}"
+        access_service_tokens_api_token: "{{ accounts_info_api_token }}"
+
+        access_service_tokens_info_account_id: "{{ _accounts_info_id }}"
+        access_service_tokens_info_api_token: "{{ accounts_info_api_token }}"
+
+        cfd_tunnel_account_id: "{{ _accounts_info_id }}"
+        cfd_tunnel_api_token: "{{ accounts_info_api_token }}"
+
+        cfd_tunnel_configurations_account_id: "{{ _accounts_info_id }}"
+        cfd_tunnel_configurations_api_token: "{{ accounts_info_api_token }}"
+
+        cfd_tunnel_configurations_info_account_id: "{{ _accounts_info_id }}"
+        cfd_tunnel_configurations_info_api_token: "{{ accounts_info_api_token }}"
+
+        cfd_tunnel_info_account_id: "{{ _accounts_info_id }}"
+        cfd_tunnel_info_api_token: "{{ accounts_info_api_token }}"
+
+        devices_policy_account_id: "{{ _accounts_info_id }}"
+        devices_policy_api_token: "{{ accounts_info_api_token }}"
+
+        devices_policy_info_account_id: "{{ _accounts_info_id }}"
+        devices_policy_info_api_token: "{{ accounts_info_api_token }}"
+
+        devices_settings_account_id: "{{ _accounts_info_id }}"
+        devices_settings_api_token: "{{ accounts_info_api_token }}"
+
+        devices_settings_info_account_id: "{{ _accounts_info_id }}"
+        devices_settings_info_api_token: "{{ accounts_info_api_token }}"
+
+        dns_api_token: "{{ accounts_info_api_token }}"
+
+        dnssec_api_token: "{{ accounts_info_api_token }}"
+
+        dnssec_info_api_token: "{{ accounts_info_api_token }}"
+
+        pagerules_api_token: "{{ accounts_info_api_token }}"
+
+        pagerules_info_api_token: "{{ accounts_info_api_token }}"
+
+        pages_projects_account_id: "{{ _accounts_info_id }}"
+        pages_projects_api_token: "{{ accounts_info_api_token }}"
+
+        pages_projects_info_account_id: "{{ _accounts_info_id }}"
+        pages_projects_info_api_token: "{{ accounts_info_api_token }}"
+
+        purge_cache_api_token: "{{ accounts_info_api_token }}"
+
+        rules_lists_account_id: "{{ _accounts_info_id }}"
+        rules_lists_api_token: "{{ accounts_info_api_token }}"
+
+        rules_lists_info_account_id: "{{ _accounts_info_id }}"
+        rules_lists_info_api_token: "{{ accounts_info_api_token }}"
+
+        rulesets_api_token: "{{ accounts_info_api_token }}"
+
+        rulesets_info_api_token: "{{ accounts_info_api_token }}"
+
+        warp_connector_account_id: "{{ _accounts_info_id }}"
+        warp_connector_api_token: "{{ accounts_info_api_token }}"
+
+        warp_connector_info_account_id: "{{ _accounts_info_id }}"
+        warp_connector_info_api_token: "{{ accounts_info_api_token }}"
+
+        zerotrust_connectivity_settings_account_id: "{{ _accounts_info_id }}"
+        zerotrust_connectivity_settings_api_token: "{{ accounts_info_api_token }}"
+
+        zerotrust_connectivity_settings_info_account_id: "{{ _accounts_info_id }}"
+        zerotrust_connectivity_settings_info_api_token: "{{ accounts_info_api_token }}"
+
+        zones_account_id: "{{ _accounts_info_id }}"
+        zones_api_token: "{{ accounts_info_api_token }}"
+
+        zones_info_api_token: "{{ accounts_info_api_token }}"
 
 scenario:
   test_sequence:

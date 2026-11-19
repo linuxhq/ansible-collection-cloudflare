@@ -3,14 +3,8 @@ provisioner:
   inventory:
     group_vars:
       all:
-        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: linuxhq-dev
-
-        purge_cache_api_token: "{{ accounts_info_api_token }}"
         purge_cache_list:
           - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"
             cache:
               purge_everything: true
-
-        zones_info_api_token: "{{ accounts_info_api_token }}"
 ...

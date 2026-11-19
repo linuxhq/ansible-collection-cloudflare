@@ -3,11 +3,6 @@ provisioner:
   inventory:
     group_vars:
       all:
-        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: linuxhq-dev
-
-        zones_account_id: "{{ _accounts_info_id }}"
-        zones_api_token: "{{ accounts_info_api_token }}"
         zones_list:
           - name: molecule-rulesets-info.org
             type: full
@@ -23,7 +18,6 @@ provisioner:
               - id: ssl
                 value: strict
 
-        rulesets_api_token: "{{ accounts_info_api_token }}"
         rulesets_list:
           - zone_id: "{{ _zones_info_dict[zones_list.0.name].id }}"
             name: default
@@ -39,7 +33,4 @@ provisioner:
                 enabled: true
                 expression: >-
                   (cf.client.bot)
-
-        rulesets_info_api_token: "{{ accounts_info_api_token }}"
-        zones_info_api_token: "{{ accounts_info_api_token }}"
 ...

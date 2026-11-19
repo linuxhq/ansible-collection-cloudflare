@@ -3,11 +3,6 @@ provisioner:
   inventory:
     group_vars:
       all:
-        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: linuxhq-dev
-
-        warp_connector_account_id: "{{ _accounts_info_id }}"
-        warp_connector_api_token: "{{ accounts_info_api_token }}"
         warp_connector_list:
           - name: molecule-warp-connector-info-00
           - name: molecule-warp-connector-info-01
@@ -15,7 +10,5 @@ provisioner:
           - name: molecule-warp-connector-info-03
           - name: molecule-warp-connector-info-04
 
-        warp_connector_info_account_id: "{{ _accounts_info_id }}"
-        warp_connector_info_api_token: "{{ accounts_info_api_token }}"
         warp_connector_info_include_token: true
 ...

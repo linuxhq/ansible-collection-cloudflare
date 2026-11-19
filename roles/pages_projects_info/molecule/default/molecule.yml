@@ -3,11 +3,6 @@ provisioner:
   inventory:
     group_vars:
       all:
-        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: linuxhq-dev
-
-        pages_projects_account_id: "{{ _accounts_info_id }}"
-        pages_projects_api_token: "{{ accounts_info_api_token }}"
         pages_projects_list:
           - name: molecule-pages-projects-info-com
             production_branch: main
@@ -23,7 +18,4 @@ provisioner:
             production_branch: main
             domains:
               - name: molecule-pages-projects-info.org
-
-        pages_projects_info_account_id: "{{ _accounts_info_id }}"
-        pages_projects_info_api_token: "{{ accounts_info_api_token }}"
 ...

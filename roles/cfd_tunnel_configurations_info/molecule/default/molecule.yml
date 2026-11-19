@@ -3,20 +3,10 @@ provisioner:
   inventory:
     group_vars:
       all:
-        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: linuxhq-dev
-
-        cfd_tunnel_account_id: "{{ _accounts_info_id }}"
-        cfd_tunnel_api_token: "{{ accounts_info_api_token }}"
         cfd_tunnel_list:
           - name: molecule-cfd-tunnel-configurations-info
             config_src: cloudflare
 
-        cfd_tunnel_info_account_id: "{{ _accounts_info_id }}"
-        cfd_tunnel_info_api_token: "{{ accounts_info_api_token }}"
-
-        cfd_tunnel_configurations_account_id: "{{ _accounts_info_id }}"
-        cfd_tunnel_configurations_api_token: "{{ accounts_info_api_token }}"
         cfd_tunnel_configurations_list:
           - tunnel_id: "{{ _cfd_tunnel_info_dict['molecule-cfd-tunnel-configurations-info'].id }}"
             config:
@@ -32,7 +22,4 @@ provisioner:
                     originServerName: inorganic.molecule.org
                   service: https://nginx:8443
                 - service: http_status:404
-
-        cfd_tunnel_configurations_info_account_id: "{{ _accounts_info_id }}"
-        cfd_tunnel_configurations_info_api_token: "{{ accounts_info_api_token }}"
 ...

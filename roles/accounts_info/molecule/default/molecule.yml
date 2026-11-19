@@ -1,8 +1,3 @@
 ---
-provisioner:
-  inventory:
-    group_vars:
-      all:
-        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: linuxhq-dev
+{}
 ...

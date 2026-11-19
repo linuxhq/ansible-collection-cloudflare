@@ -3,11 +3,6 @@ provisioner:
   inventory:
     group_vars:
       all:
-        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: linuxhq-dev
-
-        zones_account_id: "{{ _accounts_info_id }}"
-        zones_api_token: "{{ accounts_info_api_token }}"
         zones_list:
           - name: molecule-zones.com
             type: full
