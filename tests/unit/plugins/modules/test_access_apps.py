@@ -206,6 +206,26 @@ class AccessAppsTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertNotIn("msg", result)
 
+    def test_cors_header_lists_with_duplicates_match_the_deduplicated_stored_lists(self):
+        # Cloudflare drops duplicate CORS list values on write.
+        requested = {"allowed_methods": ["GET", "GET", "POST"], "allowed_origins": ["https://a.example.com"] * 2}
+        cloudflare = {"allowed_methods": ["POST", "GET"], "allowed_origins": ["https://a.example.com"]}
+        current = stored(cors_headers=cloudflare)
+        client, api = client_with(created=current)
+
+        result = self.run_module(FakeModule(params(cors_headers=requested)), client)
+
+        self.assertEqual(api.create.call_args.kwargs["cors_headers"], requested)
+        self.assertTrue(result["changed"])
+        self.assertNotIn("msg", result)
+
+        client, api = client_with([current])
+        result = self.run_module(FakeModule(params(cors_headers=requested)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+        self.assertEqual(result["access_app"]["cors_headers"], cloudflare)
+
     def test_preserved_lists_match_in_any_order_after_an_update(self):
         # Omitted lists are sent from the stored app, and Cloudflare may return them reordered.
         for field, value, reordered in (
@@ -242,6 +262,16 @@ class AccessAppsTests(TestCase):
 
                 self.assertEqual(api.update.call_args.kwargs["allowed_idps"], requested)
                 self.assertIn("did not apply", result["msg"])
+
+    def test_duplicate_allowed_idps_are_a_change(self):
+        # Unlike the CORS lists, Cloudflare rejects duplicate identity providers instead of dropping them.
+        current = stored(allowed_idps=["idp-a"])
+        client, api = client_with([current], updated=current)
+
+        result = self.run_module(FakeModule(params(allowed_idps=["idp-a", "idp-a"])), client)
+
+        self.assertEqual(api.update.call_args.kwargs["allowed_idps"], ["idp-a", "idp-a"])
+        self.assertIn("did not apply", result["msg"])
 
     def test_change_to_bookmark_carries_only_fields_bookmarks_store(self):
         current = {

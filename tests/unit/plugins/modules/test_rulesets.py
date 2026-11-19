@@ -192,6 +192,26 @@ class RulesetsTests(TestCase):
                 f"Cloudflare does not store these empty action parameters: {', '.join(empty)}; omit them instead",
             )
 
+    def test_rejects_skip_parameters_empty_without_their_null_keys_before_any_request(self):
+        # Null keys are not sent, so these would be sent empty and dropped by Cloudflare.
+        rules = [
+            {
+                "action": "skip",
+                "expression": "true",
+                "action_parameters": {"ruleset": "current", "rules": {"id": None}},
+            },
+            {"action": "skip", "expression": "true", "action_parameters": {"rules": {"id": ["rule"], "other": None}}},
+        ]
+        empty = ["rules[0].action_parameters.rules"]
+        for check_mode in (True, False):
+            client, api = make_client(CURRENT)
+            with self.subTest(check_mode=check_mode):
+                result = self.run_module(FakeModule(params(rules=rules), check_mode=check_mode), client)
+
+            api.phases.get.assert_not_called()
+            api.phases.update.assert_not_called()
+            self.assertEqual(result["empty_fields"], empty)
+
     def test_rejects_empty_rule_id_or_ref_before_any_request(self):
         rules = [
             {**RULES[0], "ref": "kept"},
