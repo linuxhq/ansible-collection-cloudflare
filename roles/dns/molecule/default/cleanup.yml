@@ -8,8 +8,6 @@
 
     - name: Ensure inventory lists are formatted
       ansible.builtin.set_fact:
-        cfd_tunnel_info_api_token: null
-        warp_connector_info_api_token: null
         dns_records:
           "{{ [{'zone': zones_list.0.name,
                 'records': dns_records.0.records |
