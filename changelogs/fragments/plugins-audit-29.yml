@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - pagerules - lowercase the host of a target URL whose bare host is followed by a query, such as
+    C(Example.com?a=b), and keep the scheme and query as requested. Cloudflare stores the host in lowercase, so the
+    module created the rule and then failed because Cloudflare did not apply it, and created a duplicate rule on the
+    next run.
