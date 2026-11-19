@@ -6,15 +6,30 @@
     - access_identity_providers_info
 
   post_tasks:
+    - name: Ensure providers are queried
+      linuxhq.cloudflare.access_identity_providers_info:
+        account_id: "{{ access_identity_providers_info_account_id }}"
+        api_token: "{{ access_identity_providers_info_api_token }}"
+      register: __access_identity_providers_info_verify
+      no_log: "{{ access_identity_providers_info_no_log }}"
+
     - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _access_identity_providers_info_dict['onetimepin'].config.redirect_url is defined
-          - _access_identity_providers_info_dict['onetimepin'].id is defined
-          - _access_identity_providers_info_dict['onetimepin'].name is defined
-          - _access_identity_providers_info_dict['onetimepin'].scim_config is defined
-          - _access_identity_providers_info_dict['onetimepin'].scim_config | length > 0
-          - _access_identity_providers_info_dict['onetimepin'].type == 'onetimepin'
-          - _access_identity_providers_info_dict['onetimepin'].uid is defined
-          - _access_identity_providers_info_dict['onetimepin'].version is defined
+          - _access_identity_providers_info_list ==
+            __access_identity_providers_info_verify.access_identity_providers
+          - _access_identity_providers_info_dict.keys() | sort ==
+            _access_identity_providers_info_list | map(attribute='type') | unique | sort
+      no_log: "{{ access_identity_providers_info_no_log }}"
+
+    - name: Ensure provider dict is verified
+      ansible.builtin.assert:
+        that:
+          - _item.value.type == _item.key
+          - _item.value in __access_identity_providers_info_verify.access_identity_providers
+      loop: "{{ _access_identity_providers_info_dict | dict2items }}"
+      loop_control:
+        label: "{{ _item.key | d(none) }}"
+        loop_var: _item
+      no_log: "{{ access_identity_providers_info_no_log }}"
 ...

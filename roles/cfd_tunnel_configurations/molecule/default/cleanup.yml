@@ -1,0 +1,13 @@
+---
+- name: Cleanup
+  hosts: all
+  pre_tasks:
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        cfd_tunnel_list:
+          "{{ cfd_tunnel_list |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - cfd_tunnel
+...

@@ -23,6 +23,7 @@ provisioner:
     ANSIBLE_ACTION_WARNINGS: false
     ANSIBLE_COLLECTIONS_PATH: ${ANSIBLE_COLLECTIONS_PATH}
     ANSIBLE_DEPRECATION_WARNINGS: false
+    OBJC_DISABLE_INITIALIZE_FORK_SAFETY: 'YES'
   log: true
   options:
     diff: true
@@ -30,19 +31,13 @@ provisioner:
     group_vars:
       all:
         accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+        accounts_info_name: linuxhq-dev
 
         purge_cache_api_token: "{{ accounts_info_api_token }}"
         purge_cache_list:
-          - zone_id: "{{ _zones_info_dict[zones_list.0.name].id }}"
+          - zone_id: "{{ _zones_info_dict['linuxhq.dev'].id }}"
             cache:
               purge_everything: true
-
-        zones_account_id: "{{ _accounts_info_id }}"
-        zones_api_token: "{{ accounts_info_api_token }}"
-        zones_list:
-          - name: linuxhq.dev
-            type: full
 
         zones_info_api_token: "{{ accounts_info_api_token }}"
 

@@ -23,6 +23,7 @@ provisioner:
     ANSIBLE_ACTION_WARNINGS: false
     ANSIBLE_COLLECTIONS_PATH: ${ANSIBLE_COLLECTIONS_PATH}
     ANSIBLE_DEPRECATION_WARNINGS: false
+    OBJC_DISABLE_INITIALIZE_FORK_SAFETY: 'YES'
   log: true
   options:
     diff: true
@@ -30,7 +31,7 @@ provisioner:
     group_vars:
       all:
         accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+        accounts_info_name: linuxhq-dev
 
         rules_lists_account_id: "{{ _accounts_info_id }}"
         rules_lists_api_token: "{{ accounts_info_api_token }}"
@@ -46,18 +47,14 @@ provisioner:
                      wantlist=true) |
               map('community.general.dict_kv', 'ip') }}"
 
-        rules_lists_list_create:
+        rules_lists_list:
           - kind: ip
             name: molecule_monitoring
             elements:
               "{{ rules_lists_hetrixtools }}"
 
-        rules_lists_list_update:
-          - kind: ip
-            name: molecule_monitoring
-            elements:
-              "{{ rules_lists_hetrixtools +
-                  rules_lists_uptimerobot }}"
+        rules_lists_info_account_id: "{{ _accounts_info_id }}"
+        rules_lists_info_api_token: "{{ accounts_info_api_token }}"
 
 scenario:
   test_sequence:

@@ -15,6 +15,7 @@ Gather information about cloudflare warp connectors
     warp_connector_info_account_id: null
     warp_connector_info_api_token: null
     warp_connector_info_include_token: false
+    warp_connector_info_no_log: false
 
 ## Dependencies
 

@@ -23,6 +23,7 @@ provisioner:
     ANSIBLE_ACTION_WARNINGS: false
     ANSIBLE_COLLECTIONS_PATH: ${ANSIBLE_COLLECTIONS_PATH}
     ANSIBLE_DEPRECATION_WARNINGS: false
+    OBJC_DISABLE_INITIALIZE_FORK_SAFETY: 'YES'
   log: true
   options:
     diff: true
@@ -30,14 +31,17 @@ provisioner:
     group_vars:
       all:
         accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+        accounts_info_name: linuxhq-dev
 
         cfd_tunnel_account_id: "{{ _accounts_info_id }}"
         cfd_tunnel_api_token: "{{ accounts_info_api_token }}"
         cfd_tunnel_list:
           - name: molecule-local
             config_src: local
-            tunnel_secret: "{{ lookup('env', 'CLOUDFLARE_TUNNEL_SECRET') }}"
+            tunnel_secret:
+              "{{ lookup('ansible.builtin.password', '/dev/null',
+                         chars=['ascii_letters', 'digits'], length=32) |
+                  b64encode }}"
 
           - name: molecule-remote
             config_src: cloudflare

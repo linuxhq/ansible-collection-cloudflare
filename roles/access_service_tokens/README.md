@@ -18,6 +18,7 @@ Manage cloudflare access service tokens
     access_service_tokens_delay: 3
     access_service_tokens_display: true
     access_service_tokens_list: []
+    access_service_tokens_no_log: false
     access_service_tokens_poll: 0
     access_service_tokens_retries: 100
 

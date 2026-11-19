@@ -18,7 +18,7 @@
         api_token: "{{ purge_cache_api_token }}"
         cache:
           files:
-            - "https://{{ zones_list.0.name }}/molecule-verify"
+            - https://linuxhq.dev/molecule-verify
         zone_id: "{{ purge_cache_list.0.zone_id }}"
       register: __purge_cache_result
 

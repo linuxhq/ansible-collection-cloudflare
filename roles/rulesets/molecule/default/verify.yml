@@ -1,27 +1,31 @@
 ---
 - name: Verify
   hosts: all
-
   roles:
     - zones_info
 
-  post_tasks:
-    - name: Ensure inventory lists are formatted
-      ansible.builtin.set_fact:
-        rulesets_list:
-          "{{ rulesets_list |
-              map('combine', {'state': 'absent'}) }}"
-        zones_list:
-          "{{ zones_list |
-              map('combine', {'state': 'absent'}) }}"
+    - role: rulesets_info
+      rulesets_info_api_token: "{{ rulesets_api_token }}"
 
-    - name: Ensure roles are included
-      ansible.builtin.include_role:
-        name: "{{ _role }}"
-      loop:
-        - rulesets
-        - zones
-      loop_control:
-        label: "{{ _role | d(none) }}"
-        loop_var: _role
+  post_tasks:
+    - name: Ensure rulesets are verified
+      ansible.builtin.assert:
+        that:
+          - _rulesets_info_dict[zones_list.0.name].phase == 'http_request_firewall_custom'
+          - _rulesets_info_dict[zones_list.0.name].rules | length == 2
+
+    - name: Ensure ruleset rules are updated
+      linuxhq.cloudflare.rulesets:
+        api_token: "{{ rulesets_api_token }}"
+        name: "{{ rulesets_list.0.name }}"
+        phase: http_request_firewall_custom
+        rules: "{{ rulesets_list.0.rules[:1] }}"
+        zone_id: "{{ rulesets_list.0.zone_id }}"
+      register: __rulesets_result
+
+    - name: Ensure ruleset rules update is verified
+      ansible.builtin.assert:
+        that:
+          - __rulesets_result is changed
+          - __rulesets_result.ruleset.rules | length == 1
 ...

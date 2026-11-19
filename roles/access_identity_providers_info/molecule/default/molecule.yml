@@ -23,6 +23,7 @@ provisioner:
     ANSIBLE_ACTION_WARNINGS: false
     ANSIBLE_COLLECTIONS_PATH: ${ANSIBLE_COLLECTIONS_PATH}
     ANSIBLE_DEPRECATION_WARNINGS: false
+    OBJC_DISABLE_INITIALIZE_FORK_SAFETY: 'YES'
   log: true
   options:
     diff: true
@@ -30,10 +31,11 @@ provisioner:
     group_vars:
       all:
         accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
+        accounts_info_name: linuxhq-dev
 
         access_identity_providers_info_account_id: "{{ _accounts_info_id }}"
         access_identity_providers_info_api_token: "{{ accounts_info_api_token }}"
+        access_identity_providers_info_no_log: true
 
 scenario:
   test_sequence:

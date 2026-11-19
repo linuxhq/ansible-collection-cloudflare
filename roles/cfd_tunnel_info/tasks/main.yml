@@ -10,6 +10,7 @@
   when:
     - cfd_tunnel_info_account_id is not none
     - cfd_tunnel_info_api_token is not none
+  no_log: "{{ cfd_tunnel_info_no_log }}"
 
 - name: Ensure list of cloudflare cfd tunnels information is generated
   tags:
@@ -18,6 +19,7 @@
     _cfd_tunnel_info_list:
       "{{ __cfd_tunnel_info_query.cfd_tunnels |
           d([]) }}"
+  no_log: "{{ cfd_tunnel_info_no_log }}"
 
 - name: Ensure dict of cloudflare cfd tunnels information is generated
   tags:
@@ -28,4 +30,5 @@
                json_query('[].name') |
                zip(_cfd_tunnel_info_list))) |
           d({}) }}"
+  no_log: "{{ cfd_tunnel_info_no_log }}"
 ...

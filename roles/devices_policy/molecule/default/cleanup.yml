@@ -1,0 +1,16 @@
+---
+- name: Cleanup
+  hosts: all
+  pre_tasks:
+    - name: Ensure inventory settings are formatted
+      ansible.builtin.set_fact:
+        devices_policy_auto_connect: 120
+        devices_policy_include:
+          - address: 100.64.0.0/10
+            description: molecule reset
+        devices_policy_service_mode_v2:
+          mode: warp
+
+  roles:
+    - devices_policy
+...

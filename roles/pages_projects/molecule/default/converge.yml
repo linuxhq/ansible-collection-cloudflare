@@ -4,8 +4,6 @@
   roles:
     - role: pages_projects
       pages_projects_list: []
-      tags:
-        - molecule-idempotence-notest
 
     - pages_projects
 ...

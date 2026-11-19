@@ -1,0 +1,33 @@
+---
+- name: Cleanup
+  hosts: all
+  pre_tasks:
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        access_apps_list:
+          "{{ access_apps_list |
+              map(attribute='name') |
+              map('community.general.dict_kv', 'name') |
+              map('combine', {'state': 'absent'}) }}"
+        access_policies_list:
+          "{{ access_policies_list |
+              map(attribute='name') |
+              map('community.general.dict_kv', 'name') |
+              map('combine', {'state': 'absent'}) }}"
+        access_groups_list:
+          "{{ access_groups_list |
+              map(attribute='name') |
+              map('community.general.dict_kv', 'name') |
+              map('combine', {'state': 'absent'}) }}"
+        access_service_tokens_list:
+          "{{ access_service_tokens_list |
+              map(attribute='name') |
+              map('community.general.dict_kv', 'name') |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - access_apps
+    - access_policies
+    - access_groups
+    - access_service_tokens
+...
