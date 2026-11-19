@@ -108,6 +108,9 @@ options:
         it; omit the key instead.
       - Compared exactly, so omitting a key removes it. A key set to null is
         not sent and counts as omitted.
+      - Order is not significant in C(allowed_headers), C(allowed_methods), and
+        C(allowed_origins). Cloudflare does not keep their order, so the same
+        values in any order match.
       - Cloudflare omits V(false) for C(allow_all_headers),
         C(allow_all_methods), C(allow_all_origins), and C(allow_credentials),
         and V(0) for C(max_age), so those values match an application that
@@ -572,8 +575,10 @@ INLINE_POLICY_SETTINGS = (
     "purpose_justification_required",
     "session_duration",
 )
+# CORS header lists whose order Cloudflare does not keep.
+CORS_HEADERS_LIST_FIELDS = ("allowed_headers", "allowed_methods", "allowed_origins")
 # Fields Cloudflare drops when they hold an empty value.
-EMPTY_CORS_HEADERS_FIELDS = ("allowed_headers", "allowed_methods", "allowed_origins")
+EMPTY_CORS_HEADERS_FIELDS = CORS_HEADERS_LIST_FIELDS
 EMPTY_DESTINATION_FIELDS = ("hostname", "port_range", "vnet_id")
 EMPTY_POLICY_FIELDS = ("purpose_justification_prompt", "session_duration")
 # Cloudflare omits these fields when they hold their default value.
@@ -780,12 +785,23 @@ def comparable_policy(policy, desired):
     return comparable
 
 
+def same_items(stored, requested):
+    """Return whether two lists of strings hold the same items in any order."""
+    return (
+        isinstance(stored, list)
+        and isinstance(requested, list)
+        and all(isinstance(item, str) for item in stored + requested)
+        and sorted(stored) == sorted(requested)
+    )
+
+
 def comparable_app(app, allowed_idps, policies, cors_headers):
     """Return app in the form compared with the requested settings.
 
     Cloudflare ignores the order of allowed_idps and stores identity providers
     in its own order, so stored identity providers that match the request take
-    its order. Stored policies are paired with the requested ones by position.
+    its order. Cloudflare does not keep the order of the CORS header lists
+    either, so they match the same way. Stored policies are paired with the requested ones by position.
     Cloudflare omits CORS header fields that hold their default, so a requested
     one the stored CORS headers omit matches its default.
     """
@@ -796,16 +812,15 @@ def comparable_app(app, allowed_idps, policies, cors_headers):
     stored = app.get("cors_headers")
     if isinstance(cors_headers, dict) and (stored is None or isinstance(stored, dict)):
         defaults = {key: value for key, value in CORS_HEADERS_DEFAULTS.items() if key in cors_headers}
-        if defaults:
-            app = {**app, "cors_headers": {**defaults, **(stored or {})}}
+        ordered = {
+            field: cors_headers[field]
+            for field in CORS_HEADERS_LIST_FIELDS
+            if same_items((stored or {}).get(field), cors_headers.get(field))
+        }
+        if defaults or ordered:
+            app = {**app, "cors_headers": {**defaults, **(stored or {}), **ordered}}
 
-    stored = app.get("allowed_idps")
-    if (
-        isinstance(allowed_idps, list)
-        and isinstance(stored, list)
-        and all(isinstance(idp, str) for idp in stored)
-        and sorted(stored) == sorted(allowed_idps)
-    ):
+    if same_items(app.get("allowed_idps"), allowed_idps):
         app = {**app, "allowed_idps": allowed_idps}
 
     stored = app.get("policies")

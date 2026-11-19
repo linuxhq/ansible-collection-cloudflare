@@ -46,6 +46,9 @@ options:
     description:
       - Desired DNSSEC status.
       - Only changed when explicitly provided.
+      - A stored C(pending) status matches V(active), and a stored
+        C(pending-disabled) status matches V(disabled), so a change in
+        progress is not requested again.
     type: str
     choices:
       - active

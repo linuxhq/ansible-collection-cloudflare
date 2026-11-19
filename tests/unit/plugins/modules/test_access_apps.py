@@ -183,6 +183,39 @@ class AccessAppsTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertNotIn("msg", result)
 
+    def test_cors_header_lists_match_in_any_order(self):
+        requested = {
+            "allowed_headers": ["X-B", "X-A"],
+            "allowed_methods": ["POST", "GET"],
+            "allowed_origins": ["https://b.example.com", "https://a.example.com"],
+            "allow_all_origins": True,
+        }
+        cloudflare = {field: sorted(value) if isinstance(value, list) else value for field, value in requested.items()}
+        current = stored(cors_headers=cloudflare)
+        client, api = client_with([current])
+        result = self.run_module(FakeModule(params(cors_headers=requested)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+        self.assertEqual(result["access_app"]["cors_headers"], current["cors_headers"])
+
+        client, api = client_with(created=current)
+        result = self.run_module(FakeModule(params(cors_headers=requested)), client)
+
+        self.assertEqual(api.create.call_args.kwargs["cors_headers"], requested)
+        self.assertTrue(result["changed"])
+        self.assertNotIn("msg", result)
+
+    def test_changed_cors_header_lists_are_a_change(self):
+        current = stored(cors_headers={"allowed_methods": ["GET", "POST"]})
+        for methods in (["GET"], ["GET", "POST", "PUT"], ["GET", "GET"]):
+            with self.subTest(methods=methods):
+                client, api = client_with([current], updated=current)
+                result = self.run_module(FakeModule(params(cors_headers={"allowed_methods": methods})), client)
+
+                self.assertEqual(api.update.call_args.kwargs["cors_headers"], {"allowed_methods": methods})
+                self.assertIn("did not apply", result["msg"])
+
     def test_changed_allowed_idps_are_a_change(self):
         current = stored(allowed_idps=["idp-a", "idp-b"])
         for requested in (["idp-a"], ["idp-a", "idp-b", "idp-c"], ["idp-a", "idp-a"]):
