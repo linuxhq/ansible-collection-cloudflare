@@ -174,7 +174,7 @@ def normalize_origin(origin, defaults):
             if not value:
                 continue
 
-        elif key == "ipRules":
+        elif key == "ipRules" and key in defaults:
             value = normalize_ip_rules(value)
             # cloudflared treats empty ipRules as unset, so an ingress rule inherits the global rules.
             if value == [] or values_equal(value, normalize_ip_rules(defaults[key])):

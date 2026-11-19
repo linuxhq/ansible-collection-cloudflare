@@ -243,6 +243,15 @@ class CfdTunnelConfigurationsTests(TestCase):
                     cfd_tunnel_configurations.comparable_config(desired),
                 )
 
+    def test_ip_rules_outside_origin_settings_are_compared_as_given(self):
+        rules = [{"prefix": "192.0.2.0/24", "allow": False}]
+        desired = {"originRequest": {"access": {"ipRules": rules}}, "ingress": [{"service": "http_status:404"}]}
+
+        self.assertEqual(
+            cfd_tunnel_configurations.comparable_config(desired, desired)["originRequest"],
+            {"access": {"ipRules": rules}},
+        )
+
     def test_ingress_ip_rules_matching_global_ip_rules_do_not_cause_change(self):
         rules = [{"prefix": "192.0.2.0/24", "ports": [443], "allow": True}]
         desired = {"originRequest": {"ipRules": rules}, "ingress": [{"service": "http_status:404"}]}
