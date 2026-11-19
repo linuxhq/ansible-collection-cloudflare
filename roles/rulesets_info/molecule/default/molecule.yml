@@ -1,32 +1,5 @@
 ---
-prerun: false
-
-dependency:
-  name: galaxy
-  options:
-    requirements-file: ../../requirements.yml
-
-driver:
-  name: default
-  options:
-    managed: false
-    ansible_connection_options:
-      ansible_connection: local
-      ansible_python_interpreter: "{{ ansible_playbook_python }}"
-
-platforms:
-  - name: localhost
-
 provisioner:
-  name: ansible
-  env:
-    ANSIBLE_ACTION_WARNINGS: false
-    ANSIBLE_COLLECTIONS_PATH: ${ANSIBLE_COLLECTIONS_PATH}
-    ANSIBLE_DEPRECATION_WARNINGS: false
-    OBJC_DISABLE_INITIALIZE_FORK_SAFETY: 'YES'
-  log: true
-  options:
-    diff: true
   inventory:
     group_vars:
       all:
@@ -36,7 +9,7 @@ provisioner:
         zones_account_id: "{{ _accounts_info_id }}"
         zones_api_token: "{{ accounts_info_api_token }}"
         zones_list:
-          - name: molecule.org
+          - name: molecule-rulesets-info.org
             type: full
             settings:
               - id: always_use_https
@@ -69,25 +42,4 @@ provisioner:
 
         rulesets_info_api_token: "{{ accounts_info_api_token }}"
         zones_info_api_token: "{{ accounts_info_api_token }}"
-
-scenario:
-  test_sequence:
-    - dependency
-    - cleanup
-    - destroy
-    - syntax
-    - create
-    - prepare
-    - check
-    - converge
-    - check
-    - idempotence
-    - verify
-    - cleanup
-    - destroy
-
-verifier:
-  name: ansible
-  options:
-    diff: true
 ...

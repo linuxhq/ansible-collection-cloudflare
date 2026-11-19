@@ -22,7 +22,7 @@
       vars:
         rules_lists_list:
           - kind: ip
-            name: molecule_monitoring
+            name: molecule_rules_lists_monitoring
             elements:
               "{{ rules_lists_hetrixtools +
                   rules_lists_uptimerobot }}"

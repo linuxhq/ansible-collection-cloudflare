@@ -9,8 +9,8 @@
     - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _access_apps_info_dict['molecule'].domain == 'molecule.example.com'
-          - _access_apps_info_dict['molecule'].id is defined
-          - _access_apps_info_dict['molecule'].policies | length == 1
-          - _access_apps_info_dict['molecule'].type == 'bookmark'
+          - _access_apps_info_dict['molecule-access-apps-info'].domain == 'molecule.example.com'
+          - _access_apps_info_dict['molecule-access-apps-info'].id is defined
+          - _access_apps_info_dict['molecule-access-apps-info'].policies | length == 1
+          - _access_apps_info_dict['molecule-access-apps-info'].type == 'bookmark'
 ...

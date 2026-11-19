@@ -9,8 +9,8 @@
     - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _cfd_tunnel_configurations_info_dict['molecule'].config.ingress.0.hostname ==
+          - _cfd_tunnel_configurations_info_dict['molecule-cfd-tunnel-configurations-info'].config.ingress.0.hostname ==
               cfd_tunnel_configurations_list.0.config.ingress.0.hostname
-          - _cfd_tunnel_configurations_info_dict['molecule'].config.ingress.1.hostname ==
+          - _cfd_tunnel_configurations_info_dict['molecule-cfd-tunnel-configurations-info'].config.ingress.1.hostname ==
               cfd_tunnel_configurations_list.0.config.ingress.1.hostname
 ...

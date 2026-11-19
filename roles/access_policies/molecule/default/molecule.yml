@@ -1,32 +1,5 @@
 ---
-prerun: false
-
-dependency:
-  name: galaxy
-  options:
-    requirements-file: ../../requirements.yml
-
-driver:
-  name: default
-  options:
-    managed: false
-    ansible_connection_options:
-      ansible_connection: local
-      ansible_python_interpreter: "{{ ansible_playbook_python }}"
-
-platforms:
-  - name: localhost
-
 provisioner:
-  name: ansible
-  env:
-    ANSIBLE_ACTION_WARNINGS: false
-    ANSIBLE_COLLECTIONS_PATH: ${ANSIBLE_COLLECTIONS_PATH}
-    ANSIBLE_DEPRECATION_WARNINGS: false
-    OBJC_DISABLE_INITIALIZE_FORK_SAFETY: 'YES'
-  log: true
-  options:
-    diff: true
   inventory:
     group_vars:
       all:
@@ -42,10 +15,10 @@ provisioner:
         access_groups_account_id: "{{ _accounts_info_id }}"
         access_groups_api_token: "{{ accounts_info_api_token }}"
         access_groups_list:
-          - name: molecule-00
+          - name: molecule-access-policies-00
             include:
               - service_token:
-                  token_id: "{{ _access_service_tokens_info_dict['molecule-00'].id }}"
+                  token_id: "{{ _access_service_tokens_info_dict['molecule-access-policies-00'].id }}"
             is_default: false
 
         access_identity_providers_info_account_id: "{{ _accounts_info_id }}"
@@ -55,42 +28,21 @@ provisioner:
         access_policies_account_id: "{{ _accounts_info_id }}"
         access_policies_api_token: "{{ accounts_info_api_token }}"
         access_policies_list:
-          - name: molecule-00-email
+          - name: molecule-access-policies-00-email
             decision: allow
             include:
               - email:
                   email: email@molecule.org
 
-          - name: molecule-00-group
+          - name: molecule-access-policies-00-group
             decision: non_identity
             include:
               - group:
-                  id: "{{ _access_groups_info_dict['molecule-00'].id }}"
+                  id: "{{ _access_groups_info_dict['molecule-access-policies-00'].id }}"
 
         access_service_tokens_account_id: "{{ _accounts_info_id }}"
         access_service_tokens_api_token: "{{ accounts_info_api_token }}"
         access_service_tokens_list:
-          - name: molecule-00
+          - name: molecule-access-policies-00
             duration: forever
-
-scenario:
-  test_sequence:
-    - dependency
-    - cleanup
-    - destroy
-    - syntax
-    - create
-    - prepare
-    - check
-    - converge
-    - check
-    - idempotence
-    - verify
-    - cleanup
-    - destroy
-
-verifier:
-  name: ansible
-  options:
-    diff: true
 ...

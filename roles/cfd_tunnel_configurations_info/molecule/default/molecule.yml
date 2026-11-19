@@ -1,32 +1,5 @@
 ---
-prerun: false
-
-dependency:
-  name: galaxy
-  options:
-    requirements-file: ../../requirements.yml
-
-driver:
-  name: default
-  options:
-    managed: false
-    ansible_connection_options:
-      ansible_connection: local
-      ansible_python_interpreter: "{{ ansible_playbook_python }}"
-
-platforms:
-  - name: localhost
-
 provisioner:
-  name: ansible
-  env:
-    ANSIBLE_ACTION_WARNINGS: false
-    ANSIBLE_COLLECTIONS_PATH: ${ANSIBLE_COLLECTIONS_PATH}
-    ANSIBLE_DEPRECATION_WARNINGS: false
-    OBJC_DISABLE_INITIALIZE_FORK_SAFETY: 'YES'
-  log: true
-  options:
-    diff: true
   inventory:
     group_vars:
       all:
@@ -36,7 +9,7 @@ provisioner:
         cfd_tunnel_account_id: "{{ _accounts_info_id }}"
         cfd_tunnel_api_token: "{{ accounts_info_api_token }}"
         cfd_tunnel_list:
-          - name: molecule
+          - name: molecule-cfd-tunnel-configurations-info
             config_src: cloudflare
 
         cfd_tunnel_info_account_id: "{{ _accounts_info_id }}"
@@ -45,7 +18,7 @@ provisioner:
         cfd_tunnel_configurations_account_id: "{{ _accounts_info_id }}"
         cfd_tunnel_configurations_api_token: "{{ accounts_info_api_token }}"
         cfd_tunnel_configurations_list:
-          - tunnel_id: "{{ _cfd_tunnel_info_dict['molecule'].id }}"
+          - tunnel_id: "{{ _cfd_tunnel_info_dict['molecule-cfd-tunnel-configurations-info'].id }}"
             config:
               ingress:
                 - hostname: organic.molecule.org
@@ -62,25 +35,4 @@ provisioner:
 
         cfd_tunnel_configurations_info_account_id: "{{ _accounts_info_id }}"
         cfd_tunnel_configurations_info_api_token: "{{ accounts_info_api_token }}"
-
-scenario:
-  test_sequence:
-    - dependency
-    - cleanup
-    - destroy
-    - syntax
-    - create
-    - prepare
-    - check
-    - converge
-    - check
-    - idempotence
-    - verify
-    - cleanup
-    - destroy
-
-verifier:
-  name: ansible
-  options:
-    diff: true
 ...
