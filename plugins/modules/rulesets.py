@@ -52,8 +52,9 @@ options:
         matches a rule without that field.
       - An empty C(action_parameters.phases), C(action_parameters.products),
         C(action_parameters.rules), or C(action_parameters.rulesets) of a
-        C(skip) rule fails before any change,
-        because Cloudflare does not store it; omit the parameter instead.
+        C(skip) rule fails before any change, including one that is empty once
+        its null keys are dropped, because Cloudflare does not store it; omit
+        the parameter instead.
       - An empty C(id) or C(ref) fails before any change, because Cloudflare
         assigns the rule its own value instead; omit the field instead.
       - A rule's C(action_parameters) are compared on their complete key sets
@@ -197,10 +198,12 @@ def validate_action_parameters(module):
                     msg=f"rules[{index}].action_parameters.{key} must use the Cloudflare API key {api_key!r}"
                 )
 
+        # Nested null keys are not sent either, so check the value that is sent.
+        sent = without_nested_nulls(action_parameters)
         empty.extend(
             f"rules[{index}].action_parameters.{key}"
             for key, value in EMPTY_SKIP_PARAMETERS.items()
-            if key in action_parameters and action_parameters[key] == value
+            if key in sent and sent[key] == value
         )
 
     if empty:
