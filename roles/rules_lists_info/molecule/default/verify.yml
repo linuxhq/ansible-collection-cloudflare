@@ -16,18 +16,4 @@
           - _rules_lists_info_dict[rules_lists_list.0.name].num_items > 0
           - _rules_lists_info_dict[rules_lists_list.0.name].num_referencing_filters is defined
 
-    - name: Ensure inventory lists are formatted
-      ansible.builtin.set_fact:
-        rules_lists_list:
-          "{{ rules_lists_list |
-              map('combine', {'state': 'absent'}) }}"
-
-    - name: Ensure roles are included
-      ansible.builtin.include_role:
-        name: "{{ _role }}"
-      loop:
-        - rules_lists
-      loop_control:
-        label: "{{ _role | d(none) }}"
-        loop_var: _role
 ...

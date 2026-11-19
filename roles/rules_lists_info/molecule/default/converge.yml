@@ -5,13 +5,6 @@
     - role: rules_lists_info
       rules_lists_info_account_id: null
       rules_lists_info_api_token: null
-      tags:
-        - molecule-idempotence-notest
-
-    - role: rules_lists
-      tags:
-        - molecule-idempotence-notest
-      check_mode: false
 
     - rules_lists_info
 ...

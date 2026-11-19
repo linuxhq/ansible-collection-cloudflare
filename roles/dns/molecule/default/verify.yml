@@ -1,21 +1,29 @@
 ---
 - name: Verify
   hosts: all
+  tasks:
+    - name: Ensure dns records are queried
+      community.general.cloudflare_dns:
+        api_token: "{{ dns_api_token }}"
+        comment: "{{ _dns.1.comment | d(omit) }}"
+        proxied: "{{ _dns.1.proxied }}"
+        record: "{{ _dns.1.record }}"
+        state: present
+        type: "{{ _dns.1.type }}"
+        value: "{{ _dns.1.value }}"
+        zone: "{{ _dns.0.zone }}"
+      register: __dns_query
+      check_mode: true
+      loop:
+        "{{ q('ansible.builtin.subelements',
+              dns_records,
+              'records') }}"
+      loop_control:
+        label: "{{ _dns.1.record | d(none) }}"
+        loop_var: _dns
 
-  pre_tasks:
-    - name: Ensure inventory lists are formatted
-      ansible.builtin.set_fact:
-        dns_records:
-          - zone: "{{ zones_list.0.name }}"
-            records:
-              "{{ dns_records[0].records |
-                  map('combine', {'state': 'absent'}) |
-                  list }}"
-        zones_list:
-          "{{ zones_list |
-              map('combine', {'state': 'absent'}) }}"
-
-  roles:
-    - dns
-    - zones
+    - name: Ensure dns records are verified
+      ansible.builtin.assert:
+        that:
+          - __dns_query.results | select('changed') | length == 0
 ...

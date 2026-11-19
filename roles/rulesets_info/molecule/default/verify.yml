@@ -4,7 +4,6 @@
 
   roles:
     - rulesets_info
-    - zones_info
 
   post_tasks:
     - name: Ensure info is verified
@@ -17,22 +16,4 @@
           - _rulesets_info_dict[zones_list.0.name].rules | length == 2
           - _rulesets_info_dict[zones_list.0.name].zone_id is defined
 
-    - name: Ensure inventory lists are formatted
-      ansible.builtin.set_fact:
-        rulesets_list:
-          "{{ rulesets_list |
-              map('combine', {'state': 'absent'}) }}"
-        zones_list:
-          "{{ zones_list |
-              map('combine', {'state': 'absent'}) }}"
-
-    - name: Ensure roles are included
-      ansible.builtin.include_role:
-        name: "{{ _role }}"
-      loop:
-        - rulesets
-        - zones
-      loop_control:
-        label: "{{ _role | d(none) }}"
-        loop_var: _role
 ...

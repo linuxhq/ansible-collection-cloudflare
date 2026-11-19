@@ -1,0 +1,24 @@
+---
+- name: Cleanup
+  hosts: all
+  pre_tasks:
+    - name: Ensure zones are queried
+      ansible.builtin.include_role:
+        name: zones_info
+
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        rulesets_list:
+          "{{ rulesets_list |
+              map('combine', {'state': 'absent'}) |
+              list
+              if zones_list.0.name in _zones_info_dict
+              else [] }}"
+        zones_list:
+          "{{ zones_list |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - rulesets
+    - zones
+...

@@ -1,14 +1,20 @@
 ---
 - name: Verify
   hosts: all
-
-  pre_tasks:
-    - name: Ensure inventory lists are formatted
-      ansible.builtin.set_fact:
-        cfd_tunnel_list:
-          "{{ cfd_tunnel_list |
-              map('combine', {'state': 'absent'}) }}"
-
   roles:
-    - cfd_tunnel
+    - role: cfd_tunnel_info
+      cfd_tunnel_info_account_id: "{{ cfd_tunnel_account_id }}"
+      cfd_tunnel_info_api_token: "{{ cfd_tunnel_api_token }}"
+
+  post_tasks:
+    - name: Ensure cfd tunnels are verified
+      ansible.builtin.assert:
+        that:
+          - _cfd_tunnel_info_dict[_cfd_tunnel.name].config_src == _cfd_tunnel.config_src
+          - _cfd_tunnel_info_dict[_cfd_tunnel.name].id is defined
+          - _cfd_tunnel_info_dict[_cfd_tunnel.name].tun_type == 'cfd_tunnel'
+      loop: "{{ cfd_tunnel_list }}"
+      loop_control:
+        label: "{{ _cfd_tunnel.name | d(none) }}"
+        loop_var: _cfd_tunnel
 ...

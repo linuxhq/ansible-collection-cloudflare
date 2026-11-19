@@ -4,8 +4,6 @@
   roles:
     - role: cfd_tunnel
       cfd_tunnel_list: []
-      tags:
-        - molecule-idempotence-notest
 
     - cfd_tunnel
 ...

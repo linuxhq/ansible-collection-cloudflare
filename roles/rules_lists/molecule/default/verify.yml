@@ -1,20 +1,39 @@
 ---
 - name: Verify
   hosts: all
+  roles:
+    - rules_lists_info
 
-  tasks:
-    - name: Ensure inventory lists are formatted
+  post_tasks:
+    - name: Ensure info is verified
+      ansible.builtin.assert:
+        that:
+          - _rules_lists_info_dict[rules_lists_list.0.name].kind == 'ip'
+          - _rules_lists_info_dict[rules_lists_list.0.name].num_items > 0
+
+    - name: Ensure rules list count is recorded
       ansible.builtin.set_fact:
-        rules_lists_list:
-          "{{ rules_lists_list_update |
-              map('combine', {'state': 'absent'}) }}"
+        __rules_lists_num_items:
+          "{{ _rules_lists_info_dict[rules_lists_list.0.name].num_items }}"
 
-    - name: Ensure roles are included
+    - name: Ensure rules list elements are updated
       ansible.builtin.include_role:
-        name: "{{ _role }}"
-      loop:
-        - rules_lists
-      loop_control:
-        label: "{{ _role | d(none) }}"
-        loop_var: _role
+        name: rules_lists
+      vars:
+        rules_lists_list:
+          - kind: ip
+            name: molecule_rules_lists_monitoring
+            elements:
+              "{{ rules_lists_hetrixtools +
+                  rules_lists_uptimerobot }}"
+
+    - name: Ensure rules lists information is gathered
+      ansible.builtin.include_role:
+        name: rules_lists_info
+
+    - name: Ensure update is verified
+      ansible.builtin.assert:
+        that:
+          - _rules_lists_info_dict[rules_lists_list.0.name].num_items | int >
+            __rules_lists_num_items | int
 ...

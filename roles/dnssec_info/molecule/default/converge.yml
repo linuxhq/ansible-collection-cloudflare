@@ -2,20 +2,8 @@
 - name: Converge
   hosts: all
   roles:
-    - role: zones
-      tags:
-        - molecule-idempotence-notest
-      check_mode: false
-
-    - role: dnssec
-      tags:
-        - molecule-idempotence-notest
-      check_mode: false
-
     - role: dnssec_info
       dnssec_info_api_token: null
-      tags:
-        - molecule-idempotence-notest
 
     - dnssec_info
 ...

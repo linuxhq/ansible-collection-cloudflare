@@ -4,8 +4,6 @@
   roles:
     - role: warp_connector
       warp_connector_list: []
-      tags:
-        - molecule-idempotence-notest
 
     - warp_connector
 ...

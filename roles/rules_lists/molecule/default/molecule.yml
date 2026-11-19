@@ -1,39 +1,8 @@
 ---
-prerun: false
-
-dependency:
-  name: galaxy
-  options:
-    requirements-file: ../../requirements.yml
-
-driver:
-  name: default
-  options:
-    managed: false
-    ansible_connection_options:
-      ansible_connection: local
-      ansible_python_interpreter: "{{ ansible_playbook_python }}"
-
-platforms:
-  - name: localhost
-
 provisioner:
-  name: ansible
-  env:
-    ANSIBLE_ACTION_WARNINGS: false
-    ANSIBLE_COLLECTIONS_PATH: ${ANSIBLE_COLLECTIONS_PATH}
-    ANSIBLE_DEPRECATION_WARNINGS: false
-  log: true
-  options:
-    diff: true
   inventory:
     group_vars:
       all:
-        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
-
-        rules_lists_account_id: "{{ _accounts_info_id }}"
-        rules_lists_api_token: "{{ accounts_info_api_token }}"
         rules_lists_hetrixtools:
           "{{ lookup('ansible.builtin.url',
                      'https://hetrixtools.com/resources/uptime-monitor-only-ips.txt',
@@ -46,37 +15,9 @@ provisioner:
                      wantlist=true) |
               map('community.general.dict_kv', 'ip') }}"
 
-        rules_lists_list_create:
+        rules_lists_list:
           - kind: ip
-            name: molecule_monitoring
+            name: molecule_rules_lists_monitoring
             elements:
               "{{ rules_lists_hetrixtools }}"
-
-        rules_lists_list_update:
-          - kind: ip
-            name: molecule_monitoring
-            elements:
-              "{{ rules_lists_hetrixtools +
-                  rules_lists_uptimerobot }}"
-
-scenario:
-  test_sequence:
-    - dependency
-    - cleanup
-    - destroy
-    - syntax
-    - create
-    - prepare
-    - check
-    - converge
-    - check
-    - idempotence
-    - verify
-    - cleanup
-    - destroy
-
-verifier:
-  name: ansible
-  options:
-    diff: true
 ...

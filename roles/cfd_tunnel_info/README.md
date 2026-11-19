@@ -15,6 +15,7 @@ Gather information about cloudflare cfd tunnels
     cfd_tunnel_info_account_id: null
     cfd_tunnel_info_api_token: null
     cfd_tunnel_info_include_token: false
+    cfd_tunnel_info_no_log: false
 
 ## Dependencies
 

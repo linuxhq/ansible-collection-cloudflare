@@ -1,82 +1,31 @@
 ---
-prerun: false
-
-dependency:
-  name: galaxy
-  options:
-    requirements-file: ../../requirements.yml
-
-driver:
-  name: default
-  options:
-    managed: false
-    ansible_connection_options:
-      ansible_connection: local
-      ansible_python_interpreter: "{{ ansible_playbook_python }}"
-
-platforms:
-  - name: localhost
-
 provisioner:
-  name: ansible
-  env:
-    ANSIBLE_ACTION_WARNINGS: false
-    ANSIBLE_COLLECTIONS_PATH: ${ANSIBLE_COLLECTIONS_PATH}
-    ANSIBLE_DEPRECATION_WARNINGS: false
-  log: true
-  options:
-    diff: true
   inventory:
     group_vars:
       all:
-        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
-        access_service_tokens_account_id: "{{ _accounts_info_id }}"
-        access_service_tokens_api_token: "{{ accounts_info_api_token }}"
         access_service_tokens_list:
-          - name: molecule-00
+          - name: molecule-access-service-tokens-00
             duration: forever
-          - name: molecule-01
+          - name: molecule-access-service-tokens-01
             duration: forever
-          - name: molecule-02
+          - name: molecule-access-service-tokens-02
             duration: forever
-          - name: molecule-03
+          - name: molecule-access-service-tokens-03
             duration: forever
-          - name: molecule-04
+          - name: molecule-access-service-tokens-04
             duration: forever
-          - name: molecule-05
+          - name: molecule-access-service-tokens-05
             duration: forever
-          - name: molecule-06
+          - name: molecule-access-service-tokens-06
             duration: forever
-          - name: molecule-07
+          - name: molecule-access-service-tokens-07
             duration: forever
-          - name: molecule-08
+          - name: molecule-access-service-tokens-08
             duration: forever
-          - name: molecule-09
+          - name: molecule-access-service-tokens-09
             duration: forever
-          - name: molecule-10
+          - name: molecule-access-service-tokens-10
             duration: forever
-          - name: molecule-11
+          - name: molecule-access-service-tokens-11
             duration: forever
-
-scenario:
-  test_sequence:
-    - dependency
-    - cleanup
-    - destroy
-    - syntax
-    - create
-    - prepare
-    - check
-    - converge
-    - check
-    - idempotence
-    - verify
-    - cleanup
-    - destroy
-
-verifier:
-  name: ansible
-  options:
-    diff: true
 ...

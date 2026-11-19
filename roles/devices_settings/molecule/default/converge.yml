@@ -5,13 +5,6 @@
     - role: devices_settings
       devices_settings_account_id: null
       devices_settings_api_token: null
-      tags:
-        - molecule-idempotence-notest
-
-    - role: devices_settings
-      devices_settings_gateway_udp_proxy_enabled: false
-      tags:
-        - molecule-idempotence-notest
 
     - devices_settings
 ...

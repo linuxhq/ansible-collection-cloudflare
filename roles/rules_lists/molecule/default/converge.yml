@@ -4,16 +4,6 @@
   roles:
     - role: rules_lists
       rules_lists_list: []
-      tags:
-        - molecule-idempotence-notest
 
-    - role: rules_lists
-      rules_lists_list:
-        "{{ rules_lists_list_create }}"
-      tags:
-        - molecule-idempotence-notest
-
-    - role: rules_lists
-      rules_lists_list:
-        "{{ rules_lists_list_update }}"
+    - rules_lists
 ...

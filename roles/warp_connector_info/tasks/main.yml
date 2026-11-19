@@ -10,6 +10,7 @@
   when:
     - warp_connector_info_account_id is not none
     - warp_connector_info_api_token is not none
+  no_log: "{{ warp_connector_info_no_log }}"
 
 - name: Ensure list of cloudflare warp connectors information is generated
   tags:
@@ -18,6 +19,7 @@
     _warp_connector_info_list:
       "{{ __warp_connector_info_query.warp_connectors |
           d([]) }}"
+  no_log: "{{ warp_connector_info_no_log }}"
 
 - name: Ensure dict of cloudflare warp connectors information is generated
   tags:
@@ -28,4 +30,5 @@
                json_query('[].name') |
                zip(_warp_connector_info_list))) |
           d({}) }}"
+  no_log: "{{ warp_connector_info_no_log }}"
 ...

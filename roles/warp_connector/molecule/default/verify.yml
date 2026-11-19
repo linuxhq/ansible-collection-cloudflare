@@ -1,14 +1,21 @@
 ---
 - name: Verify
   hosts: all
-
-  pre_tasks:
-    - name: Ensure inventory lists are formatted
-      ansible.builtin.set_fact:
-        warp_connector_list:
-          "{{ warp_connector_list |
-              map('combine', {'state': 'absent'}) }}"
-
   roles:
-    - warp_connector
+    - role: warp_connector_info
+      warp_connector_info_account_id: "{{ warp_connector_account_id }}"
+      warp_connector_info_api_token: "{{ warp_connector_api_token }}"
+
+  post_tasks:
+    - name: Ensure warp connectors are verified
+      ansible.builtin.assert:
+        that:
+          - _warp_connector_info_dict[_item].id is defined
+          - _warp_connector_info_dict[_item].tun_type == 'warp_connector'
+      loop:
+        "{{ warp_connector_list |
+            map(attribute='name') }}"
+      loop_control:
+        label: "{{ _item | d(none) }}"
+        loop_var: _item
 ...

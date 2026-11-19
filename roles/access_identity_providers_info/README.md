@@ -13,6 +13,7 @@ Gather information about cloudflare access identity providers
 
     access_identity_providers_info_account_id: null
     access_identity_providers_info_api_token: null
+    access_identity_providers_info_no_log: false
 
 ## Dependencies
 

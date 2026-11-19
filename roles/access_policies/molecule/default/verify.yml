@@ -1,33 +1,23 @@
 ---
 - name: Verify
   hosts: all
-
-  pre_tasks:
-    - name: Ensure roles are included
-      ansible.builtin.include_role:
-        name: "{{ _role }}"
-      loop:
-        - access_groups_info
-        - access_identity_providers_info
-        - access_service_tokens_info
-      loop_control:
-        label: "{{ _role | d(none) }}"
-        loop_var: _role
-
-    - name: Ensure inventory lists are formatted
-      ansible.builtin.set_fact:
-        access_groups_list:
-          "{{ access_groups_list |
-              map('combine', {'state': 'absent'}) }}"
-        access_policies_list:
-          "{{ access_policies_list |
-              map('combine', {'state': 'absent'}) }}"
-        access_service_tokens_list:
-          "{{ access_service_tokens_list |
-              map('combine', {'state': 'absent'}) }}"
-
   roles:
-    - access_policies
-    - access_groups
-    - access_service_tokens
+    - role: access_policies_info
+      access_policies_info_account_id: "{{ _accounts_info_id }}"
+      access_policies_info_api_token: "{{ accounts_info_api_token }}"
+
+    - access_groups_info
+    - access_identity_providers_info
+
+  post_tasks:
+    - name: Ensure policies are verified
+      ansible.builtin.assert:
+        that:
+          - _access_policies_info_dict[_item.name].decision == _item.decision
+          - _access_policies_info_dict[_item.name].include | length == _item.include | length
+          - _access_policies_info_dict[_item.name].require | length == _item.require | d([]) | length
+      loop: "{{ access_policies_list }}"
+      loop_control:
+        label: "{{ _item.name | d(none) }}"
+        loop_var: _item
 ...

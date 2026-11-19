@@ -1,41 +1,10 @@
 ---
-prerun: false
-
-dependency:
-  name: galaxy
-  options:
-    requirements-file: ../../requirements.yml
-
-driver:
-  name: default
-  options:
-    managed: false
-    ansible_connection_options:
-      ansible_connection: local
-      ansible_python_interpreter: "{{ ansible_playbook_python }}"
-
-platforms:
-  - name: localhost
-
 provisioner:
-  name: ansible
-  env:
-    ANSIBLE_ACTION_WARNINGS: false
-    ANSIBLE_COLLECTIONS_PATH: ${ANSIBLE_COLLECTIONS_PATH}
-    ANSIBLE_DEPRECATION_WARNINGS: false
-  log: true
-  options:
-    diff: true
   inventory:
     group_vars:
       all:
-        accounts_info_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
-        accounts_info_name: "{{ lookup('env', 'CLOUDFLARE_ACCOUNT_NAME') }}"
-
-        zones_account_id: "{{ _accounts_info_id }}"
-        zones_api_token: "{{ accounts_info_api_token }}"
         zones_list:
-          - name: molecule.com
+          - name: molecule-zones.com
             type: full
             settings:
               - id: always_use_https
@@ -49,7 +18,7 @@ provisioner:
               - id: ssl
                 value: strict
 
-          - name: molecule.net
+          - name: molecule-zones.net
             type: full
             settings:
               - id: always_use_https
@@ -63,7 +32,7 @@ provisioner:
               - id: ssl
                 value: strict
 
-          - name: molecule.org
+          - name: molecule-zones.org
             type: full
             settings:
               - id: always_use_https
@@ -76,25 +45,4 @@ provisioner:
                 value: 1.3
               - id: ssl
                 value: strict
-
-scenario:
-  test_sequence:
-    - dependency
-    - cleanup
-    - destroy
-    - syntax
-    - create
-    - prepare
-    - check
-    - converge
-    - check
-    - idempotence
-    - verify
-    - cleanup
-    - destroy
-
-verifier:
-  name: ansible
-  options:
-    diff: true
 ...

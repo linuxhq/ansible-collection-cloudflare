@@ -9,6 +9,7 @@
   when:
     - access_identity_providers_info_account_id is not none
     - access_identity_providers_info_api_token is not none
+  no_log: "{{ access_identity_providers_info_no_log }}"
 
 - name: Ensure list of cloudflare access identity providers information is generated
   tags:
@@ -17,6 +18,7 @@
     _access_identity_providers_info_list:
       "{{ __access_identity_providers_info_query.access_identity_providers |
           d([]) }}"
+  no_log: "{{ access_identity_providers_info_no_log }}"
 
 - name: Ensure dict of cloudflare access identity providers information is generated
   tags:
@@ -27,4 +29,5 @@
                json_query('[].type') |
                zip(_access_identity_providers_info_list))) |
           d({}) }}"
+  no_log: "{{ access_identity_providers_info_no_log }}"
 ...

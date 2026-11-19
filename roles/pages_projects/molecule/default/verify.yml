@@ -1,14 +1,20 @@
 ---
 - name: Verify
   hosts: all
-
-  pre_tasks:
-    - name: Ensure inventory lists are formatted
-      ansible.builtin.set_fact:
-        pages_projects_list:
-          "{{ pages_projects_list |
-              map('combine', {'state': 'absent'}) }}"
-
   roles:
-    - pages_projects
+    - role: pages_projects_info
+      pages_projects_info_account_id: "{{ pages_projects_account_id }}"
+      pages_projects_info_api_token: "{{ pages_projects_api_token }}"
+
+  post_tasks:
+    - name: Ensure pages projects are verified
+      ansible.builtin.assert:
+        that:
+          - _pages_projects_info_dict[_pages_project.name].id is defined
+          - _pages_projects_info_dict[_pages_project.name].production_branch ==
+              _pages_project.production_branch
+      loop: "{{ pages_projects_list }}"
+      loop_control:
+        label: "{{ _pages_project.name | d(none) }}"
+        loop_var: _pages_project
 ...

@@ -1,0 +1,13 @@
+---
+- name: Cleanup
+  hosts: all
+  pre_tasks:
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        pages_projects_list:
+          "{{ pages_projects_list |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - pages_projects
+...

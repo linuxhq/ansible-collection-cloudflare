@@ -22,19 +22,4 @@
       loop_control:
         label: "{{ _item | d(none) }}"
         loop_var: _item
-
-    - name: Ensure inventory lists are formatted
-      ansible.builtin.set_fact:
-        warp_connector_list:
-          "{{ warp_connector_list |
-              map('combine', {'state': 'absent'}) }}"
-
-    - name: Ensure roles are included
-      ansible.builtin.include_role:
-        name: "{{ _role }}"
-      loop:
-        - warp_connector
-      loop_control:
-        label: "{{ _role | d(none) }}"
-        loop_var: _role
 ...

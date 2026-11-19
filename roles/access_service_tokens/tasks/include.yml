@@ -22,6 +22,7 @@
   changed_when:
     - ansible_check_mode | bool
     - __access_service_tokens_result.changed | bool
+  no_log: "{{ access_service_tokens_no_log }}"
 
 - name: Ensure managed cloudflare access service token jobs are complete
   tags:
@@ -39,6 +40,7 @@
     - __access_service_tokens_status.finished | bool
   retries: "{{ access_service_tokens_retries }}"
   delay: "{{ access_service_tokens_delay }}"
+  no_log: "{{ access_service_tokens_no_log }}"
 
 - name: Ensure cloudflare access service tokens are displayed
   tags:
@@ -51,4 +53,5 @@
          to_nice_yaml(indent=2) }}
   when:
     - access_service_tokens_display | bool
+  no_log: "{{ access_service_tokens_no_log }}"
 ...
