@@ -58,6 +58,7 @@ options:
       - A field set to null, at any level, is not sent and counts as omitted.
       - URL values are matched as Cloudflare stores them, with the host in
         lowercase and a slash after a bare host, before any trailing wildcard.
+        A bare host followed by a query gets no slash.
   priority:
     type: int
     description:
@@ -267,7 +268,8 @@ def canonical_url(value):
 
     Cloudflare lowercases the host and adds a slash after a bare host, before
     a trailing wildcard, so example.com* becomes example.com/*; the scheme and
-    path keep their case.
+    path keep their case. A bare host followed by a query or fragment is only
+    lowercased, so Example.com?a=B becomes example.com?a=B.
     """
     scheme, separator, rest = value.partition("://")
     if not separator or any(character in scheme for character in "/?#"):
@@ -277,8 +279,9 @@ def canonical_url(value):
 
     host, slash, path = rest.partition("/")
     if "?" in host or "#" in host:
-        # Leave a query or fragment without a path exactly as requested.
-        return value
+        # Lowercase only the host before the query or fragment; add no slash.
+        end = min(index for index in (rest.find("?"), rest.find("#")) if index >= 0)
+        return f"{scheme}{separator}{rest[:end].lower()}{rest[end:]}"
 
     if not slash and host.endswith("*"):
         host, path = host[:-1], "*"

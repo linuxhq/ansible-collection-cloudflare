@@ -374,6 +374,9 @@ class PageRulesTests(TestCase):
             ("Example.com/to/https://Other.COM/Path", "example.com/to/https://Other.COM/Path"),
             ("https://example.com?Token=ABC", "https://example.com?Token=ABC"),
             ("example.com?u=https://Other.example", "example.com?u=https://Other.example"),
+            ("Example.COM?A=B", "example.com?A=B"),
+            ("HTTPS://Example.COM?A=B", "HTTPS://example.com?A=B"),
+            ("Example.COM?u=https://Other.example/Path", "example.com?u=https://Other.example/Path"),
         )
         for requested, stored in cases:
             with self.subTest(requested=requested):
@@ -408,6 +411,23 @@ class PageRulesTests(TestCase):
 
         self.assertEqual(api.create.call_args.kwargs["targets"][0]["constraint"]["value"], value)
         self.assertTrue(result["changed"])
+
+    def test_creates_rule_with_lowercase_host_before_query(self):
+        cases = (
+            ("Example.COM?A=B", "example.com?A=B"),
+            ("HTTPS://Example.COM?A=B", "HTTPS://example.com?A=B"),
+        )
+        for requested, stored in cases:
+            with self.subTest(requested=requested):
+                stored_targets = [{"target": "url", "constraint": {"operator": "matches", "value": stored}}]
+                targets = [{"target": "url", "constraint": {"operator": "matches", "value": requested}}]
+                created = {"id": "rule", "actions": ACTIONS, "status": "active", "targets": stored_targets}
+                client, api = client_with(created=created)
+
+                result = self.run_module(FakeModule(params(targets=targets)), client)
+
+                self.assertEqual(api.create.call_args.kwargs["targets"], stored_targets)
+                self.assertTrue(result["changed"])
 
     def test_action_order_is_not_significant(self):
         actions = [{"id": "ssl", "value": "full"}, {"id": "browser_check", "value": "on"}]
