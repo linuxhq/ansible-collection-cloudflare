@@ -113,7 +113,10 @@ ORIGIN_DEFAULTS = {
 ORIGIN_FIELDS = {
     **dict.fromkeys(ORIGIN_DEFAULTS),
     "access": {"audTag": None, "teamName": None, "required": None},
+    "ipRules": [{"prefix": None, "ports": None, "allow": None}],
 }
+# cloudflared treats an omitted allow as false and omitted or empty ports as all ports.
+IP_RULE_DEFAULTS = {"allow": False, "ports": []}
 CONFIG_FIELDS = {
     "ingress": [{"hostname": None, "service": None, "path": None, "originRequest": ORIGIN_FIELDS}],
     "originRequest": ORIGIN_FIELDS,
@@ -142,6 +145,24 @@ def managed_config_fields(current, desired, fields):
     return normalize_current_by_desired_fields(current, desired)
 
 
+def normalize_ip_rules(rules):
+    if not isinstance(rules, list):
+        return rules
+
+    return [
+        (
+            {
+                key: value
+                for key, value in rule.items()
+                if not (key in IP_RULE_DEFAULTS and values_equal(value, IP_RULE_DEFAULTS[key]))
+            }
+            if isinstance(rule, dict)
+            else rule
+        )
+        for rule in rules
+    ]
+
+
 def normalize_origin(origin, defaults):
     if not isinstance(origin, dict):
         return origin
@@ -153,8 +174,13 @@ def normalize_origin(origin, defaults):
             if not value:
                 continue
 
-        # cloudflared treats empty ipRules as unset, so an ingress rule inherits the global rules.
-        elif (key in defaults and values_equal(value, defaults[key])) or (key == "ipRules" and value == []):
+        elif key == "ipRules" and key in defaults:
+            value = normalize_ip_rules(value)
+            # cloudflared treats empty ipRules as unset, so an ingress rule inherits the global rules.
+            if value == [] or values_equal(value, normalize_ip_rules(defaults[key])):
+                continue
+
+        elif key in defaults and values_equal(value, defaults[key]):
             continue
 
         normalized[key] = value
