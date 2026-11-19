@@ -177,10 +177,12 @@ class CfdTunnelConfigurationsTests(TestCase):
         for current in (
             {"config": {"originRequest": {"ipRules": rules}, "ingress": ingress}},
             {"config": {"ingress": ingress}},
+            {"config": {**config, "originRequest": {"ipRules": rules}}},
         ):
             with self.subTest(current=current):
                 raised, api = self.run_module(module_for(config), current, {"config": config})
 
+                self.assertIsInstance(raised, ModuleExit)
                 self.assertTrue(raised.values["changed"])
                 api.update.assert_called_once_with("tunnel", account_id="account", config=config)
 
