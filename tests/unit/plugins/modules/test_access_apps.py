@@ -722,6 +722,36 @@ class AccessAppsTests(TestCase):
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
 
+    def test_inline_policy_ip_selectors_are_sent_and_compared_as_stored(self):
+        # Cloudflare stores an ip selector as its canonical network.
+        requested = {
+            "name": "inline",
+            "decision": "allow",
+            "include": [{"ip": {"ip": "192.0.2.1"}}, {"ip": {"ip": "2001:DB8:0:0::1"}}],
+            "require": [{"ip": {"ip": "198.51.100.7/24"}}],
+        }
+        sent = {
+            "name": "inline",
+            "decision": "allow",
+            "include": [{"ip": {"ip": "192.0.2.1/32"}}, {"ip": {"ip": "2001:db8::1/128"}}],
+            "require": [{"ip": {"ip": "198.51.100.0/24"}}],
+        }
+        app = stored(policies=[{"id": "a", "precedence": 1, **sent, "exclude": []}])
+        client, api = client_with(created=app)
+
+        result = self.run_module(FakeModule(params(policies=[requested])), client)
+
+        self.assertNotIn("msg", result)
+        self.assertTrue(result["changed"])
+        self.assertEqual(api.create.call_args.kwargs["policies"], [sent])
+
+        client, api = client_with([app])
+        result = self.run_module(FakeModule(params(policies=[requested])), client)
+
+        self.assertNotIn("msg", result)
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_null_cors_header_and_inline_policy_fields_count_as_omitted(self):
         cors = {"allowed_methods": ["GET"], "allowed_origins": ["https://a.example.com"]}
         null_cors = dict.fromkeys(

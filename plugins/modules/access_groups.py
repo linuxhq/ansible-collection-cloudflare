@@ -30,6 +30,12 @@ description:
     fails before any change; omit the field instead.
   - A field of a selector's configuration set to null, at any level, is not
     sent and counts as omitted.
+  - The C(ip) of an C(ip) selector that is a valid IP address or CIDR is sent
+    as the network Cloudflare stores, such as V(192.0.2.1/32) for
+    V(192.0.2.1), V(2001:db8::1/128) for V(2001:DB8:0:0::1), and
+    V(192.0.2.0/24) for V(192.0.2.1/24). An IPv4-mapped IPv6 address, such
+    as V(::ffff:192.0.2.1), is sent as written; Cloudflare rewrites it, so
+    the module fails after the write and the stored form must be requested.
 version_added: '2.0.0'
 author:
   - Taylor Kimball (@tkimball83)
@@ -125,7 +131,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     ACCESS_SELECTOR_FIELDS,
-    access_rules_without_nulls,
+    access_rules_payload,
     cloudflare_client,
     cloudflare_error_context,
     comparable_access_rules,
@@ -182,8 +188,8 @@ def run(module, client):
         "access_group",
         "Access group",
         current,
-        # A null selector field counts as omitted, so it is not sent.
-        access_rules_without_nulls(payload_from_params(params, FIELDS)),
+        # A null selector field counts as omitted, so it is not sent; an ip selector is sent as stored.
+        access_rules_payload(payload_from_params(params, FIELDS)),
         create=lambda payload: without_retries(client).zero_trust.access.groups.create(
             account_id=account_id, **payload
         ),

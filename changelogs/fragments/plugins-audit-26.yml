@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - access_groups, access_policies, access_apps - send the C(ip) of an C(ip) Access selector, including one in an
+    access_apps inline policy, as the network Cloudflare stores, such as C(192.0.2.1/32) for C(192.0.2.1),
+    C(2001:db8::1/128) for C(2001:DB8:0:0::1), and C(192.0.2.0/24) for C(192.0.2.1/24). The module sent and compared
+    the value as written, so such a selector wrote the resource on every run and then failed because Cloudflare did
+    not apply it.

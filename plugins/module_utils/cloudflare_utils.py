@@ -8,7 +8,7 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from ipaddress import ip_address
+from ipaddress import ip_address, ip_network
 from urllib.parse import quote
 
 from ansible.module_utils.basic import missing_required_lib
@@ -758,29 +758,61 @@ def comparable_access_rules(rules, desired):
     return comparable
 
 
-def selectors_without_nulls(selectors):
-    """Return the selectors with null keys removed from each selector's configuration.
+def canonical_network(value):
+    """Return an IP address or CIDR as the network Cloudflare stores for an Access ip selector.
+
+    Cloudflare trims surrounding whitespace, adds a full-length prefix to a
+    bare address, compresses and lowercases IPv6, and clears host bits, so
+    192.0.2.1/24 is stored as 192.0.2.0/24. Other values, including netmask
+    prefixes and scoped IPv6 addresses, which Cloudflare rejects, and
+    IPv4-mapped IPv6 addresses, which it rewrites, are returned unchanged.
+    """
+    if not isinstance(value, str):
+        return value
+
+    address, slash, prefix = value.strip().partition("/")
+    if "%" in address or (slash and not (prefix.isascii() and prefix.isdigit())):
+        return value
+
+    # Cloudflare rejects an IPv4 octet with a leading zero, which Python before 3.9.5 accepts.
+    ipv4 = address.rsplit(":", 1)[-1]
+    if "." in ipv4 and any(len(octet) > 1 and octet.startswith("0") for octet in ipv4.split(".")):
+        return value
+
+    try:
+        if getattr(ip_address(address), "ipv4_mapped", None) is not None:
+            return value
+
+        return str(ip_network(value.strip(), strict=False))
+    except ValueError:
+        return value
+
+
+def selector_payload(selector):
+    """Return the selector with null keys removed from its configuration and its ip in canonical form.
 
     A selector set to null keeps its key, so Cloudflare receives the selector
     the entry names.
     """
-    if not isinstance(selectors, list):
-        return selectors
+    if not isinstance(selector, dict):
+        return selector
 
-    return [
-        (
-            {key: without_nested_nulls(config) for key, config in selector.items()}
-            if isinstance(selector, dict)
-            else selector
-        )
-        for selector in selectors
-    ]
+    payload = {key: without_nested_nulls(config) for key, config in selector.items()}
+    config = payload.get("ip")
+    if isinstance(config, dict) and "ip" in config:
+        payload["ip"] = {**config, "ip": canonical_network(config["ip"])}
+
+    return payload
 
 
-def access_rules_without_nulls(rules):
-    """Return rules with null keys removed from the configuration of each selector in ACCESS_SELECTOR_FIELDS."""
+def access_rules_payload(rules):
+    """Return rules with each selector in ACCESS_SELECTOR_FIELDS as selector_payload sends it."""
     return {
-        field: selectors_without_nulls(value) if field in ACCESS_SELECTOR_FIELDS else value
+        field: (
+            [selector_payload(selector) for selector in value]
+            if field in ACCESS_SELECTOR_FIELDS and isinstance(value, list)
+            else value
+        )
         for field, value in rules.items()
     }
 

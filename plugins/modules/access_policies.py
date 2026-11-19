@@ -30,6 +30,12 @@ description:
     fails before any change; omit the field instead.
   - A field of a selector's configuration set to null, at any level, is not
     sent and counts as omitted.
+  - The C(ip) of an C(ip) selector that is a valid IP address or CIDR is sent
+    as the network Cloudflare stores, such as V(192.0.2.1/32) for
+    V(192.0.2.1), V(2001:db8::1/128) for V(2001:DB8:0:0::1), and
+    V(192.0.2.0/24) for V(192.0.2.1/24). An IPv4-mapped IPv6 address, such
+    as V(::ffff:192.0.2.1), is sent as written; Cloudflare rewrites it, so
+    the module fails after the write and the stored form must be requested.
   - Settings this module does not manage, such as C(session_duration), are
     preserved on an existing policy.
 version_added: '2.0.0'
@@ -171,7 +177,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     ACCESS_APPROVAL_GROUP_FIELDS,
     ACCESS_SELECTOR_FIELDS,
-    access_rules_without_nulls,
+    access_rules_payload,
     cloudflare_client,
     cloudflare_error_context,
     comparable_access_rules,
@@ -280,8 +286,9 @@ def run(module, client):
             context={"account_id": account_id},
         )
 
-    # A null selector or approval group field counts as omitted, so it is not sent.
-    payload = access_rules_without_nulls(payload_from_params(params, FIELDS))
+    # A null selector or approval group field counts as omitted, so it is not sent;
+    # an ip selector is sent as stored.
+    payload = access_rules_payload(payload_from_params(params, FIELDS))
     if "approval_groups" in payload:
         payload["approval_groups"] = without_nested_nulls(payload["approval_groups"])
 

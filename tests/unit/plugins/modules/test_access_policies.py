@@ -226,6 +226,25 @@ class AccessPoliciesTests(TestCase):
         self.assertEqual(api.update.call_args.kwargs["policy_resolution_account_id"], "trusted")
         self.assertTrue(result["changed"])
 
+    def test_ip_selectors_are_sent_and_compared_as_stored(self):
+        # Cloudflare stores an ip selector as its canonical network.
+        requested = [{"ip": {"ip": "192.0.2.1"}}, {"ip": {"ip": "2001:DB8:0:0::1/128"}}, {"ip": {"ip": "192.0.2.1/24"}}]
+        sent = [{"ip": {"ip": "192.0.2.1/32"}}, {"ip": {"ip": "2001:db8::1/128"}}, {"ip": {"ip": "192.0.2.0/24"}}]
+        client, api = client_with(created=policy(include=sent))
+
+        result = self.run_module(FakeModule(params(include=requested)), client)
+
+        api.create.assert_called_once_with(account_id="account", decision="allow", include=sent, name="admins")
+        self.assertNotIn("msg", result)
+        self.assertTrue(result["changed"])
+
+        client, api = client_with([policy(include=sent)])
+
+        result = self.run_module(FakeModule(params(include=requested)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_equivalent_policy_is_unchanged(self):
         client, api = client_with([policy(purpose_justification_required=False)])
 
