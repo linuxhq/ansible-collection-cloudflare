@@ -10,7 +10,7 @@ import httpx
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudflare_utils
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
-    access_rules_without_nulls,
+    access_rules_payload,
     applied_differences,
     cloudflare_client,
     cloudflare_error_context,
@@ -782,7 +782,7 @@ class ValueTests(TestCase):
         self.assertEqual(without_nested_nulls(value), {"b": [{"d": 1}, None], "e": {"f": {}}})
         self.assertEqual(value["b"][0], {"c": None, "d": 1})
 
-    def test_access_rules_without_nulls_keeps_null_selectors(self):
+    def test_access_rules_payload_keeps_null_selectors(self):
         # A selector set to null keeps its key, so Cloudflare rejects it rather
         # than dropping the empty selector.
         rules = {
@@ -792,9 +792,45 @@ class ValueTests(TestCase):
         }
 
         self.assertEqual(
-            access_rules_without_nulls(rules),
+            access_rules_payload(rules),
             {"include": [{"email": {"email": "a@example.com"}}, {"email": None}], "exclude": None, "name": "admins"},
         )
+
+    def test_access_rules_payload_sends_ip_selectors_as_stored(self):
+        # Cloudflare stores an ip selector as its canonical network; other values are left for it to reject.
+        for requested, sent in (
+            ("192.0.2.1", "192.0.2.1/32"),
+            ("2001:db8::1", "2001:db8::1/128"),
+            ("2001:DB8:0:0::1", "2001:db8::1/128"),
+            ("2001:DB8:0:0::1/128", "2001:db8::1/128"),
+            ("192.0.2.1/24", "192.0.2.0/24"),
+            ("192.0.2.0/24", "192.0.2.0/24"),
+            ("192.0.2.0/024", "192.0.2.0/24"),
+            (" 192.0.2.1 ", "192.0.2.1/32"),
+            ("64:ff9b::192.0.2.1", "64:ff9b::c000:201/128"),
+            ("not an ip", "not an ip"),
+            ("192.0.2.1/33", "192.0.2.1/33"),
+            ("192.0.2.1/255.255.255.0", "192.0.2.1/255.255.255.0"),
+            ("fe80::1234%en0/64", "fe80::1234%en0/64"),
+            ("::ffff:192.0.2.1", "::ffff:192.0.2.1"),
+            ("::ffff:c000:201/128", "::ffff:c000:201/128"),
+            ("::ffff:192.0.2.1/95", "::ffff:192.0.2.1/95"),
+            ("192.0.002.1", "192.0.002.1"),
+            ("192.0.2.01/32", "192.0.2.01/32"),
+            ("64:ff9b::192.0.2.01", "64:ff9b::192.0.2.01"),
+            ("2001:db8::0001", "2001:db8::1/128"),
+            ("192.0.2.0/32", "192.0.2.0/32"),
+            (5, 5),
+        ):
+            with self.subTest(requested=requested):
+                rules = {"include": [{"ip": {"ip": requested}}], "require": [{"ip": {"ip": requested, "x": None}}]}
+
+                self.assertEqual(
+                    access_rules_payload(rules),
+                    {"include": [{"ip": {"ip": sent}}], "require": [{"ip": {"ip": sent}}]},
+                )
+
+        self.assertEqual(access_rules_payload({"include": [{"ip": None}]}), {"include": [{"ip": None}]})
 
     def test_zone_missing_matches_deleted_zone_answers(self):
         invalid = {"success": False, "errors": [{"code": 1001, "message": "Invalid zone identifier"}]}

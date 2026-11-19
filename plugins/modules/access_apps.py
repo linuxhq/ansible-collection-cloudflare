@@ -185,6 +185,13 @@ options:
         including a nested field of C(approval_groups), C(connection_rules),
         C(connection_rules.rdp), C(mfa_config), or a C(include), C(exclude),
         or C(require) selector.
+      - The C(ip) of an inline policy C(ip) selector that is a valid IP
+        address or CIDR is sent as the network Cloudflare stores, such as
+        V(192.0.2.1/32) for V(192.0.2.1) and V(192.0.2.0/24) for
+        V(192.0.2.1/24). An IPv4-mapped IPv6 address, such as
+        V(::ffff:192.0.2.1), is sent as written; Cloudflare rewrites it, so
+        the module fails after the write and the stored form must be
+        requested.
       - Each entry accepts only the fields of a reusable policy link, C(id)
         and C(precedence), or of an inline policy, such as
         C(name), C(decision), C(include), C(exclude), C(require), and
@@ -367,7 +374,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     ACCESS_APPROVAL_GROUP_FIELDS,
     ACCESS_SELECTOR_FIELDS,
-    access_rules_without_nulls,
+    access_rules_payload,
     cidr_from_address,
     cloudflare_client,
     cloudflare_error_context,
@@ -731,13 +738,13 @@ def without_nulls(value):
 
 
 def policy_without_nulls(policy):
-    """Return the policy entry without null fields, including those in its nested mappings."""
+    """Return the policy entry without null fields, including those in its nested mappings, and ip selectors as stored."""
     policy = without_nulls(policy)
     for field in ("approval_groups", "connection_rules", "mfa_config"):
         if field in policy:
             policy[field] = without_nested_nulls(policy[field])
 
-    return access_rules_without_nulls(policy)
+    return access_rules_payload(policy)
 
 
 def policy_link(policy):

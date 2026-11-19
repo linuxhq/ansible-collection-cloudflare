@@ -301,8 +301,8 @@ class AccessGroupsTests(TestCase):
         self.assertEqual(result["access_group"], created)
 
     def test_rewritten_selector_names_requested_and_stored_values(self):
-        include = [{"ip": {"ip": "192.0.2.1"}}]
-        stored = [{"ip": {"ip": "192.0.2.1/32"}}]
+        include = [{"email": {"email": "admin@example.com"}}]
+        stored = [{"email": {"email": "other@example.com"}}]
         client, _ignored = client_with(created={"id": "group", "name": "admins", "include": stored})
 
         result = self.run_module(FakeModule(params(include=include)), client)
@@ -310,7 +310,8 @@ class AccessGroupsTests(TestCase):
         self.assertEqual(
             result["msg"],
             "Cloudflare did not apply the requested Access group: "
-            'include requested [{"ip": {"ip": "192.0.2.1"}}], stored [{"ip": {"ip": "192.0.2.1/32"}}]',
+            'include requested [{"email": {"email": "admin@example.com"}}], '
+            'stored [{"email": {"email": "other@example.com"}}]',
         )
         self.assertEqual(result["differences"], [{"field": "include", "requested": include, "stored": stored}])
 
@@ -433,6 +434,37 @@ class AccessGroupsTests(TestCase):
     def test_null_selector_field_matches_stored_selector(self):
         stored = [{"github-organization": {"name": "org", "identity_provider_id": "idp"}}]
         requested = [{"github-organization": {"name": "org", "identity_provider_id": "idp", "team": None}}]
+        client, api = client_with([{"id": "group", "name": "admins", "include": stored}])
+
+        result = self.run_module(FakeModule(params(include=requested)), client)
+
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_ip_selectors_are_sent_and_compared_as_stored(self):
+        # Cloudflare stores an ip selector as its canonical network.
+        requested = [
+            {"ip": {"ip": "192.0.2.1"}},
+            {"ip": {"ip": "2001:db8::1"}},
+            {"ip": {"ip": "2001:DB8:0:0::1/128"}},
+            {"ip": {"ip": "198.51.100.7/24"}},
+            {"ip": {"ip": "not an ip"}},
+        ]
+        stored = [
+            {"ip": {"ip": "192.0.2.1/32"}},
+            {"ip": {"ip": "2001:db8::1/128"}},
+            {"ip": {"ip": "2001:db8::1/128"}},
+            {"ip": {"ip": "198.51.100.0/24"}},
+            {"ip": {"ip": "not an ip"}},
+        ]
+        client, api = client_with(created={"id": "group", "name": "admins", "include": stored})
+
+        result = self.run_module(FakeModule(params(include=requested)), client)
+
+        api.create.assert_called_once_with(account_id="account", include=stored, name="admins")
+        self.assertTrue(result["changed"])
+        self.assertNotIn("msg", result)
+
         client, api = client_with([{"id": "group", "name": "admins", "include": stored}])
 
         result = self.run_module(FakeModule(params(include=requested)), client)
