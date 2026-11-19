@@ -378,6 +378,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     matching_resources,
     normalize_current_by_desired_fields,
     payload_from_params,
+    select_fields,
     serialize_resource,
     unsupported_fields,
     validate_access_selectors,
@@ -902,6 +903,8 @@ def run(module, client):
         # updated_at, so stored policies are kept as links, which change none.
         payload["policies"] = [policy_link(policy) for policy in current["policies"]]
 
+    # Omitted settings are sent from the stored app, so they are compared as sent.
+    sent = {**select_fields(current, preserved_fields), **payload}
     ensure_resource_present(
         module,
         "access_app",
@@ -921,7 +924,7 @@ def run(module, client):
         exact_values=("cors_headers", "destinations", "policies"),
         context={"account_id": account_id},
         comparable=lambda app, failure: comparable_app(
-            app, params.get("allowed_idps"), payload.get("policies"), payload.get("cors_headers")
+            app, sent.get("allowed_idps"), sent.get("policies"), sent.get("cors_headers")
         ),
     )
 
