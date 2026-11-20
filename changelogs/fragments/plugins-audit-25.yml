@@ -1,8 +1,0 @@
----
-bugfixes:
-  - access_apps - compare the O(cors_headers) C(allowed_headers), C(allowed_methods), and C(allowed_origins) lists
-    without regard to duplicate values. Cloudflare drops duplicates, so a list with a repeated value wrote the
-    application on every run and then failed because Cloudflare did not apply it.
-  - rulesets - reject a C(skip) rule C(action_parameters.phases), C(products), C(rules), or C(rulesets) value that is
-    empty once its null keys are dropped, such as C(rules) with only null entries, before any request. The module sent
-    it empty and Cloudflare dropped it, so the run wrote the ruleset and then failed on every run.

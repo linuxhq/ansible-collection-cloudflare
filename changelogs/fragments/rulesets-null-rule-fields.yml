@@ -1,5 +1,0 @@
----
-bugfixes:
-  - rulesets - treat a null rule field, such as C(enabled), C(logging) or C(ref), as omitted. The module compared the
-    stored value with the null, so it wrote the rules and then failed because Cloudflare did not apply the requested
-    ruleset, on every run.

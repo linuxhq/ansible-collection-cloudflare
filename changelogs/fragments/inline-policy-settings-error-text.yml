@@ -1,9 +1,0 @@
----
-bugfixes:
-  - access_apps - an inline policy entry is now compared as the policy's complete definition. Cloudflare replaces the
-    inline policy on every application update, so a setting the entry omits, such as C(approval_required),
-    C(purpose_justification_prompt), C(session_duration), or C(mfa_config), is cleared; removing one from the task
-    previously reported no change and left it in place. A key removed from a requested C(mfa_config) now counts as a
-    change too.
-  - all modules - include the text of an error response that is not JSON, such as a gateway error page, as
-    C(response) in the failure; only the status code was reported before.

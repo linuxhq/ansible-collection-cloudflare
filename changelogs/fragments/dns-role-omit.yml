@@ -1,4 +1,0 @@
----
-minor_changes:
-  - dns role - omit C(proxied), C(ttl), and C(timeout) when a record or zone does not set them, so the
-    community.general.cloudflare_dns defaults apply instead of copies of them in the role.

@@ -1,5 +1,0 @@
----
-minor_changes:
-  - access_identity_providers_info, access_service_tokens, cfd_tunnel_info, warp_connector_info - add a ``<role>_no_log``
-    variable, defaulting to ``false``, that sets ``no_log`` on the role's tasks to keep secrets out of output.
-...

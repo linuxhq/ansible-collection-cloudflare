@@ -1,6 +1,0 @@
----
-breaking_changes:
-  - warp_connector - no longer delete a newly created connector when applying O(tunnel_secret) to it fails. The module
-    fails, naming the connector ID in the message and in C(warp_connector_id) and returning the error's status code
-    and response. The connector remains without the requested secret, and later runs report it present because the
-    secret cannot be read, so rerun with O(rotate_secrets=true) to apply it.

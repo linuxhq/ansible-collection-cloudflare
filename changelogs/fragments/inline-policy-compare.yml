@@ -1,9 +1,0 @@
----
-bugfixes:
-  - access_apps - compare C(include), C(exclude), and C(require) of an inline policy in O(policies) exactly. A selector
-    key or a whole selector list removed from an inline policy reported no change and was never applied. An omitted
-    or null selector list matches an empty one, and a null one is not sent; links to reusable policies are still
-    compared only on the keys they set.
-  - access_groups, access_policies - match the C(id) Cloudflare adds to a C(github-organization) selector against a
-    selector that omits it. A C(github-organization) selector was written on every run and then failed because
-    Cloudflare did not apply it.

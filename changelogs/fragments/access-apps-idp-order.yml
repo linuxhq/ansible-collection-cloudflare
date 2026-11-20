@@ -1,5 +1,0 @@
----
-bugfixes:
-  - access_apps - compare O(allowed_idps) without regard to order. Cloudflare ignores the requested order and stores
-    identity providers in its own order, so any other order wrote the application on every run and then failed
-    because Cloudflare did not apply it.

@@ -1,6 +1,0 @@
----
-bugfixes:
-  - roles - list the API token permissions of every dependency role in the README, such as C(Account Settings) read
-    for C(accounts_info) and C(Zone) read for C(zones_info), alongside the permissions of the role's own module.
-  - pages_projects - document that an unknown O(build_config) key, C(deployment_configs) environment key, or
-    C(limits), C(placement), or binding entry field set to null counts as omitted and is not rejected.
