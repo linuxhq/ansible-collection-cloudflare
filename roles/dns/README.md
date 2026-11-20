@@ -24,12 +24,6 @@ Manage cloudflare dns records
     dns_records: []
     dns_retries: 100
 
-Each `dns_records` item sets a `zone`, an optional `timeout`, and `records`.
-Each record sets `record`, `type`, and `value`, and may set `state` (default
-`present`) and the other `community.general.cloudflare_dns` options, such as
-`proxied`, `ttl`, `comment`, and `tags`. A record without `comment` or `tags`
-has its comment or tags cleared, as `community.general.cloudflare_dns` does.
-
 ## Dependencies
 
 * [cfd\_tunnel\_info](../cfd_tunnel_info)
