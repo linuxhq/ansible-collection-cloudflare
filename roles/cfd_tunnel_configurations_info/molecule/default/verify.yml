@@ -1,6 +1,7 @@
 ---
 - name: Verify
   hosts: all
+
   roles:
     - cfd_tunnel_info
     - cfd_tunnel_configurations_info

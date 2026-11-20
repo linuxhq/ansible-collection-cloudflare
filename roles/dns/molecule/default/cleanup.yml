@@ -1,6 +1,7 @@
 ---
 - name: Cleanup
   hosts: all
+
   pre_tasks:
     - name: Ensure zones are queried
       ansible.builtin.include_role:

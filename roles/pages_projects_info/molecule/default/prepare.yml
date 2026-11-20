@@ -1,6 +1,7 @@
 ---
 - name: Prepare
   hosts: all
+
   roles:
     - pages_projects
 ...

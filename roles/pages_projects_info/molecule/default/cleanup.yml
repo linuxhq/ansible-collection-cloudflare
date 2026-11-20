@@ -1,6 +1,7 @@
 ---
 - name: Cleanup
   hosts: all
+
   pre_tasks:
     - name: Ensure inventory lists are formatted
       ansible.builtin.set_fact:

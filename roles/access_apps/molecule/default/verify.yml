@@ -1,6 +1,7 @@
 ---
 - name: Verify
   hosts: all
+
   roles:
     - role: access_apps_info
       access_apps_info_account_id: "{{ _accounts_info_id }}"
