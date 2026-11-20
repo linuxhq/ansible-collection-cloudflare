@@ -6,8 +6,10 @@ Gather information about cloudflare dnssec settings
 
 ## Requirements
 
-* Cloudflare api `Token` with `Read` permissions to `Zone`
-* Cloudflare api `Token` with `Read` permissions to `DNS`
+| Type | Permission | Value |
+| ---- | ---------- | ----- |
+| Zone | DNS        | Read  |
+| Zone | Zone       | Read  |
 
 ## Role Variables
 

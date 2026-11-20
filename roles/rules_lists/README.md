@@ -6,8 +6,10 @@ Manage cloudflare rules lists
 
 ## Requirements
 
-* Cloudflare api `Token` with `Edit` permissions to `Account Filter Lists`
-* Cloudflare api `Token` with `Read` permissions to `Account Settings`
+| Type    | Permission           | Value |
+| ------- | -------------------- | ----- |
+| Account | Account Filter Lists | Edit  |
+| Account | Account Settings     | Read  |
 
 ## Role Variables
 

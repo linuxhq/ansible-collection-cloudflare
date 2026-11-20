@@ -6,9 +6,11 @@ Manage cloudflare zones
 
 ## Requirements
 
-* Cloudflare api `Token` with `Write` permissions to `Zone`
-* Cloudflare api `Token` with `Write` permissions to `Zone Settings`
-* Cloudflare api `Token` with `Read` permissions to `Account Settings`
+| Type    | Permission       | Value |
+| ------- | ---------------- | ----- |
+| Account | Account Settings | Read  |
+| Zone    | Zone             | Write |
+| Zone    | Zone Settings    | Write |
 
 ## Role Variables
 

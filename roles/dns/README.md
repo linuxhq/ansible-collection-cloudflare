@@ -6,13 +6,15 @@ Manage cloudflare dns records
 
 ## Requirements
 
-* Cloudflare api `Token` with `Write` permissions to `DNS`
-* Cloudflare api `Token` with `Read` permissions to `Zone`
-* Cloudflare api `Token` with `Read` permissions to `Cloudflare Tunnel`
-* Cloudflare api `Token` with `Write` permissions to `Cloudflare Tunnel`
-* Cloudflare api `Token` with `Read` permissions to `Account Settings`
-* Cloudflare api `Token` with `Read` permissions to `Cloudflare One Connector: WARP`
-* Cloudflare api `Token` with `Write` permissions to `Cloudflare One Connectors`
+| Type    | Permission                     | Value |
+| ------- | ------------------------------ | ----- |
+| Account | Account Settings               | Read  |
+| Account | Cloudflare One Connector: WARP | Read  |
+| Account | Cloudflare One Connectors      | Write |
+| Account | Cloudflare Tunnel              | Read  |
+| Account | Cloudflare Tunnel              | Write |
+| Zone    | DNS                            | Write |
+| Zone    | Zone                           | Read  |
 
 ## Role Variables
 

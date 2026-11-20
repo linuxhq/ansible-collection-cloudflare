@@ -6,7 +6,9 @@ Gather information about cloudflare zones
 
 ## Requirements
 
-* Cloudflare api `Token` with `Read` permissions to `Zone`
+| Type | Permission | Value |
+| ---- | ---------- | ----- |
+| Zone | Zone       | Read  |
 
 ## Role Variables
 

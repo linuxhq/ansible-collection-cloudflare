@@ -6,7 +6,9 @@ Gather information about cloudflare accounts
 
 ## Requirements
 
-* Cloudflare api `Token` with `Read` permissions to `Account Settings`
+| Type    | Permission       | Value |
+| ------- | ---------------- | ----- |
+| Account | Account Settings | Read  |
 
 ## Role Variables
 

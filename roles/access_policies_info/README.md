@@ -6,8 +6,10 @@ Gather information about cloudflare access policies
 
 ## Requirements
 
-* Cloudflare api `Token` with `Read` permissions to `Access: Apps and Policies`
-* Cloudflare api `Token` with `Read` permissions to `Account Settings`
+| Type    | Permission                | Value |
+| ------- | ------------------------- | ----- |
+| Account | Access: Apps and Policies | Read  |
+| Account | Account Settings          | Read  |
 
 ## Role Variables
 

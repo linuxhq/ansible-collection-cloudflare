@@ -6,8 +6,10 @@ Gather information about cloudflare pagerules
 
 ## Requirements
 
-* Cloudflare api `Token` with `Read` permissions to `Page Rules`
-* Cloudflare api `Token` with `Read` permissions to `Zone`
+| Type | Permission | Value |
+| ---- | ---------- | ----- |
+| Zone | Page Rules | Read  |
+| Zone | Zone       | Read  |
 
 ## Role Variables
 

@@ -6,8 +6,10 @@ Manage cloudflare access service tokens
 
 ## Requirements
 
-* Cloudflare api `Token` with `Write` permissions to `Access: Service Tokens`
-* Cloudflare api `Token` with `Read` permissions to `Account Settings`
+| Type    | Permission             | Value |
+| ------- | ---------------------- | ----- |
+| Account | Access: Service Tokens | Write |
+| Account | Account Settings       | Read  |
 
 ## Role Variables
 

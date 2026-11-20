@@ -6,8 +6,10 @@ Manage cloudflare zerotrust connectivity settings
 
 ## Requirements
 
-* Cloudflare api `Token` with `Write` permissions to `Zero Trust`
-* Cloudflare api `Token` with `Read` permissions to `Account Settings`
+| Type    | Permission       | Value |
+| ------- | ---------------- | ----- |
+| Account | Account Settings | Read  |
+| Account | Zero Trust       | Write |
 
 ## Role Variables
 
