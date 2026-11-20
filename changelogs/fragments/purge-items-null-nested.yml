@@ -1,5 +1,0 @@
----
-bugfixes:
-  - access_apps - treat a null field of C(cors_headers) or of a C(policies) entry, such as C(allow_credentials) or
-    C(approval_required), as omitted. The module compared the stored default with the null, so it wrote the application
-    and then failed because Cloudflare did not apply the request, on every run.

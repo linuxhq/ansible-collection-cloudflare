@@ -1,5 +1,0 @@
----
-bugfixes:
-  - pagerules - skip the upper O(priority) bound in check mode. Page rules that earlier tasks in the same run would
-    create are not counted, so check mode failed for a batch of new rules with valid priorities. The bound is still
-    checked before any change outside check mode.

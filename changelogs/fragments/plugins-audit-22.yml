@@ -1,5 +1,0 @@
----
-trivial:
-  - rules_lists - document that omitting O(elements) preserves the existing items and an empty list removes every item.
-  - zones - document that an existing zone's O(vanity_name_servers) are only changed when explicitly provided.
-  - README - list the Python and C(cloudflare) SDK versions modules require.

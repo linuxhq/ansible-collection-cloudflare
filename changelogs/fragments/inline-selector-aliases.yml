@@ -1,5 +1,0 @@
----
-bugfixes:
-  - access_apps - fail before any request when an inline policy in O(policies) uses the SDK selector spelling
-    C(github_organization) or C(azure_ad) in C(include), C(exclude), or C(require). The SDK renamed these keys on
-    write, so the application was written on every run and then failed because Cloudflare did not apply it.

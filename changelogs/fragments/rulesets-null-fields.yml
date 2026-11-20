@@ -1,4 +1,0 @@
----
-bugfixes:
-  - rulesets - match a rule's null C(description) or C(action_parameters) with a stored rule that lacks the field.
-    The module wrote the rules and then failed because Cloudflare did not apply the requested ruleset, on every run.

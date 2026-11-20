@@ -1,6 +1,0 @@
----
-bugfixes:
-  - pages_projects - reject unknown fields in C(limits), C(placement), and C(browsers), C(env_vars), C(kv_namespaces),
-    or C(vectorize_bindings) entries under C(deployment_configs) before any request. Cloudflare accepted and dropped
-    them, so the module wrote the project and then failed because Cloudflare did not apply the requested settings, on
-    every run.
