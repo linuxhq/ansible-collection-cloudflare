@@ -6,8 +6,10 @@ Gather information about cloudflare access service tokens
 
 ## Requirements
 
-* Cloudflare api `Token` with `Read` permissions to `Access: Service Tokens`
-* Cloudflare api `Token` with `Read` permissions to `Account Settings`
+| Type    | Permission             | Value |
+| ------- | ---------------------- | ----- |
+| Account | Access: Service Tokens | Read  |
+| Account | Account Settings       | Read  |
 
 ## Role Variables
 

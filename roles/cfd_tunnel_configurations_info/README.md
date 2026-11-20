@@ -6,8 +6,10 @@ Gather information about cloudflare cfd tunnel configurations
 
 ## Requirements
 
-* Cloudflare api `Token` with `Read` permissions to `Cloudflare Tunnel`
-* Cloudflare api `Token` with `Read` permissions to `Account Settings`
+| Type    | Permission        | Value |
+| ------- | ----------------- | ----- |
+| Account | Account Settings  | Read  |
+| Account | Cloudflare Tunnel | Read  |
 
 ## Role Variables
 

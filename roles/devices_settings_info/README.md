@@ -6,8 +6,10 @@ Gather information about cloudflare devices settings
 
 ## Requirements
 
-* Cloudflare api `Token` with `Read` permissions to `Zero Trust`
-* Cloudflare api `Token` with `Read` permissions to `Account Settings`
+| Type    | Permission       | Value |
+| ------- | ---------------- | ----- |
+| Account | Account Settings | Read  |
+| Account | Zero Trust       | Read  |
 
 ## Role Variables
 

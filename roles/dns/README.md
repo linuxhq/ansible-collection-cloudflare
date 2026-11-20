@@ -6,13 +6,15 @@ Manage cloudflare dns records
 
 ## Requirements
 
-* Cloudflare api `Token` with `Write` permissions to `DNS`
-* Cloudflare api `Token` with `Read` permissions to `Zone`
-* Cloudflare api `Token` with `Read` permissions to `Cloudflare Tunnel`
-* Cloudflare api `Token` with `Write` permissions to `Cloudflare Tunnel`
-* Cloudflare api `Token` with `Read` permissions to `Account Settings`
-* Cloudflare api `Token` with `Read` permissions to `Cloudflare One Connector: WARP`
-* Cloudflare api `Token` with `Write` permissions to `Cloudflare One Connectors`
+| Type    | Permission                     | Value |
+| ------- | ------------------------------ | ----- |
+| Account | Account Settings               | Read  |
+| Account | Cloudflare One Connector: WARP | Read  |
+| Account | Cloudflare One Connectors      | Write |
+| Account | Cloudflare Tunnel              | Read  |
+| Account | Cloudflare Tunnel              | Write |
+| Zone    | DNS                            | Write |
+| Zone    | Zone                           | Read  |
 
 ## Role Variables
 
@@ -23,12 +25,6 @@ Manage cloudflare dns records
     dns_poll: 0
     dns_records: []
     dns_retries: 100
-
-Each `dns_records` item sets a `zone`, an optional `timeout`, and `records`.
-Each record sets `record`, `type`, and `value`, and may set `state` (default
-`present`) and the other `community.general.cloudflare_dns` options, such as
-`proxied`, `ttl`, `comment`, and `tags`. A record without `comment` or `tags`
-has its comment or tags cleared, as `community.general.cloudflare_dns` does.
 
 ## Dependencies
 

@@ -6,8 +6,10 @@ Manage cloudflare rulesets
 
 ## Requirements
 
-* Cloudflare api `Token` with `Write` permissions to `Account WAF`
-* Cloudflare api `Token` with `Read` permissions to `Zone`
+| Type    | Permission  | Value |
+| ------- | ----------- | ----- |
+| Account | Account WAF | Write |
+| Zone    | Zone        | Read  |
 
 ## Role Variables
 

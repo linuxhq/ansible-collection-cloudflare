@@ -6,9 +6,11 @@ Manage cloudflare access policies
 
 ## Requirements
 
-* Cloudflare api `Token` with `Write` permissions to `Access: Apps and Policies`
-* Cloudflare api `Token` with `Read` permissions to `Access: Organizations, Identity Providers, and Groups`
-* Cloudflare api `Token` with `Read` permissions to `Account Settings`
+| Type    | Permission                                            | Value |
+| ------- | ----------------------------------------------------- | ----- |
+| Account | Access: Apps and Policies                             | Write |
+| Account | Access: Organizations, Identity Providers, and Groups | Read  |
+| Account | Account Settings                                      | Read  |
 
 ## Role Variables
 

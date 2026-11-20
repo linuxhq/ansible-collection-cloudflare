@@ -6,9 +6,11 @@ Gather information about cloudflare warp connectors
 
 ## Requirements
 
-* Cloudflare api `Token` with `Read` permissions to `Cloudflare One Connector: WARP`
-* Cloudflare api `Token` with `Write` permissions to `Cloudflare One Connectors`
-* Cloudflare api `Token` with `Read` permissions to `Account Settings`
+| Type    | Permission                     | Value |
+| ------- | ------------------------------ | ----- |
+| Account | Account Settings               | Read  |
+| Account | Cloudflare One Connector: WARP | Read  |
+| Account | Cloudflare One Connectors      | Write |
 
 ## Role Variables
 
