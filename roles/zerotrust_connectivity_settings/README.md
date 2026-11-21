@@ -15,8 +15,10 @@ Manage cloudflare zerotrust connectivity settings
 
     zerotrust_connectivity_settings_account_id: null
     zerotrust_connectivity_settings_api_token: null
-    zerotrust_connectivity_settings_icmp_proxy_enabled: false
-    zerotrust_connectivity_settings_offramp_warp_enabled: false
+    zerotrust_connectivity_settings_icmp_proxy_enabled: null
+    zerotrust_connectivity_settings_offramp_warp_enabled: null
+
+A setting left at `null` is not sent, so Cloudflare leaves its current value unchanged.
 
 ## Dependencies
 

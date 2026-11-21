@@ -5,8 +5,10 @@
   linuxhq.cloudflare.zerotrust_connectivity_settings:
     account_id: "{{ zerotrust_connectivity_settings_account_id }}"
     api_token: "{{ zerotrust_connectivity_settings_api_token }}"
-    icmp_proxy_enabled: "{{ zerotrust_connectivity_settings_icmp_proxy_enabled }}"
-    offramp_warp_enabled: "{{ zerotrust_connectivity_settings_offramp_warp_enabled }}"
+    icmp_proxy_enabled:
+      "{{ zerotrust_connectivity_settings_icmp_proxy_enabled | d(omit) }}"
+    offramp_warp_enabled:
+      "{{ zerotrust_connectivity_settings_offramp_warp_enabled | d(omit) }}"
   when:
     - zerotrust_connectivity_settings_account_id is not none
     - zerotrust_connectivity_settings_api_token is not none
