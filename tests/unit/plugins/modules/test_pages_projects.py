@@ -1341,16 +1341,16 @@ class PagesProjectsTests(TestCase):
         api.domains.create.assert_not_called()
         self.assertTrue(result["changed"])
 
-    def test_rejects_malformed_project_domains(self):
-        for domains in ("docs.example.com", [" docs.example.com "]):
-            with self.subTest(domains=domains):
-                client, _ignored = client_with([{**PROJECT, "domains": domains}])
+    def test_project_domains_field_is_not_read(self):
+        # The domain listing holds every custom domain, so the project's domains field is not read.
+        project = {**PROJECT, "domains": "invalid"}
+        client, api = client_with([project, project], created_domain={"name": "new.example.com"})
 
-                result = self.run_module(FakeModule(params(domains=[{"name": "new.example.com"}])), client)
+        result = self.run_module(FakeModule(params(domains=[{"name": "new.example.com"}])), client)
 
-                self.assertEqual(result["msg"], "Cloudflare API returned malformed Pages domain data")
-                self.assertEqual(result["account_id"], "account")
-                self.assertEqual(result["name"], "docs")
+        api.domains.create.assert_called_once()
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["domains"], [{"name": "new.example.com"}])
 
     def test_malformed_domain_listing_names_the_account_and_project(self):
         for page in (None, {"result": "invalid"}):
@@ -1378,8 +1378,8 @@ class PagesProjectsTests(TestCase):
     def test_malformed_domains_of_another_project_name_it(self):
         client, _ignored = client_with(
             [PROJECT],
-            account_projects=[PROJECT, {"name": "other", "domains": "invalid"}],
-            other_domains={"other": []},
+            account_projects=[PROJECT, {"name": "other"}],
+            other_domains={"other": [{"name": None}]},
         )
 
         result = self.run_module(FakeModule(params(domains=[{"name": "new.example.com"}])), client)

@@ -301,7 +301,10 @@ SPECIAL_USE_TLDS = frozenset(("example", "invalid", "local", "localhost", "test"
 
 # Cloudflare accepts other keys in build_config and in a preview or production
 # deployment config but does not store them. These match the cloudflare SDK
-# BuildConfig and DeploymentConfigsPreview/DeploymentConfigsProduction types.
+# BuildConfig and DeploymentConfigsPreview/DeploymentConfigsProduction types,
+# except wrangler_config_hash, which Cloudflare drops on create and update.
+# Cloudflare keeps the current value of these deployment settings, and of an
+# environment variable's type or value, when they are set to null.
 BUILD_SETTINGS = (
     "build_caching",
     "build_command",
@@ -332,7 +335,6 @@ DEPLOYMENT_SETTINGS = (
     "services",
     "usage_model",
     "vectorize_bindings",
-    "wrangler_config_hash",
 )
 # Fields of each entry in the deployment env_vars and binding maps whose other
 # fields Cloudflare drops, and of each deployment setting object, from the
@@ -348,41 +350,6 @@ DEPLOYMENT_OBJECT_FIELDS = {"limits": ("cpu_ms",), "placement": ("mode",)}
 # Cloudflare clears these build settings when they are set to null, but keeps
 # the current value of any other build setting set to null.
 NULLABLE_BUILD_SETTINGS = ("web_analytics_tag", "web_analytics_token")
-# Cloudflare keeps the current value of these deployment settings, and of an
-# environment variable's type or value, when they are set to null.
-NON_NULLABLE_DEPLOYMENT_SETTINGS = (
-    "ai_bindings",
-    "always_use_latest_compatibility_date",
-    "analytics_engine_datasets",
-    "browsers",
-    "build_image_major_version",
-    "compatibility_date",
-    "compatibility_flags",
-    "d1_databases",
-    "durable_object_namespaces",
-    "env_vars",
-    "fail_open",
-    "hyperdrive_bindings",
-    "kv_namespaces",
-    "limits",
-    "mtls_certificates",
-    "placement",
-    "queue_producers",
-    "r2_buckets",
-    "services",
-    "usage_model",
-    "vectorize_bindings",
-)
-
-
-def contains_null(value):
-    if isinstance(value, dict):
-        return any(contains_null(item) for item in value.values())
-
-    if isinstance(value, list):
-        return any(contains_null(item) for item in value)
-
-    return value is None
 
 
 def validate_setting_names(module):
@@ -400,8 +367,7 @@ def validate_setting_names(module):
                 continue
 
             path = f"deployment_configs.{environment}.{key}"
-            # Cloudflare drops wrangler_config_hash on create and update.
-            if key not in DEPLOYMENT_SETTINGS or key == "wrangler_config_hash":
+            if key not in DEPLOYMENT_SETTINGS:
                 unknown.append(path)
 
             if key in DEPLOYMENT_OBJECT_FIELDS:
@@ -424,7 +390,7 @@ def validate_null_settings(module):
     unsupported = [
         f"build_config.{key}"
         for key, value in (params.get("build_config") or {}).items()
-        if key in BUILD_SETTINGS and key not in NULLABLE_BUILD_SETTINGS and contains_null(value)
+        if key in BUILD_SETTINGS and key not in NULLABLE_BUILD_SETTINGS and value is None
     ]
     for environment, config in (params.get("deployment_configs") or {}).items():
         path = f"deployment_configs.{environment}"
@@ -434,9 +400,7 @@ def validate_null_settings(module):
         if not isinstance(config, dict):
             continue
 
-        unsupported.extend(
-            f"{path}.{key}" for key in NON_NULLABLE_DEPLOYMENT_SETTINGS if key in config and config[key] is None
-        )
+        unsupported.extend(f"{path}.{key}" for key in DEPLOYMENT_SETTINGS if key in config and config[key] is None)
         # Variables may be null, which deletes them, but not their type.
         env_vars = config.get("env_vars")
         for name, variable in env_vars.items() if isinstance(env_vars, dict) else ():
@@ -591,27 +555,12 @@ def project_context(module):
     return {"account_id": module.params["account_id"], "name": module.params["name"]}
 
 
-def project_domain_names(module, project, context):
-    """Return the lowercased domain names of project; context adds result fields to a failure."""
-    project_domains = project.get("domains")
-    if project_domains is None:
-        return set()
+def current_domain_names(module, domains, context):
+    """Return the lowercased names of the listed domains; context adds result fields to a failure.
 
-    if not isinstance(project_domains, list):
-        module.fail_json(msg="Cloudflare API returned malformed Pages domain data", **context)
-
-    for name in project_domains:
-        if not isinstance(name, str) or not name.strip() or name != name.strip():
-            module.fail_json(msg="Cloudflare API returned malformed Pages domain data", **context)
-
-    # Domain names are case-insensitive, and Cloudflare stores them lowercased.
-    return {name.lower() for name in project_domains}
-
-
-def current_domain_names(module, project, domains, context):
-    """Return the domain names of project and domains; context adds result fields to a failure."""
-    domain_names = [domain["name"] for domain in resource_list(module, domains, "Pages domain", ("name",), context)]
-    return project_domain_names(module, project, context) | {name.lower() for name in domain_names}
+    Domain names are case-insensitive, and Cloudflare stores them lowercased.
+    """
+    return {domain["name"].lower() for domain in resource_list(module, domains, "Pages domain", ("name",), context)}
 
 
 def valid_ace_label(label):
@@ -701,7 +650,7 @@ def get_project(module, client, written=None):
     params = module.params
     with cloudflare_error_context(
         "Cloudflare API request failed while gathering the Pages project",
-        **{"account_id": params["account_id"], "name": params["name"], **(written or {})},
+        **{**project_context(module), **(written or {})},
     ):
         project = get_or_none(client.pages.projects.get, project_name=params["name"], account_id=params["account_id"])
 
@@ -717,11 +666,11 @@ def list_domains(module, client, project_name, context):
     return list_all_pages(module, client, path, "Pages domain", context)
 
 
-def existing_domain_names(module, client, project):
+def existing_domain_names(module, client):
     context = project_context(module)
     with cloudflare_error_context("Cloudflare API request failed while gathering Pages project domains", **context):
         domains = list_domains(module, client, module.params["name"], context)
-        return current_domain_names(module, project, domains, context)
+        return current_domain_names(module, domains, context)
 
 
 def check_domain_owners(module, client, existing_names, domain_names):
@@ -737,8 +686,7 @@ def check_domain_owners(module, client, existing_names, domain_names):
 
     with cloudflare_error_context(
         "Cloudflare API request failed while gathering Pages projects",
-        account_id=params["account_id"],
-        name=params["name"],
+        **project_context(module),
     ):
         projects = resource_list(
             module,
@@ -765,14 +713,13 @@ def check_domain_owners(module, client, existing_names, domain_names):
         if domains is None:
             continue
 
-        other_domains = current_domain_names(module, other, domains, context)
+        other_domains = current_domain_names(module, domains, context)
 
         for domain_name in requested:
             if domain_name in other_domains:
                 module.fail_json(
                     msg="Pages project domain is already attached to another Pages project",
-                    account_id=params["account_id"],
-                    name=params["name"],
+                    **project_context(module),
                     domain=domain_name,
                     project=other["name"],
                 )
@@ -798,12 +745,11 @@ def update_project(module, client, current, payload, secrets_requested):
 
     with cloudflare_error_context(
         "Cloudflare API request failed while updating the Pages project",
-        account_id=params["account_id"],
-        name=params["name"],
+        **project_context(module),
     ):
         project = client.pages.projects.edit(project_name=params["name"], account_id=params["account_id"], **payload)
 
-    written = {"changed": True, "account_id": params["account_id"], "name": params["name"]}
+    written = {"changed": True, **project_context(module)}
     project = checked_project(module, project, written)
     context = {**written, "pages_project": project}
     require_applied(
@@ -850,7 +796,7 @@ def add_domain(module, client, domain_name, context):
     """Add the domain; context adds result fields to a failure."""
     params = module.params
     query = {"project_name": params["name"], "account_id": params["account_id"]}
-    context = {"account_id": params["account_id"], "name": params["name"], **context, "domain": domain_name}
+    context = {**project_context(module), **context, "domain": domain_name}
     with cloudflare_error_context("Cloudflare API request failed while adding the Pages project domain", **context):
         domain = serialize_resource(
             create_once(
@@ -897,7 +843,7 @@ def ensure_present(module, client, domain_names):
     if created and params.get("production_branch") is None:
         module.fail_json(msg="production_branch is required when creating a Pages project", **project_context(module))
 
-    existing_names = existing_domain_names(module, client, current) if current is not None and domain_names else set()
+    existing_names = existing_domain_names(module, client) if current is not None and domain_names else set()
     check_domain_owners(module, client, existing_names, domain_names)
     if created:
         if module.check_mode:
@@ -905,15 +851,14 @@ def ensure_present(module, client, domain_names):
 
         with cloudflare_error_context(
             "Cloudflare API request failed while creating the Pages project",
-            account_id=params["account_id"],
-            name=params["name"],
+            **project_context(module),
         ):
             current = create_once(
                 lambda: without_retries(client).pages.projects.create(account_id=params["account_id"], **payload),
                 lambda: unique_match(get_project(module, client)),
             )
 
-        written = {"changed": True, "account_id": params["account_id"], "name": params["name"]}
+        written = {"changed": True, **project_context(module)}
         current = checked_project(module, current, written)
         comparable_payload = comparable_pages_payload(payload)
         require_applied(
@@ -929,7 +874,7 @@ def ensure_present(module, client, domain_names):
 
     added_domains = add_domains(module, client, current, existing_names, domain_names, changed) if domain_names else []
     if added_domains:
-        written = {"changed": True, "account_id": params["account_id"], "name": params["name"]}
+        written = {"changed": True, **project_context(module)}
         written_project = current
         # A failed re-read still reports the project this run wrote.
         current = get_project(module, client, {**written, "pages_project": written_project, "domains": added_domains})
@@ -971,8 +916,7 @@ def ensure_absent(module, client):
 
     with cloudflare_error_context(
         "Cloudflare API request failed while deleting the Pages project",
-        account_id=params["account_id"],
-        name=params["name"],
+        **project_context(module),
     ):
         # As in ensure_resource_absent, a 404 status counts as deleted: the SDK
         # retries a delete whose response was lost, and Cloudflare answers the

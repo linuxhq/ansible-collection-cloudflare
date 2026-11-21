@@ -57,7 +57,7 @@ class PagesProjectsInfoTests(TestCase):
         with self.assertRaises(ModuleExit) as raised:
             pages_projects_info.run(module, client)
 
-        client.pages.projects.list.assert_called_once_with(account_id="account", per_page=10)
+        client.pages.projects.list.assert_called_once_with(account_id="account")
         self.assertEqual(raised.exception.values, {"changed": False, "pages_projects": projects})
 
     def test_rejects_projects_without_name(self):
