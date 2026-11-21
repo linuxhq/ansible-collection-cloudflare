@@ -174,11 +174,11 @@ class AccessPoliciesTests(TestCase):
             access_policies.main()
 
         argument_spec = module.call_args.kwargs["argument_spec"]
-        for field in access_policies.FALSE_FIELDS:
+        for field in access_policies.ACCESS_POLICY_FALSE_FIELDS:
             self.assertNotIn("default", argument_spec[field])
 
     def test_update_preserves_omitted_required_flags(self):
-        flags = dict.fromkeys(access_policies.FALSE_FIELDS, True)
+        flags = dict.fromkeys(access_policies.ACCESS_POLICY_FALSE_FIELDS, True)
         client, api = client_with([policy(**flags)], updated=policy(decision="deny", **flags))
 
         result = self.run_module(FakeModule(params(decision="deny")), client)
@@ -194,7 +194,7 @@ class AccessPoliciesTests(TestCase):
         self.assertFalse(result["changed"])
 
     def test_explicit_required_flags_compare_with_cloudflare_defaults(self):
-        flags = dict.fromkeys(access_policies.FALSE_FIELDS, False)
+        flags = dict.fromkeys(access_policies.ACCESS_POLICY_FALSE_FIELDS, False)
         client, api = client_with([policy()])
 
         result = self.run_module(FakeModule(params(**flags)), client)

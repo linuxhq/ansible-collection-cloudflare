@@ -175,7 +175,7 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
-    ACCESS_APPROVAL_GROUP_FIELDS,
+    ACCESS_POLICY_FALSE_FIELDS,
     ACCESS_SELECTOR_FIELDS,
     access_rules_payload,
     cloudflare_client,
@@ -187,7 +187,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     find_resource,
     matching_resources,
     payload_from_params,
-    unsupported_fields,
+    unknown_approval_group_fields,
     validate_access_selectors,
     without_nested_nulls,
     without_retries,
@@ -220,20 +220,10 @@ PRESERVED_FIELDS = (
 # carried over too.
 UNMANAGED_FIELDS = ("connection_rules", "mfa_config", "policy_resolution_account_id", "session_duration")
 
-FALSE_FIELDS = (
-    "approval_required",
-    "isolation_required",
-    "purpose_justification_required",
-)
-
 
 def validate_field_names(module):
     """Fail when an approval group field Cloudflare accepts but never stores, or an empty one, is requested."""
-    unknown = [
-        field
-        for index, group in enumerate(module.params.get("approval_groups") or ())
-        for field in unsupported_fields(group, ACCESS_APPROVAL_GROUP_FIELDS, f"approval_groups[{index}]")
-    ]
+    unknown = unknown_approval_group_fields(module.params.get("approval_groups"), "approval_groups")
     if unknown:
         module.fail_json(
             msg=f"Cloudflare does not store these Access policy fields: {', '.join(unknown)}",
@@ -305,7 +295,11 @@ def run(module, client):
         find_created=lambda: matching_resources(policies.list(account_id=account_id), "name", params["name"]),
         expected_name=params["name"],
         # Cloudflare omits a prompt cleared with "" and approval groups cleared with [].
-        defaults={**dict.fromkeys(FALSE_FIELDS, False), "approval_groups": [], "purpose_justification_prompt": ""},
+        defaults={
+            **dict.fromkeys(ACCESS_POLICY_FALSE_FIELDS, False),
+            "approval_groups": [],
+            "purpose_justification_prompt": "",
+        },
         preserved_fields=PRESERVED_FIELDS + UNMANAGED_FIELDS,
         exact_values=(*ACCESS_SELECTOR_FIELDS, "approval_groups"),
         comparable=lambda resource, failure: comparable_access_rules(resource, params),

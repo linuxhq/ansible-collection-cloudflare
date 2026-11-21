@@ -372,7 +372,7 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
-    ACCESS_APPROVAL_GROUP_FIELDS,
+    ACCESS_POLICY_FALSE_FIELDS,
     ACCESS_SELECTOR_FIELDS,
     access_rules_payload,
     cidr_from_address,
@@ -388,6 +388,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     select_fields,
     serialize_resource,
+    unknown_approval_group_fields,
     unsupported_fields,
     validate_access_selectors,
     without_nested_nulls,
@@ -586,8 +587,7 @@ INLINE_POLICY_SETTINGS = (
 )
 # CORS header lists whose order Cloudflare does not keep.
 CORS_HEADERS_LIST_FIELDS = ("allowed_headers", "allowed_methods", "allowed_origins")
-# Fields Cloudflare drops when they hold an empty value.
-EMPTY_CORS_HEADERS_FIELDS = CORS_HEADERS_LIST_FIELDS
+# Fields Cloudflare drops when they hold an empty value; it drops empty CORS_HEADERS_LIST_FIELDS too.
 EMPTY_DESTINATION_FIELDS = ("hostname", "port_range", "vnet_id")
 EMPTY_POLICY_FIELDS = ("purpose_justification_prompt", "session_duration")
 # Cloudflare omits these fields when they hold their default value.
@@ -595,7 +595,6 @@ CORS_HEADERS_DEFAULTS = {
     **dict.fromkeys(("allow_all_headers", "allow_all_methods", "allow_all_origins", "allow_credentials"), False),
     "max_age": 0,
 }
-POLICY_FALSE_FIELDS = ("approval_required", "isolation_required", "purpose_justification_required")
 
 
 def validate_type_fields(module):
@@ -628,7 +627,7 @@ def validate_policy_order(module):
 
 
 def validate_field_names(module):
-    """Fail when an application field Cloudflare accepts but never stores is requested."""
+    """Fail when a destination has no type, or a field Cloudflare accepts but never stores is requested."""
     params = module.params
     destinations = params.get("destinations") or ()
     untyped = [
@@ -637,17 +636,6 @@ def validate_field_names(module):
     if untyped:
         module.fail_json(
             msg=f"{', '.join(untyped)} must set type; Cloudflare stores a destination without one as type public"
-        )
-
-    empty_overrides = [
-        f"destinations[{index}].overrides"
-        for index, destination in enumerate(destinations)
-        if destination.get("overrides") == []
-    ]
-    if empty_overrides:
-        module.fail_json(
-            msg=f"{', '.join(empty_overrides)} must be omitted instead of an empty list; Cloudflare stores a "
-            "destination with empty overrides without them"
         )
 
     unknown = unsupported_fields(params.get("cors_headers"), CORS_HEADERS_FIELDS, "cors_headers")
@@ -670,10 +658,9 @@ def validate_field_names(module):
                 f"policies[{index}].connection_rules",
             )
         )
-        approval_groups = policy.get("approval_groups")
-        for position, group in enumerate(approval_groups if isinstance(approval_groups, list) else ()):
-            path = f"policies[{index}].approval_groups[{position}]"
-            unknown.extend(unsupported_fields(group, ACCESS_APPROVAL_GROUP_FIELDS, path))
+        unknown.extend(
+            unknown_approval_group_fields(policy.get("approval_groups"), f"policies[{index}].approval_groups")
+        )
 
     if unknown:
         module.fail_json(
@@ -692,7 +679,7 @@ def validate_empty_values(module):
     cors_headers = params.get("cors_headers")
     empty = [
         f"cors_headers.{field}"
-        for field in EMPTY_CORS_HEADERS_FIELDS
+        for field in CORS_HEADERS_LIST_FIELDS
         if isinstance(cors_headers, dict) and cors_headers.get(field) == []
     ]
     destinations = params.get("destinations")
@@ -703,6 +690,8 @@ def validate_empty_values(module):
         empty.extend(
             f"destinations[{index}].{field}" for field in EMPTY_DESTINATION_FIELDS if destination.get(field) == ""
         )
+        if destination.get("overrides") == []:
+            empty.append(f"destinations[{index}].overrides")
 
     if params.get("session_duration") == "":
         empty.append("session_duration")
@@ -732,19 +721,15 @@ def validate_empty_values(module):
         )
 
 
-def without_nulls(value):
-    """Return the mapping value without the keys set to null, which count as omitted."""
-    return {key: item for key, item in value.items() if item is not None}
-
-
 def policy_without_nulls(policy):
     """Return the policy entry without null fields, including those in its nested mappings, and ip selectors as stored."""
-    policy = without_nulls(policy)
-    for field in ("approval_groups", "connection_rules", "mfa_config"):
-        if field in policy:
-            policy[field] = without_nested_nulls(policy[field])
-
-    return access_rules_payload(policy)
+    return access_rules_payload(
+        {
+            field: without_nested_nulls(value) if field in INLINE_POLICY_EXACT_FIELDS else value
+            for field, value in policy.items()
+            if value is not None
+        }
+    )
 
 
 def policy_link(policy):
@@ -763,13 +748,13 @@ def comparable_policy(policy, desired):
     keys and lists count as differences. Its requested INLINE_POLICY_EXACT_FIELDS
     are kept whole too, and its stored INLINE_POLICY_SETTINGS are kept even when
     omitted, as the entry is the policy's complete definition. An omitted
-    selector list matches an empty one, and an omitted POLICY_FALSE_FIELDS field
+    selector list matches an empty one, and an omitted ACCESS_POLICY_FALSE_FIELDS field
     matches false.
     """
     if not isinstance(policy, dict) or not isinstance(desired, dict):
         return policy
 
-    policy = {**dict.fromkeys(POLICY_FALSE_FIELDS, False), **policy}
+    policy = {**dict.fromkeys(ACCESS_POLICY_FALSE_FIELDS, False), **policy}
     comparable = normalize_current_by_desired_fields(policy, desired)
     if "id" in desired and not any(field in desired for field in ACCESS_SELECTOR_FIELDS):
         return comparable
@@ -906,11 +891,11 @@ def run(module, client):
         ]
 
     if "cors_headers" in payload:
-        payload["cors_headers"] = without_nulls(payload["cors_headers"])
+        payload["cors_headers"] = without_nested_nulls(payload["cors_headers"])
 
     if "policies" in payload:
         payload["policies"] = [policy_without_nulls(policy) for policy in payload["policies"]]
-    elif current is not None and "policies" in preserved_fields and isinstance(current.get("policies"), list):
+    elif current is not None and isinstance(current.get("policies"), list):
         # Cloudflare replaces inline policies sent whole, and assigns them a new
         # updated_at, so stored policies are kept as links, which change none.
         payload["policies"] = [policy_link(policy) for policy in current["policies"]]

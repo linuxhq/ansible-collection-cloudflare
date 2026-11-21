@@ -691,8 +691,20 @@ ACCESS_SELECTOR_DROPPED_EMPTY_FIELDS = {
 ACCESS_APPROVAL_GROUP_FIELDS = ("approvals_needed", "email_addresses", "email_list_uuid")
 
 
+# Access policy flags Cloudflare omits when they are false.
+ACCESS_POLICY_FALSE_FIELDS = ("approval_required", "isolation_required", "purpose_justification_required")
+
 # Approval group fields Cloudflare drops when they hold these empty values.
 EMPTY_APPROVAL_GROUP_FIELDS = {"email_addresses": [], "email_list_uuid": ""}
+
+
+def unknown_approval_group_fields(groups, path):
+    """Return the path of each field of the approval groups that ACCESS_APPROVAL_GROUP_FIELDS does not list."""
+    return [
+        field
+        for index, group in enumerate(groups if isinstance(groups, list) else ())
+        for field in unsupported_fields(group, ACCESS_APPROVAL_GROUP_FIELDS, f"{path}[{index}]")
+    ]
 
 
 def empty_approval_group_fields(groups, path):

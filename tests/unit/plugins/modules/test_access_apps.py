@@ -880,11 +880,8 @@ class AccessAppsTests(TestCase):
 
                 result = self.run_module(FakeModule(params(destinations=destinations), check_mode=check_mode), client)
 
-                self.assertEqual(
-                    result["msg"],
-                    "destinations[0].overrides, destinations[2].overrides must be omitted instead of an empty list; "
-                    "Cloudflare stores a destination with empty overrides without them",
-                )
+                self.assertEqual(result["empty_fields"], ["destinations[0].overrides", "destinations[2].overrides"])
+                self.assertIn("Cloudflare does not store an empty value", result["msg"])
                 api.list.assert_not_called()
                 api.create.assert_not_called()
 
