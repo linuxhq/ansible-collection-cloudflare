@@ -29,10 +29,8 @@ options:
   name:
     description:
       - Access application name.
-      - Cloudflare trims surrounding whitespace from the name, so a name with
-        leading or trailing whitespace is not idempotent; each run creates
-        another resource and then fails because Cloudflare returns the
-        trimmed name.
+      - Surrounding whitespace is removed from the name before it is looked up
+        or sent, as Cloudflare trims it.
       - An empty or whitespace-only name fails before any change, because
         Cloudflare does not store it.
     required: true
@@ -832,9 +830,11 @@ def run(module, client):
     params = module.params
     account_id = params["account_id"]
     applications = client.zero_trust.access.applications
+    # Cloudflare trims surrounding whitespace from the name.
+    params["name"] = params["name"].strip()
     if params["state"] == "present":
         # Cloudflare stores an empty name as the app's domain, so the app is never found by name again.
-        if not params["name"].strip():
+        if not params["name"]:
             module.fail_json(msg="name must not be empty or only whitespace")
 
         validate_type_fields(module)

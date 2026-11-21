@@ -1504,11 +1504,29 @@ class AccessAppsTests(TestCase):
         self.assertEqual(result["message"], "Access application created")
         self.assertEqual(result["access_app"], stored())
 
+    def test_padded_name_is_trimmed_before_any_request(self):
+        # Cloudflare trims the name, so the trimmed name is looked up and sent.
+        client, api = client_with(created=stored())
+
+        result = self.run_module(FakeModule(params(name=" app ")), client)
+
+        self.assertEqual(api.list.call_args_list[0].kwargs, {"account_id": "account", "name": "app", "exact": True})
+        self.assertEqual(api.create.call_args.kwargs["name"], "app")
+        self.assertEqual(result["message"], "Access application created")
+
+        client, api = client_with([stored()])
+
+        result = self.run_module(FakeModule(params(name=" app ")), client)
+
+        api.create.assert_not_called()
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_created_app_with_another_name_reports_the_write(self):
-        created = stored()
+        created = stored(name="other")
         client, api = client_with(created=created)
 
-        result = self.run_module(FakeModule(params(name=" app")), client)
+        result = self.run_module(FakeModule(params()), client)
 
         api.create.assert_called_once()
         self.assertEqual(result["msg"], "Cloudflare API returned the wrong Access application")

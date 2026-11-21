@@ -208,11 +208,30 @@ class AccessServiceTokensTests(TestCase):
         api.delete.assert_not_called()
         self.assertTrue(result["changed"])
 
+    def test_padded_name_is_trimmed_before_any_request(self):
+        # Cloudflare trims the name, so the trimmed name is looked up and sent.
+        token = {"id": "token", "name": "automation", "duration": "1y"}
+        client, api = client_with(created=token)
+
+        result = self.run_module(FakeModule(params(name=" automation ")), client)
+
+        self.assertEqual(api.list.call_args_list[0].kwargs, {"account_id": "account", "name": "automation"})
+        api.create.assert_called_once_with(account_id="account", name="automation", duration="1y")
+        self.assertEqual(result["message"], "Service token created")
+
+        client, api = client_with([token])
+
+        result = self.run_module(FakeModule(params(name=" automation ")), client)
+
+        api.create.assert_not_called()
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_created_token_with_another_name_reports_the_write(self):
-        created = {"id": "token", "name": "automation", "duration": "1y", "client_secret": "secret"}
+        created = {"id": "token", "name": "other", "duration": "1y", "client_secret": "secret"}
         client, api = client_with(created=created)
 
-        result = self.run_module(FakeModule(params(name=" automation")), client)
+        result = self.run_module(FakeModule(params()), client)
 
         api.create.assert_called_once()
         self.assertEqual(result["msg"], "Cloudflare API returned the wrong service token")

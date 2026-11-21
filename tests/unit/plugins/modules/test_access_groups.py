@@ -384,12 +384,30 @@ class AccessGroupsTests(TestCase):
         api.delete.assert_called_once_with("group", account_id="account")
         self.assertTrue(result["changed"])
 
+    def test_padded_name_is_trimmed_before_any_request(self):
+        # Cloudflare trims the name, so the trimmed name is looked up and sent.
+        group = {"id": "group", "name": "admins", "include": INCLUDE}
+        client, api = client_with(created=group)
+
+        result = self.run_module(FakeModule(params(name=" admins ")), client)
+
+        self.assertEqual(api.list.call_args_list[0].kwargs, {"account_id": "account", "name": "admins"})
+        self.assertEqual(api.create.call_args.kwargs["name"], "admins")
+        self.assertEqual(result["message"], "Access group created")
+
+        client, api = client_with([group])
+
+        result = self.run_module(FakeModule(params(name=" admins ")), client)
+
+        api.create.assert_not_called()
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_created_group_with_another_name_reports_the_write(self):
-        # Cloudflare strips a padded name, so the created group is not named as requested.
-        created = {"id": "group", "name": "admins", "include": INCLUDE}
+        created = {"id": "group", "name": "other", "include": INCLUDE}
         client, api = client_with(created=created)
 
-        result = self.run_module(FakeModule(params(name=" admins")), client)
+        result = self.run_module(FakeModule(params()), client)
 
         api.create.assert_called_once()
         self.assertEqual(result["msg"], "Cloudflare API returned the wrong Access group")
