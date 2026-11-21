@@ -264,6 +264,21 @@ def require_mapping(module, value, resource_name, context=None):
         module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data", **(context or {}))
 
 
+def require_mapping_list(module, value, resource_name, item_name, context=None):
+    """Return value, failing when it is not a list of mappings; context adds result fields to the failure.
+
+    The failure names resource_name for a value that is not a list, and
+    item_name for an item that is not a mapping.
+    """
+    if not isinstance(value, list):
+        module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data", **(context or {}))
+
+    for item in value:
+        require_mapping(module, item, item_name, context)
+
+    return value
+
+
 def resource_list(module, items, resource_name, required_fields=("id",), context=None):
     """Serialize every item of an SDK list, validating its required fields.
 

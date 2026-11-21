@@ -31,6 +31,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     require_applied,
     require_mapping,
+    require_mapping_list,
     resource_field,
     resource_id,
     resource_list,
@@ -530,6 +531,18 @@ class ValueTests(TestCase):
                 resource_id(module, resource, "resource")
 
             self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed resource data")
+
+    def test_require_mapping_list_names_the_list_or_the_item(self):
+        module = FakeModule({})
+        rules = [{"id": "one"}]
+
+        self.assertIs(require_mapping_list(module, rules, "ruleset", "ruleset rule"), rules)
+        for value, name in ((None, "ruleset"), ({"id": "one"}, "ruleset"), ([{"id": "one"}, "two"], "ruleset rule")):
+            with self.subTest(value=value), self.assertRaises(ModuleFail) as raised:
+                require_mapping_list(module, value, "ruleset", "ruleset rule", context={"zone_id": "zone"})
+
+            self.assertEqual(raised.exception.values["msg"], f"Cloudflare API returned malformed {name} data")
+            self.assertEqual(raised.exception.values["zone_id"], "zone")
 
     def test_lists_and_finds_resources(self):
         module = FakeModule({})
