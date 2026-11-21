@@ -1,0 +1,12 @@
+---
+minor_changes:
+  - cfd_tunnel, warp_connector - drop the ``cfd_tunnel_id`` and ``warp_connector_id`` failure keys, which repeated
+    ``resource_id``.
+  - warp_connector - check the response of the edit that applies ``tunnel_secret`` to a created connector like every
+    other write, reporting ``Cloudflare API returned the wrong WARP Connector`` or malformed data without the separate
+    ``error`` key.
+trivial:
+  - cfd_tunnel, warp_connector - share the check of the resource a write returned with ensure_resource_present.
+  - cfd_tunnel_configurations, cfd_tunnel_configurations_info - drop mapping checks on the configuration Cloudflare
+    returns before a write, which the SDK response model guarantees.
+  - zerotrust_connectivity_settings - add unit tests for omitted settings.

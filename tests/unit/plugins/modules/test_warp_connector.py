@@ -129,29 +129,28 @@ class WarpConnectorTests(TestCase):
         api.delete.assert_not_called()
         self.assertEqual(result["msg"], SECRET_FAILURE)
         self.assertEqual(result["account_id"], "account")
-        self.assertEqual(result["warp_connector_id"], "connector-id")
+        self.assertEqual(result["resource_id"], "connector-id")
         self.assertEqual(result["status_code"], 400)
         self.assertEqual(result["response"], APPLY_BODY)
 
     def test_wrong_secret_response_reports_the_edit_response(self):
-        for edited in ({"id": "wrong", "name": "connector"}, {"id": "connector-id", "name": "other"}, None):
+        cases = (
+            ({"id": "wrong", "name": "connector"}, "Cloudflare API returned the wrong WARP Connector"),
+            ({"id": "connector-id", "name": "other"}, "Cloudflare API returned the wrong WARP Connector"),
+            (None, "Cloudflare API returned malformed WARP Connector data"),
+        )
+        for edited, message in cases:
             with self.subTest(edited=edited):
                 client, api = client_with(created=CREATED, edited=edited)
 
                 result = self.run_module(FakeModule(params(tunnel_secret=SECRET)), client)
 
                 api.delete.assert_not_called()
-                self.assertEqual(
-                    result["msg"],
-                    "Cloudflare API returned the wrong WARP Connector after applying tunnel_secret to the created "
-                    "WARP Connector connector-id",
-                )
+                self.assertEqual(result["msg"], message)
                 self.assertTrue(result["changed"])
                 self.assertEqual(result["warp_connector"], edited)
                 self.assertEqual(result["account_id"], "account")
                 self.assertEqual(result["resource_id"], "connector-id")
-                self.assertEqual(result["warp_connector_id"], "connector-id")
-                self.assertEqual(result["error"], "Cloudflare API returned the wrong WARP Connector")
 
     def test_rejects_non_base64_secret_before_create(self):
         for secret in ("short", "eHh4-eHh4", ""):
@@ -233,7 +232,6 @@ class WarpConnectorTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertEqual(result["warp_connector"], CREATED)
         self.assertEqual(result["resource_id"], "connector-id")
-        self.assertEqual(result["warp_connector_id"], "connector-id")
         self.assertEqual(result["account_id"], "account")
 
     def test_created_connector_with_another_name_reports_the_write(self):

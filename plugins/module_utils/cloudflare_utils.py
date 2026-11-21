@@ -889,6 +889,25 @@ def validate_access_selectors(module, rules=None, prefix=""):
         )
 
 
+def checked_written(module, resource, resource_name, result_key, context, expected_name=None, expected_id=None):
+    """Serialize the resource a create or update returned, failing when it has the wrong id or name.
+
+    A failure reports changed=True, context, the resource under result_key,
+    and its resource_id. Return the resource and that failure context, for
+    later checks of the write.
+    """
+    resource = serialize_resource(resource)
+    failure = {"changed": True, **context, result_key: resource}
+    failure = {
+        "resource_id": resource_id(module, resource, resource_name, expected=expected_id, context=failure),
+        **failure,
+    }
+    if expected_name is not None:
+        resource_field(module, resource, "name", resource_name, expected=expected_name, context=failure)
+
+    return resource, failure
+
+
 def exit_resource_list(module, result_key, items, resource_name, required_fields=("id", "name"), context=None):
     """Exit an info module with the serialized and validated items; context names their owner in failures."""
     module.exit_json(
@@ -975,15 +994,9 @@ def ensure_resource_present(
 
         Every failure reports the write, the resource, and its identifiers.
         """
-        resource = serialize_resource(resource)
-        failure = {"changed": True, **written_context, result_key: resource}
-        failure = {
-            "resource_id": resource_id(module, resource, resource_name, expected=expected_id, context=failure),
-            **failure,
-        }
-        if expected_name is not None:
-            resource_field(module, resource, "name", resource_name, expected=expected_name, context=failure)
-
+        resource, failure = checked_written(
+            module, resource, resource_name, result_key, written_context, expected_name, expected_id
+        )
         require_applied(
             module,
             comparable(resource, failure),

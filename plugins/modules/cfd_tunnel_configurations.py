@@ -273,13 +273,7 @@ def run(module, client):
     ):
         current = serialize_resource(configurations.get(tunnel_id, account_id=params["account_id"])) or {}
 
-    require_mapping(module, current, "tunnel configuration", identifiers)
-    current_config = current.get("config")
-    if current_config is None:
-        current_config = {}
-    else:
-        require_mapping(module, current_config, "tunnel configuration", identifiers)
-
+    current_config = current.get("config") or {}
     if not values_differ(
         comparable_config(current_config, params["config"]),
         comparable_config(params["config"]),

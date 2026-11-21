@@ -95,6 +95,7 @@ from base64 import b64decode
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    checked_written,
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
@@ -103,9 +104,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_absent,
     find_resource,
     matching_resources,
-    resource_field,
     resource_id,
-    serialize_resource,
     without_retries,
 )
 
@@ -139,21 +138,13 @@ def checked_connector(module, connector, expected_id=None):
 
     A failure reports changed=True, the connector, and its identifiers.
     """
-    connector = serialize_resource(connector)
-    failure = {
-        "changed": True,
-        "account_id": module.params["account_id"],
-        "name": module.params["name"],
-        "warp_connector": connector,
-    }
+    context = {"account_id": module.params["account_id"], "name": module.params["name"]}
     if expected_id is not None:
-        failure["resource_id"] = expected_id
+        context["resource_id"] = expected_id
 
-    failure = {
-        "resource_id": resource_id(module, connector, "WARP Connector", expected=expected_id, context=failure),
-        **failure,
-    }
-    resource_field(module, connector, "name", "WARP Connector", expected=module.params["name"], context=failure)
+    connector, _failure = checked_written(
+        module, connector, "WARP Connector", "warp_connector", context, module.params["name"], expected_id
+    )
     return connector
 
 
@@ -166,16 +157,8 @@ def apply_created_secret(module, connectors, created):
     params = module.params
     account_id = params["account_id"]
     connector_id = created["id"]
-    failure = {
-        "changed": True,
-        "account_id": account_id,
-        "resource_id": connector_id,
-        "warp_connector_id": connector_id,
-    }
     try:
-        connector = serialize_resource(
-            connectors.edit(connector_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
-        )
+        connector = connectors.edit(connector_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
     except cloudflare.APIError as exc:
         module.fail_json(
             msg=(
@@ -183,27 +166,14 @@ def apply_created_secret(module, connectors, created):
                 "without the requested secret. Later runs report it present and cannot detect the secret, "
                 "so rerun with rotate_secrets: true to apply it"
             ),
+            changed=True,
+            account_id=account_id,
+            resource_id=connector_id,
             warp_connector=created,
-            **failure,
             **cloudflare_error_details(exc),
         )
 
-    if (
-        not isinstance(connector, dict)
-        or connector.get("id") != connector_id
-        or connector.get("name") != params["name"]
-    ):
-        module.fail_json(
-            msg=(
-                f"Cloudflare API returned the wrong WARP Connector after applying tunnel_secret to the created "
-                f"WARP Connector {connector_id}"
-            ),
-            error="Cloudflare API returned the wrong WARP Connector",
-            warp_connector=connector,
-            **failure,
-        )
-
-    return connector
+    return checked_connector(module, connector, expected_id=connector_id)
 
 
 def ensure_present(module, client, current):

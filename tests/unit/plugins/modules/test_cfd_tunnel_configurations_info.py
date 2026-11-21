@@ -49,13 +49,6 @@ class CfdTunnelConfigurationsInfoTests(TestCase):
 
                 self.assertEqual(result["cfd_tunnel_configurations"], [{"id": "remote", "name": "one", "config": {}}])
 
-    def test_rejects_malformed_configuration(self):
-        result, _ignored = self.run_module([{"id": "remote", "name": "one"}], {"config": ["invalid"]})
-
-        self.assertIn("malformed tunnel configuration", result["msg"])
-        self.assertEqual(result["account_id"], "account")
-        self.assertEqual(result["tunnel_id"], "remote")
-
     def test_skips_tunnel_deleted_after_listing(self):
         tunnels = [{"id": "deleted", "name": "one"}, {"id": "remote", "name": "two"}]
         client = Mock()
