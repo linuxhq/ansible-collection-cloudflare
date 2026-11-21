@@ -73,8 +73,6 @@ options:
         C(preserve_path_suffix), C(preserve_query_string), and
         C(subpath_matching) must be V(true) or V(false). A field set to null
         is not sent.
-      - These checks run before any change, because Cloudflare rejects such
-        entries only after the list and its description are written.
       - An C(ip) entry must be an IP address, or a CIDR with a prefix length of
         8 to 32 for IPv4 or 12 to 128 for IPv6 and no host bits set.
         IPv4-mapped IPv6 addresses and scoped IPv6 addresses such as
@@ -132,6 +130,9 @@ options:
         newline, anywhere.
       - A C(redirect.status_code), when set, must be the integer 301, 302,
         307, or 308.
+      - Every entry requirement above is checked before any change, because
+        Cloudflare rejects such entries only after the list and its
+        description are written.
   operation_timeout:
     type: int
     default: 240
@@ -187,8 +188,24 @@ rules_list:
       type: str
     num_items:
       description: Number of entries in the Rules list.
-      returned: when available
+      returned: always
       type: float
+    num_referencing_filters:
+      description: Number of filters that reference the Rules list.
+      returned: always
+      type: float
+    description:
+      description: Rules list description.
+      returned: when set
+      type: str
+    created_on:
+      description: When the Rules list was created.
+      returned: always
+      type: str
+    modified_on:
+      description: When the Rules list was last modified.
+      returned: always
+      type: str
 items_operation:
   description: Bulk operation returned when list items were updated.
   returned: when list items changed
@@ -200,6 +217,10 @@ items_operation:
       type: str
     status:
       description: Final bulk operation status.
+      returned: always
+      type: str
+    completed:
+      description: When the bulk operation completed.
       returned: always
       type: str
 differences:
@@ -257,7 +278,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     find_resource,
     matching_resources,
     require_applied,
-    require_mapping,
     resource_field,
     resource_id,
     serialize_resource,
@@ -371,11 +391,11 @@ def canonical_item(item):
     return json.dumps(item, sort_keys=True, separators=(",", ":"))
 
 
-def list_items(module, client, account_id, list_id, context=None):
+def list_items(client, account_id, list_id, context=None):
     """Return the items of the list; context adds result fields to a failure."""
     context = {"account_id": account_id, "rules_list_id": list_id, **(context or {})}
     with cloudflare_error_context("Cloudflare API request failed while gathering Rules list items", **context):
-        items = [
+        return [
             serialize_resource(item)
             for item in client.rules.lists.items.list(
                 list_id,
@@ -383,11 +403,6 @@ def list_items(module, client, account_id, list_id, context=None):
                 per_page=ITEMS_PER_PAGE,
             )
         ]
-
-    for item in items:
-        require_mapping(module, item, "Rules list item", context)
-
-    return items
 
 
 def pending_operation_error(exc):
@@ -440,11 +455,9 @@ def submit_items(module, client, account_id, list_id, items, deadline, context=N
 def wait_for_operation(module, client, account_id, list_id, operation, deadline, context=None):
     """Wait for the submitted items operation; context adds result fields to a failure."""
     context = {"account_id": account_id, "rules_list_id": list_id, **(context or {})}
-    operation_id = None
-    if isinstance(operation, dict):
-        operation_id = operation.get("operation_id") or operation.get("id")
-
-    if not isinstance(operation_id, str) or not operation_id.strip() or operation_id != operation_id.strip():
+    operation_id = operation.get("operation_id")
+    # The SDK refuses to build a request path with an empty segment.
+    if not operation_id:
         module.fail_json(
             msg="Rules list items submission did not return an operation id",
             **context,
@@ -480,13 +493,10 @@ def wait_for_operation(module, client, account_id, list_id, operation, deadline,
             time.sleep(min(OPERATION_POLL_SECONDS, max(deadline - time.monotonic(), 0)))
             continue
 
-        if not isinstance(status, dict) or not isinstance(status.get("status"), str):
-            module.fail_json(msg="Cloudflare API returned malformed Rules list operation data", **context)
-
         if status.get("id") != operation_id:
             module.fail_json(msg="Cloudflare API returned the wrong Rules list operation", **context, operation=status)
 
-        operation_status = status["status"]
+        operation_status = status.get("status")
         if operation_status == "completed":
             return status
 
@@ -958,23 +968,11 @@ def ensure_present(module, client, current):
     if params.get("elements") is not None:
         desired_items = normalize_items(params["elements"])
         current_count = current.get("num_items")
-
-        if current_count is not None and (
-            isinstance(current_count, bool)
-            or not isinstance(current_count, (int, float))
-            or current_count < 0
-            or int(current_count) != current_count
-        ):
-            module.fail_json(
-                msg="Cloudflare API returned malformed Rules list data",
-                **{"account_id": account_id, "rules_list_id": current_id, **written},
-            )
-
         if current_count is not None and current_count != len(desired_items):
             items_changed = True
         else:
             items_changed = values_differ(
-                normalize_items(list_items(module, client, account_id, current_id, written)),
+                normalize_items(list_items(client, account_id, current_id, written)),
                 desired_items,
             )
 
@@ -999,7 +997,7 @@ def ensure_present(module, client, current):
 
             current = checked_list(module, rules_list, params["name"], current_kind, written, expected_id=current_id)
             written["rules_list"] = current
-            stored_items = normalize_items(list_items(module, client, account_id, current_id, written))
+            stored_items = normalize_items(list_items(client, account_id, current_id, written))
             if values_differ(stored_items, desired_items):
                 fail_not_applied(module, current_kind, desired_items, stored_items, **written)
 

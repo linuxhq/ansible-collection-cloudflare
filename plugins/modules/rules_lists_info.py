@@ -45,6 +45,26 @@ rules_lists:
       description: Data type stored by the Rules list.
       returned: always
       type: str
+    num_items:
+      description: Number of entries in the Rules list.
+      returned: always
+      type: float
+    num_referencing_filters:
+      description: Number of filters that reference the Rules list.
+      returned: always
+      type: float
+    description:
+      description: Rules list description.
+      returned: when set
+      type: str
+    created_on:
+      description: When the Rules list was created.
+      returned: always
+      type: str
+    modified_on:
+      description: When the Rules list was last modified.
+      returned: always
+      type: str
 
 """
 
