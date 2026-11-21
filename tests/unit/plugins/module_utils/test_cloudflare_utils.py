@@ -703,6 +703,7 @@ class ValueTests(TestCase):
     def test_access_selectors_leave_other_non_mapping_values_to_cloudflare(self):
         # Cloudflare rejects these on the first write.
         rules = {
+            "exclude": ["everyone", ["everyone"], 5],
             "include": [{"email": None}, {"ip": None}, {"group": None}, {"email": "a@example.com"}],
             "require": [{"everyone": []}, {"everyone": True}, {"any_valid_service_token": ""}],
         }
@@ -711,9 +712,7 @@ class ValueTests(TestCase):
 
     def test_access_selectors_reject_non_mapping_and_empty_selectors(self):
         cases = (
-            (None, "must be a mapping that sets one selector, such as {'everyone': {}}"),
-            ("azure_ad", "must be a mapping that sets one selector, such as {'everyone': {}}"),
-            (["everyone"], "must be a mapping that sets one selector, such as {'everyone': {}}"),
+            (None, "must not be null; Cloudflare drops a null selector"),
             ({}, "must set one selector; Cloudflare drops an empty selector"),
         )
         for field in ("include", "exclude", "require"):

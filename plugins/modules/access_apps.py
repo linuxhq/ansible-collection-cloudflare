@@ -228,7 +228,9 @@ options:
       - Each inline policy selector is a mapping that sets one rule, such as
         C(email) or C(everyone). Cloudflare drops an empty selector V({}) and
         splits a selector with several rules into separate selectors, so such
-        a selector fails before any change.
+        a selector fails before any change. Cloudflare also drops a null
+        selector entry, so one fails before any change; Cloudflare rejects
+        another entry that is not a mapping, such as V(everyone).
       - Cloudflare stores a null C(any_valid_service_token) inline policy
         selector value as V({}), so such a selector fails before any change;
         use V({}) instead.

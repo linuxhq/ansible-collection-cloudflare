@@ -840,8 +840,8 @@ def access_rules_payload(rules):
 def validate_access_selectors(module, rules=None, prefix=""):
     """Fail when an Access selector is not one rule, uses an SDK spelling, or holds a value Cloudflare drops.
 
-    Each selector is a mapping that sets one rule, as every SDK AccessRuleParam type has one key; Cloudflare drops an
-    empty selector and splits a selector with several rules into separate selectors. SDK spellings must use their API
+    Each selector is a mapping that sets one rule, as every SDK AccessRuleParam type has one key; Cloudflare drops a
+    null or empty selector and splits a selector with several rules into separate selectors. SDK spellings must use their API
     keys instead. Cloudflare stores a null any_valid_service_token as {}. A known selector's fields must be ones
     Cloudflare stores, and not the empty strings it drops. Other values are left to Cloudflare, which rejects them.
     rules defaults to the module parameters; prefix names their location in failure messages, such as "policies[0].".
@@ -854,8 +854,12 @@ def validate_access_selectors(module, rules=None, prefix=""):
         selectors = rules.get(field)
         for index, selector in enumerate(selectors if isinstance(selectors, list) else ()):
             path = f"{prefix}{field}[{index}]"
+            if selector is None:
+                module.fail_json(msg=f"{path} must not be null; Cloudflare drops a null selector")
+
+            # Cloudflare rejects another value that is not a mapping before any change.
             if not isinstance(selector, dict):
-                module.fail_json(msg=f"{path} must be a mapping that sets one selector, such as {{'everyone': {{}}}}")
+                continue
 
             if not selector:
                 module.fail_json(msg=f"{path} must set one selector; Cloudflare drops an empty selector")
