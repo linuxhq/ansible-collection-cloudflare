@@ -22,7 +22,7 @@
   ansible.builtin.set_fact:
     _zones_info_dict:
       "{{ (dict(__zones_info_public_list |
-               json_query('[].name') |
+               map(attribute='name') |
                zip(__zones_info_public_list))) |
           d({}) }}"
   vars:

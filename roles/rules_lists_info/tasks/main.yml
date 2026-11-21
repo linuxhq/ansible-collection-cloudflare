@@ -24,7 +24,7 @@
   ansible.builtin.set_fact:
     _rules_lists_info_dict:
       "{{ (dict(_rules_lists_info_list |
-               json_query('[].name') |
+               map(attribute='name') |
                zip(_rules_lists_info_list))) |
           d({}) }}"
 ...

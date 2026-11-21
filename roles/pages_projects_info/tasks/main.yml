@@ -24,7 +24,7 @@
   ansible.builtin.set_fact:
     _pages_projects_info_dict:
       "{{ (dict(_pages_projects_info_list |
-               json_query('[].name') |
+               map(attribute='name') |
                zip(_pages_projects_info_list))) |
           d({}) }}"
 ...
