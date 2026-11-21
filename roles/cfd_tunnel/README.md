@@ -19,8 +19,11 @@ Manage cloudflare cfd tunnels
     cfd_tunnel_batch: 10
     cfd_tunnel_delay: 3
     cfd_tunnel_list: []
+    cfd_tunnel_no_log: false
     cfd_tunnel_poll: 0
     cfd_tunnel_retries: 100
+
+Set `cfd_tunnel_no_log: true` to keep the connector tokens and tunnel credentials that results include out of task output.
 
 ## Dependencies
 

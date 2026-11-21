@@ -23,6 +23,7 @@
   changed_when:
     - ansible_check_mode | bool
     - __warp_connector_result.changed | bool
+  no_log: "{{ warp_connector_no_log }}"
 
 - name: Ensure managed cloudflare warp connector jobs are complete
   tags:
@@ -40,4 +41,5 @@
     - __warp_connector_status.finished | bool
   retries: "{{ warp_connector_retries }}"
   delay: "{{ warp_connector_delay }}"
+  no_log: "{{ warp_connector_no_log }}"
 ...
