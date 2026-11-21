@@ -247,19 +247,16 @@ def comparable_policy(policy, payload):
     """Return policy with each route stored without a description matching a requested empty description.
 
     Cloudflare drops a split tunnel route description set to "" and returns
-    the route without it. Null route fields are dropped from requested, as
-    the comparison ignores them.
+    the route without it.
     """
     policy = dict(policy)
     for field in ("exclude", "include"):
-        requested, routes = serialize_resource(payload.get(field)), policy.get(field)
-        if requested is not None and isinstance(routes, list):
+        requested, routes = payload.get(field), policy.get(field)
+        if requested is not None and routes:
             policy[field] = [
                 (
                     {**route, "description": ""}
-                    if isinstance(route, dict)
-                    and route.get("description") is None
-                    and {**route, "description": ""} in requested
+                    if route.get("description") is None and {**route, "description": ""} in requested
                     else route
                 )
                 for route in routes
@@ -304,9 +301,9 @@ def run(module, client):
         "Cloudflare API request failed while gathering the device policy",
         account_id=account_id,
     ):
-        current = serialize_resource(policy.get(account_id=account_id))
+        current = serialize_resource(policy.get(account_id=account_id)) or {}
 
-    if "service_mode_v2" in payload and isinstance(current, dict):
+    if "service_mode_v2" in payload:
         payload["service_mode_v2"] = service_mode(payload["service_mode_v2"], current.get("service_mode_v2"))
 
     ensure_settings(

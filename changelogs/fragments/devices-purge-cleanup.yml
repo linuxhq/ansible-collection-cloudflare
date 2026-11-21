@@ -1,0 +1,5 @@
+---
+trivial:
+  - devices_policy - compare split tunnel routes without re-serializing the request or re-checking the SDK response
+    shape.
+  - purge_cache - build the purge payload from the ``cache`` option, whose ``options`` already limit its keys.

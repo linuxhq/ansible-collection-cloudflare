@@ -126,7 +126,6 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_error_context,
-    payload_from_params,
     require_cloudflare_sdk,
     resource_id,
     serialize_resource,
@@ -134,12 +133,10 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     without_nested_nulls,
 )
 
-CACHE_KEYS = ("files", "hosts", "prefixes", "purge_everything", "tags")
-
 
 def cache_payload(module):
-    """Return the purge payload; a null key in a files entry counts as omitted, so it is not sent."""
-    return without_nested_nulls(payload_from_params(module.params["cache"], CACHE_KEYS))
+    """Return the purge payload; a null key, including one in a files entry, counts as omitted, so it is not sent."""
+    return without_nested_nulls(module.params["cache"])
 
 
 def run(module, client):
