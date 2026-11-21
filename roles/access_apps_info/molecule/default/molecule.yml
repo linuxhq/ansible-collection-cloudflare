@@ -12,21 +12,10 @@ provisioner:
               - id: "{{ _access_policies_info_dict['molecule-access-apps-info-00-email'].id }}"
             type: bookmark
 
-        access_groups_list:
-          - name: molecule-access-apps-info-00
-            include:
-              - service_token:
-                  token_id: "{{ _access_service_tokens_info_dict['molecule-access-apps-info-00'].id }}"
-            is_default: false
-
         access_policies_list:
           - name: molecule-access-apps-info-00-email
             decision: allow
             include:
               - email:
                   email: email@molecule.org
-
-        access_service_tokens_list:
-          - name: molecule-access-apps-info-00
-            duration: forever
 ...

@@ -1,0 +1,6 @@
+---
+trivial:
+  - access_apps, access_apps_info - drop the unused Access group and service token Molecule fixtures.
+  - pages_projects - verify in Molecule that the requested custom domains are attached.
+  - rules_lists, rules_lists_info - use static documentation IP ranges in Molecule instead of fetched third-party
+    lists, assert exact item counts, and assert the list is absent after cleanup.

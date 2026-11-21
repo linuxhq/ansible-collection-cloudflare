@@ -3,8 +3,6 @@
   hosts: all
 
   roles:
-    - access_service_tokens
-    - access_groups
     - access_policies
     - access_apps
 ...
