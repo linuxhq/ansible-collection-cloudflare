@@ -125,11 +125,12 @@ def cloudflare_client(module):
         else:
             default_message = "Cloudflare API error"
 
-        fail_from_cloudflare_error(
-            module,
-            getattr(exc, "_cloudflare_message", default_message),
-            exc,
-            **getattr(exc, "_cloudflare_context", {}),
+        module.fail_json(
+            **{
+                "msg": getattr(exc, "_cloudflare_message", default_message),
+                **getattr(exc, "_cloudflare_context", {}),
+                **cloudflare_error_details(exc),
+            }
         )
 
 
@@ -202,10 +203,6 @@ def cloudflare_error_details(exc):
         details["response"] = response_body
 
     return details
-
-
-def fail_from_cloudflare_error(module, message, exc, **context):
-    module.fail_json(**{"msg": message, **context, **cloudflare_error_details(exc)})
 
 
 def serialize_resource(resource):
@@ -419,22 +416,18 @@ def path_segment(value):
 def find_resource(module, items, resource_name, field, value, context=None):
     """Return the serialized item whose field equals value, or None.
 
-    Fail when more than one item matches, so an ambiguous name never selects
-    an arbitrary resource. Only the matched items are validated strictly, so
-    an unrelated item with surrounding whitespace in its field is skipped,
-    and an item without the field, such as an Access policy Cloudflare stored
-    without a name, never matches. context adds result fields to a failure,
-    such as the resource's owner; field and value are always reported.
+    Fail when an item is not a mapping, or when more than one item matches,
+    so an ambiguous name never selects an arbitrary resource. An item without
+    the field, such as an Access policy Cloudflare stored without a name,
+    never matches. context adds result fields to a failure, such as the
+    resource's owner; field and value are always reported.
     """
     context = {**(context or {}), field: value}
     matches = []
     for item in items:
         resource = serialize_resource(item)
-        if isinstance(resource, dict) and not isinstance(resource.get(field), str):
-            continue
-
-        if resource_field(module, resource, field, resource_name, strict=False, context=context) == value:
-            resource_field(module, resource, field, resource_name, context=context)
+        require_mapping(module, resource, resource_name, context)
+        if resource.get(field) == value:
             matches.append(resource)
 
     if len(matches) > 1:
