@@ -88,7 +88,6 @@ def run(module, client):
             "rules_lists",
             client.rules.lists.list(account_id=account_id),
             "Rules list",
-            required_fields=("id", "name", "kind"),
             context={"account_id": account_id},
         )
 

@@ -922,7 +922,6 @@ def exit_resource_list(module, result_key, items, resource_name, required_fields
 def exit_settings(module, result_key, settings, resource_name, context=None):
     """Exit an info module with account-wide settings; context names their owner in failures."""
     settings = serialize_resource(settings) or {}
-    require_mapping(module, settings, resource_name, context)
     module.exit_json(changed=False, **{result_key: settings})
 
 
@@ -941,7 +940,6 @@ def ensure_settings(
     context = context or {}
     label = resource_name[0].upper() + resource_name[1:]
     current = serialize_resource(current) or {}
-    require_mapping(module, current, resource_name, context)
 
     if not differs(comparable(current, context), payload, exact_values=exact_values):
         module.exit_json(changed=False, message=f"{label} already present", **{result_key: current})
