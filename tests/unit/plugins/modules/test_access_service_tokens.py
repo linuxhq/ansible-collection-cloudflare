@@ -94,8 +94,9 @@ class AccessServiceTokensTests(TestCase):
                 self.assertEqual(
                     raised.exception.values,
                     {
-                        "msg": "Service token created, but Cloudflare returned no client secret, which it returns only "
-                        "in the create response; rotate or delete the service token",
+                        "msg": "Cloudflare returned the service token without a client secret, which it returns only "
+                        "in the create response; if this run created the token, rotate or delete it to obtain a new "
+                        "client secret",
                         "changed": True,
                         "account_id": "account",
                         "name": "automation",
