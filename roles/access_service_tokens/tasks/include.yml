@@ -20,8 +20,8 @@
     - access_service_tokens_api_token is not none
     - _service_token.name is defined
   changed_when:
-    - ansible_check_mode | bool
     - __access_service_tokens_result.changed | bool
+    - __access_service_tokens_result.finished | d(true) | bool
   no_log: "{{ access_service_tokens_no_log }}"
 
 - name: Ensure managed cloudflare access service token jobs are complete
@@ -36,6 +36,7 @@
     loop_var: _jid
   when:
     - _jid.ansible_job_id is defined
+    - not _jid.finished | d(false) | bool
   until:
     - __access_service_tokens_status.finished | bool
   retries: "{{ access_service_tokens_retries }}"

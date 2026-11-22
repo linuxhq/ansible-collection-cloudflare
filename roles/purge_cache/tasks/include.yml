@@ -16,8 +16,8 @@
   when:
     - purge_cache_api_token is not none
   changed_when:
-    - ansible_check_mode | bool
     - __purge_cache_result.changed | bool
+    - __purge_cache_result.finished | d(true) | bool
 
 - name: Ensure managed cloudflare cache purge jobs are complete
   tags:
@@ -31,6 +31,7 @@
     loop_var: _jid
   when:
     - _jid.ansible_job_id is defined
+    - not _jid.finished | d(false) | bool
   until:
     - __purge_cache_status.finished | bool
   retries: "{{ purge_cache_retries }}"
