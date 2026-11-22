@@ -1,0 +1,7 @@
+---
+trivial:
+  - access_apps, cloudflare_utils - rewrap docstrings over 120 characters.
+  - access_groups, cloudflare_utils - drop a unit test for a null selector Ansible rejects first, and rename the
+    selector test to what it covers.
+  - access_identity_providers_info role - key the published dict with ``map(attribute='type')`` instead of
+    ``json_query``; the facts are unchanged.

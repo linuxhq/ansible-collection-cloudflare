@@ -725,7 +725,7 @@ class ValueTests(TestCase):
 
         validate_access_selectors(FakeModule(rules))
 
-    def test_access_selectors_reject_non_mapping_and_empty_selectors(self):
+    def test_access_selectors_reject_null_and_empty_selectors(self):
         cases = (
             (None, "must not be null; Cloudflare drops a null selector"),
             ({}, "must set one selector; Cloudflare drops an empty selector"),

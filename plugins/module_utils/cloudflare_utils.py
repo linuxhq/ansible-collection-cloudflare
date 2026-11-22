@@ -826,9 +826,9 @@ def validate_access_selectors(module, rules=None, prefix=""):
     """Fail when an Access selector is not one rule, uses an SDK spelling, or holds a value Cloudflare drops.
 
     Each selector is a mapping that sets one rule, as every SDK AccessRuleParam type has one key; Cloudflare drops a
-    null or empty selector and splits a selector with several rules into separate selectors. SDK spellings must use their API
-    keys instead. Cloudflare stores a null any_valid_service_token as {}. A known selector's fields must be ones
-    Cloudflare stores, and not the empty strings it drops. Other values are left to Cloudflare, which rejects them.
+    null or empty selector and splits a selector with several rules into separate selectors. SDK spellings must use
+    their API keys instead. Cloudflare stores a null any_valid_service_token as {}. A known selector's fields must be
+    ones Cloudflare stores, and not the empty strings it drops. Other values are left to Cloudflare, which rejects them.
     rules defaults to the module parameters; prefix names their location in failure messages, such as "policies[0].".
     """
     rules = module.params if rules is None else rules

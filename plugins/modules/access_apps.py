@@ -722,7 +722,7 @@ def validate_empty_values(module):
 
 
 def policy_without_nulls(policy):
-    """Return the policy entry without null fields, including those in its nested mappings, and ip selectors as stored."""
+    """Return the policy entry without null fields, including those in nested mappings, and ip selectors as stored."""
     return access_rules_payload(
         {
             field: without_nested_nulls(value) if field in INLINE_POLICY_EXACT_FIELDS else value
