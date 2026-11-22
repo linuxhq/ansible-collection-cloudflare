@@ -113,6 +113,17 @@ class AccessServiceTokensTests(TestCase):
                     },
                 )
 
+    def test_malformed_recovered_token_reports_the_create_error(self):
+        client, api = client_with()
+        api.create.side_effect = timeout_error()
+        api.list.side_effect = [[], [{"name": "automation", "duration": "1y"}]]
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed service token data")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["error"], "Request timed out.")
+
     def test_retried_create_without_a_secret_reports_no_earlier_error(self):
         created = {"id": "token", "name": "automation", "duration": "1y"}
         client, api = client_with()

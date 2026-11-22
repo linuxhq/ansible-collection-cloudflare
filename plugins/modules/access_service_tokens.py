@@ -145,15 +145,19 @@ def checked_token(module, service_token, expected_id=None, create_error=None):
     A failure reports changed=True and includes the token, as a created
     token's client secret is returned only once. Without expected_id, the
     token was created, and it fails without a client secret, before its
-    duration is compared; create_error, the error of a create request after
-    which the token was found by name, adds its details to that failure.
+    duration is compared. create_error, the error of a create request after
+    which the token was found by name, adds its details to every failure.
     """
+    context = {"account_id": module.params["account_id"], "name": module.params["name"]}
+    if create_error is not None:
+        context.update(cloudflare_error_details(create_error))
+
     service_token, failure = checked_written(
         module,
         service_token,
         "service token",
         "service_token",
-        {"account_id": module.params["account_id"], "name": module.params["name"]},
+        context,
         expected_name=module.params["name"],
         expected_id=expected_id,
     )
@@ -164,7 +168,6 @@ def checked_token(module, service_token, expected_id=None, create_error=None):
             msg="Cloudflare returned the service token without a client secret, which it returns only in the create "
             "response; if this run created the token, rotate or delete it to obtain a new client secret",
             **failure,
-            **(cloudflare_error_details(create_error) if create_error is not None else {}),
         )
 
     if not duration_matches(service_token, module.params["duration"]):
