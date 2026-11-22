@@ -184,6 +184,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     serialize_resource,
     unsupported_fields,
+    without_nested_nulls,
 )
 
 FIELDS = (
@@ -235,10 +236,9 @@ def validate_field_names(module):
 
 
 def split_tunnel_route(route):
-    """Return route without null fields, which count as omitted, and with a bare IP address as Cloudflare stores it."""
-    route = {key: value for key, value in route.items() if value is not None}
+    """Return route with a bare IP address as Cloudflare stores it."""
     if "address" in route:
-        route["address"] = cidr_from_address(route["address"])
+        return {**route, "address": cidr_from_address(route["address"])}
 
     return route
 
@@ -271,10 +271,8 @@ def service_mode(requested, current):
     Cloudflare replaces service_mode_v2 as a whole, so a write that omits the
     port of an unchanged mode would reset it. Keys are carried over only when
     the mode is unchanged, since another mode stores different keys, and the
-    port only for mode proxy, the only mode that stores one. Null keys count
-    as omitted, as Cloudflare rejects a null port.
+    port only for mode proxy, the only mode that stores one.
     """
-    requested = {key: value for key, value in requested.items() if value is not None}
     if not isinstance(current, dict) or current.get("mode") != requested.get("mode"):
         return requested
 
@@ -291,7 +289,8 @@ def run(module, client):
 
     validate_field_names(module)
 
-    payload = payload_from_params(module.params, FIELDS)
+    # Null nested keys count as omitted; Cloudflare rejects a null service mode port.
+    payload = without_nested_nulls(payload_from_params(module.params, FIELDS))
     for field in ("exclude", "include"):
         if field in payload:
             payload[field] = [split_tunnel_route(route) for route in payload[field]]

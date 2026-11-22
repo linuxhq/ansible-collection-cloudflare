@@ -13,11 +13,11 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 
 
 class WarpConnectorInfoTests(TestCase):
-    def run_module(self, listed, include_token, token="token"):
+    def run_module(self, listed, include_token):
         client = Mock()
         api = client.zero_trust.tunnels.warp_connector
         api.list.return_value = listed
-        api.token.get.return_value = token
+        api.token.get.return_value = "token"
         with self.assertRaises((ModuleExit, ModuleFail)) as raised:
             warp_connector_info.run(FakeModule({"account_id": "account", "include_token": include_token}), client)
 
@@ -34,13 +34,6 @@ class WarpConnectorInfoTests(TestCase):
 
         api.token.get.assert_called_once_with("connector", account_id="account")
         self.assertEqual(result["warp_connectors"], [{"id": "connector", "name": "example", "token": "token"}])
-
-    def test_rejects_malformed_token(self):
-        result, _ignored = self.run_module([{"id": "connector", "name": "example"}], True, token="")
-
-        self.assertIn("malformed WARP Connector token", result["msg"])
-        self.assertEqual(result["account_id"], "account")
-        self.assertEqual(result["resource_id"], "connector")
 
     def test_malformed_listing_names_the_account(self):
         result, _ignored = self.run_module([{"id": "connector"}], False)

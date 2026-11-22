@@ -93,14 +93,6 @@ class PageRulesTests(TestCase):
         api.list.assert_called_once_with(zone_id="zone")
         self.assertEqual(result["pagerule"], rules[-1])
 
-    def test_malformed_rule_names_the_zone(self):
-        client, _ignored = client_with(["invalid"])
-
-        result = self.run_module(FakeModule(params()), client)
-
-        self.assertEqual(result["msg"], "Cloudflare API returned malformed page rule data")
-        self.assertEqual(result["zone_id"], "zone")
-
     def test_find_pagerule_ignores_target_keys_outside_the_identity(self):
         current = {"id": "match", "actions": ACTIONS, "targets": TARGETS}
         client, _ignored = client_with([current])

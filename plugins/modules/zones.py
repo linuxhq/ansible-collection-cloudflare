@@ -419,7 +419,7 @@ def checked_zone(module, zone, payload, expected_id=None, written=None):
     if expected_id is not None:
         failure["zone_id"] = expected_id
 
-    failure = {"zone_id": resource_id(module, zone, "zone", expected=expected_id, context=failure), **failure}
+    failure["zone_id"] = resource_id(module, zone, "zone", expected=expected_id, context=failure)
     resource_field(module, zone, "name", "zone", expected=module.params["name"], context=failure)
     require_applied(module, zone, payload, "zone", context=failure)
     return zone

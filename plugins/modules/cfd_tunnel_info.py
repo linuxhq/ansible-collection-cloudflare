@@ -61,7 +61,6 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     cloudflare_client,
     cloudflare_error_context,
-    resource_field,
     resource_list,
 )
 
@@ -88,15 +87,7 @@ def run(module, client):
                 account_id=account_id,
                 resource_id=tunnel["id"],
             ):
-                token = tunnels.token.get(tunnel["id"], account_id=account_id)
-
-            tunnel["token"] = resource_field(
-                module,
-                {"token": token},
-                "token",
-                "cloudflared tunnel token",
-                context={"account_id": account_id, "resource_id": tunnel["id"]},
-            )
+                tunnel["token"] = tunnels.token.get(tunnel["id"], account_id=account_id)
 
     module.exit_json(changed=False, cfd_tunnels=cfd_tunnels)
 

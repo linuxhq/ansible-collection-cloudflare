@@ -905,10 +905,7 @@ def checked_written(module, resource, resource_name, result_key, context, expect
     if expected_id is not None:
         failure["resource_id"] = expected_id
 
-    failure = {
-        "resource_id": resource_id(module, resource, resource_name, expected=expected_id, context=failure),
-        **failure,
-    }
+    failure["resource_id"] = resource_id(module, resource, resource_name, expected=expected_id, context=failure)
     if expected_name is not None:
         resource_field(module, resource, "name", resource_name, expected=expected_name, context=failure)
 

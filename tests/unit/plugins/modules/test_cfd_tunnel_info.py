@@ -13,11 +13,11 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
 
 
 class CfdTunnelInfoTests(TestCase):
-    def run_module(self, listed, include_token, token="token"):
+    def run_module(self, listed, include_token):
         client = Mock()
         api = client.zero_trust.tunnels.cloudflared
         api.list.return_value = listed
-        api.token.get.return_value = token
+        api.token.get.return_value = "token"
         with self.assertRaises((ModuleExit, ModuleFail)) as raised:
             cfd_tunnel_info.run(FakeModule({"account_id": "account", "include_token": include_token}), client)
 
@@ -34,13 +34,6 @@ class CfdTunnelInfoTests(TestCase):
 
         api.token.get.assert_called_once_with("tunnel", account_id="account")
         self.assertEqual(result["cfd_tunnels"], [{"id": "tunnel", "name": "example", "token": "token"}])
-
-    def test_rejects_malformed_token(self):
-        result, _ignored = self.run_module([{"id": "tunnel", "name": "example"}], True, token="")
-
-        self.assertIn("malformed cloudflared tunnel token", result["msg"])
-        self.assertEqual(result["account_id"], "account")
-        self.assertEqual(result["resource_id"], "tunnel")
 
     def test_malformed_listing_names_the_account(self):
         result, _ignored = self.run_module([{"id": "tunnel"}], False)

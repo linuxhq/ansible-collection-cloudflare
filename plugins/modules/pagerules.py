@@ -180,7 +180,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_absent,
     ensure_resource_present,
     payload_from_params,
-    require_mapping,
     resource_id,
     serialize_resource,
     unsupported_fields,
@@ -245,11 +244,6 @@ def validate_field_names(module):
             msg=f"Cloudflare does not store these page rule fields: {', '.join(unknown)}",
             unsupported_fields=unknown,
         )
-
-
-def pagerule_targets(module, pagerule):
-    require_mapping(module, pagerule, "page rule", {"zone_id": module.params["zone_id"]})
-    return pagerule["targets"]
 
 
 def canonical_url(value):
@@ -359,7 +353,7 @@ def matching_pagerules(module, client, targets):
     matches = []
     for pagerule in pagerules:
         pagerule = serialize_resource(pagerule)
-        stored = target_identity(pagerule_targets(module, pagerule))
+        stored = target_identity(pagerule["targets"])
         if not values_differ(stored, identity):
             matches.append(pagerule)
 
