@@ -140,8 +140,9 @@ def checked_token(module, service_token, expected_id=None):
     """Serialize and validate the service token a create or update returned.
 
     A failure reports changed=True and includes the token, as a created
-    token's client secret is returned only once. Return the token and that
-    failure context.
+    token's client secret is returned only once. Without expected_id, the
+    token was created, and it fails without a client secret, before its
+    duration is compared.
     """
     service_token, failure = checked_written(
         module,
@@ -152,6 +153,15 @@ def checked_token(module, service_token, expected_id=None):
         expected_name=module.params["name"],
         expected_id=expected_id,
     )
+    # Only the create response holds the client secret; a token recovered by
+    # name after a lost response has none, and it cannot be read again.
+    if expected_id is None and not service_token.get("client_secret"):
+        module.fail_json(
+            msg="Service token created, but Cloudflare returns its client secret only in the create response, "
+            "which was lost; rotate or delete the service token",
+            **failure,
+        )
+
     if not duration_matches(service_token, module.params["duration"]):
         fail_not_applied(
             module,
@@ -160,7 +170,7 @@ def checked_token(module, service_token, expected_id=None):
             **failure,
         )
 
-    return service_token, failure
+    return service_token
 
 
 def run(module, client):
@@ -217,17 +227,11 @@ def run(module, client):
                 ),
             )
 
-        service_token, failure = checked_token(module, service_token)
-        # Only the create response holds the client secret; a token recovered
-        # by name after a lost response has none, and it cannot be read again.
-        if not service_token.get("client_secret"):
-            module.fail_json(
-                msg="Service token created, but Cloudflare returns its client secret only in the create response, "
-                "which was lost; rotate or delete the service token",
-                **failure,
-            )
-
-        module.exit_json(changed=True, message="Service token created", service_token=service_token)
+        module.exit_json(
+            changed=True,
+            message="Service token created",
+            service_token=checked_token(module, service_token),
+        )
 
     current_id = resource_id(
         module, current, "service token", context={"account_id": account_id, "name": params["name"]}
@@ -248,7 +252,7 @@ def run(module, client):
     module.exit_json(
         changed=True,
         message="Service token updated",
-        service_token=checked_token(module, service_token, expected_id=current_id)[0],
+        service_token=checked_token(module, service_token, expected_id=current_id),
     )
 
 
