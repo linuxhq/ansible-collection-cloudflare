@@ -99,13 +99,25 @@ class RulesListsTests(TestCase):
 
         self.assertEqual(rules_lists.normalize_items([{"redirect": redirect}]), [{"redirect": redirect}])
 
-    def test_rejects_operation_timeout_below_one_second(self):
+    def test_rejects_operation_timeout_below_one_second_before_any_write(self):
         client, api = make_client()
 
-        result = self.run_module(FakeModule(params(operation_timeout=0)), client)
+        result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}], operation_timeout=0)), client)
 
-        api.list.assert_not_called()
+        api.create.assert_not_called()
+        api.update.assert_not_called()
+        api.items.update.assert_not_called()
         self.assertEqual(result["msg"], "operation_timeout must be at least 1 second")
+
+    def test_operation_timeout_is_not_checked_without_elements(self):
+        for state, lists, deleted in (("absent", [CURRENT], {"id": "list"}), ("present", [CURRENT], None)):
+            with self.subTest(state=state):
+                client, api = make_client(lists=lists, deleted=deleted)
+
+                result = self.run_module(FakeModule(params(state=state, operation_timeout=0)), client)
+
+                self.assertNotIn("msg", result)
+                api.items.update.assert_not_called()
 
     def test_submit_retries_pending_operation_within_deadline(self):
         client, api = make_client()

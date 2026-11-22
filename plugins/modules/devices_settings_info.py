@@ -60,7 +60,7 @@ def run(module, client):
     ):
         settings = client.zero_trust.devices.settings.get(account_id=account_id)
 
-    exit_settings(module, "devices_settings", settings, "device settings", {"account_id": account_id})
+    exit_settings(module, "devices_settings", settings)
 
 
 def main():

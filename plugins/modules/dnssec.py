@@ -78,7 +78,7 @@ dnssec:
   contains:
     status:
       description: Current DNSSEC activation status.
-      returned: always
+      returned: when provided by Cloudflare
       type: str
     algorithm:
       description: DNSSEC signing algorithm identifier.
@@ -146,7 +146,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_error_context,
     ensure_settings,
     payload_from_params,
-    resource_field,
 )
 
 BOOLEAN_FIELDS = ("dnssec_multi_signer", "dnssec_presigned", "dnssec_use_nsec3")
@@ -154,8 +153,8 @@ FIELDS = BOOLEAN_FIELDS + ("status",)
 PENDING_STATUSES = {"pending": "active", "pending-disabled": "disabled"}
 
 
-def comparable_settings(module, settings, failure):
-    status = resource_field(module, settings, "status", "DNSSEC settings", context=failure)
+def comparable_settings(settings):
+    status = settings.get("status")
     # Cloudflare omits these settings while DNSSEC is disabled, so an omitted
     # setting matches false.
     return {
@@ -180,7 +179,7 @@ def run(module, client):
         current,
         payload_from_params(module.params, FIELDS),
         edit=lambda payload: client.dns.dnssec.edit(zone_id=zone_id, **payload),
-        comparable=lambda settings, failure: comparable_settings(module, settings, failure),
+        comparable=lambda settings, failure: comparable_settings(settings),
         context={"zone_id": zone_id},
     )
 

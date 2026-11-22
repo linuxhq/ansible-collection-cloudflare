@@ -919,8 +919,8 @@ def exit_resource_list(module, result_key, items, resource_name, required_fields
     )
 
 
-def exit_settings(module, result_key, settings, resource_name, context=None):
-    """Exit an info module with account-wide settings; context names their owner in failures."""
+def exit_settings(module, result_key, settings):
+    """Exit an info module with account-wide settings."""
     settings = serialize_resource(settings) or {}
     module.exit_json(changed=False, **{result_key: settings})
 

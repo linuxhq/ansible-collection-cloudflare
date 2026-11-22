@@ -1,0 +1,9 @@
+---
+minor_changes:
+  - rules_lists - check that ``operation_timeout`` is at least 1 second only when ``elements`` is set, still before
+    any change, so ``state=absent`` and runs without ``elements`` no longer fail on a timeout they never use.
+trivial:
+  - devices_policy_info, devices_settings_info, zerotrust_connectivity_settings_info - drop the unused resource name
+    and context arguments of the shared settings exit helper.
+  - dnssec - read the DNSSEC ``status`` directly; a requested status Cloudflare does not return after the update still
+    fails as not applied.

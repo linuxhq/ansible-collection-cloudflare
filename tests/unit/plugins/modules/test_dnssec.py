@@ -96,12 +96,6 @@ class DnssecTests(TestCase):
         api.edit.assert_called_once_with(zone_id="zone", dnssec_use_nsec3=False, status="disabled")
         self.assertTrue(result["changed"])
 
-    def test_rejects_settings_without_status(self):
-        result, api = self.run_module(FakeModule(params(status=None)), {"dnssec_presigned": False})
-
-        api.edit.assert_not_called()
-        self.assertEqual(result["msg"], "Cloudflare API returned malformed DNSSEC settings data")
-
     def test_rejects_an_unmet_update_postcondition(self):
         settings = {"status": "active", "dnssec_presigned": False}
         result, _ignored = self.run_module(FakeModule(params(dnssec_presigned=True)), settings, settings)
@@ -111,13 +105,16 @@ class DnssecTests(TestCase):
             "Cloudflare did not apply the requested DNSSEC settings: dnssec_presigned requested true, stored false",
         )
 
-    def test_malformed_status_after_the_edit_reports_the_write(self):
+    def test_missing_status_after_the_edit_fails_as_unapplied(self):
         edited = {"status": None}
 
         result, api = self.run_module(FakeModule(params()), {"status": "disabled"}, edited=edited)
 
         api.edit.assert_called_once()
-        self.assertEqual(result["msg"], "Cloudflare API returned malformed DNSSEC settings data")
+        self.assertEqual(
+            result["msg"],
+            'Cloudflare did not apply the requested DNSSEC settings: status requested "active", stored null',
+        )
         self.assertTrue(result["changed"])
         self.assertEqual(result["dnssec"], {})
         self.assertEqual(result["zone_id"], "zone")

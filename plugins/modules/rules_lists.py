@@ -144,7 +144,7 @@ options:
         remains, so polling sleeps never extend past it.
       - The budget bounds each request's timeout rather than enforcing a hard
         wall-clock limit, so a single slow request can briefly exceed it.
-      - Must be at least 1 second.
+      - Must be at least 1 second when O(elements) is set.
       - When executed asynchronously, the async budget must exceed this value.
   state:
     type: str
@@ -875,6 +875,11 @@ def ensure_present(module, client, current):
     account_id = params["account_id"]
     lists = client.rules.lists
 
+    # The items are written after the list, so a budget too small to submit
+    # them would leave a partial change.
+    if params.get("elements") is not None and params["operation_timeout"] < 1:
+        module.fail_json(msg="operation_timeout must be at least 1 second")
+
     if current is None:
         # Cloudflare rejects a new list without a kind.
         current_kind = params.get("kind")
@@ -1019,9 +1024,6 @@ def run(module, client):
     params = module.params
     account_id = params["account_id"]
     lists = client.rules.lists
-
-    if params["operation_timeout"] < 1:
-        module.fail_json(msg="operation_timeout must be at least 1 second")
 
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the Rules list",
