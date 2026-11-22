@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - devices_policy, devices_settings, zerotrust_connectivity_settings, zones - omit a role variable left at ``null``
+    with an explicit check instead of ``d(omit)``. ``d(omit)`` replaces only undefined values, and ansible-core 2.18
+    renders a ``null`` as an empty string, so the role sent ``""`` and the module rejected it as a Boolean or number,
+    or, for ``zones_account_id``, as an empty identifier.

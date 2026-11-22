@@ -6,9 +6,13 @@
     account_id: "{{ zerotrust_connectivity_settings_account_id }}"
     api_token: "{{ zerotrust_connectivity_settings_api_token }}"
     icmp_proxy_enabled:
-      "{{ zerotrust_connectivity_settings_icmp_proxy_enabled | d(omit) }}"
+      "{{ zerotrust_connectivity_settings_icmp_proxy_enabled
+          if zerotrust_connectivity_settings_icmp_proxy_enabled is not none
+          else omit }}"
     offramp_warp_enabled:
-      "{{ zerotrust_connectivity_settings_offramp_warp_enabled | d(omit) }}"
+      "{{ zerotrust_connectivity_settings_offramp_warp_enabled
+          if zerotrust_connectivity_settings_offramp_warp_enabled is not none
+          else omit }}"
   when:
     - zerotrust_connectivity_settings_account_id is not none
     - zerotrust_connectivity_settings_api_token is not none
