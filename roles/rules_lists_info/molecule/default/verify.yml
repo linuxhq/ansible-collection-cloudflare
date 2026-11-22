@@ -9,11 +9,13 @@
     - name: Ensure info is verified
       ansible.builtin.assert:
         that:
-          - _rules_lists_info_dict[rules_lists_list.0.name].description is defined
+          - _rules_lists_info_dict[rules_lists_list.0.name].created_on is defined
+          - _rules_lists_info_dict[rules_lists_list.0.name].description == rules_lists_list.0.name
           - _rules_lists_info_dict[rules_lists_list.0.name].id is defined
           - _rules_lists_info_dict[rules_lists_list.0.name].kind == 'ip'
-          - _rules_lists_info_dict[rules_lists_list.0.name].name is defined
-          - _rules_lists_info_dict[rules_lists_list.0.name].num_items > 0
+          - _rules_lists_info_dict[rules_lists_list.0.name].modified_on is defined
+          - _rules_lists_info_dict[rules_lists_list.0.name].name == rules_lists_list.0.name
+          - _rules_lists_info_dict[rules_lists_list.0.name].num_items | int ==
+            rules_lists_list.0.elements | length
           - _rules_lists_info_dict[rules_lists_list.0.name].num_referencing_filters is defined
-
 ...

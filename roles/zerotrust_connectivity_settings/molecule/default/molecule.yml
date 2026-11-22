@@ -4,5 +4,4 @@ provisioner:
     group_vars:
       all:
         zerotrust_connectivity_settings_icmp_proxy_enabled: true
-        zerotrust_connectivity_settings_offramp_warp_enabled: true
 ...

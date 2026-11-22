@@ -12,4 +12,9 @@
           - _devices_settings_info_dict.gateway_proxy_enabled | bool
           - _devices_settings_info_dict.gateway_udp_proxy_enabled | bool
           - _devices_settings_info_dict.use_zt_virtual_ip | bool
+
+    - name: Ensure setting left null is unchanged
+      ansible.builtin.assert:
+        that:
+          - _devices_settings_info_dict.root_certificate_installation_enabled | bool
 ...
