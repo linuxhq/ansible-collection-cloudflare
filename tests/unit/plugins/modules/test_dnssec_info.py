@@ -41,7 +41,10 @@ class DnssecInfoTests(TestCase):
     def test_skips_unsupported_zones_with_unmodified_error_details(self):
         for status_code in (400, 404):
             with self.subTest(status_code=status_code):
-                error = status_error(status_code, {"errors": [{"api_token": "secret"}], "messages": ["invalid"]})
+                error = status_error(
+                    status_code,
+                    {"errors": [{"api_token": "secret"}], "messages": [{"code": 1000, "message": "invalid"}]},
+                )
 
                 with self.assertRaises(ModuleExit) as raised:
                     dnssec_info.run(FakeModule({}), client_with(error=error))
@@ -55,7 +58,7 @@ class DnssecInfoTests(TestCase):
                             "zone_name": "example.com",
                             "status_code": status_code,
                             "errors": [{"api_token": "secret"}],
-                            "messages": ["invalid"],
+                            "messages": [{"code": 1000, "message": "invalid"}],
                         }
                     ],
                 )
