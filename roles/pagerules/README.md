@@ -4,6 +4,8 @@
 
 Manage cloudflare pagerules
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/page_rules/).
+
 ## Requirements
 
 | Type | Permission | Value |
@@ -13,8 +15,10 @@ Manage cloudflare pagerules
 
 ## Role Variables
 
-    pagerules_api_token: null
-    pagerules_list: []
+| Variable              | Default | Description                               |
+| --------------------- | ------- | ----------------------------------------- |
+| `pagerules_api_token` | `null`  | Cloudflare API token; null skips the role |
+| `pagerules_list`      | `[]`    | Zones and their page rules to manage      |
 
 ## Dependencies
 

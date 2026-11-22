@@ -4,6 +4,8 @@
 
 Gather information about cloudflare pagerules
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/page_rules/).
+
 ## Requirements
 
 | Type | Permission | Value |
@@ -13,7 +15,9 @@ Gather information about cloudflare pagerules
 
 ## Role Variables
 
-    pagerules_info_api_token: null
+| Variable                   | Default | Description                               |
+| -------------------------- | ------- | ----------------------------------------- |
+| `pagerules_info_api_token` | `null`  | Cloudflare API token; null skips the role |
 
 ## Dependencies
 

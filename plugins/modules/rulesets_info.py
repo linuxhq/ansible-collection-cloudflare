@@ -73,7 +73,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     cloudflare_error_context,
     get_or_none,
-    require_mapping_list,
     resource_field,
     resource_id,
     resource_list,
@@ -128,9 +127,8 @@ def run(module, client):
             context = {"zone_id": zone["id"], "phase": phase}
             entry["id"] = resource_id(module, ruleset, "ruleset", context=context)
             entry["phase"] = resource_field(module, ruleset, "phase", "ruleset", expected=phase, context=context)
-            rules = ruleset.get("rules")
-            if rules is not None:
-                entry["rules"] = require_mapping_list(module, rules, "ruleset", "ruleset rule", context)
+            # The SDK types rules as optional; treat null as no rules.
+            entry["rules"] = ruleset.get("rules") or []
 
         rulesets.append(entry)
 

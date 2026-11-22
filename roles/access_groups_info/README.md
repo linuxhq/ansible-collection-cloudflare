@@ -4,6 +4,8 @@
 
 Gather information about cloudflare access groups
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/groups/).
+
 ## Requirements
 
 | Type    | Permission                                            | Value |
@@ -13,8 +15,10 @@ Gather information about cloudflare access groups
 
 ## Role Variables
 
-    access_groups_info_account_id: null
-    access_groups_info_api_token: null
+| Variable                        | Default | Description                                |
+| ------------------------------- | ------- | ------------------------------------------ |
+| `access_groups_info_account_id` | `null`  | Cloudflare account ID; null skips the role |
+| `access_groups_info_api_token`  | `null`  | Cloudflare API token; null skips the role  |
 
 ## Dependencies
 

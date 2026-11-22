@@ -4,6 +4,8 @@
 
 Gather information about cloudflare cfd tunnels
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/subresources/cloudflared/).
+
 ## Requirements
 
 | Type    | Permission        | Value |
@@ -14,10 +16,12 @@ Gather information about cloudflare cfd tunnels
 
 ## Role Variables
 
-    cfd_tunnel_info_account_id: null
-    cfd_tunnel_info_api_token: null
-    cfd_tunnel_info_include_token: false
-    cfd_tunnel_info_no_log: false
+| Variable                        | Default | Description                                |
+| ------------------------------- | ------- | ------------------------------------------ |
+| `cfd_tunnel_info_account_id`    | `null`  | Cloudflare account ID; null skips the role |
+| `cfd_tunnel_info_api_token`     | `null`  | Cloudflare API token; null skips the role  |
+| `cfd_tunnel_info_include_token` | `false` | Return each tunnel's token                 |
+| `cfd_tunnel_info_no_log`        | `false` | Hide task output from logs                 |
 
 ## Dependencies
 

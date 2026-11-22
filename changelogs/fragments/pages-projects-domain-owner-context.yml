@@ -1,0 +1,8 @@
+---
+bugfixes:
+  - pages_projects - report the managed project as ``name`` and the other project as ``project`` when the request
+    for another project's custom domains fails, as a malformed response of the same request already did. The failure
+    used to report the other project as ``name``.
+trivial:
+  - pages_projects - move the null deployment settings comment to its constant, drop a stale domains comment, and
+    drop the unused ``domains`` field from unit test fixtures.

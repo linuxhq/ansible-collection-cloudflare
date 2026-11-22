@@ -26,7 +26,7 @@
   ansible.builtin.set_fact:
     _access_identity_providers_info_dict:
       "{{ (dict(_access_identity_providers_info_list |
-               json_query('[].type') |
+               map(attribute='type') |
                zip(_access_identity_providers_info_list))) |
           d({}) }}"
   no_log: "{{ access_identity_providers_info_no_log }}"

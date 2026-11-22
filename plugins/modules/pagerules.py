@@ -181,7 +181,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_present,
     payload_from_params,
     require_mapping,
-    require_mapping_list,
     resource_id,
     serialize_resource,
     unsupported_fields,
@@ -190,12 +189,12 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     without_retries,
 )
 
+# Fields sent from the module parameters, and carried from the current rule on update.
 FIELDS = ("priority", "status")
 
 # Cloudflare answers a request for a deleted page rule with this error code
 # and a 400 status.
 INVALID_PAGERULE_CODE = 1002
-PRESERVED_FIELDS = ("priority", "status")
 
 # Actions whose value mapping is compared on every key, not only those requested.
 EXACT_VALUE_ACTIONS = ("cache_ttl_by_status",)
@@ -249,12 +248,8 @@ def validate_field_names(module):
 
 
 def pagerule_targets(module, pagerule):
-    context = {"zone_id": module.params["zone_id"]}
-    require_mapping(module, pagerule, "page rule", context)
-    if "id" in pagerule:
-        context["resource_id"] = pagerule["id"]
-
-    return require_mapping_list(module, pagerule.get("targets"), "page rule", "page rule target", context)
+    require_mapping(module, pagerule, "page rule", {"zone_id": module.params["zone_id"]})
+    return pagerule["targets"]
 
 
 def canonical_url(value):
@@ -301,8 +296,7 @@ def ordered_actions(actions, current):
     Cloudflare lists a rule's actions sorted by id but echoes a write in request
     order, so action order is not significant.
     """
-    current_actions = (current or {}).get("actions")
-    order = [action.get("id") for action in current_actions or () if isinstance(action, dict)]
+    order = [action.get("id") for action in current["actions"]] if current is not None else []
     return sorted(
         actions,
         key=lambda action: (
@@ -320,13 +314,9 @@ def comparable_pagerule(pagerule, actions):
     request lacks is replaced by its sorted keys, which never match a mapping.
     """
     requested = {action.get("id"): action.get("value") for action in actions}
-    current_actions = pagerule.get("actions")
-    if not isinstance(current_actions, list):
-        return pagerule
-
     comparable_actions = []
-    for action in current_actions:
-        if isinstance(action, dict) and action.get("id") in EXACT_VALUE_ACTIONS:
+    for action in pagerule["actions"]:
+        if action.get("id") in EXACT_VALUE_ACTIONS:
             value = action.get("value")
             wanted = requested.get(action["id"])
             if isinstance(value, dict) and isinstance(wanted, dict) and not value.keys() <= wanted.keys():
@@ -345,11 +335,10 @@ def target_identity(targets):
     """
     identity = []
     for target in targets:
-        if isinstance(target, dict):
-            target = {key: value for key, value in target.items() if key in ("constraint", "target")}
-            constraint = target.get("constraint")
-            if isinstance(constraint, dict):
-                target["constraint"] = {key: value for key, value in constraint.items() if key in ("operator", "value")}
+        target = {key: value for key, value in target.items() if key in ("constraint", "target")}
+        constraint = target.get("constraint")
+        if isinstance(constraint, dict):
+            target["constraint"] = {key: value for key, value in constraint.items() if key in ("operator", "value")}
 
         identity.append(target)
 
@@ -451,7 +440,7 @@ def run(module, client):
         create=lambda payload: without_retries(client).page_rules.create(zone_id=zone_id, **payload),
         update=lambda pagerule_id, payload: page_rules.update(pagerule_id=pagerule_id, zone_id=zone_id, **payload),
         find_created=lambda: matching_pagerules(module, client, targets)[0],
-        preserved_fields=PRESERVED_FIELDS,
+        preserved_fields=FIELDS,
         context={"zone_id": zone_id},
         comparable=lambda pagerule, failure: comparable_pagerule(pagerule, payload["actions"]),
     )

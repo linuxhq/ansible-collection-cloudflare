@@ -4,6 +4,8 @@
 
 Manage cloudflare zones
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zones/).
+
 ## Requirements
 
 | Type    | Permission       | Value |
@@ -14,14 +16,16 @@ Manage cloudflare zones
 
 ## Role Variables
 
-    zones_account_id: null
-    zones_api_token: null
-    zones_async: 300
-    zones_batch: 10
-    zones_delay: 3
-    zones_list: []
-    zones_poll: 0
-    zones_retries: 100
+| Variable           | Default | Description                                           |
+| ------------------ | ------- | ----------------------------------------------------- |
+| `zones_account_id` | `null`  | Account to create and look up zones in; null omits it |
+| `zones_api_token`  | `null`  | Cloudflare API token; null skips the role             |
+| `zones_async`      | `300`   | Seconds each async job may run                        |
+| `zones_batch`      | `10`    | Items submitted per batch                             |
+| `zones_delay`      | `3`     | Seconds between job status checks                     |
+| `zones_list`       | `[]`    | Zones to manage                                       |
+| `zones_poll`       | `0`     | Async poll interval; 0 runs jobs in the background    |
+| `zones_retries`    | `100`   | Job status checks before failing                      |
 
 ## Dependencies
 

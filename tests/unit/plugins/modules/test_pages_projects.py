@@ -275,8 +275,7 @@ class PagesProjectsTests(TestCase):
             "site.xn--p1ai",
         ):
             with self.subTest(name=name):
-                current = {**PROJECT, "domains": [name.lower()]}
-                client, api = client_with([current], domains=[{"name": name.lower()}])
+                client, api = client_with([PROJECT], domains=[{"name": name.lower()}])
 
                 result = self.run_module(FakeModule(params(domains=[{"name": name}])), client)
 
@@ -297,8 +296,7 @@ class PagesProjectsTests(TestCase):
             "p40fix.trycloudflare.com",
         ):
             with self.subTest(name=name):
-                current = {**PROJECT, "domains": [name]}
-                client, api = client_with([current], domains=[{"name": name}])
+                client, api = client_with([PROJECT], domains=[{"name": name}])
 
                 result = self.run_module(FakeModule(params(domains=[{"name": name}])), client)
 
@@ -308,8 +306,7 @@ class PagesProjectsTests(TestCase):
     def test_accepts_domain_names_at_the_length_limits(self):
         for name in (f"{'a' * 63}.example.com", ".".join(["a" * 63] * 3 + ["b" * 61]), "xn--bcher-kva.Example.com"):
             with self.subTest(name=name):
-                current = {**PROJECT, "domains": [name.lower()]}
-                client, api = client_with([current], domains=[{"name": name.lower()}])
+                client, api = client_with([PROJECT], domains=[{"name": name.lower()}])
 
                 result = self.run_module(FakeModule(params(domains=[{"name": name}])), client)
 
@@ -1133,10 +1130,9 @@ class PagesProjectsTests(TestCase):
 
     def test_adds_only_missing_unique_domains(self):
         domains = [{"name": "docs.example.com"}, {"name": "new.example.com"}, {"name": "new.example.com"}]
-        current = {**PROJECT, "domains": ["docs.example.com"]}
-        refreshed = {**current, "domains": ["docs.example.com", "new.example.com"]}
+        refreshed = {**PROJECT, "domains": ["docs.example.com", "new.example.com"]}
         client, api = client_with(
-            [current, refreshed],
+            [PROJECT, refreshed],
             domains=[{"name": "docs.example.com"}],
             created_domain={"name": "new.example.com"},
         )
@@ -1198,8 +1194,7 @@ class PagesProjectsTests(TestCase):
         self.assertEqual(result["domains"], [{"name": "new.example.com"}])
 
     def test_domain_names_compare_case_insensitively(self):
-        current = {**PROJECT, "domains": ["docs.example.com"]}
-        client, api = client_with([current], domains=[{"name": "docs.example.com"}])
+        client, api = client_with([PROJECT], domains=[{"name": "docs.example.com"}])
 
         result = self.run_module(FakeModule(params(domains=[{"name": "Docs.Example.com"}])), client)
 
@@ -1208,13 +1203,7 @@ class PagesProjectsTests(TestCase):
         self.assertFalse(result["changed"])
 
     def test_rejects_domain_of_another_project_before_any_write(self):
-        account_projects = [
-            {"name": "docs", "domains": ["docs.pages.dev"]},
-            {"name": "active", "domains": ["active.pages.dev", "unrelated.example.com"]},
-            {"name": "other", "domains": ["other.pages.dev"]},
-        ]
-        # A pending custom domain is only in the domains list, and an active
-        # one is also in the project's domains field.
+        account_projects = [{"name": "docs"}, {"name": "active"}, {"name": "other"}]
         other_domains = {
             "active": [{"name": "unrelated.example.com"}],
             "other": [{"name": "Shared.example.com"}],
@@ -1300,7 +1289,7 @@ class PagesProjectsTests(TestCase):
 
     def test_adds_domain_no_other_project_has(self):
         refreshed = {**PROJECT, "domains": ["new.example.com"]}
-        account_projects = [{"name": "docs"}, {"name": "other", "domains": ["other.pages.dev"]}]
+        account_projects = [{"name": "docs"}, {"name": "other"}]
         client, api = client_with(
             [PROJECT, refreshed],
             created_domain={"name": "new.example.com"},
@@ -1389,6 +1378,30 @@ class PagesProjectsTests(TestCase):
         self.assertEqual(result["name"], "docs")
         self.assertEqual(result["project"], "other")
 
+    def test_failed_domains_request_of_another_project_names_it(self):
+        client, _ignored = client_with([PROJECT], account_projects=[PROJECT, {"name": "other"}])
+        get = client.get.side_effect
+
+        def get_or_deny(path, cast_to, options):
+            if "/projects/other/" in path:
+                raise status_error(403)
+
+            return get(path, cast_to, options)
+
+        client.get.side_effect = get_or_deny
+
+        with self.assertRaises(cloudflare.PermissionDeniedError) as raised:
+            pages_projects.run(FakeModule(params(domains=[{"name": "new.example.com"}])), client)
+
+        self.assertEqual(
+            raised.exception._cloudflare_context,
+            {"account_id": "account", "name": "docs", "project": "other"},
+        )
+        self.assertEqual(
+            raised.exception._cloudflare_message,
+            "Cloudflare API request failed while gathering Pages project domains",
+        )
+
     def test_absent_project_is_unchanged(self):
         client, api = client_with([None])
 
@@ -1407,8 +1420,7 @@ class PagesProjectsTests(TestCase):
         self.assertTrue(result["changed"])
 
     def test_deletes_only_the_project(self):
-        project = {**PROJECT, "domains": ["a.example.com"]}
-        client, api = client_with([project], domains=[{"name": "a.example.com"}])
+        client, api = client_with([PROJECT], domains=[{"name": "a.example.com"}])
 
         result = self.run_module(
             FakeModule(params(state="absent", domains=[{"name": "A.Example.com"}, {"name": "b.example.com"}])),

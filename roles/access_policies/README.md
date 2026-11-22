@@ -4,6 +4,8 @@
 
 Manage cloudflare access policies
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/policies/).
+
 ## Requirements
 
 | Type    | Permission                                            | Value |
@@ -14,14 +16,16 @@ Manage cloudflare access policies
 
 ## Role Variables
 
-    access_policies_account_id: null
-    access_policies_api_token: null
-    access_policies_async: 300
-    access_policies_batch: 10
-    access_policies_delay: 3
-    access_policies_list: []
-    access_policies_poll: 0
-    access_policies_retries: 100
+| Variable                     | Default | Description                                        |
+| ---------------------------- | ------- | -------------------------------------------------- |
+| `access_policies_account_id` | `null`  | Cloudflare account ID; null skips the role         |
+| `access_policies_api_token`  | `null`  | Cloudflare API token; null skips the role          |
+| `access_policies_async`      | `300`   | Seconds each async job may run                     |
+| `access_policies_batch`      | `10`    | Items submitted per batch                          |
+| `access_policies_delay`      | `3`     | Seconds between job status checks                  |
+| `access_policies_list`       | `[]`    | Access policies to manage                          |
+| `access_policies_poll`       | `0`     | Async poll interval; 0 runs jobs in the background |
+| `access_policies_retries`    | `100`   | Job status checks before failing                   |
 
 ## Dependencies
 

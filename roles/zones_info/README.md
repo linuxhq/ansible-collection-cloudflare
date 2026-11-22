@@ -4,6 +4,8 @@
 
 Gather information about cloudflare zones
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zones/).
+
 ## Requirements
 
 | Type | Permission | Value |
@@ -12,7 +14,9 @@ Gather information about cloudflare zones
 
 ## Role Variables
 
-    zones_info_api_token: null
+| Variable               | Default | Description                               |
+| ---------------------- | ------- | ----------------------------------------- |
+| `zones_info_api_token` | `null`  | Cloudflare API token; null skips the role |
 
 ## Dependencies
 

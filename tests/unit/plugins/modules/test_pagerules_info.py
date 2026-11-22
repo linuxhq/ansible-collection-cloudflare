@@ -53,23 +53,6 @@ class PageRulesInfoTests(TestCase):
 
         self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed zone data")
 
-    def test_rejects_malformed_rule_collections(self):
-        for rule in (
-            {"actions": [], "targets": []},
-            {"id": "rule", "actions": {}, "targets": []},
-            {"id": "rule", "actions": [], "targets": ["invalid"]},
-        ):
-            with self.subTest(rule=rule):
-                client = client_with(ZONES[:1], {"zone": [rule]})
-
-                with self.assertRaises(ModuleFail) as raised:
-                    pagerules_info.run(FakeModule({}), client)
-
-                self.assertIn("malformed page rule", raised.exception.values["msg"])
-                self.assertEqual(raised.exception.values["zone_id"], "zone")
-                if "id" in rule:
-                    self.assertEqual(raised.exception.values["resource_id"], "rule")
-
     def test_skips_zones_deleted_after_listing(self):
         invalid_zone = {"success": False, "errors": [{"code": 1001, "message": "Invalid zone identifier"}]}
         for error in (status_error(404), status_error(400, invalid_zone)):

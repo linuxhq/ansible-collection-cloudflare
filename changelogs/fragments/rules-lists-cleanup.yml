@@ -1,0 +1,5 @@
+---
+trivial:
+  - rules_lists - drop element type checks that the required string field check already guarantees, compare the
+    item count Cloudflare always returns, and stop treating 429 as a pending operation, as it is already retried as
+    a transient error.

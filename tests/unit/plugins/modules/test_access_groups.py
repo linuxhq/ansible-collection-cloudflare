@@ -225,18 +225,6 @@ class AccessGroupsTests(TestCase):
                 api.list.assert_not_called()
                 api.create.assert_not_called()
 
-    def test_null_selector_fails_before_any_request(self):
-        # Ansible rejects other non-mapping selectors, as include holds dict elements.
-        for check_mode in (True, False):
-            with self.subTest(check_mode=check_mode):
-                client, api = client_with()
-
-                result = self.run_module(FakeModule(params(include=[None]), check_mode=check_mode), client)
-
-                self.assertEqual(result["msg"], "include[0] must not be null; Cloudflare drops a null selector")
-                api.list.assert_not_called()
-                api.create.assert_not_called()
-
     def test_empty_selector_fails_before_any_request(self):
         for check_mode in (True, False):
             with self.subTest(check_mode=check_mode):

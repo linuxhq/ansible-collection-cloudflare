@@ -4,6 +4,8 @@
 
 Manage cloudflare dns records
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/dns/subresources/records/).
+
 ## Requirements
 
 | Type    | Permission                     | Value |
@@ -18,13 +20,15 @@ Manage cloudflare dns records
 
 ## Role Variables
 
-    dns_api_token: null
-    dns_async: 300
-    dns_batch: 10
-    dns_delay: 3
-    dns_poll: 0
-    dns_records: []
-    dns_retries: 100
+| Variable        | Default | Description                                        |
+| --------------- | ------- | -------------------------------------------------- |
+| `dns_api_token` | `null`  | Cloudflare API token; null skips the role          |
+| `dns_async`     | `300`   | Seconds each async job may run                     |
+| `dns_batch`     | `10`    | Items submitted per batch                          |
+| `dns_delay`     | `3`     | Seconds between job status checks                  |
+| `dns_poll`      | `0`     | Async poll interval; 0 runs jobs in the background |
+| `dns_records`   | `[]`    | Zones and their DNS records to manage              |
+| `dns_retries`   | `100`   | Job status checks before failing                   |
 
 ## Dependencies
 

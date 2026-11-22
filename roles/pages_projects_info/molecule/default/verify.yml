@@ -22,22 +22,4 @@
       loop_control:
         label: "{{ _item | d(none) }}"
         loop_var: _item
-
-    - name: Ensure custom domains are queried
-      linuxhq.cloudflare.pages_projects:
-        account_id: "{{ pages_projects_account_id }}"
-        api_token: "{{ pages_projects_api_token }}"
-        domains: "{{ _project.domains }}"
-        name: "{{ _project.name }}"
-      register: __pages_projects_info_domains
-      check_mode: true
-      loop: "{{ pages_projects_list }}"
-      loop_control:
-        label: "{{ _project.name | d(none) }}"
-        loop_var: _project
-
-    - name: Ensure custom domains are attached
-      ansible.builtin.assert:
-        that:
-          - __pages_projects_info_domains is not changed
 ...

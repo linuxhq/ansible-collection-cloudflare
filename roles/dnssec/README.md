@@ -4,6 +4,8 @@
 
 Manage cloudflare dnssec settings
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/dns/subresources/dnssec/).
+
 ## Requirements
 
 | Type | Permission | Value |
@@ -13,13 +15,15 @@ Manage cloudflare dnssec settings
 
 ## Role Variables
 
-    dnssec_api_token: null
-    dnssec_async: 300
-    dnssec_batch: 10
-    dnssec_delay: 3
-    dnssec_list: []
-    dnssec_poll: 0
-    dnssec_retries: 100
+| Variable           | Default | Description                                        |
+| ------------------ | ------- | -------------------------------------------------- |
+| `dnssec_api_token` | `null`  | Cloudflare API token; null skips the role          |
+| `dnssec_async`     | `300`   | Seconds each async job may run                     |
+| `dnssec_batch`     | `10`    | Items submitted per batch                          |
+| `dnssec_delay`     | `3`     | Seconds between job status checks                  |
+| `dnssec_list`      | `[]`    | Zone DNSSEC settings to manage                     |
+| `dnssec_poll`      | `0`     | Async poll interval; 0 runs jobs in the background |
+| `dnssec_retries`   | `100`   | Job status checks before failing                   |
 
 ## Dependencies
 

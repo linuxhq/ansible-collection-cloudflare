@@ -109,6 +109,7 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    checked_written,
     cloudflare_client,
     cloudflare_error_context,
     create_once,
@@ -117,9 +118,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     find_resource,
     matching_resources,
     payload_from_params,
-    resource_field,
     resource_id,
-    serialize_resource,
     without_retries,
 )
 
@@ -141,22 +140,15 @@ def checked_token(module, service_token, expected_id=None):
     A failure reports changed=True and includes the token, as a created
     token's client secret is returned only once.
     """
-    service_token = serialize_resource(service_token)
-    failure = {
-        "changed": True,
-        "account_id": module.params["account_id"],
-        "name": module.params["name"],
-        "service_token": service_token,
-    }
-    if expected_id is not None:
-        failure["resource_id"] = expected_id
-
-    token_id = resource_id(module, service_token, "service token", expected=expected_id, context=failure)
-    failure = {"resource_id": token_id, **failure}
-    name = resource_field(module, service_token, "name", "service token", context=failure)
-    if name != module.params["name"]:
-        module.fail_json(msg="Cloudflare API returned the wrong service token", **failure)
-
+    service_token, failure = checked_written(
+        module,
+        service_token,
+        "service token",
+        "service_token",
+        {"account_id": module.params["account_id"], "name": module.params["name"]},
+        expected_name=module.params["name"],
+        expected_id=expected_id,
+    )
     if not duration_matches(service_token, module.params["duration"]):
         fail_not_applied(
             module,

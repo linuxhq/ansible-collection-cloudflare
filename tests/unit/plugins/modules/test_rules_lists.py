@@ -21,7 +21,7 @@ PENDING_BODY = {
     "errors": [{"code": 10000, "message": "a bulk operation is already pending"}],
     "messages": [],
 }
-CURRENT = {"id": "list", "name": "addresses", "kind": "ip", "description": "current"}
+CURRENT = {"id": "list", "name": "addresses", "kind": "ip", "description": "current", "num_items": 0}
 
 
 def params(**updates):
@@ -359,7 +359,7 @@ class RulesListsTests(TestCase):
         api.create.assert_called_once_with(account_id="account", description="addresses", kind=None, name="addresses")
 
     def test_creates_list_with_default_description(self):
-        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
+        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses", "num_items": 0}
         client, api = make_client(created=created)
 
         result = self.run_module(FakeModule(params()), client)
@@ -1216,7 +1216,7 @@ class RulesListsTests(TestCase):
         self.assertEqual(result["rules_list"]["num_items"], 1)
 
     def test_created_list_is_kept_when_items_are_rejected(self):
-        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
+        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses", "num_items": 0}
         body = {"success": False, "errors": [{"code": 10026, "message": "filter parsing error"}], "messages": []}
         client, api = make_client(created=created)
         api.items.update.side_effect = status_error(400, body)
@@ -1237,7 +1237,7 @@ class RulesListsTests(TestCase):
         )
 
     def test_created_list_is_kept_when_the_items_operation_fails(self):
-        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
+        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses", "num_items": 0}
         client, api = make_client(created=created)
         api.bulk_operations.get.return_value = {"id": "operation", "status": "failed", "error": "bad"}
 
@@ -1249,7 +1249,7 @@ class RulesListsTests(TestCase):
         self.assertEqual(result["operation"], {"id": "operation", "status": "failed", "error": "bad"})
 
     def test_wrong_operation_id_fails(self):
-        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
+        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses", "num_items": 0}
         client, api = make_client(created=created)
         api.bulk_operations.get.return_value = {"id": "other", "status": "completed"}
 
@@ -1366,7 +1366,7 @@ class RulesListsTests(TestCase):
         self.assertTrue(result["changed"])
 
     def test_failures_after_create_report_the_created_list(self):
-        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}
+        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses", "num_items": 0}
         written = {"changed": True, "account_id": "account", "rules_list_id": "list", "rules_list": created}
         operations = {
             "failed": {"id": "operation", "status": "failed"},

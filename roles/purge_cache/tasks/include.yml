@@ -4,8 +4,8 @@
     - purge_cache
   linuxhq.cloudflare.purge_cache:
     api_token: "{{ purge_cache_api_token }}"
-    cache: "{{ _cache.cache }}"
-    zone_id: "{{ _cache.zone_id }}"
+    cache: "{{ _cache.cache | d(omit) }}"
+    zone_id: "{{ _cache.zone_id | d(omit) }}"
   register: __purge_cache_result
   loop: "{{ __purge_cache_list }}"
   loop_control:
@@ -15,8 +15,6 @@
   poll: "{{ purge_cache_poll }}"
   when:
     - purge_cache_api_token is not none
-    - _cache.cache is defined
-    - _cache.zone_id is defined
   changed_when:
     - ansible_check_mode | bool
     - __purge_cache_result.changed | bool

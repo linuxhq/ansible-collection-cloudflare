@@ -406,18 +406,15 @@ def list_items(client, account_id, list_id, context=None):
 
 
 def pending_operation_error(exc):
-    if getattr(exc, "status_code", None) not in (400, 409, 429):
-        return False
-
-    return "operation" in f"{exc} {getattr(exc, 'body', '')}".lower()
+    """Return whether the APIStatusError exc rejects a write while another operation is pending."""
+    return exc.status_code in (400, 409) and "operation" in f"{exc} {exc.body}".lower()
 
 
 def transient_error(exc):
     if isinstance(exc, cloudflare.APIConnectionError):
         return True
 
-    status_code = getattr(exc, "status_code", None)
-    return status_code == 429 or (isinstance(status_code, int) and status_code >= 500)
+    return exc.status_code == 429 or exc.status_code >= 500
 
 
 def submit_items(module, client, account_id, list_id, items, deadline, context=None):
@@ -439,7 +436,7 @@ def submit_items(module, client, account_id, list_id, items, deadline, context=N
                 )
         except (cloudflare.APIConnectionError, cloudflare.APIStatusError) as exc:
             if (
-                not (pending_operation_error(exc) or transient_error(exc))
+                not (transient_error(exc) or pending_operation_error(exc))
                 or deadline - time.monotonic() < OPERATION_POLL_SECONDS + 1
             ):
                 raise
@@ -524,11 +521,12 @@ def normalize_items(items):
             if key == "comment" and value == "":
                 continue
 
+            # Items are validated elements or SDK items, so each value has its kind's type.
             normalized_value = value
-            if key == "ip" and isinstance(normalized_value, str):
+            if key == "ip":
                 normalized_value = canonical_ip(normalized_value)
 
-            if key == "hostname" and isinstance(normalized_value, dict):
+            if key == "hostname":
                 hostname = {
                     hostname_key: hostname_value
                     for hostname_key, hostname_value in normalized_value.items()
@@ -540,7 +538,7 @@ def normalize_items(items):
 
                 normalized_value = hostname
 
-            if key == "redirect" and isinstance(normalized_value, dict):
+            if key == "redirect":
                 normalized_value = {
                     redirect_key: redirect_value
                     for redirect_key, redirect_value in normalized_value.items()
@@ -696,7 +694,7 @@ def item_value(item, kind):
     """Return the value that identifies an item of the list kind."""
     value = item.get(kind)
     field = IDENTITY_FIELDS.get(kind)
-    return value.get(field) if field and isinstance(value, dict) else value
+    return value.get(field) if field else value
 
 
 def validate_elements(module, kind):
@@ -753,59 +751,61 @@ def validate_elements(module, kind):
         if kind == "asn" and (not isinstance(asn, int) or isinstance(asn, bool) or not 1 <= asn <= MAX_ASN):
             module.fail_json(msg=f"elements[{index}].asn must be an integer from 1 to {MAX_ASN}", asn=asn)
 
-        redirect = element.get("redirect") if kind == "redirect" else None
-        status_code = redirect.get("status_code") if isinstance(redirect, dict) else None
-        if status_code is not None and (
-            not isinstance(status_code, int)
-            or isinstance(status_code, bool)
-            or status_code not in REDIRECT_STATUS_CODES
-        ):
-            module.fail_json(
-                msg=f"elements[{index}].redirect.status_code must be one of 301, 302, 307, or 308",
-                status_code=status_code,
-            )
+        # REQUIRED_STRING_FIELDS guarantees a mapping with non-empty string URLs and hostname.
+        if kind == "redirect":
+            redirect = element["redirect"]
+            status_code = redirect.get("status_code")
+            if status_code is not None and (
+                not isinstance(status_code, int)
+                or isinstance(status_code, bool)
+                or status_code not in REDIRECT_STATUS_CODES
+            ):
+                module.fail_json(
+                    msg=f"elements[{index}].redirect.status_code must be one of 301, 302, 307, or 308",
+                    status_code=status_code,
+                )
 
-        source_url = redirect.get("source_url") if isinstance(redirect, dict) else None
-        source_url_problem = source_url_error(source_url) if isinstance(source_url, str) else None
-        if source_url_problem:
-            module.fail_json(msg=f"elements[{index}].redirect.source_url {source_url_problem}", source_url=source_url)
+            source_url = redirect["source_url"]
+            source_url_problem = source_url_error(source_url)
+            if source_url_problem:
+                module.fail_json(
+                    msg=f"elements[{index}].redirect.source_url {source_url_problem}", source_url=source_url
+                )
 
-        target_url = redirect.get("target_url") if isinstance(redirect, dict) else None
-        if isinstance(target_url, str) and not target_url_valid(target_url):
-            module.fail_json(
-                msg=(
-                    f"elements[{index}].redirect.target_url must start with a scheme, have "
-                    "no whitespace in its authority, and only digits in its port, must not start with whitespace "
-                    "or contain an ASCII control character, and may use '%' only in a percent-escape such as %20"
-                ),
-                target_url=target_url,
-            )
+            target_url = redirect["target_url"]
+            if not target_url_valid(target_url):
+                module.fail_json(
+                    msg=(
+                        f"elements[{index}].redirect.target_url must start with a scheme, have "
+                        "no whitespace in its authority, and only digits in its port, must not start with "
+                        "whitespace or contain an ASCII control character, and may use '%' only in a "
+                        "percent-escape such as %20"
+                    ),
+                    target_url=target_url,
+                )
 
-        hostname = element.get("hostname") if kind == "hostname" else None
-        url_hostname = hostname.get("url_hostname") if isinstance(hostname, dict) else None
-        if isinstance(url_hostname, str) and not valid_hostname(url_hostname):
-            module.fail_json(
-                msg=(
-                    f"elements[{index}].hostname.url_hostname may contain only ASCII letters, digits, "
-                    "'.', '-', '_', and a '*' wildcard only as a single leading '*.' label, "
-                    "each other label must have 1 to 63 characters and must not start or end with '-', "
-                    "and the name must have at most 253 characters"
-                ),
-                url_hostname=url_hostname,
-            )
+        if kind == "hostname":
+            hostname = element["hostname"]
+            url_hostname = hostname["url_hostname"]
+            if not valid_hostname(url_hostname):
+                module.fail_json(
+                    msg=(
+                        f"elements[{index}].hostname.url_hostname may contain only ASCII letters, digits, "
+                        "'.', '-', '_', and a '*' wildcard only as a single leading '*.' label, "
+                        "each other label must have 1 to 63 characters and must not start or end with '-', "
+                        "and the name must have at most 253 characters"
+                    ),
+                    url_hostname=url_hostname,
+                )
 
-        if (
-            isinstance(url_hostname, str)
-            and not url_hostname.startswith("*.")
-            and hostname.get("exclude_exact_hostname") is False
-        ):
-            module.fail_json(
-                msg=(
-                    f"elements[{index}].hostname.exclude_exact_hostname may be false only for a wildcard "
-                    "url_hostname such as '*.example.com'"
-                ),
-                url_hostname=url_hostname,
-            )
+            if not url_hostname.startswith("*.") and hostname.get("exclude_exact_hostname") is False:
+                module.fail_json(
+                    msg=(
+                        f"elements[{index}].hostname.exclude_exact_hostname may be false only for a wildcard "
+                        "url_hostname such as '*.example.com'"
+                    ),
+                    url_hostname=url_hostname,
+                )
 
         if kind == "ip" and not valid_ip(element["ip"]):
             module.fail_json(
@@ -967,8 +967,7 @@ def ensure_present(module, client, current):
 
     if params.get("elements") is not None:
         desired_items = normalize_items(params["elements"])
-        current_count = current.get("num_items")
-        if current_count is not None and current_count != len(desired_items):
+        if current["num_items"] != len(desired_items):
             items_changed = True
         else:
             items_changed = values_differ(

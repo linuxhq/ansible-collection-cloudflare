@@ -30,4 +30,27 @@
           - __purge_cache_check.purge_cache is not defined
           - __purge_cache_result is changed
           - __purge_cache_result.purge_cache.id == purge_cache_list.0.zone_id
+
+    - name: Ensure cache purge without a zone fails
+      block:
+        - name: Ensure cache purge without a zone is attempted
+          ansible.builtin.include_role:
+            name: purge_cache
+          vars:
+            purge_cache_async: 0
+            purge_cache_list:
+              - cache:
+                  purge_everything: true
+
+        - name: Ensure cache purge without a zone did not succeed
+          ansible.builtin.fail:
+            msg: A purge_cache_list item without zone_id was not rejected
+
+      rescue:
+        - name: Ensure cache purge without a zone names the option
+          ansible.builtin.assert:
+            that:
+              - "'missing required arguments: zone_id' in
+                 (ansible_failed_result.results | d([]) |
+                  map(attribute='msg', default='') | join(' '))"
 ...

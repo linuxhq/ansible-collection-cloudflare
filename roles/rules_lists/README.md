@@ -4,6 +4,8 @@
 
 Manage cloudflare rules lists
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/rules/subresources/lists/).
+
 ## Requirements
 
 | Type    | Permission           | Value |
@@ -13,14 +15,16 @@ Manage cloudflare rules lists
 
 ## Role Variables
 
-    rules_lists_account_id: null
-    rules_lists_api_token: null
-    rules_lists_async: 300
-    rules_lists_batch: 10
-    rules_lists_delay: 3
-    rules_lists_list: []
-    rules_lists_poll: 0
-    rules_lists_retries: 100
+| Variable                 | Default | Description                                        |
+| ------------------------ | ------- | -------------------------------------------------- |
+| `rules_lists_account_id` | `null`  | Cloudflare account ID; null skips the role         |
+| `rules_lists_api_token`  | `null`  | Cloudflare API token; null skips the role          |
+| `rules_lists_async`      | `300`   | Seconds each async job may run                     |
+| `rules_lists_batch`      | `10`    | Items submitted per batch                          |
+| `rules_lists_delay`      | `3`     | Seconds between job status checks                  |
+| `rules_lists_list`       | `[]`    | Rules lists to manage                              |
+| `rules_lists_poll`       | `0`     | Async poll interval; 0 runs jobs in the background |
+| `rules_lists_retries`    | `100`   | Job status checks before failing                   |
 
 ## Dependencies
 

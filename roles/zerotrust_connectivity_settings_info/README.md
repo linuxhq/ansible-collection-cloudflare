@@ -4,6 +4,8 @@
 
 Gather information about cloudflare zerotrust connectivity settings
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/connectivity_settings/).
+
 ## Requirements
 
 | Type    | Permission       | Value |
@@ -13,8 +15,10 @@ Gather information about cloudflare zerotrust connectivity settings
 
 ## Role Variables
 
-    zerotrust_connectivity_settings_info_account_id: null
-    zerotrust_connectivity_settings_info_api_token: null
+| Variable                                          | Default | Description                                |
+| ------------------------------------------------- | ------- | ------------------------------------------ |
+| `zerotrust_connectivity_settings_info_account_id` | `null`  | Cloudflare account ID; null skips the role |
+| `zerotrust_connectivity_settings_info_api_token`  | `null`  | Cloudflare API token; null skips the role  |
 
 ## Return Values
 

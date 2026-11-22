@@ -130,9 +130,6 @@ def checked_tunnel(module, tunnel, expected_id=None):
     A failure reports changed=True, the tunnel, and its identifiers.
     """
     context = {"account_id": module.params["account_id"], "name": module.params["name"]}
-    if expected_id is not None:
-        context["resource_id"] = expected_id
-
     tunnel, failure = checked_written(
         module, tunnel, "cloudflared tunnel", "cfd_tunnel", context, module.params["name"], expected_id
     )

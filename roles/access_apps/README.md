@@ -4,6 +4,8 @@
 
 Manage cloudflare access apps
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/applications/).
+
 ## Requirements
 
 | Type    | Permission                | Value |
@@ -13,14 +15,16 @@ Manage cloudflare access apps
 
 ## Role Variables
 
-    access_apps_account_id: null
-    access_apps_api_token: null
-    access_apps_async: 300
-    access_apps_batch: 10
-    access_apps_delay: 3
-    access_apps_list: []
-    access_apps_poll: 0
-    access_apps_retries: 100
+| Variable                 | Default | Description                                        |
+| ------------------------ | ------- | -------------------------------------------------- |
+| `access_apps_account_id` | `null`  | Cloudflare account ID; null skips the role         |
+| `access_apps_api_token`  | `null`  | Cloudflare API token; null skips the role          |
+| `access_apps_async`      | `300`   | Seconds each async job may run                     |
+| `access_apps_batch`      | `10`    | Items submitted per batch                          |
+| `access_apps_delay`      | `3`     | Seconds between job status checks                  |
+| `access_apps_list`       | `[]`    | Access apps to manage                              |
+| `access_apps_poll`       | `0`     | Async poll interval; 0 runs jobs in the background |
+| `access_apps_retries`    | `100`   | Job status checks before failing                   |
 
 ## Dependencies
 

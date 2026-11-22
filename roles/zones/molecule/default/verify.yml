@@ -19,6 +19,18 @@
         label: "{{ _item.name | d(none) }}"
         loop_var: _item
 
+    - name: Ensure zones are managed without an account
+      ansible.builtin.include_role:
+        name: zones
+      vars:
+        zones_account_id: null
+
+    - name: Ensure zones without an account are unchanged
+      ansible.builtin.assert:
+        that:
+          - __zones_status.results | length == zones_list | length
+          - __zones_status.results | select('changed') | list | length == 0
+
     - name: Ensure zone setting is updated
       linuxhq.cloudflare.zones:
         account_id: "{{ zones_account_id }}"

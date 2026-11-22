@@ -1,0 +1,7 @@
+---
+trivial:
+  - cloudflare_utils - remove ``require_mapping_list``.
+  - pagerules, pagerules_info, rulesets, rulesets_info - rely on the SDK models for the shape of page rule actions
+    and targets and of ruleset rules, keeping a null ``rules`` as no rules.
+  - pagerules - keep one tuple for the fields sent and preserved on update.
+  - rulesets - check the phase of a returned ruleset directly instead of re-serializing it.

@@ -4,6 +4,8 @@
 
 Gather information about cloudflare devices settings
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/devices/subresources/settings/).
+
 ## Requirements
 
 | Type    | Permission       | Value |
@@ -13,8 +15,10 @@ Gather information about cloudflare devices settings
 
 ## Role Variables
 
-    devices_settings_info_account_id: null
-    devices_settings_info_api_token: null
+| Variable                           | Default | Description                                |
+| ---------------------------------- | ------- | ------------------------------------------ |
+| `devices_settings_info_account_id` | `null`  | Cloudflare account ID; null skips the role |
+| `devices_settings_info_api_token`  | `null`  | Cloudflare API token; null skips the role  |
 
 ## Return Values
 

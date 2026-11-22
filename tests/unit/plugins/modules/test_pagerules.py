@@ -93,17 +93,6 @@ class PageRulesTests(TestCase):
         api.list.assert_called_once_with(zone_id="zone")
         self.assertEqual(result["pagerule"], rules[-1])
 
-    def test_rejects_malformed_targets(self):
-        for targets in ({}, ["invalid"]):
-            with self.subTest(targets=targets):
-                client, _ignored = client_with([{"id": "rule", "targets": targets}])
-
-                result = self.run_module(FakeModule(params()), client)
-
-                self.assertIn("malformed page rule", result["msg"])
-                self.assertEqual(result["zone_id"], "zone")
-                self.assertEqual(result["resource_id"], "rule")
-
     def test_malformed_rule_names_the_zone(self):
         client, _ignored = client_with(["invalid"])
 
@@ -135,7 +124,9 @@ class PageRulesTests(TestCase):
             ([{"target": "url", "constraint": "example.com/*"}], None),
         ):
             with self.subTest(targets=targets):
-                client, api = client_with([{"id": "other", "targets": TARGETS}], created={"id": "new"})
+                client, api = client_with(
+                    [{"id": "other", "targets": TARGETS}], created={"id": "new", "actions": ACTIONS, "targets": TARGETS}
+                )
 
                 self.run_module(FakeModule(params(targets=targets)), client)
 
@@ -201,7 +192,7 @@ class PageRulesTests(TestCase):
         self.assertEqual(result["pagerule"], created)
 
     def test_rejects_a_create_response_with_different_targets(self):
-        client, _ignored = client_with(created={"id": "rule", "targets": []})
+        client, _ignored = client_with(created={"id": "rule", "actions": ACTIONS, "targets": []})
 
         result = self.run_module(FakeModule(params()), client)
 
@@ -278,7 +269,7 @@ class PageRulesTests(TestCase):
 
     def test_negative_priority_reaches_cloudflare(self):
         # Cloudflare rejects a negative priority on the only write.
-        client, api = client_with(created={"id": "new"})
+        client, api = client_with(created={"id": "new", "actions": ACTIONS, "targets": TARGETS})
 
         self.run_module(FakeModule(params(priority=-1)), client)
 
@@ -593,7 +584,7 @@ class PageRulesTests(TestCase):
         for action in ({"id": 1, "value": "on"}, {"id": "", "value": "on"}, {"id": None}, {"value": "on"}):
             with self.subTest(action=action):
                 actions = [{"id": "ssl", "value": "strict"}, action]
-                client, api = client_with(created={"id": "new"})
+                client, api = client_with(created={"id": "new", "actions": ACTIONS, "targets": TARGETS})
 
                 self.run_module(FakeModule(params(actions=actions)), client)
 

@@ -4,6 +4,8 @@
 
 Manage cloudflare warp connectors
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/subresources/warp_connector/).
+
 ## Requirements
 
 | Type    | Permission                     | Value |
@@ -13,15 +15,17 @@ Manage cloudflare warp connectors
 
 ## Role Variables
 
-    warp_connector_account_id: null
-    warp_connector_api_token: null
-    warp_connector_async: 300
-    warp_connector_batch: 10
-    warp_connector_delay: 3
-    warp_connector_list: []
-    warp_connector_no_log: false
-    warp_connector_poll: 0
-    warp_connector_retries: 100
+| Variable                    | Default | Description                                        |
+| --------------------------- | ------- | -------------------------------------------------- |
+| `warp_connector_account_id` | `null`  | Cloudflare account ID; null skips the role         |
+| `warp_connector_api_token`  | `null`  | Cloudflare API token; null skips the role          |
+| `warp_connector_async`      | `300`   | Seconds each async job may run                     |
+| `warp_connector_batch`      | `10`    | Items submitted per batch                          |
+| `warp_connector_delay`      | `3`     | Seconds between job status checks                  |
+| `warp_connector_list`       | `[]`    | WARP connectors to manage                          |
+| `warp_connector_no_log`     | `false` | Hide task output from logs                         |
+| `warp_connector_poll`       | `0`     | Async poll interval; 0 runs jobs in the background |
+| `warp_connector_retries`    | `100`   | Job status checks before failing                   |
 
 Set `warp_connector_no_log: true` to keep the connector tokens and tunnel credentials that results include out of task output.
 

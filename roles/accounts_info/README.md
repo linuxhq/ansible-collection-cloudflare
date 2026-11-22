@@ -4,6 +4,8 @@
 
 Gather information about cloudflare accounts
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/accounts/).
+
 ## Requirements
 
 | Type    | Permission       | Value |
@@ -12,8 +14,10 @@ Gather information about cloudflare accounts
 
 ## Role Variables
 
-    accounts_info_api_token: null
-    accounts_info_name: null
+| Variable                  | Default | Description                               |
+| ------------------------- | ------- | ----------------------------------------- |
+| `accounts_info_api_token` | `null`  | Cloudflare API token; null skips the role |
+| `accounts_info_name`      | `null`  | Account name to read; null skips the role |
 
 ## Dependencies
 

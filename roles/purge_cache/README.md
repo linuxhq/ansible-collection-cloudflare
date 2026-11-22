@@ -4,6 +4,8 @@
 
 Manage cloudflare purging of cache
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/cache/).
+
 ## Requirements
 
 | Type | Permission  | Value |
@@ -13,13 +15,15 @@ Manage cloudflare purging of cache
 
 ## Role Variables
 
-    purge_cache_api_token: null
-    purge_cache_async: 300
-    purge_cache_batch: 10
-    purge_cache_delay: 3
-    purge_cache_list: []
-    purge_cache_poll: 0
-    purge_cache_retries: 100
+| Variable                | Default | Description                                        |
+| ----------------------- | ------- | -------------------------------------------------- |
+| `purge_cache_api_token` | `null`  | Cloudflare API token; null skips the role          |
+| `purge_cache_async`     | `300`   | Seconds each async job may run                     |
+| `purge_cache_batch`     | `10`    | Items submitted per batch                          |
+| `purge_cache_delay`     | `3`     | Seconds between job status checks                  |
+| `purge_cache_list`      | `[]`    | Cache purges to run                                |
+| `purge_cache_poll`      | `0`     | Async poll interval; 0 runs jobs in the background |
+| `purge_cache_retries`   | `100`   | Job status checks before failing                   |
 
 ## Dependencies
 
