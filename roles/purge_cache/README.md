@@ -21,6 +21,11 @@ Manage cloudflare purging of cache
     purge_cache_poll: 0
     purge_cache_retries: 100
 
+Each `purge_cache_list` item requires `zone_id` and `cache`, the
+`linuxhq.cloudflare.purge_cache` module options. An item without either fails,
+naming the missing option. The role does nothing while `purge_cache_api_token`
+is `null`.
+
 ## Dependencies
 
 * [zones\_info](../zones_info)
