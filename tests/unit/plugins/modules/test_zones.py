@@ -533,7 +533,7 @@ class ZonesTests(TestCase):
                 self.run_module(FakeModule(params(state="absent")), client)
 
     def test_malformed_lookup_names_the_zone(self):
-        for found in ([{"name": "example.com"}], [ZONE, {**ZONE, "id": "other"}]):
+        for found in ([{"name": "example.com"}], [ZONE, {**ZONE, "id": "other"}], ["invalid"]):
             client = client_with(found)
             with self.subTest(found=found):
                 result = self.run_module(FakeModule(params()), client)
