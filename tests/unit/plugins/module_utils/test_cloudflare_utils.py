@@ -885,7 +885,7 @@ class InfoTests(TestCase):
 
     def test_exit_settings_treats_null_as_empty(self):
         with self.assertRaises(ModuleExit) as raised:
-            exit_settings(FakeModule({}), "settings", None, "settings")
+            exit_settings(FakeModule({}), "settings", None)
 
         self.assertEqual(raised.exception.values, {"changed": False, "settings": {}})
 
