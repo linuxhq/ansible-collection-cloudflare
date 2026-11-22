@@ -1,7 +1,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import cloudflare
 
@@ -78,12 +78,19 @@ class AccessServiceTokensTests(TestCase):
 
     def test_token_recovered_after_a_lost_response_fails_without_its_secret(self):
         # The list model has no client secret, so the one the create response held is lost.
-        # The lost secret is reported even when Cloudflare stored another duration.
-        for duration in ("1y", "8760h"):
-            with self.subTest(duration=duration):
+        # The lost secret is reported even when Cloudflare stored another duration, with
+        # the details of the create error.
+        server_body = {"success": False, "errors": [{"code": 10000, "message": "Internal"}], "messages": []}
+        cases = (
+            ("1y", timeout_error, {"error": "Request timed out."}),
+            ("8760h", timeout_error, {"error": "Request timed out."}),
+            ("1y", lambda: status_error(500, server_body), {"status_code": 500, "response": server_body}),
+        )
+        for duration, error, details in cases:
+            with self.subTest(duration=duration, details=details):
                 recovered = {"id": "token", "name": "automation", "duration": duration}
                 client, api = client_with()
-                api.create.side_effect = timeout_error()
+                api.create.side_effect = error()
                 api.list.side_effect = [[], [recovered]]
 
                 with self.assertRaises(ModuleFail) as raised:
@@ -102,8 +109,34 @@ class AccessServiceTokensTests(TestCase):
                         "name": "automation",
                         "resource_id": "token",
                         "service_token": recovered,
+                        **details,
                     },
                 )
+
+    def test_retried_create_without_a_secret_reports_no_earlier_error(self):
+        created = {"id": "token", "name": "automation", "duration": "1y"}
+        client, api = client_with()
+        api.create.side_effect = [status_error(429), created]
+
+        with patch("time.sleep"):
+            result = self.run_module(FakeModule(params()), client)
+
+        self.assertEqual(api.create.call_count, 2)
+        self.assertIn("without a client secret", result["msg"])
+        self.assertNotIn("status_code", result)
+        self.assertNotIn("response", result)
+
+    def test_created_token_without_a_secret_fails_without_error_details(self):
+        created = {"id": "token", "name": "automation", "duration": "1y"}
+        client, _ignored = client_with(created=created)
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertIn("without a client secret", result["msg"])
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["service_token"], created)
+        self.assertNotIn("error", result)
+        self.assertNotIn("status_code", result)
 
     def test_create_failure_is_reported_without_a_single_match(self):
         for found in ([], [{"id": "one", "name": "automation"}, {"id": "two", "name": "automation"}]):
