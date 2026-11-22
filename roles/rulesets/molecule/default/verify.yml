@@ -5,8 +5,7 @@
   roles:
     - zones_info
 
-    - role: rulesets_info
-      rulesets_info_api_token: "{{ rulesets_api_token }}"
+    - rulesets_info
 
   post_tasks:
     - name: Ensure rulesets are verified

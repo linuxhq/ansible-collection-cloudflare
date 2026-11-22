@@ -3,9 +3,7 @@
   hosts: all
 
   roles:
-    - role: access_service_tokens_info
-      access_service_tokens_info_account_id: "{{ _accounts_info_id }}"
-      access_service_tokens_info_api_token: "{{ accounts_info_api_token }}"
+    - access_service_tokens_info
 
   post_tasks:
     - name: Ensure service tokens are verified

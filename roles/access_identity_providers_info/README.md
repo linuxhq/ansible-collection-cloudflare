@@ -15,11 +15,11 @@ See the [Cloudflare API reference](https://developers.cloudflare.com/api/resourc
 
 ## Role Variables
 
-| Variable                                    | Default | Description                                |
-| ------------------------------------------- | ------- | ------------------------------------------ |
-| `access_identity_providers_info_account_id` | `null`  | Cloudflare account ID; null skips the role |
-| `access_identity_providers_info_api_token`  | `null`  | Cloudflare API token; null skips the role  |
-| `access_identity_providers_info_no_log`     | `false` | Hide task output from logs                 |
+| Variable                                    | Default | Description                                                           |
+| ------------------------------------------- | ------- | --------------------------------------------------------------------- |
+| `access_identity_providers_info_account_id` | `null`  | Cloudflare account ID; null skips the query and publishes empty facts |
+| `access_identity_providers_info_api_token`  | `null`  | Cloudflare API token; null skips the query and publishes empty facts  |
+| `access_identity_providers_info_no_log`     | `false` | Hide task output from logs                                            |
 
 ## Dependencies
 

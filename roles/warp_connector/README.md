@@ -23,11 +23,9 @@ See the [Cloudflare API reference](https://developers.cloudflare.com/api/resourc
 | `warp_connector_batch`      | `10`    | Items submitted per batch                          |
 | `warp_connector_delay`      | `3`     | Seconds between job status checks                  |
 | `warp_connector_list`       | `[]`    | WARP connectors to manage                          |
-| `warp_connector_no_log`     | `false` | Hide task output from logs                         |
+| `warp_connector_no_log`     | `false` | Hide task output, including tokens and credentials |
 | `warp_connector_poll`       | `0`     | Async poll interval; 0 runs jobs in the background |
 | `warp_connector_retries`    | `100`   | Job status checks before failing                   |
-
-Set `warp_connector_no_log: true` to keep the connector tokens and tunnel credentials that results include out of task output.
 
 ## Dependencies
 

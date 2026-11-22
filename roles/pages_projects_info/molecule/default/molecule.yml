@@ -6,16 +6,10 @@ provisioner:
         pages_projects_list:
           - name: molecule-pages-projects-info-com
             production_branch: main
-            domains:
-              - name: molecule-pages-projects-info.com
 
           - name: molecule-pages-projects-info-net
             production_branch: main
-            domains:
-              - name: molecule-pages-projects-info.net
 
           - name: molecule-pages-projects-info-org
             production_branch: main
-            domains:
-              - name: molecule-pages-projects-info.org
 ...

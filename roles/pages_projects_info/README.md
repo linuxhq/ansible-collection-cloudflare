@@ -15,10 +15,10 @@ See the [Cloudflare API reference](https://developers.cloudflare.com/api/resourc
 
 ## Role Variables
 
-| Variable                         | Default | Description                                |
-| -------------------------------- | ------- | ------------------------------------------ |
-| `pages_projects_info_account_id` | `null`  | Cloudflare account ID; null skips the role |
-| `pages_projects_info_api_token`  | `null`  | Cloudflare API token; null skips the role  |
+| Variable                         | Default | Description                                                           |
+| -------------------------------- | ------- | --------------------------------------------------------------------- |
+| `pages_projects_info_account_id` | `null`  | Cloudflare account ID; null skips the query and publishes empty facts |
+| `pages_projects_info_api_token`  | `null`  | Cloudflare API token; null skips the query and publishes empty facts  |
 
 ## Dependencies
 

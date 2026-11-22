@@ -5,8 +5,7 @@
   roles:
     - zones_info
 
-    - role: pagerules_info
-      pagerules_info_api_token: "{{ pagerules_api_token }}"
+    - pagerules_info
 
   post_tasks:
     - name: Ensure pagerules are verified

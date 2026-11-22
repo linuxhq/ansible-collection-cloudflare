@@ -23,11 +23,9 @@ See the [Cloudflare API reference](https://developers.cloudflare.com/api/resourc
 | `cfd_tunnel_batch`      | `10`    | Items submitted per batch                          |
 | `cfd_tunnel_delay`      | `3`     | Seconds between job status checks                  |
 | `cfd_tunnel_list`       | `[]`    | Cloudflared tunnels to manage                      |
-| `cfd_tunnel_no_log`     | `false` | Hide task output from logs                         |
+| `cfd_tunnel_no_log`     | `false` | Hide task output, including tokens and credentials |
 | `cfd_tunnel_poll`       | `0`     | Async poll interval; 0 runs jobs in the background |
 | `cfd_tunnel_retries`    | `100`   | Job status checks before failing                   |
-
-Set `cfd_tunnel_no_log: true` to keep the connector tokens and tunnel credentials that results include out of task output.
 
 ## Dependencies
 

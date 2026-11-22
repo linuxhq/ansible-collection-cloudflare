@@ -15,10 +15,10 @@ See the [Cloudflare API reference](https://developers.cloudflare.com/api/resourc
 
 ## Role Variables
 
-| Variable                                    | Default | Description                                |
-| ------------------------------------------- | ------- | ------------------------------------------ |
-| `cfd_tunnel_configurations_info_account_id` | `null`  | Cloudflare account ID; null skips the role |
-| `cfd_tunnel_configurations_info_api_token`  | `null`  | Cloudflare API token; null skips the role  |
+| Variable                                    | Default | Description                                                           |
+| ------------------------------------------- | ------- | --------------------------------------------------------------------- |
+| `cfd_tunnel_configurations_info_account_id` | `null`  | Cloudflare account ID; null skips the query and publishes empty facts |
+| `cfd_tunnel_configurations_info_api_token`  | `null`  | Cloudflare API token; null skips the query and publishes empty facts  |
 
 ## Dependencies
 
