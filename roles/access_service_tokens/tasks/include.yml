@@ -47,12 +47,15 @@
   tags:
     - access_service_tokens
   ansible.builtin.debug:
-    msg: |
-      {{ __access_service_tokens_status.results |
-         d([]) |
-         json_query("[?changed && _jid._service_token.state != 'absent'].service_token") |
-         to_nice_yaml(indent=2) }}
+    msg: "{{ _result.service_token }}"
+  loop:
+    "{{ __access_service_tokens_result.results | d([]) +
+        __access_service_tokens_status.results | d([]) }}"
+  loop_control:
+    label: "{{ _result.service_token.name | d(none) }}"
+    loop_var: _result
   when:
     - access_service_tokens_display | bool
+    - _result.service_token is defined
   no_log: "{{ access_service_tokens_no_log }}"
 ...
