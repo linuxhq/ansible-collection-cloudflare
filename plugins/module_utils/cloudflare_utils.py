@@ -301,7 +301,7 @@ def without_retries(client):
 def matching_resources(items, field, value):
     """Return the serialized items whose field equals value."""
     resources = [serialize_resource(item) for item in items]
-    return [resource for resource in resources if isinstance(resource, dict) and resource.get(field) == value]
+    return [resource for resource in resources if resource.get(field) == value]
 
 
 def unique_match(resource):
@@ -416,17 +416,16 @@ def path_segment(value):
 def find_resource(module, items, resource_name, field, value, context=None):
     """Return the serialized item whose field equals value, or None.
 
-    Fail when an item is not a mapping, or when more than one item matches,
-    so an ambiguous name never selects an arbitrary resource. An item without
-    the field, such as an Access policy Cloudflare stored without a name,
-    never matches. context adds result fields to a failure, such as the
+    items come from a generated SDK list method, so each serializes to a
+    mapping. Fail when more than one item matches, so an ambiguous name never
+    selects an arbitrary resource. An item without the field, such as an
+    Access policy Cloudflare stored without a name, never matches. context adds result fields to a failure, such as the
     resource's owner; field and value are always reported.
     """
     context = {**(context or {}), field: value}
     matches = []
     for item in items:
         resource = serialize_resource(item)
-        require_mapping(module, resource, resource_name, context)
         if resource.get(field) == value:
             matches.append(resource)
 

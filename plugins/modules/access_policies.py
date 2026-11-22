@@ -147,6 +147,31 @@ EXAMPLES = r"""
     include:
       - email:
           email: admin@example.com
+
+- name: Ensure Access policy requires approval
+  linuxhq.cloudflare.access_policies:
+    account_id: "{{ account_id }}"
+    api_token: "{{ cloudflare_api_token }}"
+    name: approved-contractors
+    decision: allow
+    include:
+      - email_domain:
+          domain: example.com
+    require:
+      - geo:
+          country_code: US
+    approval_required: true
+    approval_groups:
+      - approvals_needed: 1
+        email_addresses:
+          - approver@example.com
+
+- name: Ensure Access policy is absent
+  linuxhq.cloudflare.access_policies:
+    account_id: "{{ account_id }}"
+    api_token: "{{ cloudflare_api_token }}"
+    name: allow-admins
+    state: absent
 """
 
 RETURN = r"""

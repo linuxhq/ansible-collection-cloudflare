@@ -567,9 +567,6 @@ class ValueTests(TestCase):
         self.assertEqual(find_resource(module, iter(items), "resource", "name", "Two"), items[1])
         self.assertIsNone(find_resource(module, iter(items), "resource", "name", "Three"))
 
-        with self.assertRaises(ModuleFail):
-            find_resource(module, [{"id": "one", "name": "One"}, "not a mapping"], "resource", "name", "One")
-
     def test_find_resource_skips_items_without_the_field(self):
         # Cloudflare stores an Access policy, group, or token with an empty name as null.
         items = [{"id": "nameless"}, {"id": "null", "name": None}, {"id": "one", "name": "One"}]
@@ -1423,7 +1420,7 @@ class CreateOnceTests(TestCase):
         sleep.assert_called_once_with(2.0)
 
     def test_matching_resources_compares_the_field_exactly(self):
-        items = [{"id": "one", "name": "n"}, {"id": "two", "name": "N"}, {"id": "three"}, None]
+        items = [{"id": "one", "name": "n"}, {"id": "two", "name": "N"}, {"id": "three"}]
 
         self.assertEqual(matching_resources(iter(items), "name", "n"), [{"id": "one", "name": "n"}])
 

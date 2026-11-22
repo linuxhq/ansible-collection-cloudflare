@@ -45,8 +45,10 @@ options:
       - absent
     default: present
 notes:
-  - Cloudflare only returns the client secret when a token is created. A token found by name again after a failed
-    create request is returned without it.
+  - Cloudflare returns the client secret only in the response to the create request. When that response is lost,
+    for example to a timeout, and the created token is found by name afterwards, the module fails with
+    C(changed=true) and the token in C(service_token), without its client secret. Rotate or delete the token to
+    obtain a new client secret.
   - When a token is created but Cloudflare stores another name or duration, the failure includes the created token
     in C(service_token), with its client secret.
   - Cloudflare may store a requested value in a canonical form that differs from the request. The module then
@@ -138,7 +140,8 @@ def checked_token(module, service_token, expected_id=None):
     """Serialize and validate the service token a create or update returned.
 
     A failure reports changed=True and includes the token, as a created
-    token's client secret is returned only once.
+    token's client secret is returned only once. Return the token and that
+    failure context.
     """
     service_token, failure = checked_written(
         module,
@@ -157,7 +160,7 @@ def checked_token(module, service_token, expected_id=None):
             **failure,
         )
 
-    return service_token
+    return service_token, failure
 
 
 def run(module, client):
@@ -214,12 +217,17 @@ def run(module, client):
                 ),
             )
 
-        # The client secret is only returned on creation and is part of the result.
-        module.exit_json(
-            changed=True,
-            message="Service token created",
-            service_token=checked_token(module, service_token),
-        )
+        service_token, failure = checked_token(module, service_token)
+        # Only the create response holds the client secret; a token recovered
+        # by name after a lost response has none, and it cannot be read again.
+        if not service_token.get("client_secret"):
+            module.fail_json(
+                msg="Service token created, but Cloudflare returns its client secret only in the create response, "
+                "which was lost; rotate or delete the service token",
+                **failure,
+            )
+
+        module.exit_json(changed=True, message="Service token created", service_token=service_token)
 
     current_id = resource_id(
         module, current, "service token", context={"account_id": account_id, "name": params["name"]}
@@ -240,7 +248,7 @@ def run(module, client):
     module.exit_json(
         changed=True,
         message="Service token updated",
-        service_token=checked_token(module, service_token, expected_id=current_id),
+        service_token=checked_token(module, service_token, expected_id=current_id)[0],
     )
 
 

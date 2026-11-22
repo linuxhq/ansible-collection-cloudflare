@@ -76,18 +76,30 @@ class AccessServiceTokensTests(TestCase):
         self.assertEqual(result["resource_id"], "token")
         self.assertEqual(result["service_token"], created)
 
-    def test_create_recovers_the_token_after_a_lost_response(self):
+    def test_token_recovered_after_a_lost_response_fails_without_its_secret(self):
+        # The list model has no client secret, so the one the create response held is lost.
         recovered = {"id": "token", "name": "automation", "duration": "1y"}
         client, api = client_with()
         api.create.side_effect = timeout_error()
         api.list.side_effect = [[], [recovered]]
 
-        result = self.run_module(FakeModule(params()), client)
+        with self.assertRaises(ModuleFail) as raised:
+            access_service_tokens.run(FakeModule(params()), client)
 
         client.with_options.assert_called_once_with(max_retries=0)
         api.create.assert_called_once()
-        self.assertEqual(result["message"], "Service token created")
-        self.assertEqual(result["service_token"], recovered)
+        self.assertEqual(
+            raised.exception.values,
+            {
+                "msg": "Service token created, but Cloudflare returns its client secret only in the create response, "
+                "which was lost; rotate or delete the service token",
+                "changed": True,
+                "account_id": "account",
+                "name": "automation",
+                "resource_id": "token",
+                "service_token": recovered,
+            },
+        )
 
     def test_create_failure_is_reported_without_a_single_match(self):
         for found in ([], [{"id": "one", "name": "automation"}, {"id": "two", "name": "automation"}]):
@@ -125,9 +137,11 @@ class AccessServiceTokensTests(TestCase):
         self.assertEqual(result["service_token"], created)
 
     def test_creates_token_without_duration(self):
-        client, api = client_with(created={"id": "token", "name": "automation"})
+        client, api = client_with(created={"id": "token", "name": "automation", "client_secret": "secret"})
 
-        self.run_module(FakeModule(params(duration=None)), client)
+        result = self.run_module(FakeModule(params(duration=None)), client)
+
+        self.assertEqual(result["message"], "Service token created")
 
         api.create.assert_called_once_with(account_id="account", name="automation")
 
@@ -189,7 +203,7 @@ class AccessServiceTokensTests(TestCase):
     def test_padded_name_is_trimmed_before_any_request(self):
         # Cloudflare trims the name, so the trimmed name is looked up and sent.
         token = {"id": "token", "name": "automation", "duration": "1y"}
-        client, api = client_with(created=token)
+        client, api = client_with(created={**token, "client_secret": "secret"})
 
         result = self.run_module(FakeModule(params(name=" automation ")), client)
 
