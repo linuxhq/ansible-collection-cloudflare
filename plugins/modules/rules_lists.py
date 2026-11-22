@@ -563,10 +563,7 @@ def checked_list(module, rules_list, name, kind, context, expected_id=None):
     if expected_id is not None:
         failure["rules_list_id"] = expected_id
 
-    failure = {
-        "rules_list_id": resource_id(module, rules_list, "Rules list", expected=expected_id, context=failure),
-        **failure,
-    }
+    failure["rules_list_id"] = resource_id(module, rules_list, "Rules list", expected=expected_id, context=failure)
     resource_field(module, rules_list, "name", "Rules list", expected=name, context=failure)
     resource_field(module, rules_list, "kind", "Rules list", expected=kind, context=failure)
     return rules_list

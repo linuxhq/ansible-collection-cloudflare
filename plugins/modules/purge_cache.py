@@ -134,15 +134,11 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
 )
 
 
-def cache_payload(module):
-    """Return the purge payload; a null key, including one in a files entry, counts as omitted, so it is not sent."""
-    return without_nested_nulls(module.params["cache"])
-
-
 def run(module, client):
     zone_id = module.params["zone_id"]
     with cloudflare_error_context("Cloudflare API request failed while purging the cache", zone_id=zone_id):
-        result = serialize_resource(client.cache.purge(zone_id=zone_id, **cache_payload(module)))
+        # A null key, including one in a files entry, counts as omitted.
+        result = serialize_resource(client.cache.purge(zone_id=zone_id, **without_nested_nulls(module.params["cache"])))
 
     resource_id(
         module,

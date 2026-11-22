@@ -23,8 +23,8 @@
     - rules_lists_api_token is not none
     - _rules_list.name is defined
   changed_when:
-    - ansible_check_mode | bool
     - __rules_lists_result.changed | bool
+    - __rules_lists_result.finished | d(true) | bool
 
 - name: Ensure managed cloudflare rules list jobs are complete
   tags:
@@ -38,6 +38,7 @@
     loop_var: _jid
   when:
     - _jid.ansible_job_id is defined
+    - not _jid.finished | d(false) | bool
   until:
     - __rules_lists_status.finished | bool
   retries: "{{ rules_lists_retries }}"

@@ -14,9 +14,9 @@ See the [Cloudflare API reference](https://developers.cloudflare.com/api/resourc
 
 ## Role Variables
 
-| Variable               | Default | Description                               |
-| ---------------------- | ------- | ----------------------------------------- |
-| `zones_info_api_token` | `null`  | Cloudflare API token; null skips the role |
+| Variable               | Default | Description                                                          |
+| ---------------------- | ------- | -------------------------------------------------------------------- |
+| `zones_info_api_token` | `null`  | Cloudflare API token; null skips the query and publishes empty facts |
 
 ## Dependencies
 

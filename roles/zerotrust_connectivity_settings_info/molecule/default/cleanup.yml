@@ -6,7 +6,7 @@
     - name: Ensure inventory settings are formatted
       ansible.builtin.set_fact:
         zerotrust_connectivity_settings_icmp_proxy_enabled: false
-        zerotrust_connectivity_settings_offramp_warp_enabled: false
+        zerotrust_connectivity_settings_offramp_warp_enabled: true
 
   roles:
     - zerotrust_connectivity_settings

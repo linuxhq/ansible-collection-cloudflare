@@ -20,8 +20,8 @@
     - dnssec_api_token is not none
     - _dnssec.zone_id is defined
   changed_when:
-    - ansible_check_mode | bool
     - __dnssec_result.changed | bool
+    - __dnssec_result.finished | d(true) | bool
 
 - name: Ensure managed cloudflare dnssec setting jobs are complete
   tags:
@@ -35,6 +35,7 @@
     loop_var: _jid
   when:
     - _jid.ansible_job_id is defined
+    - not _jid.finished | d(false) | bool
   until:
     - __dnssec_status.finished | bool
   retries: "{{ dnssec_retries }}"

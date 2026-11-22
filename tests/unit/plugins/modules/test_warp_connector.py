@@ -120,19 +120,6 @@ class WarpConnectorTests(TestCase):
         api.delete.assert_not_called()
         self.assertEqual(result["warp_connector"], {**CREATED, "tunnel_secret": SECRET})
 
-    def test_secret_failure_keeps_created_connector(self):
-        client, api = client_with(created=CREATED)
-        api.edit.side_effect = status_error(400, APPLY_BODY)
-
-        result = self.run_module(FakeModule(params(tunnel_secret=SECRET)), client)
-
-        api.delete.assert_not_called()
-        self.assertEqual(result["msg"], SECRET_FAILURE)
-        self.assertEqual(result["account_id"], "account")
-        self.assertEqual(result["resource_id"], "connector-id")
-        self.assertEqual(result["status_code"], 400)
-        self.assertEqual(result["response"], APPLY_BODY)
-
     def test_wrong_secret_response_reports_the_edit_response(self):
         cases = (
             ({"id": "wrong", "name": "connector"}, "Cloudflare API returned the wrong WARP Connector"),
@@ -228,11 +215,14 @@ class WarpConnectorTests(TestCase):
 
         result = self.run_module(FakeModule(params(tunnel_secret=SECRET)), client)
 
+        api.delete.assert_not_called()
         self.assertEqual(result["msg"], SECRET_FAILURE)
         self.assertTrue(result["changed"])
         self.assertEqual(result["warp_connector"], CREATED)
         self.assertEqual(result["resource_id"], "connector-id")
         self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["status_code"], 400)
+        self.assertEqual(result["response"], APPLY_BODY)
 
     def test_created_connector_with_another_name_reports_the_write(self):
         created = {"id": "connector-id", "name": "other"}

@@ -23,8 +23,8 @@
     - access_groups_api_token is not none
     - _access_group.name is defined
   changed_when:
-    - ansible_check_mode | bool
     - __access_groups_result.changed | bool
+    - __access_groups_result.finished | d(true) | bool
 
 - name: Ensure managed cloudflare access group jobs are complete
   tags:
@@ -38,6 +38,7 @@
     loop_var: _jid
   when:
     - _jid.ansible_job_id is defined
+    - not _jid.finished | d(false) | bool
   until:
     - __access_groups_status.finished | bool
   retries: "{{ access_groups_retries }}"

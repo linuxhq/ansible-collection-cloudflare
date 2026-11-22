@@ -22,8 +22,6 @@ See the [Cloudflare API reference](https://developers.cloudflare.com/api/resourc
 | `zerotrust_connectivity_settings_icmp_proxy_enabled`   | `null`  | Proxy ICMP traffic; null leaves it unchanged          |
 | `zerotrust_connectivity_settings_offramp_warp_enabled` | `null`  | Enable WARP-to-WARP traffic; null leaves it unchanged |
 
-A setting left at `null` is not sent, so Cloudflare leaves its current value unchanged.
-
 ## Dependencies
 
 * [accounts\_info](../accounts_info)

@@ -22,8 +22,8 @@
     - cfd_tunnel_api_token is not none
     - _cfd_tunnel.name is defined
   changed_when:
-    - ansible_check_mode | bool
     - __cfd_tunnel_result.changed | bool
+    - __cfd_tunnel_result.finished | d(true) | bool
   no_log: "{{ cfd_tunnel_no_log }}"
 
 - name: Ensure managed cloudflare cfd tunnel jobs are complete
@@ -38,6 +38,7 @@
     loop_var: _jid
   when:
     - _jid.ansible_job_id is defined
+    - not _jid.finished | d(false) | bool
   until:
     - __cfd_tunnel_status.finished | bool
   retries: "{{ cfd_tunnel_retries }}"

@@ -142,7 +142,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     cloudflare_error_context,
     error_response_body,
-    require_mapping,
     resource_field,
     resource_list,
     serialize_resource,
@@ -187,7 +186,6 @@ def run(module, client):
 
         dnssec_settings = serialize_resource(dnssec_settings)
         context = {"zone_id": zone["id"]}
-        require_mapping(module, dnssec_settings, "DNSSEC settings", context)
         resource_field(module, dnssec_settings, "status", "DNSSEC settings", context=context)
 
         dnssec.append(

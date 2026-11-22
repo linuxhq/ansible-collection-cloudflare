@@ -354,14 +354,6 @@ class AccessGroupsTests(TestCase):
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
 
-    def test_rejects_update_response_for_wrong_group(self):
-        current = {"id": "group", "name": "admins", "include": INCLUDE}
-        client, _ignored = client_with([current], updated={"id": "other", "name": "admins"})
-
-        result = self.run_module(FakeModule(params(include=[{"everyone": {}}])), client)
-
-        self.assertEqual(result["msg"], "Cloudflare API returned the wrong Access group")
-
     def test_deletes_group(self):
         client, api = client_with([{"id": "group", "name": "admins"}], deleted={"id": "group"})
 

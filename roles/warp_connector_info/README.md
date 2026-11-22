@@ -16,12 +16,12 @@ See the [Cloudflare API reference](https://developers.cloudflare.com/api/resourc
 
 ## Role Variables
 
-| Variable                            | Default | Description                                |
-| ----------------------------------- | ------- | ------------------------------------------ |
-| `warp_connector_info_account_id`    | `null`  | Cloudflare account ID; null skips the role |
-| `warp_connector_info_api_token`     | `null`  | Cloudflare API token; null skips the role  |
-| `warp_connector_info_include_token` | `false` | Return each connector's token              |
-| `warp_connector_info_no_log`        | `false` | Hide task output from logs                 |
+| Variable                            | Default | Description                                                           |
+| ----------------------------------- | ------- | --------------------------------------------------------------------- |
+| `warp_connector_info_account_id`    | `null`  | Cloudflare account ID; null skips the query and publishes empty facts |
+| `warp_connector_info_api_token`     | `null`  | Cloudflare API token; null skips the query and publishes empty facts  |
+| `warp_connector_info_include_token` | `false` | Return each connector's token                                         |
+| `warp_connector_info_no_log`        | `false` | Hide task output from logs                                            |
 
 ## Dependencies
 

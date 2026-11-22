@@ -25,8 +25,6 @@ See the [Cloudflare API reference](https://developers.cloudflare.com/api/resourc
 | `devices_settings_root_certificate_installation_enabled` | `null`  | Install the root certificate; null leaves it unchanged      |
 | `devices_settings_use_zt_virtual_ip`                     | `null`  | Assign Zero Trust virtual IPs; null leaves it unchanged     |
 
-A setting left at `null` is not sent, so Cloudflare leaves its current value unchanged.
-
 ## Dependencies
 
 * [accounts\_info](../accounts_info)

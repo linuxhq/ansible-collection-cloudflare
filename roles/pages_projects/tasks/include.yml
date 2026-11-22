@@ -25,8 +25,8 @@
     - pages_projects_api_token is not none
     - _pages_project.name is defined
   changed_when:
-    - ansible_check_mode | bool
     - __pages_projects_result.changed | bool
+    - __pages_projects_result.finished | d(true) | bool
 
 - name: Ensure managed cloudflare pages project jobs are complete
   tags:
@@ -40,6 +40,7 @@
     loop_var: _jid
   when:
     - _jid.ansible_job_id is defined
+    - not _jid.finished | d(false) | bool
   until:
     - __pages_projects_status.finished | bool
   retries: "{{ pages_projects_retries }}"

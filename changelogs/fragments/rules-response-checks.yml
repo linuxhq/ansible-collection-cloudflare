@@ -1,7 +1,6 @@
 ---
 trivial:
-  - pagerules, pagerules_info, rulesets, rulesets_info - share one check that a returned list holds only mappings, and
-    check a ruleset's rules once per comparison.
+  - rulesets - check a ruleset's rules once per comparison.
   - pagerules - stop copying ``actions`` and ``targets`` into the payload before replacing them.
   - rulesets - document that the empty action parameter check applies to every rule, and move the description
     preservation note to O(rules).

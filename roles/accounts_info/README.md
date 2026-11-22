@@ -14,10 +14,10 @@ See the [Cloudflare API reference](https://developers.cloudflare.com/api/resourc
 
 ## Role Variables
 
-| Variable                  | Default | Description                               |
-| ------------------------- | ------- | ----------------------------------------- |
-| `accounts_info_api_token` | `null`  | Cloudflare API token; null skips the role |
-| `accounts_info_name`      | `null`  | Account name to read; null skips the role |
+| Variable                  | Default | Description                                                          |
+| ------------------------- | ------- | -------------------------------------------------------------------- |
+| `accounts_info_api_token` | `null`  | Cloudflare API token; null skips the query and publishes empty facts |
+| `accounts_info_name`      | `null`  | Account name to read; null skips the query and publishes empty facts |
 
 ## Dependencies
 

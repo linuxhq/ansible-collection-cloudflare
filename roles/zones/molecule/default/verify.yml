@@ -5,8 +5,7 @@
   roles:
     - accounts_info
 
-    - role: zones_info
-      zones_info_api_token: "{{ zones_api_token }}"
+    - zones_info
 
   post_tasks:
     - name: Ensure zones are verified

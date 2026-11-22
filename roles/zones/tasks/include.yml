@@ -24,8 +24,8 @@
     - zones_api_token is not none
     - _zone.name is defined
   changed_when:
-    - ansible_check_mode | bool
     - __zones_result.changed | bool
+    - __zones_result.finished | d(true) | bool
 
 - name: Ensure managed cloudflare zone jobs are complete
   tags:
@@ -39,6 +39,7 @@
     loop_var: _jid
   when:
     - _jid.ansible_job_id is defined
+    - not _jid.finished | d(false) | bool
   until:
     - __zones_status.finished | bool
   retries: "{{ zones_retries }}"
