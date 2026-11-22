@@ -8,7 +8,7 @@
         devices_settings_disable_for_time: 0
         devices_settings_gateway_proxy_enabled: false
         devices_settings_gateway_udp_proxy_enabled: false
-        devices_settings_root_certificate_installation_enabled: false
+        devices_settings_root_certificate_installation_enabled: true
         devices_settings_use_zt_virtual_ip: false
 
   roles:
