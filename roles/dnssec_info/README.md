@@ -4,6 +4,8 @@
 
 Gather information about cloudflare dnssec settings
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/dns/subresources/dnssec/).
+
 ## Requirements
 
 | Type | Permission | Value |
@@ -13,7 +15,9 @@ Gather information about cloudflare dnssec settings
 
 ## Role Variables
 
-    dnssec_info_api_token: null
+| Variable                | Default | Description                               |
+| ----------------------- | ------- | ----------------------------------------- |
+| `dnssec_info_api_token` | `null`  | Cloudflare API token; null skips the role |
 
 ## Dependencies
 

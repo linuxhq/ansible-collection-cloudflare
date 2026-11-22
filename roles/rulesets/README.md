@@ -4,6 +4,8 @@
 
 Manage cloudflare rulesets
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/rulesets/).
+
 ## Requirements
 
 | Type    | Permission  | Value |
@@ -13,14 +15,16 @@ Manage cloudflare rulesets
 
 ## Role Variables
 
-    rulesets_api_token: null
-    rulesets_async: 300
-    rulesets_batch: 10
-    rulesets_delay: 3
-    rulesets_list: []
-    rulesets_phase: http_request_firewall_custom
-    rulesets_poll: 0
-    rulesets_retries: 100
+| Variable             | Default                        | Description                                        |
+| -------------------- | ------------------------------ | -------------------------------------------------- |
+| `rulesets_api_token` | `null`                         | Cloudflare API token; null skips the role          |
+| `rulesets_async`     | `300`                          | Seconds each async job may run                     |
+| `rulesets_batch`     | `10`                           | Items submitted per batch                          |
+| `rulesets_delay`     | `3`                            | Seconds between job status checks                  |
+| `rulesets_list`      | `[]`                           | Zone rulesets to manage                            |
+| `rulesets_phase`     | `http_request_firewall_custom` | Ruleset phase to manage                            |
+| `rulesets_poll`      | `0`                            | Async poll interval; 0 runs jobs in the background |
+| `rulesets_retries`   | `100`                          | Job status checks before failing                   |
 
 ## Dependencies
 

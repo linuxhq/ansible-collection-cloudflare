@@ -4,6 +4,8 @@
 
 Manage cloudflare devices settings
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/devices/subresources/settings/).
+
 ## Requirements
 
 | Type    | Permission       | Value |
@@ -13,13 +15,15 @@ Manage cloudflare devices settings
 
 ## Role Variables
 
-    devices_settings_account_id: null
-    devices_settings_api_token: null
-    devices_settings_disable_for_time: null
-    devices_settings_gateway_proxy_enabled: null
-    devices_settings_gateway_udp_proxy_enabled: null
-    devices_settings_root_certificate_installation_enabled: null
-    devices_settings_use_zt_virtual_ip: null
+| Variable                                                 | Default | Description                                                 |
+| -------------------------------------------------------- | ------- | ----------------------------------------------------------- |
+| `devices_settings_account_id`                            | `null`  | Cloudflare account ID; null skips the role                  |
+| `devices_settings_api_token`                             | `null`  | Cloudflare API token; null skips the role                   |
+| `devices_settings_disable_for_time`                      | `null`  | Override code duration in seconds; null leaves it unchanged |
+| `devices_settings_gateway_proxy_enabled`                 | `null`  | Proxy TCP through Gateway; null leaves it unchanged         |
+| `devices_settings_gateway_udp_proxy_enabled`             | `null`  | Proxy UDP through Gateway; null leaves it unchanged         |
+| `devices_settings_root_certificate_installation_enabled` | `null`  | Install the root certificate; null leaves it unchanged      |
+| `devices_settings_use_zt_virtual_ip`                     | `null`  | Assign Zero Trust virtual IPs; null leaves it unchanged     |
 
 A setting left at `null` is not sent, so Cloudflare leaves its current value unchanged.
 

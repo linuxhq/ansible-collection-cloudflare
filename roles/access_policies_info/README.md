@@ -4,6 +4,8 @@
 
 Gather information about cloudflare access policies
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/policies/).
+
 ## Requirements
 
 | Type    | Permission                | Value |
@@ -13,8 +15,10 @@ Gather information about cloudflare access policies
 
 ## Role Variables
 
-    access_policies_info_account_id: null
-    access_policies_info_api_token: null
+| Variable                          | Default | Description                                |
+| --------------------------------- | ------- | ------------------------------------------ |
+| `access_policies_info_account_id` | `null`  | Cloudflare account ID; null skips the role |
+| `access_policies_info_api_token`  | `null`  | Cloudflare API token; null skips the role  |
 
 ## Dependencies
 

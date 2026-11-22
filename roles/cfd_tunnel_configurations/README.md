@@ -4,6 +4,8 @@
 
 Manage cloudflare cfd tunnel configurations
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/subresources/cloudflared/subresources/configurations/).
+
 ## Requirements
 
 | Type    | Permission        | Value |
@@ -13,14 +15,16 @@ Manage cloudflare cfd tunnel configurations
 
 ## Role Variables
 
-    cfd_tunnel_configurations_account_id: null
-    cfd_tunnel_configurations_api_token: null
-    cfd_tunnel_configurations_async: 300
-    cfd_tunnel_configurations_batch: 10
-    cfd_tunnel_configurations_delay: 3
-    cfd_tunnel_configurations_list: []
-    cfd_tunnel_configurations_poll: 0
-    cfd_tunnel_configurations_retries: 100
+| Variable                               | Default | Description                                        |
+| -------------------------------------- | ------- | -------------------------------------------------- |
+| `cfd_tunnel_configurations_account_id` | `null`  | Cloudflare account ID; null skips the role         |
+| `cfd_tunnel_configurations_api_token`  | `null`  | Cloudflare API token; null skips the role          |
+| `cfd_tunnel_configurations_async`      | `300`   | Seconds each async job may run                     |
+| `cfd_tunnel_configurations_batch`      | `10`    | Items submitted per batch                          |
+| `cfd_tunnel_configurations_delay`      | `3`     | Seconds between job status checks                  |
+| `cfd_tunnel_configurations_list`       | `[]`    | Tunnel configurations to manage                    |
+| `cfd_tunnel_configurations_poll`       | `0`     | Async poll interval; 0 runs jobs in the background |
+| `cfd_tunnel_configurations_retries`    | `100`   | Job status checks before failing                   |
 
 ## Dependencies
 

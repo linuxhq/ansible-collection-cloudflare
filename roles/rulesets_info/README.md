@@ -4,6 +4,8 @@
 
 Gather information about cloudflare rulesets
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/rulesets/).
+
 ## Requirements
 
 | Type    | Permission  | Value |
@@ -13,8 +15,10 @@ Gather information about cloudflare rulesets
 
 ## Role Variables
 
-    rulesets_info_api_token: null
-    rulesets_info_phase: http_request_firewall_custom
+| Variable                  | Default                        | Description                               |
+| ------------------------- | ------------------------------ | ----------------------------------------- |
+| `rulesets_info_api_token` | `null`                         | Cloudflare API token; null skips the role |
+| `rulesets_info_phase`     | `http_request_firewall_custom` | Ruleset phase to read                     |
 
 ## Dependencies
 

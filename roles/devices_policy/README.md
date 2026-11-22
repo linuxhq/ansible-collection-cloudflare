@@ -4,6 +4,8 @@
 
 Manage cloudflare devices policy
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/devices/subresources/policies/subresources/default/).
+
 ## Requirements
 
 | Type    | Permission       | Value |
@@ -13,25 +15,27 @@ Manage cloudflare devices policy
 
 ## Role Variables
 
-    devices_policy_account_id: null
-    devices_policy_allow_mode_switch: null
-    devices_policy_allow_updates: null
-    devices_policy_allowed_to_leave: null
-    devices_policy_api_token: null
-    devices_policy_auto_connect: null
-    devices_policy_captive_portal: null
-    devices_policy_disable_auto_fallback: null
-    devices_policy_exclude: null
-    devices_policy_exclude_office_ips: null
-    devices_policy_include: null
-    devices_policy_lan_allow_minutes: null
-    devices_policy_lan_allow_subnet_size: null
-    devices_policy_register_interface_ip_with_dns: null
-    devices_policy_sccm_vpn_boundary_support: null
-    devices_policy_service_mode_v2: null
-    devices_policy_support_url: null
-    devices_policy_switch_locked: null
-    devices_policy_tunnel_protocol: null
+| Variable                                        | Default | Description                                                      |
+| ----------------------------------------------- | ------- | ---------------------------------------------------------------- |
+| `devices_policy_account_id`                     | `null`  | Cloudflare account ID; null skips the role                       |
+| `devices_policy_allow_mode_switch`              | `null`  | Allow switching WARP modes; null leaves it unchanged             |
+| `devices_policy_allow_updates`                  | `null`  | Receive WARP update notifications; null leaves it unchanged      |
+| `devices_policy_allowed_to_leave`               | `null`  | Allow leaving the organization; null leaves it unchanged         |
+| `devices_policy_api_token`                      | `null`  | Cloudflare API token; null skips the role                        |
+| `devices_policy_auto_connect`                   | `null`  | Seconds before WARP reconnects; null leaves it unchanged         |
+| `devices_policy_captive_portal`                 | `null`  | Seconds before captive portal handling; null leaves it unchanged |
+| `devices_policy_disable_auto_fallback`          | `null`  | Disable automatic fallback DNS; null leaves it unchanged         |
+| `devices_policy_exclude`                        | `null`  | Split tunnel routes to exclude; null leaves it unchanged         |
+| `devices_policy_exclude_office_ips`             | `null`  | Exclude Microsoft IPs; null leaves it unchanged                  |
+| `devices_policy_include`                        | `null`  | Split tunnel routes to include; null leaves it unchanged         |
+| `devices_policy_lan_allow_minutes`              | `null`  | Minutes of LAN access; null leaves it unchanged                  |
+| `devices_policy_lan_allow_subnet_size`          | `null`  | Subnet size for LAN access; null leaves it unchanged             |
+| `devices_policy_register_interface_ip_with_dns` | `null`  | Register WARP interface IP in DNS; null leaves it unchanged      |
+| `devices_policy_sccm_vpn_boundary_support`      | `null`  | Report SCCM VPN boundary; null leaves it unchanged               |
+| `devices_policy_service_mode_v2`                | `null`  | WARP service mode; null leaves it unchanged                      |
+| `devices_policy_support_url`                    | `null`  | Send Feedback button URL; null leaves it unchanged               |
+| `devices_policy_switch_locked`                  | `null`  | Prevent turning off WARP; null leaves it unchanged               |
+| `devices_policy_tunnel_protocol`                | `null`  | Tunnel protocol; null leaves it unchanged                        |
 
 ## Dependencies
 

@@ -4,6 +4,8 @@
 
 Gather information about cloudflare rules lists
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/rules/subresources/lists/).
+
 ## Requirements
 
 | Type    | Permission           | Value |
@@ -13,8 +15,10 @@ Gather information about cloudflare rules lists
 
 ## Role Variables
 
-    rules_lists_info_account_id: null
-    rules_lists_info_api_token: null
+| Variable                      | Default | Description                                |
+| ----------------------------- | ------- | ------------------------------------------ |
+| `rules_lists_info_account_id` | `null`  | Cloudflare account ID; null skips the role |
+| `rules_lists_info_api_token`  | `null`  | Cloudflare API token; null skips the role  |
 
 ## Dependencies
 

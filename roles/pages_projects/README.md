@@ -4,6 +4,8 @@
 
 Manage cloudflare pages projects
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/pages/subresources/projects/).
+
 ## Requirements
 
 | Type    | Permission       | Value |
@@ -13,14 +15,16 @@ Manage cloudflare pages projects
 
 ## Role Variables
 
-    pages_projects_account_id: null
-    pages_projects_api_token: null
-    pages_projects_async: 300
-    pages_projects_batch: 10
-    pages_projects_delay: 3
-    pages_projects_list: []
-    pages_projects_poll: 0
-    pages_projects_retries: 100
+| Variable                    | Default | Description                                        |
+| --------------------------- | ------- | -------------------------------------------------- |
+| `pages_projects_account_id` | `null`  | Cloudflare account ID; null skips the role         |
+| `pages_projects_api_token`  | `null`  | Cloudflare API token; null skips the role          |
+| `pages_projects_async`      | `300`   | Seconds each async job may run                     |
+| `pages_projects_batch`      | `10`    | Items submitted per batch                          |
+| `pages_projects_delay`      | `3`     | Seconds between job status checks                  |
+| `pages_projects_list`       | `[]`    | Pages projects to manage                           |
+| `pages_projects_poll`       | `0`     | Async poll interval; 0 runs jobs in the background |
+| `pages_projects_retries`    | `100`   | Job status checks before failing                   |
 
 ## Dependencies
 

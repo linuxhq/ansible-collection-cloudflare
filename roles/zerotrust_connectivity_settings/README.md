@@ -4,6 +4,8 @@
 
 Manage cloudflare zerotrust connectivity settings
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/connectivity_settings/).
+
 ## Requirements
 
 | Type    | Permission       | Value |
@@ -13,10 +15,12 @@ Manage cloudflare zerotrust connectivity settings
 
 ## Role Variables
 
-    zerotrust_connectivity_settings_account_id: null
-    zerotrust_connectivity_settings_api_token: null
-    zerotrust_connectivity_settings_icmp_proxy_enabled: null
-    zerotrust_connectivity_settings_offramp_warp_enabled: null
+| Variable                                               | Default | Description                                           |
+| ------------------------------------------------------ | ------- | ----------------------------------------------------- |
+| `zerotrust_connectivity_settings_account_id`           | `null`  | Cloudflare account ID; null skips the role            |
+| `zerotrust_connectivity_settings_api_token`            | `null`  | Cloudflare API token; null skips the role             |
+| `zerotrust_connectivity_settings_icmp_proxy_enabled`   | `null`  | Proxy ICMP traffic; null leaves it unchanged          |
+| `zerotrust_connectivity_settings_offramp_warp_enabled` | `null`  | Enable WARP-to-WARP traffic; null leaves it unchanged |
 
 A setting left at `null` is not sent, so Cloudflare leaves its current value unchanged.
 

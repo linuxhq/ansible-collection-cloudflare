@@ -4,6 +4,8 @@
 
 Gather information about cloudflare access apps
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/applications/).
+
 ## Requirements
 
 | Type    | Permission                | Value |
@@ -13,8 +15,10 @@ Gather information about cloudflare access apps
 
 ## Role Variables
 
-    access_apps_info_account_id: null
-    access_apps_info_api_token: null
+| Variable                      | Default | Description                                |
+| ----------------------------- | ------- | ------------------------------------------ |
+| `access_apps_info_account_id` | `null`  | Cloudflare account ID; null skips the role |
+| `access_apps_info_api_token`  | `null`  | Cloudflare API token; null skips the role  |
 
 ## Dependencies
 

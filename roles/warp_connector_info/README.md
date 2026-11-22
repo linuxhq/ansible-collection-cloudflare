@@ -4,6 +4,8 @@
 
 Gather information about cloudflare warp connectors
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/subresources/warp_connector/).
+
 ## Requirements
 
 | Type    | Permission                     | Value |
@@ -14,10 +16,12 @@ Gather information about cloudflare warp connectors
 
 ## Role Variables
 
-    warp_connector_info_account_id: null
-    warp_connector_info_api_token: null
-    warp_connector_info_include_token: false
-    warp_connector_info_no_log: false
+| Variable                            | Default | Description                                |
+| ----------------------------------- | ------- | ------------------------------------------ |
+| `warp_connector_info_account_id`    | `null`  | Cloudflare account ID; null skips the role |
+| `warp_connector_info_api_token`     | `null`  | Cloudflare API token; null skips the role  |
+| `warp_connector_info_include_token` | `false` | Return each connector's token              |
+| `warp_connector_info_no_log`        | `false` | Hide task output from logs                 |
 
 ## Dependencies
 

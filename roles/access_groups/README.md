@@ -4,6 +4,8 @@
 
 Manage cloudflare access groups
 
+See the [Cloudflare API reference](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/groups/).
+
 ## Requirements
 
 | Type    | Permission                                            | Value |
@@ -14,14 +16,16 @@ Manage cloudflare access groups
 
 ## Role Variables
 
-    access_groups_account_id: null
-    access_groups_api_token: null
-    access_groups_async: 300
-    access_groups_batch: 10
-    access_groups_delay: 3
-    access_groups_list: []
-    access_groups_poll: 0
-    access_groups_retries: 100
+| Variable                   | Default | Description                                        |
+| -------------------------- | ------- | -------------------------------------------------- |
+| `access_groups_account_id` | `null`  | Cloudflare account ID; null skips the role         |
+| `access_groups_api_token`  | `null`  | Cloudflare API token; null skips the role          |
+| `access_groups_async`      | `300`   | Seconds each async job may run                     |
+| `access_groups_batch`      | `10`    | Items submitted per batch                          |
+| `access_groups_delay`      | `3`     | Seconds between job status checks                  |
+| `access_groups_list`       | `[]`    | Access groups to manage                            |
+| `access_groups_poll`       | `0`     | Async poll interval; 0 runs jobs in the background |
+| `access_groups_retries`    | `100`   | Job status checks before failing                   |
 
 ## Dependencies
 
