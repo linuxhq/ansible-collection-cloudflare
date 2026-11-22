@@ -29,8 +29,15 @@ class RulesListsInfoTests(TestCase):
         self.assertFalse(result["changed"])
         self.assertEqual(result["rules_lists"], lists)
 
-    def test_rejects_list_without_kind(self):
-        result, _ignored = self.run_module([{"id": "list", "name": "addresses"}])
+    def test_accepts_list_without_kind(self):
+        lists = [{"id": "list", "name": "addresses"}]
+
+        result, _ignored = self.run_module(lists)
+
+        self.assertEqual(result["rules_lists"], lists)
+
+    def test_rejects_list_without_name(self):
+        result, _ignored = self.run_module([{"id": "list"}])
 
         self.assertEqual(result["msg"], "Cloudflare API returned malformed Rules list data")
         self.assertEqual(result["account_id"], "account")

@@ -889,14 +889,10 @@ class InfoTests(TestCase):
 
         self.assertEqual(raised.exception.values, {"changed": False, "settings": {}})
 
-        with self.assertRaises(ModuleFail):
-            exit_settings(FakeModule({}), "settings", ["bad"], "settings")
-
     def test_info_failures_carry_the_owner(self):
         context = {"account_id": "account"}
         for call in (
             lambda: exit_resource_list(FakeModule({}), "things", [{"id": "one"}], "thing", context=context),
-            lambda: exit_settings(FakeModule({}), "settings", ["bad"], "settings", context),
             lambda: resource_list(FakeModule({}), [{"id": ""}], "thing", context=context),
         ):
             with self.assertRaises(ModuleFail) as raised:

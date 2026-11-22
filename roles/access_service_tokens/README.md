@@ -22,7 +22,7 @@ See the [Cloudflare API reference](https://developers.cloudflare.com/api/resourc
 | `access_service_tokens_async`      | `300`   | Seconds each async job may run                     |
 | `access_service_tokens_batch`      | `10`    | Items submitted per batch                          |
 | `access_service_tokens_delay`      | `3`     | Seconds between job status checks                  |
-| `access_service_tokens_display`    | `true`  | Print service tokens from changed items            |
+| `access_service_tokens_display`    | `true`  | Print the service token from every result          |
 | `access_service_tokens_list`       | `[]`    | Access service tokens to manage                    |
 | `access_service_tokens_no_log`     | `false` | Hide task output from logs                         |
 | `access_service_tokens_poll`       | `0`     | Async poll interval; 0 runs jobs in the background |
