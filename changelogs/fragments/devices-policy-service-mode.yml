@@ -1,0 +1,4 @@
+---
+trivial:
+  - devices_policy role - omit a ``null`` ``devices_policy_service_mode_v2`` with an explicit check, like the role's
+    other variables; the ``roles-null-omit`` bugfix entry already lists devices_policy.

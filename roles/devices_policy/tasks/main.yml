@@ -57,7 +57,10 @@
       "{{ devices_policy_sccm_vpn_boundary_support
           if devices_policy_sccm_vpn_boundary_support is not none
           else omit }}"
-    service_mode_v2: "{{ devices_policy_service_mode_v2 | d(omit) }}"
+    service_mode_v2:
+      "{{ devices_policy_service_mode_v2
+          if devices_policy_service_mode_v2 is not none
+          else omit }}"
     support_url:
       "{{ devices_policy_support_url
           if devices_policy_support_url is not none
