@@ -264,21 +264,6 @@ def require_mapping(module, value, resource_name, context=None):
         module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data", **(context or {}))
 
 
-def require_mapping_list(module, value, resource_name, item_name, context=None):
-    """Return value, failing when it is not a list of mappings; context adds result fields to the failure.
-
-    The failure names resource_name for a value that is not a list, and
-    item_name for an item that is not a mapping.
-    """
-    if not isinstance(value, list):
-        module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data", **(context or {}))
-
-    for item in value:
-        require_mapping(module, item, item_name, context)
-
-    return value
-
-
 def resource_list(module, items, resource_name, required_fields=("id",), context=None):
     """Serialize every item of an SDK list, validating its required fields.
 
@@ -912,11 +897,14 @@ def checked_written(module, resource, resource_name, result_key, context, expect
     """Serialize the resource a create or update returned, failing when it has the wrong id or name.
 
     A failure reports changed=True, context, the resource under result_key,
-    and its resource_id. Return the resource and that failure context, for
-    later checks of the write.
+    and its resource_id, which is expected_id when given. Return the resource
+    and that failure context, for later checks of the write.
     """
     resource = serialize_resource(resource)
     failure = {"changed": True, **context, result_key: resource}
+    if expected_id is not None:
+        failure["resource_id"] = expected_id
+
     failure = {
         "resource_id": resource_id(module, resource, resource_name, expected=expected_id, context=failure),
         **failure,
@@ -1064,7 +1052,7 @@ def ensure_resource_present(
     ):
         updated = update(current_id, payload)
 
-    resource = require_written(updated, {"resource_id": current_id, **context}, expected_id=current_id)
+    resource = require_written(updated, context, expected_id=current_id)
     module.exit_json(changed=True, message=f"{label} updated", **{result_key: resource})
 
 

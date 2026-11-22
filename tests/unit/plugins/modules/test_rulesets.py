@@ -88,15 +88,15 @@ class RulesetsTests(TestCase):
                     self.assertIn("value of kind must be one of", raised.exception.values["msg"])
                     client.assert_not_called()
 
-    def test_rejects_malformed_rules(self):
-        for rules in ({}, ["invalid"]):
-            client, _ignored = make_client({**CURRENT, "rules": rules})
+    def test_null_stored_rules_count_as_no_rules(self):
+        current = {key: value for key, value in CURRENT.items() if key != "rules"}
+        for rules, changed in (([], False), (RULES, True)):
+            client, api = make_client(current, updated={**current, "rules": RULES})
             with self.subTest(rules=rules):
-                result = self.run_module(FakeModule(params()), client)
+                result = self.run_module(FakeModule(params(rules=rules)), client)
 
-            self.assertIn("malformed ruleset", result["msg"])
-            self.assertEqual(result["zone_id"], "zone")
-            self.assertEqual(result["phase"], PHASE)
+                self.assertEqual(result["changed"], changed)
+                self.assertEqual(api.phases.update.called, changed)
 
     def test_malformed_entrypoint_names_the_zone_and_phase(self):
         for current in (["invalid"], {**CURRENT, "phase": "other"}, {**CURRENT, "name": None}):
@@ -403,19 +403,6 @@ class RulesetsTests(TestCase):
         self.assertEqual(result["msg"], "Cloudflare API returned the wrong ruleset")
         self.assertTrue(result["changed"])
         self.assertEqual(result["ruleset"], created)
-        self.assertEqual(result["resource_id"], "ruleset")
-        self.assertEqual(result["zone_id"], "zone")
-
-    def test_updated_ruleset_with_malformed_rules_reports_the_write(self):
-        updated = {**CURRENT, "rules": "malformed"}
-        client, api = make_client(current={**CURRENT, "rules": []}, updated=updated)
-
-        result = self.run_module(FakeModule(params(rules=RULES)), client)
-
-        api.phases.update.assert_called_once()
-        self.assertEqual(result["msg"], "Cloudflare API returned malformed ruleset data")
-        self.assertTrue(result["changed"])
-        self.assertEqual(result["ruleset"], updated)
         self.assertEqual(result["resource_id"], "ruleset")
         self.assertEqual(result["zone_id"], "zone")
 

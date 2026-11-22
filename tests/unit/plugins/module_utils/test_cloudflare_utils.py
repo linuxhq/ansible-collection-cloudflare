@@ -12,6 +12,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudfla
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     access_rules_payload,
     applied_differences,
+    checked_written,
     cloudflare_client,
     cloudflare_error_context,
     cloudflare_error_details,
@@ -31,7 +32,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     require_applied,
     require_mapping,
-    require_mapping_list,
     resource_field,
     resource_id,
     resource_list,
@@ -532,17 +532,32 @@ class ValueTests(TestCase):
 
             self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed resource data")
 
-    def test_require_mapping_list_names_the_list_or_the_item(self):
+    def test_checked_written_reports_the_expected_id(self):
         module = FakeModule({})
-        rules = [{"id": "one"}]
+        context = {"account_id": "account"}
 
-        self.assertIs(require_mapping_list(module, rules, "ruleset", "ruleset rule"), rules)
-        for value, name in ((None, "ruleset"), ({"id": "one"}, "ruleset"), ([{"id": "one"}, "two"], "ruleset rule")):
-            with self.subTest(value=value), self.assertRaises(ModuleFail) as raised:
-                require_mapping_list(module, value, "ruleset", "ruleset rule", context={"zone_id": "zone"})
+        resource, failure = checked_written(
+            module, {"id": "one", "name": "One"}, "resource", "item", context, expected_name="One", expected_id="one"
+        )
 
-            self.assertEqual(raised.exception.values["msg"], f"Cloudflare API returned malformed {name} data")
-            self.assertEqual(raised.exception.values["zone_id"], "zone")
+        self.assertEqual(resource, {"id": "one", "name": "One"})
+        self.assertEqual(
+            failure,
+            {"changed": True, "account_id": "account", "item": resource, "resource_id": "one"},
+        )
+        self.assertEqual(context, {"account_id": "account"})
+        for written, msg in (
+            ({"id": "two", "name": "One"}, "Cloudflare API returned the wrong resource"),
+            ({"id": "one", "name": "Two"}, "Cloudflare API returned the wrong resource"),
+            ({"name": "One"}, "Cloudflare API returned malformed resource data"),
+        ):
+            with self.subTest(written=written), self.assertRaises(ModuleFail) as raised:
+                checked_written(module, written, "resource", "item", context, expected_name="One", expected_id="one")
+
+            self.assertEqual(
+                raised.exception.values,
+                {"msg": msg, "changed": True, "account_id": "account", "item": written, "resource_id": "one"},
+            )
 
     def test_lists_and_finds_resources(self):
         module = FakeModule({})

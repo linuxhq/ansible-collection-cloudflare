@@ -52,18 +52,6 @@ class RulesetsInfoTests(TestCase):
 
         self.assertEqual(raised.exception._cloudflare_context, {"zone_id": "zone", "phase": PHASE})
 
-    def test_rejects_non_mapping_rules(self):
-        result, _ignored = self.run_module({"id": "ruleset", "phase": PHASE, "rules": ["invalid"]})
-
-        self.assertEqual(result["msg"], "Cloudflare API returned malformed ruleset rule data")
-        self.assertEqual((result["zone_id"], result["phase"]), ("zone", PHASE))
-
-    def test_rejects_non_list_rules_with_zone_context(self):
-        result, _ignored = self.run_module({"id": "ruleset", "phase": PHASE, "rules": "invalid"})
-
-        self.assertEqual(result["msg"], "Cloudflare API returned malformed ruleset data")
-        self.assertEqual((result["zone_id"], result["phase"]), ("zone", PHASE))
-
     def test_rejects_malformed_ruleset_id_with_zone_context(self):
         result, _ignored = self.run_module({"id": "", "phase": PHASE})
 

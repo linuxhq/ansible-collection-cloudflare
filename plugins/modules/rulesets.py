@@ -151,8 +151,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_absent,
     ensure_resource_present,
     get_or_none,
-    require_mapping,
-    require_mapping_list,
     resource_field,
     serialize_resource,
     unique_match,
@@ -231,15 +229,6 @@ def validate_assigned_fields(module):
             msg=f"Cloudflare assigns its own value for these empty rule fields: {', '.join(empty)}; omit them instead",
             empty_fields=empty,
         )
-
-
-def rules_from_resource(module, ruleset, failure=None):
-    """Return the rules of ruleset; failure adds result fields to a malformed-data failure."""
-    rules = ruleset.get("rules")
-    if rules is None:
-        return []
-
-    return require_mapping_list(module, rules, "ruleset", "ruleset rule", failure)
 
 
 # Cloudflare assigns these rule fields; every other rule field is managed.
@@ -339,17 +328,6 @@ def comparable_rules(rules, desired_rules):
     return comparable
 
 
-def checked_ruleset(module, ruleset, phase, failure=None):
-    """Serialize a ruleset response and validate its phase.
-
-    failure adds result fields to a failure, such as changed=True after a write.
-    """
-    ruleset = serialize_resource(ruleset)
-    require_mapping(module, ruleset, "ruleset", failure)
-    resource_field(module, ruleset, "phase", "ruleset", expected=phase, context=failure)
-    return ruleset
-
-
 def run(module, client):
     params = module.params
     zone_id = params["zone_id"]
@@ -361,11 +339,10 @@ def run(module, client):
         validate_assigned_fields(module)
 
     with cloudflare_error_context("Cloudflare API request failed while gathering the ruleset entrypoint", **lookup):
-        current = get_or_none(rulesets.phases.get, phase, zone_id=zone_id)
-        if current is not None:
-            current = checked_ruleset(module, current, phase, lookup)
+        current = serialize_resource(get_or_none(rulesets.phases.get, phase, zone_id=zone_id))
 
     if current is not None:
+        resource_field(module, current, "phase", "ruleset", expected=phase, context=lookup)
         name = resource_field(module, current, "name", "ruleset", context=lookup)
         if params.get("name") is not None and params["name"] != name:
             failure = {**lookup, "ruleset": current}
@@ -421,10 +398,9 @@ def run(module, client):
         context=lookup,
         comparable=lambda ruleset, failure: {
             **ruleset,
-            "rules": comparable_rules(
-                rules_from_resource(module, checked_ruleset(module, ruleset, phase, failure), failure),
-                payload.get("rules", []),
-            ),
+            "phase": resource_field(module, ruleset, "phase", "ruleset", expected=phase, context=failure),
+            # The SDK types rules as optional; treat null as no rules.
+            "rules": comparable_rules(ruleset.get("rules") or [], payload.get("rules", [])),
         },
     )
 

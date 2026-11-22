@@ -139,13 +139,9 @@ def checked_connector(module, connector, expected_id=None):
     A failure reports changed=True, the connector, and its identifiers.
     """
     context = {"account_id": module.params["account_id"], "name": module.params["name"]}
-    if expected_id is not None:
-        context["resource_id"] = expected_id
-
-    connector, _failure = checked_written(
+    return checked_written(
         module, connector, "WARP Connector", "warp_connector", context, module.params["name"], expected_id
-    )
-    return connector
+    )[0]
 
 
 def apply_created_secret(module, connectors, created):
