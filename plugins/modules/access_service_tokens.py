@@ -45,8 +45,11 @@ options:
       - absent
     default: present
 notes:
-  - Cloudflare only returns the client secret when a token is created. A token found by name again after a failed
-    create request is returned without it.
+  - Cloudflare returns the client secret only in the response to the create request. When a created token has no
+    client secret, for example when the create request fails with a timeout or a 5xx status and the token is found
+    by name afterwards, the module fails with C(changed=true), the token in C(service_token) without its client
+    secret, and the details of the failed create request. A token found by name may have been created by another
+    run, so check that this run created it before rotating or deleting it to obtain a new client secret.
   - When a token is created but Cloudflare stores another name or duration, the failure includes the created token
     in C(service_token), with its client secret.
   - Cloudflare may store a requested value in a canonical form that differs from the request. The module then
@@ -110,8 +113,10 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
     checked_written,
+    cloudflare,
     cloudflare_client,
     cloudflare_error_context,
+    cloudflare_error_details,
     create_once,
     ensure_resource_absent,
     fail_not_applied,
@@ -134,21 +139,37 @@ def duration_matches(service_token, duration):
     return duration == "forever" and service_token.get("expires_at") in (None, "")
 
 
-def checked_token(module, service_token, expected_id=None):
+def checked_token(module, service_token, expected_id=None, create_error=None):
     """Serialize and validate the service token a create or update returned.
 
     A failure reports changed=True and includes the token, as a created
-    token's client secret is returned only once.
+    token's client secret is returned only once. Without expected_id, the
+    token was created, and it fails without a client secret, before its
+    duration is compared. create_error, the error of a create request after
+    which the token was found by name, adds its details to every failure.
     """
+    context = {"account_id": module.params["account_id"], "name": module.params["name"]}
+    if create_error is not None:
+        context.update(cloudflare_error_details(create_error))
+
     service_token, failure = checked_written(
         module,
         service_token,
         "service token",
         "service_token",
-        {"account_id": module.params["account_id"], "name": module.params["name"]},
+        context,
         expected_name=module.params["name"],
         expected_id=expected_id,
     )
+    # Only the create response holds the client secret; a token found by name
+    # after a failed create has none, and it cannot be read again.
+    if expected_id is None and not service_token.get("client_secret"):
+        module.fail_json(
+            msg="Cloudflare returned the service token without a client secret, which it returns only in the create "
+            "response; if this run created the token, rotate or delete it to obtain a new client secret",
+            **failure,
+        )
+
     if not duration_matches(service_token, module.params["duration"]):
         fail_not_applied(
             module,
@@ -200,25 +221,35 @@ def run(module, client):
         if module.check_mode:
             module.exit_json(changed=True, message="Service token would be created")
 
+        # The error of the last create attempt, when it failed.
+        create_errors = []
+
+        def create():
+            create_errors.clear()
+            try:
+                return without_retries(client).zero_trust.access.service_tokens.create(account_id=account_id, **payload)
+            except cloudflare.APIError as exc:
+                create_errors.append(exc)
+                raise
+
         with cloudflare_error_context(
             "Cloudflare API request failed while creating the service token",
             account_id=account_id,
             name=params["name"],
         ):
             service_token = create_once(
-                lambda: without_retries(client).zero_trust.access.service_tokens.create(
-                    account_id=account_id, **payload
-                ),
+                create,
                 lambda: matching_resources(
                     service_tokens.list(account_id=account_id, name=params["name"]), "name", params["name"]
                 ),
             )
 
-        # The client secret is only returned on creation and is part of the result.
         module.exit_json(
             changed=True,
             message="Service token created",
-            service_token=checked_token(module, service_token),
+            service_token=checked_token(
+                module, service_token, create_error=create_errors[0] if create_errors else None
+            ),
         )
 
     current_id = resource_id(

@@ -1,7 +1,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import cloudflare
 
@@ -76,18 +76,78 @@ class AccessServiceTokensTests(TestCase):
         self.assertEqual(result["resource_id"], "token")
         self.assertEqual(result["service_token"], created)
 
-    def test_create_recovers_the_token_after_a_lost_response(self):
-        recovered = {"id": "token", "name": "automation", "duration": "1y"}
+    def test_token_recovered_after_a_lost_response_fails_without_its_secret(self):
+        # The list model has no client secret, so the one the create response held is lost.
+        # The lost secret is reported even when Cloudflare stored another duration, with
+        # the details of the create error.
+        server_body = {"success": False, "errors": [{"code": 10000, "message": "Internal"}], "messages": []}
+        cases = (
+            ("1y", timeout_error, {"error": "Request timed out."}),
+            ("8760h", timeout_error, {"error": "Request timed out."}),
+            ("1y", lambda: status_error(500, server_body), {"status_code": 500, "response": server_body}),
+        )
+        for duration, error, details in cases:
+            with self.subTest(duration=duration, details=details):
+                recovered = {"id": "token", "name": "automation", "duration": duration}
+                client, api = client_with()
+                api.create.side_effect = error()
+                api.list.side_effect = [[], [recovered]]
+
+                with self.assertRaises(ModuleFail) as raised:
+                    access_service_tokens.run(FakeModule(params()), client)
+
+                client.with_options.assert_called_once_with(max_retries=0)
+                api.create.assert_called_once()
+                self.assertEqual(
+                    raised.exception.values,
+                    {
+                        "msg": "Cloudflare returned the service token without a client secret, which it returns only "
+                        "in the create response; if this run created the token, rotate or delete it to obtain a new "
+                        "client secret",
+                        "changed": True,
+                        "account_id": "account",
+                        "name": "automation",
+                        "resource_id": "token",
+                        "service_token": recovered,
+                        **details,
+                    },
+                )
+
+    def test_malformed_recovered_token_reports_the_create_error(self):
         client, api = client_with()
         api.create.side_effect = timeout_error()
-        api.list.side_effect = [[], [recovered]]
+        api.list.side_effect = [[], [{"name": "automation", "duration": "1y"}]]
 
         result = self.run_module(FakeModule(params()), client)
 
-        client.with_options.assert_called_once_with(max_retries=0)
-        api.create.assert_called_once()
-        self.assertEqual(result["message"], "Service token created")
-        self.assertEqual(result["service_token"], recovered)
+        self.assertEqual(result["msg"], "Cloudflare API returned malformed service token data")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["error"], "Request timed out.")
+
+    def test_retried_create_without_a_secret_reports_no_earlier_error(self):
+        created = {"id": "token", "name": "automation", "duration": "1y"}
+        client, api = client_with()
+        api.create.side_effect = [status_error(429), created]
+
+        with patch("time.sleep"):
+            result = self.run_module(FakeModule(params()), client)
+
+        self.assertEqual(api.create.call_count, 2)
+        self.assertIn("without a client secret", result["msg"])
+        self.assertNotIn("status_code", result)
+        self.assertNotIn("response", result)
+
+    def test_created_token_without_a_secret_fails_without_error_details(self):
+        created = {"id": "token", "name": "automation", "duration": "1y"}
+        client, _ignored = client_with(created=created)
+
+        result = self.run_module(FakeModule(params()), client)
+
+        self.assertIn("without a client secret", result["msg"])
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["service_token"], created)
+        self.assertNotIn("error", result)
+        self.assertNotIn("status_code", result)
 
     def test_create_failure_is_reported_without_a_single_match(self):
         for found in ([], [{"id": "one", "name": "automation"}, {"id": "two", "name": "automation"}]):
@@ -125,9 +185,11 @@ class AccessServiceTokensTests(TestCase):
         self.assertEqual(result["service_token"], created)
 
     def test_creates_token_without_duration(self):
-        client, api = client_with(created={"id": "token", "name": "automation"})
+        client, api = client_with(created={"id": "token", "name": "automation", "client_secret": "secret"})
 
-        self.run_module(FakeModule(params(duration=None)), client)
+        result = self.run_module(FakeModule(params(duration=None)), client)
+
+        self.assertEqual(result["message"], "Service token created")
 
         api.create.assert_called_once_with(account_id="account", name="automation")
 
@@ -189,7 +251,7 @@ class AccessServiceTokensTests(TestCase):
     def test_padded_name_is_trimmed_before_any_request(self):
         # Cloudflare trims the name, so the trimmed name is looked up and sent.
         token = {"id": "token", "name": "automation", "duration": "1y"}
-        client, api = client_with(created=token)
+        client, api = client_with(created={**token, "client_secret": "secret"})
 
         result = self.run_module(FakeModule(params(name=" automation ")), client)
 
