@@ -129,7 +129,7 @@ it for reviews, triage, or probes.
 
 ### Check mode and failures
 
-- Check mode predicts the real result and changes nothing.
+- Check mode predicts the real result, including failures, and changes nothing.
 - The next run converges after a partial failure.
 - Failures name the operation, resource, and blocker.
 - Version and capability checks run before any write.

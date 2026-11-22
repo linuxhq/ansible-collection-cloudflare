@@ -99,8 +99,11 @@ Standards for Python modules, lookup plugins, and filter plugins under
 - Use `mutually_exclusive`, `required_by`, `required_if`,
   `required_one_of`, and `required_together` for static relationships.
 - Validate input only to prevent a crash, a partial change, a run that
-  never converges, or an action on the wrong resource; let the provider
-  reject everything else.
+  never converges, an action on the wrong resource, or a check-mode run
+  that succeeds where the real run would fail; let the provider reject
+  everything else.
+- Keep an existing check that makes check mode fail as the real run
+  would; do not add one only for that reason.
 - Model each valid alternate identifier with relationship validators.
 
 #### State and check mode
@@ -114,6 +117,8 @@ Standards for Python modules, lookup plugins, and filter plugins under
 - Return the predicted `changed` value and safely derivable result data.
 - Avoid mutation-only dependencies in check mode when prediction is reliable.
 - Report `changed=True` for an action that would execute in check mode.
+- Fail in check mode wherever the real run would fail, for the same reason,
+  when the module's reads and existing checks can tell.
 
 #### Requests, results, and failures
 
