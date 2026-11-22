@@ -15,11 +15,13 @@ Manage cloudflare devices settings
 
     devices_settings_account_id: null
     devices_settings_api_token: null
-    devices_settings_disable_for_time: 0
-    devices_settings_gateway_proxy_enabled: false
-    devices_settings_gateway_udp_proxy_enabled: false
-    devices_settings_root_certificate_installation_enabled: false
-    devices_settings_use_zt_virtual_ip: false
+    devices_settings_disable_for_time: null
+    devices_settings_gateway_proxy_enabled: null
+    devices_settings_gateway_udp_proxy_enabled: null
+    devices_settings_root_certificate_installation_enabled: null
+    devices_settings_use_zt_virtual_ip: null
+
+A setting left at `null` is not sent, so Cloudflare leaves its current value unchanged.
 
 ## Dependencies
 

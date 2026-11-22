@@ -11,4 +11,14 @@
 
   roles:
     - rules_lists
+
+  post_tasks:
+    - name: Ensure rules lists information is gathered
+      ansible.builtin.include_role:
+        name: rules_lists_info
+
+    - name: Ensure rules lists are absent
+      ansible.builtin.assert:
+        that:
+          - rules_lists_list.0.name not in _rules_lists_info_dict
 ...

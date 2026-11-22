@@ -208,8 +208,10 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     without_retries,
 )
 
-# Fields of the setting values the cloudflare SDK types as objects, by setting
-# id. Cloudflare accepts any other field but drops it.
+# Fields of the object setting values whose unknown fields Cloudflare accepts
+# but drops, by setting id, from the cloudflare SDK types. The SDK also types
+# automatic_platform_optimization as an object, but Cloudflare rejects an
+# incomplete one, so it is left to Cloudflare.
 SETTING_VALUE_FIELDS = {
     "aegis": ("enabled", "pool_id"),
     "nel": ("enabled",),

@@ -19,8 +19,11 @@ Manage cloudflare warp connectors
     warp_connector_batch: 10
     warp_connector_delay: 3
     warp_connector_list: []
+    warp_connector_no_log: false
     warp_connector_poll: 0
     warp_connector_retries: 100
+
+Set `warp_connector_no_log: true` to keep the connector tokens and tunnel credentials that results include out of task output.
 
 ## Dependencies
 

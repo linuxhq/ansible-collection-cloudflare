@@ -225,19 +225,17 @@ class AccessGroupsTests(TestCase):
                 api.list.assert_not_called()
                 api.create.assert_not_called()
 
-    def test_non_mapping_selector_fails_before_any_request(self):
-        for selector in (None, "everyone", ["everyone"]):
-            for check_mode in (True, False):
-                with self.subTest(selector=selector, check_mode=check_mode):
-                    client, api = client_with()
+    def test_null_selector_fails_before_any_request(self):
+        # Ansible rejects other non-mapping selectors, as include holds dict elements.
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                client, api = client_with()
 
-                    result = self.run_module(FakeModule(params(include=[selector]), check_mode=check_mode), client)
+                result = self.run_module(FakeModule(params(include=[None]), check_mode=check_mode), client)
 
-                    self.assertEqual(
-                        result["msg"], "include[0] must be a mapping that sets one selector, such as {'everyone': {}}"
-                    )
-                    api.list.assert_not_called()
-                    api.create.assert_not_called()
+                self.assertEqual(result["msg"], "include[0] must not be null; Cloudflare drops a null selector")
+                api.list.assert_not_called()
+                api.create.assert_not_called()
 
     def test_empty_selector_fails_before_any_request(self):
         for check_mode in (True, False):
@@ -384,12 +382,30 @@ class AccessGroupsTests(TestCase):
         api.delete.assert_called_once_with("group", account_id="account")
         self.assertTrue(result["changed"])
 
+    def test_padded_name_is_trimmed_before_any_request(self):
+        # Cloudflare trims the name, so the trimmed name is looked up and sent.
+        group = {"id": "group", "name": "admins", "include": INCLUDE}
+        client, api = client_with(created=group)
+
+        result = self.run_module(FakeModule(params(name=" admins ")), client)
+
+        self.assertEqual(api.list.call_args_list[0].kwargs, {"account_id": "account", "name": "admins"})
+        self.assertEqual(api.create.call_args.kwargs["name"], "admins")
+        self.assertEqual(result["message"], "Access group created")
+
+        client, api = client_with([group])
+
+        result = self.run_module(FakeModule(params(name=" admins ")), client)
+
+        api.create.assert_not_called()
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_created_group_with_another_name_reports_the_write(self):
-        # Cloudflare strips a padded name, so the created group is not named as requested.
-        created = {"id": "group", "name": "admins", "include": INCLUDE}
+        created = {"id": "group", "name": "other", "include": INCLUDE}
         client, api = client_with(created=created)
 
-        result = self.run_module(FakeModule(params(name=" admins")), client)
+        result = self.run_module(FakeModule(params()), client)
 
         api.create.assert_called_once()
         self.assertEqual(result["msg"], "Cloudflare API returned the wrong Access group")

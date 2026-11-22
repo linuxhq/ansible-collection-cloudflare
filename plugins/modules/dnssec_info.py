@@ -166,23 +166,19 @@ def run(module, client):
             ):
                 dnssec_settings = client.dns.dnssec.get(zone_id=zone["id"])
         except cloudflare.APIStatusError as exc:
-            status_code = getattr(exc, "status_code", None)
-            if status_code not in SKIP_STATUSES:
+            if exc.status_code not in SKIP_STATUSES:
                 raise
 
             response_body = error_response_body(exc)
             skipped_zone = {
                 "zone_id": zone["id"],
                 "zone_name": zone["name"],
-                "status_code": status_code,
+                "status_code": exc.status_code,
             }
 
             if isinstance(response_body, dict):
                 for field in ("errors", "messages"):
-                    value = response_body.get(field, [])
-                    skipped_zone[field] = (
-                        value if isinstance(value, list) and all(isinstance(item, dict) for item in value) else []
-                    )
+                    skipped_zone[field] = response_body.get(field, [])
             else:
                 skipped_zone["error"] = "Cloudflare API did not return structured error details"
 

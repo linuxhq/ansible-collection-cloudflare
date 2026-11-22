@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - access_apps - send an inline policy selector entry that is neither a mapping nor null, such as ``everyone``, to
+    Cloudflare, which rejects it before any change. A null selector entry, which Cloudflare drops, still fails before
+    any request, now with a message saying so.

@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - access_apps, access_groups, access_service_tokens - remove surrounding whitespace from ``name`` before the lookup
+    and every request, as Cloudflare trims it. A padded name created the resource and then failed because Cloudflare
+    returned the trimmed name, and access_service_tokens created another token on every run. An empty or
+    whitespace-only name still fails before any change.

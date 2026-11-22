@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - dnssec_info - return the ``errors`` and ``messages`` of a skipped zone as Cloudflare sent them, instead of
+    replacing a list that holds anything other than mappings with an empty list.
+trivial:
+  - zones - correct the comment on the object setting values whose fields are checked.

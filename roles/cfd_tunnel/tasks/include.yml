@@ -24,6 +24,7 @@
   changed_when:
     - ansible_check_mode | bool
     - __cfd_tunnel_result.changed | bool
+  no_log: "{{ cfd_tunnel_no_log }}"
 
 - name: Ensure managed cloudflare cfd tunnel jobs are complete
   tags:
@@ -41,4 +42,5 @@
     - __cfd_tunnel_status.finished | bool
   retries: "{{ cfd_tunnel_retries }}"
   delay: "{{ cfd_tunnel_delay }}"
+  no_log: "{{ cfd_tunnel_no_log }}"
 ...

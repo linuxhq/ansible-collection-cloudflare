@@ -34,13 +34,13 @@ options:
       - Required when creating the ruleset.
       - An existing ruleset cannot be renamed, because Cloudflare keeps the stored name of a phase entrypoint;
         when O(name) differs from it, the module fails before any change, including with O(state=absent).
-      - An existing ruleset's description is preserved.
   rules:
     type: list
     elements: dict
     description:
       - Ordered rules evaluated by the ruleset.
       - When omitted, the existing rules are preserved.
+      - An update of the rules preserves the existing ruleset's description.
       - An explicit empty list clears the ruleset.
       - A rule without C(enabled) is enabled, as in Cloudflare; set C(enabled=false)
         to keep a rule disabled.
@@ -51,10 +51,10 @@ options:
         Cloudflare drops an empty C(description) or C(action_parameters), so either
         matches a rule without that field.
       - An empty C(action_parameters.phases), C(action_parameters.products),
-        C(action_parameters.rules), or C(action_parameters.rulesets) of a
-        C(skip) rule fails before any change, including one that is empty once
-        its null keys are dropped, because Cloudflare does not store it; omit
-        the parameter instead.
+        C(action_parameters.rules), or C(action_parameters.rulesets) fails
+        before any change, including one that is empty once its null keys are
+        dropped, because Cloudflare does not store it; omit the parameter
+        instead.
       - An empty C(id) or C(ref) fails before any change, because Cloudflare
         assigns the rule its own value instead; omit the field instead.
       - A rule's C(action_parameters) are compared on their complete key sets
@@ -152,6 +152,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_present,
     get_or_none,
     require_mapping,
+    require_mapping_list,
     resource_field,
     serialize_resource,
     unique_match,
@@ -180,9 +181,9 @@ EMPTY_SKIP_PARAMETERS = {"phases": [], "products": [], "rules": {}, "rulesets": 
 
 
 def validate_action_parameters(module):
-    """Fail when an action parameter uses an SDK spelling or a skip rule parameter is empty.
+    """Fail when an action parameter uses an SDK spelling or a skip parameter is empty.
 
-    Cloudflare drops an empty skip rule phases, products, rules, or rulesets value, so
+    Cloudflare drops an empty phases, products, rules, or rulesets value, so
     the rule would never match the request.
     """
     empty = []
@@ -238,13 +239,7 @@ def rules_from_resource(module, ruleset, failure=None):
     if rules is None:
         return []
 
-    if not isinstance(rules, list):
-        module.fail_json(msg="Cloudflare API returned malformed ruleset data", **(failure or {}))
-
-    for rule in rules:
-        require_mapping(module, rule, "ruleset rule", failure)
-
-    return rules
+    return require_mapping_list(module, rules, "ruleset", "ruleset rule", failure)
 
 
 # Cloudflare assigns these rule fields; every other rule field is managed.
@@ -345,14 +340,13 @@ def comparable_rules(rules, desired_rules):
 
 
 def checked_ruleset(module, ruleset, phase, failure=None):
-    """Serialize a ruleset response and validate its phase and rules.
+    """Serialize a ruleset response and validate its phase.
 
     failure adds result fields to a failure, such as changed=True after a write.
     """
     ruleset = serialize_resource(ruleset)
     require_mapping(module, ruleset, "ruleset", failure)
     resource_field(module, ruleset, "phase", "ruleset", expected=phase, context=failure)
-    rules_from_resource(module, ruleset, failure)
     return ruleset
 
 

@@ -1,0 +1,9 @@
+---
+minor_changes:
+  - rules_lists - report a bulk operation without a status as an unknown operation status, with the operation, and
+    read the operation id only from ``operation_id``.
+  - rules_lists, rules_lists_info - document the ``description``, ``num_referencing_filters``, ``created_on``, and
+    ``modified_on`` fields Cloudflare returns for a Rules list, and the ``completed`` time of ``items_operation``.
+trivial:
+  - rules_lists - drop checks of list item, item count, and operation id shapes that the SDK response models
+    guarantee, and state once that every entry requirement is checked before any change.

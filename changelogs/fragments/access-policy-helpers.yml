@@ -1,0 +1,7 @@
+---
+minor_changes:
+  - access_apps - report an empty ``destinations[].overrides`` list in ``empty_fields`` with the other empty values
+    Cloudflare does not store, instead of in a separate failure.
+trivial:
+  - access_apps, access_policies - share the Access policy false-flag fields and approval group field check, and drop
+    a duplicate null filter, an alias constant, and an always-true condition.

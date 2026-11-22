@@ -54,6 +54,24 @@ class ZeroTrustConnectivitySettingsTests(TestCase):
         api.edit.assert_called_once_with(account_id="account", icmp_proxy_enabled=True, offramp_warp_enabled=False)
         self.assertEqual(result["connectivity_settings"], applied)
 
+    def test_omitted_setting_is_not_sent(self):
+        current = {"icmp_proxy_enabled": False, "offramp_warp_enabled": True}
+        applied = {**current, "icmp_proxy_enabled": True}
+        result, api = self.run_module(
+            FakeModule(params(icmp_proxy_enabled=True, offramp_warp_enabled=None)), current, applied
+        )
+
+        api.edit.assert_called_once_with(account_id="account", icmp_proxy_enabled=True)
+        self.assertTrue(result["changed"])
+
+    def test_omitted_settings_change_nothing(self):
+        current = {"icmp_proxy_enabled": True, "offramp_warp_enabled": True}
+        result, api = self.run_module(FakeModule(params(icmp_proxy_enabled=None, offramp_warp_enabled=None)), current)
+
+        api.edit.assert_not_called()
+        self.assertFalse(result["changed"])
+        self.assertEqual(result["connectivity_settings"], current)
+
     def test_rejects_update_response_with_wrong_settings(self):
         result, _ignored = self.run_module(
             FakeModule(params(icmp_proxy_enabled=True)), {"icmp_proxy_enabled": False}, {"icmp_proxy_enabled": False}

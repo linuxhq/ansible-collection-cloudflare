@@ -22,7 +22,7 @@
   ansible.builtin.set_fact:
     _dnssec_info_dict:
       "{{ (dict(_dnssec_info_list |
-                json_query('[].name') |
+                map(attribute='name') |
                 zip(_dnssec_info_list))) |
           d({}) }}"
 ...

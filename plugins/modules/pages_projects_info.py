@@ -64,7 +64,7 @@ def run(module, client):
         exit_resource_list(
             module,
             "pages_projects",
-            client.pages.projects.list(account_id=account_id, per_page=10),
+            client.pages.projects.list(account_id=account_id),
             "Pages project",
             required_fields=("name",),
             context={"account_id": account_id},

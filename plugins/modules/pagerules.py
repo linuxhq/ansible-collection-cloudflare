@@ -181,6 +181,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_present,
     payload_from_params,
     require_mapping,
+    require_mapping_list,
     resource_id,
     serialize_resource,
     unsupported_fields,
@@ -189,7 +190,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     without_retries,
 )
 
-FIELDS = ("actions", "priority", "status", "targets")
+FIELDS = ("priority", "status")
 
 # Cloudflare answers a request for a deleted page rule with this error code
 # and a 400 status.
@@ -253,14 +254,7 @@ def pagerule_targets(module, pagerule):
     if "id" in pagerule:
         context["resource_id"] = pagerule["id"]
 
-    targets = pagerule.get("targets")
-    if not isinstance(targets, list):
-        module.fail_json(msg="Cloudflare API returned malformed page rule data", **context)
-
-    for target in targets:
-        require_mapping(module, target, "page rule target", context)
-
-    return targets
+    return require_mapping_list(module, pagerule.get("targets"), "page rule", "page rule target", context)
 
 
 def canonical_url(value):
@@ -444,7 +438,7 @@ def run(module, client):
     payload = payload_from_params(module.params, FIELDS)
     # A null target or action field, at any level, counts as omitted, so it is not sent.
     payload["targets"] = without_nested_nulls(targets)
-    payload["actions"] = without_nested_nulls(ordered_actions(payload["actions"], current))
+    payload["actions"] = without_nested_nulls(ordered_actions(module.params["actions"], current))
     if current is None:
         payload.setdefault("status", "active")
 

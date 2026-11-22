@@ -55,10 +55,9 @@ cfd_tunnel_configurations:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    cloudflare,
     cloudflare_client,
     cloudflare_error_context,
-    get_or_none,
-    require_mapping,
     resource_list,
     serialize_resource,
 )
@@ -89,25 +88,13 @@ def run(module, client):
             account_id=account_id,
             tunnel_id=tunnel["id"],
         ):
-            # Skip a tunnel deleted after it was listed, which returns 404. A
-            # null configuration becomes an empty mapping, so None means 404.
-            configuration = get_or_none(
-                lambda tunnel_id: serialize_resource(tunnels.configurations.get(tunnel_id, account_id=account_id))
-                or {},
-                tunnel["id"],
-            )
+            # Skip a tunnel deleted after it was listed, which returns 404.
+            try:
+                configuration = tunnels.configurations.get(tunnel["id"], account_id=account_id)
+            except cloudflare.NotFoundError:
+                continue
 
-        if configuration is None:
-            continue
-
-        context = {"account_id": account_id, "tunnel_id": tunnel["id"]}
-        require_mapping(module, configuration, "tunnel configuration", context)
-        config = configuration.get("config")
-        if config is None:
-            config = {}
-        else:
-            require_mapping(module, config, "tunnel configuration", context)
-
+        config = (serialize_resource(configuration) or {}).get("config") or {}
         configurations.append({"id": tunnel["id"], "name": tunnel["name"], "config": config})
 
     module.exit_json(changed=False, cfd_tunnel_configurations=configurations)

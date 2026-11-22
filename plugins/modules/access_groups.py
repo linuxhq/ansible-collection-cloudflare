@@ -53,11 +53,8 @@ options:
     type: str
     description:
       - Access group name.
-      - Cloudflare trims surrounding whitespace from the name, and group names
-        are unique, so a name with leading or trailing whitespace never
-        converges. The first run creates the group with the trimmed name and
-        then fails because Cloudflare returns the wrong Access group; later
-        runs fail because Cloudflare rejects the name as already in use.
+      - Surrounding whitespace is removed from the name before it is looked up
+        or sent, as Cloudflare trims it.
       - An empty or whitespace-only name fails before any change, because
         Cloudflare does not store it.
   include:
@@ -152,9 +149,11 @@ def run(module, client):
     params = module.params
     account_id = params["account_id"]
     groups = client.zero_trust.access.groups
+    # Cloudflare trims surrounding whitespace from the name.
+    params["name"] = params["name"].strip()
     if params["state"] == "present":
         # Cloudflare stores an empty name as null, so the resource is never found again.
-        if not params["name"].strip():
+        if not params["name"]:
             module.fail_json(msg="name must not be empty or only whitespace")
 
         validate_access_selectors(module)

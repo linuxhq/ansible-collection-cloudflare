@@ -73,7 +73,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     cloudflare_error_context,
     get_or_none,
-    require_mapping,
+    require_mapping_list,
     resource_field,
     resource_id,
     resource_list,
@@ -129,15 +129,8 @@ def run(module, client):
             entry["id"] = resource_id(module, ruleset, "ruleset", context=context)
             entry["phase"] = resource_field(module, ruleset, "phase", "ruleset", expected=phase, context=context)
             rules = ruleset.get("rules")
-            if rules is None:
-                rules = []
-            elif not isinstance(rules, list):
-                module.fail_json(msg="Cloudflare API returned malformed ruleset data", **context)
-
-            for rule in rules:
-                require_mapping(module, rule, "ruleset rule", context)
-
-            entry["rules"] = rules
+            if rules is not None:
+                entry["rules"] = require_mapping_list(module, rules, "ruleset", "ruleset rule", context)
 
         rulesets.append(entry)
 

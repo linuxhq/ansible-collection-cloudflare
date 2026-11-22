@@ -125,11 +125,12 @@ def cloudflare_client(module):
         else:
             default_message = "Cloudflare API error"
 
-        fail_from_cloudflare_error(
-            module,
-            getattr(exc, "_cloudflare_message", default_message),
-            exc,
-            **getattr(exc, "_cloudflare_context", {}),
+        module.fail_json(
+            **{
+                "msg": getattr(exc, "_cloudflare_message", default_message),
+                **getattr(exc, "_cloudflare_context", {}),
+                **cloudflare_error_details(exc),
+            }
         )
 
 
@@ -204,10 +205,6 @@ def cloudflare_error_details(exc):
     return details
 
 
-def fail_from_cloudflare_error(module, message, exc, **context):
-    module.fail_json(**{"msg": message, **context, **cloudflare_error_details(exc)})
-
-
 def serialize_resource(resource):
     if resource is None:
         return None
@@ -265,6 +262,21 @@ def require_mapping(module, value, resource_name, context=None):
     """Fail when value is not a mapping; context adds result fields to the failure."""
     if not isinstance(value, dict):
         module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data", **(context or {}))
+
+
+def require_mapping_list(module, value, resource_name, item_name, context=None):
+    """Return value, failing when it is not a list of mappings; context adds result fields to the failure.
+
+    The failure names resource_name for a value that is not a list, and
+    item_name for an item that is not a mapping.
+    """
+    if not isinstance(value, list):
+        module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data", **(context or {}))
+
+    for item in value:
+        require_mapping(module, item, item_name, context)
+
+    return value
 
 
 def resource_list(module, items, resource_name, required_fields=("id",), context=None):
@@ -419,22 +431,18 @@ def path_segment(value):
 def find_resource(module, items, resource_name, field, value, context=None):
     """Return the serialized item whose field equals value, or None.
 
-    Fail when more than one item matches, so an ambiguous name never selects
-    an arbitrary resource. Only the matched items are validated strictly, so
-    an unrelated item with surrounding whitespace in its field is skipped,
-    and an item without the field, such as an Access policy Cloudflare stored
-    without a name, never matches. context adds result fields to a failure,
-    such as the resource's owner; field and value are always reported.
+    Fail when an item is not a mapping, or when more than one item matches,
+    so an ambiguous name never selects an arbitrary resource. An item without
+    the field, such as an Access policy Cloudflare stored without a name,
+    never matches. context adds result fields to a failure, such as the
+    resource's owner; field and value are always reported.
     """
     context = {**(context or {}), field: value}
     matches = []
     for item in items:
         resource = serialize_resource(item)
-        if isinstance(resource, dict) and not isinstance(resource.get(field), str):
-            continue
-
-        if resource_field(module, resource, field, resource_name, strict=False, context=context) == value:
-            resource_field(module, resource, field, resource_name, context=context)
+        require_mapping(module, resource, resource_name, context)
+        if resource.get(field) == value:
             matches.append(resource)
 
     if len(matches) > 1:
@@ -698,8 +706,20 @@ ACCESS_SELECTOR_DROPPED_EMPTY_FIELDS = {
 ACCESS_APPROVAL_GROUP_FIELDS = ("approvals_needed", "email_addresses", "email_list_uuid")
 
 
+# Access policy flags Cloudflare omits when they are false.
+ACCESS_POLICY_FALSE_FIELDS = ("approval_required", "isolation_required", "purpose_justification_required")
+
 # Approval group fields Cloudflare drops when they hold these empty values.
 EMPTY_APPROVAL_GROUP_FIELDS = {"email_addresses": [], "email_list_uuid": ""}
+
+
+def unknown_approval_group_fields(groups, path):
+    """Return the path of each field of the approval groups that ACCESS_APPROVAL_GROUP_FIELDS does not list."""
+    return [
+        field
+        for index, group in enumerate(groups if isinstance(groups, list) else ())
+        for field in unsupported_fields(group, ACCESS_APPROVAL_GROUP_FIELDS, f"{path}[{index}]")
+    ]
 
 
 def empty_approval_group_fields(groups, path):
@@ -820,8 +840,8 @@ def access_rules_payload(rules):
 def validate_access_selectors(module, rules=None, prefix=""):
     """Fail when an Access selector is not one rule, uses an SDK spelling, or holds a value Cloudflare drops.
 
-    Each selector is a mapping that sets one rule, as every SDK AccessRuleParam type has one key; Cloudflare drops an
-    empty selector and splits a selector with several rules into separate selectors. SDK spellings must use their API
+    Each selector is a mapping that sets one rule, as every SDK AccessRuleParam type has one key; Cloudflare drops a
+    null or empty selector and splits a selector with several rules into separate selectors. SDK spellings must use their API
     keys instead. Cloudflare stores a null any_valid_service_token as {}. A known selector's fields must be ones
     Cloudflare stores, and not the empty strings it drops. Other values are left to Cloudflare, which rejects them.
     rules defaults to the module parameters; prefix names their location in failure messages, such as "policies[0].".
@@ -834,8 +854,12 @@ def validate_access_selectors(module, rules=None, prefix=""):
         selectors = rules.get(field)
         for index, selector in enumerate(selectors if isinstance(selectors, list) else ()):
             path = f"{prefix}{field}[{index}]"
+            if selector is None:
+                module.fail_json(msg=f"{path} must not be null; Cloudflare drops a null selector")
+
+            # Cloudflare rejects another value that is not a mapping before any change.
             if not isinstance(selector, dict):
-                module.fail_json(msg=f"{path} must be a mapping that sets one selector, such as {{'everyone': {{}}}}")
+                continue
 
             if not selector:
                 module.fail_json(msg=f"{path} must set one selector; Cloudflare drops an empty selector")
@@ -882,6 +906,25 @@ def validate_access_selectors(module, rules=None, prefix=""):
             "omit them instead",
             empty_fields=empty,
         )
+
+
+def checked_written(module, resource, resource_name, result_key, context, expected_name=None, expected_id=None):
+    """Serialize the resource a create or update returned, failing when it has the wrong id or name.
+
+    A failure reports changed=True, context, the resource under result_key,
+    and its resource_id. Return the resource and that failure context, for
+    later checks of the write.
+    """
+    resource = serialize_resource(resource)
+    failure = {"changed": True, **context, result_key: resource}
+    failure = {
+        "resource_id": resource_id(module, resource, resource_name, expected=expected_id, context=failure),
+        **failure,
+    }
+    if expected_name is not None:
+        resource_field(module, resource, "name", resource_name, expected=expected_name, context=failure)
+
+    return resource, failure
 
 
 def exit_resource_list(module, result_key, items, resource_name, required_fields=("id", "name"), context=None):
@@ -970,15 +1013,9 @@ def ensure_resource_present(
 
         Every failure reports the write, the resource, and its identifiers.
         """
-        resource = serialize_resource(resource)
-        failure = {"changed": True, **written_context, result_key: resource}
-        failure = {
-            "resource_id": resource_id(module, resource, resource_name, expected=expected_id, context=failure),
-            **failure,
-        }
-        if expected_name is not None:
-            resource_field(module, resource, "name", resource_name, expected=expected_name, context=failure)
-
+        resource, failure = checked_written(
+            module, resource, resource_name, result_key, written_context, expected_name, expected_id
+        )
         require_applied(
             module,
             comparable(resource, failure),

@@ -77,7 +77,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
-    require_mapping,
+    require_mapping_list,
     resource_list,
     zone_missing,
 )
@@ -110,12 +110,7 @@ def run(module, client):
         for rule in rules:
             context = {"zone_id": zone["id"], "resource_id": rule["id"]}
             for field in ("actions", "targets"):
-                values = rule.get(field)
-                if not isinstance(values, list):
-                    module.fail_json(msg="Cloudflare API returned malformed page rule data", **context)
-
-                for value in values:
-                    require_mapping(module, value, f"page rule {field[:-1]}", context)
+                require_mapping_list(module, rule.get(field), "page rule", f"page rule {field[:-1]}", context)
 
         pagerules.append({"id": zone["id"], "name": zone["name"], "pagerules": rules})
 

@@ -102,6 +102,7 @@ message:
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_utils import (
+    checked_written,
     cloudflare_client,
     cloudflare_error_context,
     create_once,
@@ -111,7 +112,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     resource_field,
     resource_id,
-    serialize_resource,
     without_retries,
 )
 
@@ -129,21 +129,13 @@ def checked_tunnel(module, tunnel, expected_id=None):
 
     A failure reports changed=True, the tunnel, and its identifiers.
     """
-    tunnel = serialize_resource(tunnel)
-    failure = {
-        "changed": True,
-        "account_id": module.params["account_id"],
-        "name": module.params["name"],
-        "cfd_tunnel": tunnel,
-    }
+    context = {"account_id": module.params["account_id"], "name": module.params["name"]}
     if expected_id is not None:
-        failure["resource_id"] = expected_id
+        context["resource_id"] = expected_id
 
-    failure = {
-        "resource_id": resource_id(module, tunnel, "cloudflared tunnel", expected=expected_id, context=failure),
-        **failure,
-    }
-    resource_field(module, tunnel, "name", "cloudflared tunnel", expected=module.params["name"], context=failure)
+    tunnel, failure = checked_written(
+        module, tunnel, "cloudflared tunnel", "cfd_tunnel", context, module.params["name"], expected_id
+    )
     if expected_id is None and module.params.get("config_src") is not None:
         resource_field(
             module, tunnel, "config_src", "cloudflared tunnel", expected=module.params["config_src"], context=failure
@@ -171,7 +163,6 @@ def ensure_present(module, client, current):
                 f"{current_config_src} to {params['config_src']}",
                 account_id=account_id,
                 resource_id=current_id,
-                cfd_tunnel_id=current_id,
                 current_config_src=current_config_src,
                 requested_config_src=params["config_src"],
             )

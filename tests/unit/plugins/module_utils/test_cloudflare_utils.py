@@ -31,6 +31,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     require_applied,
     require_mapping,
+    require_mapping_list,
     resource_field,
     resource_id,
     resource_list,
@@ -531,6 +532,18 @@ class ValueTests(TestCase):
 
             self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed resource data")
 
+    def test_require_mapping_list_names_the_list_or_the_item(self):
+        module = FakeModule({})
+        rules = [{"id": "one"}]
+
+        self.assertIs(require_mapping_list(module, rules, "ruleset", "ruleset rule"), rules)
+        for value, name in ((None, "ruleset"), ({"id": "one"}, "ruleset"), ([{"id": "one"}, "two"], "ruleset rule")):
+            with self.subTest(value=value), self.assertRaises(ModuleFail) as raised:
+                require_mapping_list(module, value, "ruleset", "ruleset rule", context={"zone_id": "zone"})
+
+            self.assertEqual(raised.exception.values["msg"], f"Cloudflare API returned malformed {name} data")
+            self.assertEqual(raised.exception.values["zone_id"], "zone")
+
     def test_lists_and_finds_resources(self):
         module = FakeModule({})
         items = [{"id": "one", "name": "One"}, {"id": "two", "name": "Two"}]
@@ -690,6 +703,7 @@ class ValueTests(TestCase):
     def test_access_selectors_leave_other_non_mapping_values_to_cloudflare(self):
         # Cloudflare rejects these on the first write.
         rules = {
+            "exclude": ["everyone", ["everyone"], 5],
             "include": [{"email": None}, {"ip": None}, {"group": None}, {"email": "a@example.com"}],
             "require": [{"everyone": []}, {"everyone": True}, {"any_valid_service_token": ""}],
         }
@@ -698,9 +712,7 @@ class ValueTests(TestCase):
 
     def test_access_selectors_reject_non_mapping_and_empty_selectors(self):
         cases = (
-            (None, "must be a mapping that sets one selector, such as {'everyone': {}}"),
-            ("azure_ad", "must be a mapping that sets one selector, such as {'everyone': {}}"),
-            (["everyone"], "must be a mapping that sets one selector, such as {'everyone': {}}"),
+            (None, "must not be null; Cloudflare drops a null selector"),
             ({}, "must set one selector; Cloudflare drops an empty selector"),
         )
         for field in ("include", "exclude", "require"):

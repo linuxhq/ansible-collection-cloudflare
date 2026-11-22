@@ -3,7 +3,10 @@
   tags:
     - zones
   linuxhq.cloudflare.zones:
-    account_id: "{{ zones_account_id | d(omit) }}"
+    account_id:
+      "{{ zones_account_id
+          if zones_account_id is not none
+          else omit }}"
     api_token: "{{ zones_api_token }}"
     name: "{{ _zone.name }}"
     settings: "{{ _zone.settings | d(omit) }}"

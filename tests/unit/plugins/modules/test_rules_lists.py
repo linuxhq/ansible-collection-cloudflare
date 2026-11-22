@@ -176,7 +176,7 @@ class RulesListsTests(TestCase):
         self.assertIn("Timed out submitting", raised.exception.values["msg"])
 
     def test_wait_rejects_missing_operation_identifier(self):
-        for operation in ({}, {"operation_id": " operation "}):
+        for operation in ({}, {"operation_id": ""}, {"id": "operation"}):
             with (
                 self.subTest(operation=operation),
                 self.assertRaises(ModuleFail) as raised,
@@ -213,7 +213,9 @@ class RulesListsTests(TestCase):
             patch.object(rules_lists.time, "monotonic", side_effect=[1, 2, 3, 4, 29.7, 29.8]),
             patch.object(rules_lists.time, "sleep") as sleep,
         ):
-            result = rules_lists.wait_for_operation(FakeModule({}), client, "account", "list", {"id": "operation"}, 30)
+            result = rules_lists.wait_for_operation(
+                FakeModule({}), client, "account", "list", {"operation_id": "operation"}, 30
+            )
 
         self.assertEqual(result["status"], "completed")
         self.assertEqual(sleep.call_args_list[0].args, (rules_lists.OPERATION_POLL_SECONDS,))
@@ -227,10 +229,26 @@ class RulesListsTests(TestCase):
             patch.object(rules_lists.time, "monotonic", return_value=1),
             self.assertRaises(ModuleFail) as raised,
         ):
-            rules_lists.wait_for_operation(FakeModule({}), client, "account", "list", {"id": "operation"}, 30)
+            rules_lists.wait_for_operation(FakeModule({}), client, "account", "list", {"operation_id": "operation"}, 30)
 
         self.assertEqual(raised.exception.values["msg"], "Rules list items operation failed")
         self.assertEqual(raised.exception.values["rules_list_id"], "list")
+
+    def test_wait_reports_an_operation_without_status_as_unknown(self):
+        operation = {"id": "operation"}
+        client, api = make_client()
+        api.bulk_operations.get.return_value = operation
+
+        with (
+            patch.object(rules_lists.time, "monotonic", return_value=1),
+            self.assertRaises(ModuleFail) as raised,
+        ):
+            rules_lists.wait_for_operation(FakeModule({}), client, "account", "list", {"operation_id": "operation"}, 30)
+
+        self.assertEqual(
+            raised.exception.values["msg"], "Cloudflare API returned an unknown Rules list operation status"
+        )
+        self.assertEqual(raised.exception.values["operation"], operation)
 
     def test_wait_raises_permanent_polling_errors_with_context(self):
         client, api = make_client()
@@ -240,7 +258,7 @@ class RulesListsTests(TestCase):
             patch.object(rules_lists.time, "monotonic", return_value=1),
             self.assertRaises(cloudflare.PermissionDeniedError) as raised,
         ):
-            rules_lists.wait_for_operation(FakeModule({}), client, "account", "list", {"id": "operation"}, 30)
+            rules_lists.wait_for_operation(FakeModule({}), client, "account", "list", {"operation_id": "operation"}, 30)
 
         self.assertEqual(
             raised.exception._cloudflare_context,
@@ -282,7 +300,7 @@ class RulesListsTests(TestCase):
             ):
                 try:
                     result = rules_lists.wait_for_operation(
-                        FakeModule({}), client, "account", "list", {"id": "operation"}, 1
+                        FakeModule({}), client, "account", "list", {"operation_id": "operation"}, 1
                     )
                 except ModuleFail as exc:
                     result = exc.values
@@ -300,7 +318,9 @@ class RulesListsTests(TestCase):
         client, _ignored = make_client()
 
         with patch.object(rules_lists.time, "monotonic", return_value=0.5):
-            result = rules_lists.wait_for_operation(FakeModule({}), client, "account", "list", {"id": "operation"}, 1)
+            result = rules_lists.wait_for_operation(
+                FakeModule({}), client, "account", "list", {"operation_id": "operation"}, 1
+            )
 
         client.with_options.assert_called_once_with(timeout=0.5, max_retries=0)
         self.assertEqual(result["status"], "completed")
@@ -1142,7 +1162,7 @@ class RulesListsTests(TestCase):
             http_client=httpx.Client(transport=httpx.MockTransport(respond)),
         )
         with client:
-            items = rules_lists.list_items(FakeModule({}), client, "account", "list")
+            items = rules_lists.list_items(client, "account", "list")
 
         self.assertEqual(
             [(request.url.path, dict(request.url.params)) for request in requests],

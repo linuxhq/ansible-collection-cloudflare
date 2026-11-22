@@ -824,21 +824,32 @@ class AccessAppsTests(TestCase):
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
 
-    def test_non_mapping_inline_policy_selector_fails_before_any_request(self):
-        for selector in (None, "everyone", ["everyone"]):
-            for check_mode in (True, False):
-                with self.subTest(selector=selector, check_mode=check_mode):
-                    policies = [{"name": "inline", "decision": "allow", "include": [selector]}]
-                    client, api = client_with()
+    def test_null_inline_policy_selector_fails_before_any_request(self):
+        # Cloudflare drops a null selector, so the policy would never match the request.
+        for check_mode in (True, False):
+            with self.subTest(check_mode=check_mode):
+                policies = [{"name": "inline", "decision": "allow", "include": [{"everyone": {}}, None]}]
+                client, api = client_with()
 
-                    result = self.run_module(FakeModule(params(policies=policies), check_mode=check_mode), client)
+                result = self.run_module(FakeModule(params(policies=policies), check_mode=check_mode), client)
 
-                    self.assertEqual(
-                        result["msg"],
-                        "policies[0].include[0] must be a mapping that sets one selector, such as {'everyone': {}}",
-                    )
-                    api.list.assert_not_called()
-                    api.create.assert_not_called()
+                self.assertEqual(
+                    result["msg"], "policies[0].include[1] must not be null; Cloudflare drops a null selector"
+                )
+                api.list.assert_not_called()
+                api.create.assert_not_called()
+
+    def test_other_non_mapping_inline_policy_selectors_reach_cloudflare(self):
+        # Cloudflare rejects these with a 400 status before any change.
+        for selector in ("everyone", ["everyone"], 5):
+            with self.subTest(selector=selector):
+                policies = [{"name": "inline", "decision": "allow", "include": [selector]}]
+                client, api = client_with()
+
+                self.run_module(FakeModule(params(policies=policies)), client)
+
+                api.create.assert_called_once()
+                self.assertEqual(api.create.call_args.kwargs["policies"][0]["include"], [selector])
 
     def test_inline_policy_empty_selector_fails_before_any_request(self):
         policies = [{"name": "inline", "decision": "allow", "include": [{"everyone": {}}], "exclude": [{}]}]
@@ -880,11 +891,8 @@ class AccessAppsTests(TestCase):
 
                 result = self.run_module(FakeModule(params(destinations=destinations), check_mode=check_mode), client)
 
-                self.assertEqual(
-                    result["msg"],
-                    "destinations[0].overrides, destinations[2].overrides must be omitted instead of an empty list; "
-                    "Cloudflare stores a destination with empty overrides without them",
-                )
+                self.assertEqual(result["empty_fields"], ["destinations[0].overrides", "destinations[2].overrides"])
+                self.assertIn("Cloudflare does not store an empty value", result["msg"])
                 api.list.assert_not_called()
                 api.create.assert_not_called()
 
@@ -1507,11 +1515,29 @@ class AccessAppsTests(TestCase):
         self.assertEqual(result["message"], "Access application created")
         self.assertEqual(result["access_app"], stored())
 
+    def test_padded_name_is_trimmed_before_any_request(self):
+        # Cloudflare trims the name, so the trimmed name is looked up and sent.
+        client, api = client_with(created=stored())
+
+        result = self.run_module(FakeModule(params(name=" app ")), client)
+
+        self.assertEqual(api.list.call_args_list[0].kwargs, {"account_id": "account", "name": "app", "exact": True})
+        self.assertEqual(api.create.call_args.kwargs["name"], "app")
+        self.assertEqual(result["message"], "Access application created")
+
+        client, api = client_with([stored()])
+
+        result = self.run_module(FakeModule(params(name=" app ")), client)
+
+        api.create.assert_not_called()
+        api.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
     def test_created_app_with_another_name_reports_the_write(self):
-        created = stored()
+        created = stored(name="other")
         client, api = client_with(created=created)
 
-        result = self.run_module(FakeModule(params(name=" app")), client)
+        result = self.run_module(FakeModule(params()), client)
 
         api.create.assert_called_once()
         self.assertEqual(result["msg"], "Cloudflare API returned the wrong Access application")

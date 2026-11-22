@@ -4,32 +4,72 @@
     - devices_policy
   linuxhq.cloudflare.devices_policy:
     account_id: "{{ devices_policy_account_id }}"
-    allow_mode_switch: "{{ devices_policy_allow_mode_switch | d(omit) }}"
-    allow_updates: "{{ devices_policy_allow_updates | d(omit) }}"
-    allowed_to_leave: "{{ devices_policy_allowed_to_leave | d(omit) }}"
+    allow_mode_switch:
+      "{{ devices_policy_allow_mode_switch
+          if devices_policy_allow_mode_switch is not none
+          else omit }}"
+    allow_updates:
+      "{{ devices_policy_allow_updates
+          if devices_policy_allow_updates is not none
+          else omit }}"
+    allowed_to_leave:
+      "{{ devices_policy_allowed_to_leave
+          if devices_policy_allowed_to_leave is not none
+          else omit }}"
     api_token: "{{ devices_policy_api_token }}"
-    auto_connect: "{{ devices_policy_auto_connect | d(omit) }}"
-    captive_portal: "{{ devices_policy_captive_portal | d(omit) }}"
-    disable_auto_fallback: "{{ devices_policy_disable_auto_fallback | d(omit) }}"
+    auto_connect:
+      "{{ devices_policy_auto_connect
+          if devices_policy_auto_connect is not none
+          else omit }}"
+    captive_portal:
+      "{{ devices_policy_captive_portal
+          if devices_policy_captive_portal is not none
+          else omit }}"
+    disable_auto_fallback:
+      "{{ devices_policy_disable_auto_fallback
+          if devices_policy_disable_auto_fallback is not none
+          else omit }}"
     exclude:
       "{{ devices_policy_exclude
           if devices_policy_exclude is not none
           else omit }}"
-    exclude_office_ips: "{{ devices_policy_exclude_office_ips | d(omit) }}"
+    exclude_office_ips:
+      "{{ devices_policy_exclude_office_ips
+          if devices_policy_exclude_office_ips is not none
+          else omit }}"
     include:
       "{{ devices_policy_include
           if devices_policy_include is not none
           else omit }}"
-    lan_allow_minutes: "{{ devices_policy_lan_allow_minutes | d(omit) }}"
-    lan_allow_subnet_size: "{{ devices_policy_lan_allow_subnet_size | d(omit) }}"
+    lan_allow_minutes:
+      "{{ devices_policy_lan_allow_minutes
+          if devices_policy_lan_allow_minutes is not none
+          else omit }}"
+    lan_allow_subnet_size:
+      "{{ devices_policy_lan_allow_subnet_size
+          if devices_policy_lan_allow_subnet_size is not none
+          else omit }}"
     register_interface_ip_with_dns:
-      "{{ devices_policy_register_interface_ip_with_dns | d(omit) }}"
+      "{{ devices_policy_register_interface_ip_with_dns
+          if devices_policy_register_interface_ip_with_dns is not none
+          else omit }}"
     sccm_vpn_boundary_support:
-      "{{ devices_policy_sccm_vpn_boundary_support | d(omit) }}"
+      "{{ devices_policy_sccm_vpn_boundary_support
+          if devices_policy_sccm_vpn_boundary_support is not none
+          else omit }}"
     service_mode_v2: "{{ devices_policy_service_mode_v2 | d(omit) }}"
-    support_url: "{{ devices_policy_support_url | d(omit) }}"
-    switch_locked: "{{ devices_policy_switch_locked | d(omit) }}"
-    tunnel_protocol: "{{ devices_policy_tunnel_protocol | d(omit) }}"
+    support_url:
+      "{{ devices_policy_support_url
+          if devices_policy_support_url is not none
+          else omit }}"
+    switch_locked:
+      "{{ devices_policy_switch_locked
+          if devices_policy_switch_locked is not none
+          else omit }}"
+    tunnel_protocol:
+      "{{ devices_policy_tunnel_protocol
+          if devices_policy_tunnel_protocol is not none
+          else omit }}"
   when:
     - devices_policy_account_id is not none
     - devices_policy_api_token is not none

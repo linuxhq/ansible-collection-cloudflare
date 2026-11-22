@@ -1,0 +1,5 @@
+---
+trivial:
+  - access_apps_info, cfd_tunnel_configurations_info, cfd_tunnel_info, dnssec_info, pagerules_info, pages_projects_info,
+    rules_lists_info, rulesets_info, warp_connector_info, zones_info - key the published dict with
+    ``map(attribute='name')`` instead of ``json_query``; the facts are unchanged.

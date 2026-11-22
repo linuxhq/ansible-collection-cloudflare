@@ -10,12 +10,8 @@
       ansible.builtin.assert:
         that:
           - _rules_lists_info_dict[rules_lists_list.0.name].kind == 'ip'
-          - _rules_lists_info_dict[rules_lists_list.0.name].num_items > 0
-
-    - name: Ensure rules list count is recorded
-      ansible.builtin.set_fact:
-        __rules_lists_num_items:
-          "{{ _rules_lists_info_dict[rules_lists_list.0.name].num_items }}"
+          - _rules_lists_info_dict[rules_lists_list.0.name].num_items | int ==
+            rules_lists_list.0.elements | length
 
     - name: Ensure rules list elements are updated
       ansible.builtin.include_role:
@@ -25,8 +21,9 @@
           - kind: ip
             name: molecule_rules_lists_monitoring
             elements:
-              "{{ rules_lists_hetrixtools +
-                  rules_lists_uptimerobot }}"
+              - ip: 192.0.2.1
+              - ip: 198.51.100.0/24
+              - ip: 203.0.113.0/24
 
     - name: Ensure rules lists information is gathered
       ansible.builtin.include_role:
@@ -35,6 +32,5 @@
     - name: Ensure update is verified
       ansible.builtin.assert:
         that:
-          - _rules_lists_info_dict[rules_lists_list.0.name].num_items | int >
-            __rules_lists_num_items | int
+          - _rules_lists_info_dict[rules_lists_list.0.name].num_items | int == 3
 ...
