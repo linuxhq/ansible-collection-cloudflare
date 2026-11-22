@@ -45,10 +45,10 @@ options:
       - absent
     default: present
 notes:
-  - Cloudflare returns the client secret only in the response to the create request. When that response is lost,
-    for example to a timeout, and the created token is found by name afterwards, the module fails with
-    C(changed=true) and the token in C(service_token), without its client secret. Rotate or delete the token to
-    obtain a new client secret.
+  - Cloudflare returns the client secret only in the response to the create request. When a created token has no
+    client secret, for example when the create request fails with a timeout or a 5xx status and the token is found
+    by name afterwards, the module fails with C(changed=true) and the token in C(service_token), without its client
+    secret. Rotate or delete the token to obtain a new client secret.
   - When a token is created but Cloudflare stores another name or duration, the failure includes the created token
     in C(service_token), with its client secret.
   - Cloudflare may store a requested value in a canonical form that differs from the request. The module then
@@ -153,12 +153,12 @@ def checked_token(module, service_token, expected_id=None):
         expected_name=module.params["name"],
         expected_id=expected_id,
     )
-    # Only the create response holds the client secret; a token recovered by
-    # name after a lost response has none, and it cannot be read again.
+    # Only the create response holds the client secret; a token found by name
+    # after a failed create has none, and it cannot be read again.
     if expected_id is None and not service_token.get("client_secret"):
         module.fail_json(
-            msg="Service token created, but Cloudflare returns its client secret only in the create response, "
-            "which was lost; rotate or delete the service token",
+            msg="Service token created, but Cloudflare returned no client secret, which it returns only in the "
+            "create response; rotate or delete the service token",
             **failure,
         )
 
