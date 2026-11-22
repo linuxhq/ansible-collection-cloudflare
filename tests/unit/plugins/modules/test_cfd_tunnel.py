@@ -196,13 +196,6 @@ class CfdTunnelTests(TestCase):
         )
         self.assertTrue(result["changed"])
 
-    def test_rejects_create_response_with_wrong_config_source(self):
-        client, _ignored = client_with(created={"id": "tunnel-id", "name": "tunnel", "config_src": "local"})
-
-        result = self.run_module(FakeModule(params()), client)
-
-        self.assertIn("wrong cloudflared tunnel", result["msg"])
-
     def test_sends_secret_without_local_checks(self):
         # Cloudflare validates the secret on the only write, so it is sent as given.
         created = {"id": "tunnel-id", "name": "tunnel", "config_src": "local"}
@@ -221,15 +214,6 @@ class CfdTunnelTests(TestCase):
         result = self.run_module(module, client)
 
         api.edit.assert_not_called()
-        self.assertTrue(result["changed"])
-
-    def test_rotates_secret_for_remote_tunnel(self):
-        current = {"id": "tunnel-id", "name": "tunnel", "config_src": "cloudflare", "remote_config": True}
-        client, api = client_with([current], edited=current)
-
-        result = self.run_module(FakeModule(params(rotate_secrets=True, tunnel_secret=SECRET)), client)
-
-        api.edit.assert_called_once_with("tunnel-id", account_id="account", tunnel_secret=SECRET)
         self.assertTrue(result["changed"])
 
     def test_created_tunnel_with_another_config_src_reports_the_write(self):

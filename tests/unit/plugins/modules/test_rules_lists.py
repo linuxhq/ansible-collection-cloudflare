@@ -22,6 +22,7 @@ PENDING_BODY = {
     "messages": [],
 }
 CURRENT = {"id": "list", "name": "addresses", "kind": "ip", "description": "current", "num_items": 0}
+CREATED = {**CURRENT, "description": "addresses"}
 
 
 def params(**updates):
@@ -126,7 +127,7 @@ class RulesListsTests(TestCase):
         sleep.assert_called_once_with(rules_lists.OPERATION_POLL_SECONDS)
 
     def test_submit_retries_transient_errors_within_deadline(self):
-        for error in (connection_error(), timeout_error(), status_error(503)):
+        for error in (connection_error(), timeout_error(), status_error(429), status_error(503)):
             client, api = make_client()
             api.items.update.side_effect = [error, {"operation_id": "operation"}]
             with (
@@ -267,7 +268,7 @@ class RulesListsTests(TestCase):
 
     def test_late_submit_response_reports_the_submitted_operation(self):
         # Cloudflare accepted the operation, so the timeout names it.
-        client, api = make_client([{**CURRENT, "num_items": 0}])
+        client, api = make_client([CURRENT])
         with (
             patch.object(rules_lists.time, "monotonic", side_effect=[0, 0, 31]),
             self.assertRaises(ModuleFail) as raised,
@@ -359,7 +360,7 @@ class RulesListsTests(TestCase):
         api.create.assert_called_once_with(account_id="account", description="addresses", kind=None, name="addresses")
 
     def test_creates_list_with_default_description(self):
-        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses", "num_items": 0}
+        created = CREATED
         client, api = make_client(created=created)
 
         result = self.run_module(FakeModule(params()), client)
@@ -399,7 +400,7 @@ class RulesListsTests(TestCase):
         self.assertEqual(result["account_id"], "account")
 
     def test_unapplied_items_after_create_report_the_created_list(self):
-        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses", "num_items": 0}
+        created = CREATED
         client, _ignored = make_client(created=created, fetched=created)
 
         with patch.object(rules_lists.time, "monotonic", return_value=1):
@@ -1191,7 +1192,7 @@ class RulesListsTests(TestCase):
         )
 
     def test_count_mismatch_skips_item_listing_in_check_mode(self):
-        client, api = make_client([{**CURRENT, "num_items": 0}])
+        client, api = make_client([CURRENT])
 
         result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}]), check_mode=True), client)
 
@@ -1200,7 +1201,7 @@ class RulesListsTests(TestCase):
         self.assertEqual(result["message"], "Rules list items would be updated")
 
     def test_submits_normalized_items_and_verifies_result(self):
-        current = {**CURRENT, "num_items": 0}
+        current = CURRENT
         elements = [{"ip": "2001:DB8::1", "comment": ""}, {"ip": "2001:db8::1"}]
         client, api = make_client([current], items=[{"ip": "2001:db8::1"}], fetched={**current, "num_items": 1})
 
@@ -1216,7 +1217,7 @@ class RulesListsTests(TestCase):
         self.assertEqual(result["rules_list"]["num_items"], 1)
 
     def test_created_list_is_kept_when_items_are_rejected(self):
-        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses", "num_items": 0}
+        created = CREATED
         body = {"success": False, "errors": [{"code": 10026, "message": "filter parsing error"}], "messages": []}
         client, api = make_client(created=created)
         api.items.update.side_effect = status_error(400, body)
@@ -1237,7 +1238,7 @@ class RulesListsTests(TestCase):
         )
 
     def test_created_list_is_kept_when_the_items_operation_fails(self):
-        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses", "num_items": 0}
+        created = CREATED
         client, api = make_client(created=created)
         api.bulk_operations.get.return_value = {"id": "operation", "status": "failed", "error": "bad"}
 
@@ -1249,7 +1250,7 @@ class RulesListsTests(TestCase):
         self.assertEqual(result["operation"], {"id": "operation", "status": "failed", "error": "bad"})
 
     def test_wrong_operation_id_fails(self):
-        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses", "num_items": 0}
+        created = CREATED
         client, api = make_client(created=created)
         api.bulk_operations.get.return_value = {"id": "other", "status": "completed"}
 
@@ -1261,7 +1262,7 @@ class RulesListsTests(TestCase):
         self.assertEqual(result["operation_id"], "operation")
 
     def test_existing_list_is_not_deleted_when_items_are_rejected(self):
-        current = {**CURRENT, "num_items": 0}
+        current = CURRENT
         client, api = make_client([current])
         api.items.update.side_effect = status_error(400)
         api.bulk_operations.get.return_value = {"id": "operation", "status": "failed"}
@@ -1280,7 +1281,7 @@ class RulesListsTests(TestCase):
         api.delete.assert_not_called()
 
     def test_rejects_completed_update_with_wrong_items(self):
-        current = {**CURRENT, "num_items": 0}
+        current = CURRENT
         client, _ignored = make_client([current], fetched=current)
 
         with patch.object(rules_lists.time, "monotonic", return_value=1):
@@ -1295,7 +1296,7 @@ class RulesListsTests(TestCase):
         self.assertTrue(result["changed"])
 
     def test_not_applied_failure_message_pairs_a_bounded_number_of_items(self):
-        current = {**CURRENT, "num_items": 0}
+        current = CURRENT
         elements = [{"ip": f"192.0.2.{index}"} for index in range(1, 13)]
         stored = [{"ip": f"198.51.100.{index}"} for index in range(1, 13)]
         client, _ignored = make_client([current], items=stored, fetched=current)
@@ -1309,7 +1310,7 @@ class RulesListsTests(TestCase):
         self.assertEqual(len(result["unexpected_items"]), 12)
 
     def test_not_applied_failure_names_unrequested_stored_values(self):
-        current = {**CURRENT, "num_items": 0}
+        current = CURRENT
         client, _ignored = make_client([current], items=[{"ip": "192.0.2.1"}, {"ip": "192.0.2.9"}], fetched=current)
 
         with patch.object(rules_lists.time, "monotonic", return_value=1):
@@ -1324,7 +1325,7 @@ class RulesListsTests(TestCase):
 
     def test_not_applied_failure_names_requested_and_stored_values(self):
         redirect = {"target_url": "https://example.net/"}
-        current = {**CURRENT, "kind": "redirect", "num_items": 0}
+        current = {**CURRENT, "kind": "redirect"}
         stored = [
             {"redirect": {**redirect, "source_url": "example.com/"}},
             {"redirect": {**redirect, "source_url": "example.com/b"}},
@@ -1366,7 +1367,7 @@ class RulesListsTests(TestCase):
         self.assertTrue(result["changed"])
 
     def test_failures_after_create_report_the_created_list(self):
-        created = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses", "num_items": 0}
+        created = CREATED
         written = {"changed": True, "account_id": "account", "rules_list_id": "list", "rules_list": created}
         operations = {
             "failed": {"id": "operation", "status": "failed"},
