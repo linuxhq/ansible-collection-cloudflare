@@ -303,8 +303,6 @@ SPECIAL_USE_TLDS = frozenset(("example", "invalid", "local", "localhost", "test"
 # deployment config but does not store them. These match the cloudflare SDK
 # BuildConfig and DeploymentConfigsPreview/DeploymentConfigsProduction types,
 # except wrangler_config_hash, which Cloudflare drops on create and update.
-# Cloudflare keeps the current value of these deployment settings, and of an
-# environment variable's type or value, when they are set to null.
 BUILD_SETTINGS = (
     "build_caching",
     "build_command",
@@ -313,6 +311,8 @@ BUILD_SETTINGS = (
     "web_analytics_tag",
     "web_analytics_token",
 )
+# Cloudflare keeps the current value of these deployment settings, and of an
+# environment variable's type, when they are set to null.
 DEPLOYMENT_SETTINGS = (
     "ai_bindings",
     "always_use_latest_compatibility_date",
@@ -700,13 +700,8 @@ def check_domain_owners(module, client, existing_names, domain_names):
         if other["name"] == params["name"]:
             continue
 
-        # A project's domains field omits custom domains that are not active yet.
         context = {**project_context(module), "project": other["name"]}
-        with cloudflare_error_context(
-            "Cloudflare API request failed while gathering Pages project domains",
-            account_id=params["account_id"],
-            name=other["name"],
-        ):
+        with cloudflare_error_context("Cloudflare API request failed while gathering Pages project domains", **context):
             domains = get_or_none(list_domains, module, client, other["name"], context)
 
         # A project deleted since it was listed has no domains.
