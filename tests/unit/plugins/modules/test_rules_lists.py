@@ -14,6 +14,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     ModuleFail,
     connection_error,
     list_response,
+    run_through_client,
     sdk_client,
     status_error,
     timeout_error,
@@ -64,6 +65,39 @@ class RulesListsTests(TestCase):
             rules_lists.run(module, client)
 
         return raised.exception.values
+
+    def test_overlong_list_id_fails_cleanly(self):
+        # HTTPX refuses to build a request whose URL is longer than 65536 characters.
+        list_id = "a" * 70000
+        for created in (False, True):
+
+            def respond(request, created=created):
+                if request.method == "POST":
+                    return httpx.Response(200, json={"success": True, "result": {**CREATED, "id": list_id}})
+
+                lists = [] if created else [{**CURRENT, "id": list_id, "num_items": 1}]
+                return httpx.Response(200, json={"success": True, "result": lists})
+
+            with self.subTest(created=created):
+                result, requests = run_through_client(
+                    rules_lists.run,
+                    FakeModule({**params(elements=[{"ip": "192.0.2.1"}]), "api_token": "token"}),
+                    respond,
+                )
+
+                self.assertEqual([method for method, _path in requests], ["GET", "POST"] if created else ["GET"])
+                self.assertEqual(result["error"], "InvalidURL: URL too long")
+                self.assertEqual(result["account_id"], "account")
+                self.assertEqual(result["rules_list_id"], list_id)
+                if created:
+                    self.assertEqual(
+                        result["msg"], "Cloudflare API request failed while submitting the Rules list items"
+                    )
+                    self.assertTrue(result["changed"])
+                    self.assertEqual(result["rules_list"]["id"], list_id)
+                else:
+                    self.assertEqual(result["msg"], "Cloudflare API request failed while gathering Rules list items")
+                    self.assertNotIn("changed", result)
 
     def test_create_recovers_the_list_after_a_lost_response(self):
         recovered = {"id": "list", "name": "addresses", "kind": "ip", "description": "addresses"}

@@ -1219,6 +1219,21 @@ class PagesProjectsTests(TestCase):
                 self.assertEqual(result["status_code"], 500)
                 self.assertNotIn("changed", result)
 
+    def test_overlong_name_fails_cleanly(self):
+        # HTTPX refuses to build a request whose URL is longer than 65536 characters.
+        def respond(request):
+            raise AssertionError("no request can be sent")
+
+        result, requests = run_through_client(
+            pages_projects.run, FakeModule({**params(name="a" * 70000), "api_token": "token"}), respond
+        )
+
+        self.assertEqual(requests, [])
+        self.assertEqual(result["msg"], "Cloudflare API request failed while gathering the Pages project")
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["error"], "InvalidURL: URL too long")
+        self.assertNotIn("changed", result)
+
     def test_failed_domain_lookup_after_a_failed_add_reports_the_add_error(self):
         lookups = (
             httpx.Response(403, json={"success": False, "errors": [{"code": 10000}], "messages": []}),

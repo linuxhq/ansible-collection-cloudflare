@@ -493,6 +493,39 @@ class ClientTests(TestCase):
                     self.assertTrue(values["error"].startswith(f"{error}: "))
                     self.assertEqual(values.get("changed"), True if write else None)
 
+    def test_client_fails_cleanly_on_an_overlong_url(self):
+        # HTTPX refuses to build a request whose URL is longer than 65536 characters.
+        def respond(request):
+            return httpx.Response(200, json={"success": True, "result": {"id": "zone"}})
+
+        for write in (False, True):
+            with (
+                self.subTest(write=write),
+                patch.object(cloudflare_utils, "Cloudflare", side_effect=sdk_constructor(respond)),
+                self.assertRaises(ModuleFail) as raised,
+                cloudflare_client(FakeModule({"api_token": "secret"})) as client,
+                cloudflare_error_context("Reading the zone failed", zone_id="zone"),
+            ):
+                if write:
+                    client.zones.edit(zone_id="zone", paused=True)
+
+                client.zones.get(zone_id="a" * 70000)
+
+            values = raised.exception.values
+            self.assertEqual(values["msg"], "Reading the zone failed")
+            self.assertEqual(values["zone_id"], "zone")
+            self.assertEqual(values["error"], "InvalidURL: URL too long")
+            self.assertEqual(values.get("changed"), True if write else None)
+
+        with (
+            patch.object(cloudflare_utils, "Cloudflare", side_effect=sdk_constructor(respond)),
+            self.assertRaises(ModuleFail) as raised,
+            cloudflare_client(FakeModule({"api_token": "secret"})) as client,
+        ):
+            client.zones.get(zone_id="a" * 70000)
+
+        self.assertEqual(raised.exception.values["msg"], "Cloudflare API request failed")
+
     def test_client_reports_the_change_of_an_answered_write_on_a_later_api_error(self):
         def respond(request):
             if request.method == "PATCH":
@@ -522,6 +555,7 @@ class ClientTests(TestCase):
             RecursionError("bug"),
             TypeError("bug"),
             ValueError("bug"),
+            httpx.InvalidURL("bug"),
         )
         for error in errors:
             with (
