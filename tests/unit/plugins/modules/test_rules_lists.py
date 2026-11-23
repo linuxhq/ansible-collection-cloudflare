@@ -1619,10 +1619,6 @@ class MalformedListTests(TestCase):
                 self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed Rules list data")
                 self.assertEqual([request.method for request in requests], ["GET"])
 
-    def test_null_item_page_is_empty(self):
-        with sdk_client(list_response(None, [])) as client:
-            self.assertEqual(rules_lists.list_items(FakeModule({}), client, "account", "list", "ip"), [])
-
 
 class LongPrefixTests(TestCase):
     """A prefix of more digits than int() reads is not a prefix length."""

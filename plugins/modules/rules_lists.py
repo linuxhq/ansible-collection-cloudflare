@@ -276,7 +276,6 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     create_once,
     ensure_resource_absent,
     find_resource,
-    listed_items,
     matching_resources,
     require_applied,
     require_mapping,
@@ -429,22 +428,20 @@ def valid_item(item, kind):
 def list_items(module, client, account_id, list_id, kind, context=None):
     """Return the items of the list of kind, failing when a page or item is malformed.
 
-    context adds result fields to a failure.
+    The SDK reads a page whose result is falsy, such as {}, as an empty last
+    page, so each page's result is checked. context adds result fields to a
+    failure.
     """
     context = {"account_id": account_id, "rules_list_id": list_id, **(context or {})}
+    items = []
     with cloudflare_error_context("Cloudflare API request failed while gathering Rules list items", **context):
-        items = [
-            serialize_resource(item)
-            for item in listed_items(
-                module,
-                client.rules.lists.items.list(list_id, account_id=account_id, per_page=ITEMS_PER_PAGE),
-                "Rules list item",
-                context,
-            )
-        ]
+        pages = client.rules.lists.items.list(list_id, account_id=account_id, per_page=ITEMS_PER_PAGE).iter_pages()
+        for page in pages:
+            result = serialize_resource(page.result)
+            if not isinstance(result, list) or not all(valid_item(item, kind) for item in result):
+                module.fail_json(msg="Cloudflare API returned malformed Rules list item data", **context)
 
-    if not all(valid_item(item, kind) for item in items):
-        module.fail_json(msg="Cloudflare API returned malformed Rules list item data", **context)
+            items.extend(result)
 
     return items
 

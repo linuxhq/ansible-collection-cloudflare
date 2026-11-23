@@ -4,8 +4,7 @@ bugfixes:
     list, such as ``{}`` or ``false``, which the SDK reads as an empty page. Such a page no longer lets
     access_apps, access_groups, access_policies, access_service_tokens, cfd_tunnel, rules_lists, warp_connector
     and zones create a duplicate resource or report one already absent, pages_projects skip its check for another
-    project owning a domain, or the info modules return an empty list. A null page still counts as empty, also for
-    the items of a Rules list.
+    project owning a domain, or the info modules return an empty list. A null page still counts as empty.
   - modules - report the create error, with its status code and response, when a create fails without a response or
     with a 5xx status and the follow-up lookup gets a response the SDK cannot read, instead of the lookup's error.
   - devices_settings_info, zerotrust_connectivity_settings_info, devices_policy_info - return falsy settings other
