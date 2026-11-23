@@ -128,7 +128,8 @@ def run(module, client):
             entry["id"] = resource_id(module, ruleset, "ruleset", context=context)
             entry["phase"] = resource_field(module, ruleset, "phase", "ruleset", expected=phase, context=context)
             # The SDK types rules as optional; treat null as no rules.
-            entry["rules"] = ruleset.get("rules") or []
+            rules = ruleset.get("rules")
+            entry["rules"] = [] if rules is None else rules
 
         rulesets.append(entry)
 

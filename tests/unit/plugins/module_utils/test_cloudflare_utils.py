@@ -413,6 +413,47 @@ class ClientTests(TestCase):
 
         self.assertEqual(raised.exception.values["msg"], "Cloudflare API request failed")
 
+    def test_client_fails_cleanly_on_retry_and_decoding_errors(self):
+        # An out-of-range Retry-After date the SDK reads before retrying a 429,
+        # and a 2xx body nested too deeply to decode.
+        rate_limited = httpx.Response(
+            429,
+            headers={"Retry-After": "Mon, 01 Jan 99999999999999999999 00:00:00 GMT"},
+            json={"success": False, "errors": [], "messages": []},
+        )
+        depth = 100000
+        nested = httpx.Response(
+            200,
+            content=b'{"success": true, "result": ' + b"[" * depth + b"]" * depth + b"}",
+            headers={"content-type": "application/json"},
+        )
+        for error, answer in (("OverflowError", rate_limited), ("RecursionError", nested)):
+            for write in (False, True):
+
+                def respond(request, answer=answer):
+                    if request.method == "PATCH":
+                        return httpx.Response(200, json={"success": True, "result": {"id": "zone"}})
+
+                    return answer
+
+                with self.subTest(error=error, write=write):
+                    with (
+                        patch.object(cloudflare_utils, "Cloudflare", side_effect=sdk_constructor(respond)),
+                        self.assertRaises(ModuleFail) as raised,
+                        cloudflare_client(FakeModule({"api_token": "secret"})) as client,
+                        cloudflare_error_context("Reading the zone failed", zone_id="zone"),
+                    ):
+                        if write:
+                            client.zones.edit(zone_id="zone", paused=True)
+
+                        client.zones.get(zone_id="zone")
+
+                    values = raised.exception.values
+                    self.assertEqual(values["msg"], "Reading the zone failed")
+                    self.assertEqual(values["zone_id"], "zone")
+                    self.assertTrue(values["error"].startswith(f"{error}: "))
+                    self.assertEqual(values.get("changed"), True if write else None)
+
     def test_client_reports_the_change_of_an_answered_write_on_a_later_api_error(self):
         def respond(request):
             if request.method == "PATCH":
@@ -436,7 +477,14 @@ class ClientTests(TestCase):
             self.assertEqual(raised.exception.values.get("changed"), True if write else None)
 
     def test_client_keeps_the_traceback_of_errors_raised_outside_the_sdk(self):
-        for error in (AttributeError("bug"), TypeError("bug"), ValueError("bug")):
+        errors = (
+            AttributeError("bug"),
+            OverflowError("bug"),
+            RecursionError("bug"),
+            TypeError("bug"),
+            ValueError("bug"),
+        )
+        for error in errors:
             with (
                 self.subTest(error=type(error).__name__),
                 patch.object(cloudflare_utils, "Cloudflare", return_value=sdk_context(Mock())),
@@ -1583,6 +1631,12 @@ class CreateOnceTests(TestCase):
             ({"Retry-After": "nan"}, 0, 0.5),
             ({"Retry-After": "soon"}, 0, 0.5),
             ({"Retry-After": "Tue, 17 Nov 2026 01:00:00 GMT"}, 0, 0.5),
+            # Out-of-range and extreme dates use the backoff.
+            ({"Retry-After": "Mon, 01 Jan 99999999999999999999 00:00:00 GMT"}, 0, 0.5),
+            ({"Retry-After": "Tue, 17 Nov 2026 99999999999999999999:00:00 GMT"}, 0, 0.5),
+            ({"Retry-After": "Tue, 17 Nov 2026 00:00:00 +99999999999999999999"}, 0, 0.5),
+            ({"Retry-After": "Fri, 31 Dec 9999 23:59:59 -2359"}, 0, 0.5),
+            ({"Retry-After": "Mon, 01 Jan 0001 00:00:00 +2359"}, 0, 0.5),
             ({}, 1, 1.0),
         )
         with patch.object(cloudflare_utils, "datetime", Mock(wraps=datetime, now=Mock(return_value=now))):
@@ -1616,6 +1670,46 @@ class CreateOnceTests(TestCase):
         self.assertEqual(serialize_resource(group)["id"], "one")
         self.assertEqual([request.method for request in requests], ["POST", "POST"])
         sleep.assert_called_once_with(2.0)
+
+    def test_rate_limited_create_with_an_out_of_range_retry_date_uses_the_backoff(self):
+        requests = []
+
+        def respond(request):
+            requests.append(request)
+            if len(requests) == 1:
+                return httpx.Response(
+                    429,
+                    headers={"Retry-After": "Mon, 01 Jan 99999999999999999999 00:00:00 GMT"},
+                    json={"success": False, "errors": []},
+                )
+
+            return httpx.Response(200, json={"success": True, "result": {"id": "one", "name": "n"}})
+
+        module = FakeModule({"api_token": "secret"})
+        with (
+            patch.object(cloudflare_utils.time, "sleep") as sleep,
+            patch.object(cloudflare_utils, "Cloudflare", side_effect=sdk_constructor(respond)),
+            self.assertRaises(ModuleExit) as raised,
+            cloudflare_client(module) as client,
+        ):
+            ensure_resource_present(
+                module,
+                "group",
+                "Access group",
+                None,
+                {"name": "n"},
+                lambda payload: without_retries(client).zero_trust.access.groups.create(
+                    account_id="account", include=[{"everyone": {}}], **payload
+                ),
+                Mock(),
+                list,
+                expected_name="n",
+            )
+
+        self.assertEqual([request.method for request in requests], ["POST", "POST"])
+        sleep.assert_called_once_with(0.5)
+        self.assertTrue(raised.exception.values["changed"])
+        self.assertEqual(raised.exception.values["group"]["id"], "one")
 
     def test_matching_resources_compares_the_field_exactly(self):
         items = [{"id": "one", "name": "n"}, {"id": "two", "name": "N"}, {"id": "three"}, None]
@@ -1703,6 +1797,17 @@ class ListAllPagesTests(TestCase):
 
         self.assertEqual(len(items), 20)
         self.assertEqual(len(requests), 2)
+
+    def test_stops_at_an_empty_page_despite_total_pages(self):
+        first = [{"name": f"item-{index}"} for index in range(20)]
+        info = {"result_info": {"total_pages": 1000000000}}
+        for pages in ([{"result": first, **info}, {"result": [], **info}], [{"result": [], **info}]):
+            with self.subTest(pages=len(pages)):
+                # Every later page is empty too.
+                items, requests = self.run_pages(pages + [{"result": [], **info}] * 10)
+
+                self.assertEqual(items, pages[0]["result"])
+                self.assertEqual(len(requests), len(pages))
 
     def test_rejects_a_malformed_page(self):
         with self.assertRaises(ModuleFail) as raised:
