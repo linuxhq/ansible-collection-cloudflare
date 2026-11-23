@@ -363,3 +363,37 @@ class DevicesPolicyTests(TestCase):
                 api.edit.assert_called_once_with(account_id="account", **{field: stored})
                 self.assertTrue(result["changed"])
                 self.assertNotIn("msg", result)
+
+    def test_malformed_current_policy_fails_before_any_change(self):
+        module = FakeModule({"account_id": "account", "service_mode_v2": {"mode": "warp"}})
+        for current in (["allow_updates"], "malformed", [], False):
+            with self.subTest(current=current):
+                result, api = self.run_module(module, current)
+
+                api.edit.assert_not_called()
+                self.assertEqual(
+                    result, {"msg": "Cloudflare API returned malformed device policy data", "account_id": "account"}
+                )
+
+    def test_malformed_routes_never_match_the_request(self):
+        desired = [{"address": "192.0.2.0/24", "description": ""}]
+        stored = [{"address": "192.0.2.0/24"}]
+        for routes in ("192.0.2.0/24", {"address": "192.0.2.0/24"}, [None], ["192.0.2.0/24"]):
+            module = FakeModule({"account_id": "account", "include": desired})
+            with self.subTest(routes=routes, write="before"):
+                result, api = self.run_module(module, {"include": routes}, {"include": stored})
+
+                api.edit.assert_called_once_with(account_id="account", include=desired)
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)
+
+            with self.subTest(routes=routes, write="after"):
+                result, api = self.run_module(
+                    module, {"include": [{"address": "198.51.100.0/24"}]}, {"include": routes}
+                )
+
+                api.edit.assert_called_once()
+                self.assertTrue(result["msg"].startswith("Cloudflare did not apply the requested device policy"))
+                self.assertTrue(result["changed"])
+                self.assertEqual(result["devices_policy"], {"include": routes})
+                self.assertEqual(result["account_id"], "account")

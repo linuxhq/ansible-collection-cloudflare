@@ -74,3 +74,17 @@ class CfdTunnelConfigurationsInfoTests(TestCase):
             cfd_tunnel_configurations_info.run(FakeModule({"account_id": "account"}), client)
 
         self.assertEqual(raised.exception.status_code, 403)
+
+    def test_malformed_configuration_fails_naming_the_tunnel(self):
+        for configuration in (["config"], "malformed", [], False, {"config": "malformed"}, {"config": ["ingress"]}):
+            with self.subTest(configuration=configuration):
+                result, _ignored = self.run_module([{"id": "remote", "name": "one"}], configuration)
+
+                self.assertEqual(
+                    result,
+                    {
+                        "msg": "Cloudflare API returned malformed tunnel configuration data",
+                        "account_id": "account",
+                        "tunnel_id": "remote",
+                    },
+                )

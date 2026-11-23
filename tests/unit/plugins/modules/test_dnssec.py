@@ -118,3 +118,21 @@ class DnssecTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertEqual(result["dnssec"], {})
         self.assertEqual(result["zone_id"], "zone")
+
+    def test_unhashable_status_never_matches_the_request(self):
+        for status in (["active"], {"value": "active"}):
+            with self.subTest(status=status, write="before"):
+                result, api = self.run_module(FakeModule(params()), {"status": status}, edited={"status": "active"})
+
+                api.edit.assert_called_once_with(zone_id="zone", status="active")
+                self.assertTrue(result["changed"])
+                self.assertNotIn("msg", result)
+
+            with self.subTest(status=status, write="after"):
+                result, api = self.run_module(FakeModule(params()), {"status": "disabled"}, edited={"status": status})
+
+                api.edit.assert_called_once()
+                self.assertTrue(result["msg"].startswith("Cloudflare did not apply the requested DNSSEC settings"))
+                self.assertTrue(result["changed"])
+                self.assertEqual(result["dnssec"], {"status": status})
+                self.assertEqual(result["zone_id"], "zone")

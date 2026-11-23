@@ -278,6 +278,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     find_resource,
     matching_resources,
     require_applied,
+    require_mapping,
     resource_field,
     resource_id,
     serialize_resource,
@@ -303,6 +304,9 @@ ITEM_META_FIELDS = (
 # Prefix lengths Cloudflare accepts in IP lists, by IP version:
 # https://developers.cloudflare.com/waf/tools/lists/custom-lists/
 IP_PREFIX_LENGTHS = {4: range(8, 33), 6: range(12, 129)}
+
+# Type of the value an item of each list kind stores under the kind's name.
+KIND_VALUE_TYPES = {"asn": int, "hostname": dict, "ip": str, "redirect": dict}
 
 # Field that identifies an item of each mapping-valued list kind; Cloudflare
 # rejects two items with the same value even when their other fields differ.
@@ -391,18 +395,41 @@ def canonical_item(item):
     return json.dumps(item, sort_keys=True, separators=(",", ":"))
 
 
-def list_items(client, account_id, list_id, context=None):
-    """Return the items of the list; context adds result fields to a failure."""
+def valid_item(item, kind):
+    """Return whether a listed item is a mapping that stores a value of the list kind.
+
+    Each value stored under a kind's name, such as ip, must have that kind's
+    type; an asn is an integer, not a Boolean.
+    """
+    if not isinstance(item, dict) or item.get(kind) is None:
+        return False
+
+    return all(
+        isinstance(value, KIND_VALUE_TYPES[key]) and not isinstance(value, bool)
+        for key, value in item.items()
+        if key in KIND_VALUE_TYPES and value is not None
+    )
+
+
+def list_items(module, client, account_id, list_id, kind, context=None):
+    """Return the items of the list of kind, failing when a page or item is malformed.
+
+    The SDK reads a page whose result is falsy, such as {}, as an empty last
+    page, so each page's result is checked. context adds result fields to a
+    failure.
+    """
     context = {"account_id": account_id, "rules_list_id": list_id, **(context or {})}
+    items = []
     with cloudflare_error_context("Cloudflare API request failed while gathering Rules list items", **context):
-        return [
-            serialize_resource(item)
-            for item in client.rules.lists.items.list(
-                list_id,
-                account_id=account_id,
-                per_page=ITEMS_PER_PAGE,
-            )
-        ]
+        pages = client.rules.lists.items.list(list_id, account_id=account_id, per_page=ITEMS_PER_PAGE).iter_pages()
+        for page in pages:
+            result = serialize_resource(page.result)
+            if not isinstance(result, list) or not all(valid_item(item, kind) for item in result):
+                module.fail_json(msg="Cloudflare API returned malformed Rules list item data", **context)
+
+            items.extend(result)
+
+    return items
 
 
 def pending_operation_error(exc):
@@ -452,6 +479,7 @@ def submit_items(module, client, account_id, list_id, items, deadline, context=N
 def wait_for_operation(module, client, account_id, list_id, operation, deadline, context=None):
     """Wait for the submitted items operation; context adds result fields to a failure."""
     context = {"account_id": account_id, "rules_list_id": list_id, **(context or {})}
+    require_mapping(module, operation, "Rules list items operation", {**context, "operation": operation})
     operation_id = operation.get("operation_id")
     # The SDK refuses to build a request path with an empty segment.
     if not operation_id:
@@ -490,6 +518,7 @@ def wait_for_operation(module, client, account_id, list_id, operation, deadline,
             time.sleep(min(OPERATION_POLL_SECONDS, max(deadline - time.monotonic(), 0)))
             continue
 
+        require_mapping(module, status, "Rules list operation", {**context, "operation": status})
         if status.get("id") != operation_id:
             module.fail_json(msg="Cloudflare API returned the wrong Rules list operation", **context, operation=status)
 
@@ -969,11 +998,19 @@ def ensure_present(module, client, current):
 
     if params.get("elements") is not None:
         desired_items = normalize_items(params["elements"])
-        if current["num_items"] != len(desired_items):
+        num_items = current.get("num_items")
+        # The stored count decides whether the items are read.
+        if isinstance(num_items, bool) or not isinstance(num_items, (int, float)):
+            module.fail_json(
+                msg="Cloudflare API returned malformed Rules list data",
+                **{"account_id": account_id, "rules_list_id": current_id, **written},
+            )
+
+        if num_items != len(desired_items):
             items_changed = True
         else:
             items_changed = values_differ(
-                normalize_items(list_items(client, account_id, current_id, written)),
+                normalize_items(list_items(module, client, account_id, current_id, current_kind, written)),
                 desired_items,
             )
 
@@ -998,7 +1035,7 @@ def ensure_present(module, client, current):
 
             current = checked_list(module, rules_list, params["name"], current_kind, written, expected_id=current_id)
             written["rules_list"] = current
-            stored_items = normalize_items(list_items(client, account_id, current_id, written))
+            stored_items = normalize_items(list_items(module, client, account_id, current_id, current_kind, written))
             if values_differ(stored_items, desired_items):
                 fail_not_applied(module, current_kind, desired_items, stored_items, **written)
 

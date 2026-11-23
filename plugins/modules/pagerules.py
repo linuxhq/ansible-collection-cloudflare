@@ -180,6 +180,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_absent,
     ensure_resource_present,
     payload_from_params,
+    require_mapping_list,
     resource_id,
     serialize_resource,
     unsupported_fields,
@@ -284,13 +285,25 @@ def canonical_targets(targets):
     return canonical
 
 
-def ordered_actions(actions, current):
-    """Return actions in the order of current's action ids, then sorted by id.
+def pagerule_list(module, pagerule, field, item_name, context):
+    """Return the targets or actions of the page rule, failing when they are not a list of mappings.
+
+    context adds result fields to the failure, which also names the page
+    rule's id.
+    """
+    if "id" in pagerule:
+        context = {"resource_id": pagerule["id"], **context}
+
+    return require_mapping_list(module, pagerule.get(field), "page rule", item_name, context)
+
+
+def ordered_actions(actions, current_actions):
+    """Return actions in the order of the current action ids, then sorted by id.
 
     Cloudflare lists a rule's actions sorted by id but echoes a write in request
     order, so action order is not significant.
     """
-    order = [action.get("id") for action in current["actions"]] if current is not None else []
+    order = [action.get("id") for action in current_actions]
     return sorted(
         actions,
         key=lambda action: (
@@ -300,16 +313,17 @@ def ordered_actions(actions, current):
     )
 
 
-def comparable_pagerule(pagerule, actions):
+def comparable_pagerule(module, pagerule, actions, failure):
     """Return pagerule with EXACT_VALUE_ACTIONS values compared on every key.
 
     The comparison projects a stored mapping onto the requested keys, which
     would hide a key removed from the request. A stored value with a key the
     request lacks is replaced by its sorted keys, which never match a mapping.
+    failure adds result fields to a malformed-data failure.
     """
     requested = {action.get("id"): action.get("value") for action in actions}
     comparable_actions = []
-    for action in pagerule["actions"]:
+    for action in pagerule_list(module, pagerule, "actions", "page rule action", failure):
         if action.get("id") in EXACT_VALUE_ACTIONS:
             value = action.get("value")
             wanted = requested.get(action["id"])
@@ -342,18 +356,21 @@ def target_identity(targets):
 def matching_pagerules(module, client, targets):
     """Return the page rules matching targets and the zone's rule count."""
     zone_id = module.params["zone_id"]
+    context = {"zone_id": zone_id}
     with cloudflare_error_context(
         "Cloudflare API request failed while finding the page rule",
-        zone_id=zone_id,
+        **context,
     ):
-        # The SDK types this response as optional; treat null as no rules.
-        pagerules = client.page_rules.list(zone_id=zone_id) or []
+        pagerules = serialize_resource(client.page_rules.list(zone_id=zone_id))
+
+    # The SDK types this response as optional; treat null as no rules.
+    if pagerules is None:
+        pagerules = []
 
     identity = target_identity(targets)
     matches = []
-    for pagerule in pagerules:
-        pagerule = serialize_resource(pagerule)
-        stored = target_identity(pagerule["targets"])
+    for pagerule in require_mapping_list(module, pagerules, "page rule", "page rule", context):
+        stored = target_identity(pagerule_list(module, pagerule, "targets", "page rule target", context))
         if not values_differ(stored, identity):
             matches.append(pagerule)
 
@@ -421,7 +438,10 @@ def run(module, client):
     payload = payload_from_params(module.params, FIELDS)
     # A null target or action field, at any level, counts as omitted, so it is not sent.
     payload["targets"] = without_nested_nulls(targets)
-    payload["actions"] = without_nested_nulls(ordered_actions(module.params["actions"], current))
+    current_actions = (
+        [] if current is None else pagerule_list(module, current, "actions", "page rule action", {"zone_id": zone_id})
+    )
+    payload["actions"] = without_nested_nulls(ordered_actions(module.params["actions"], current_actions))
     if current is None:
         payload.setdefault("status", "active")
 
@@ -436,7 +456,7 @@ def run(module, client):
         find_created=lambda: matching_pagerules(module, client, targets)[0],
         preserved_fields=FIELDS,
         context={"zone_id": zone_id},
-        comparable=lambda pagerule, failure: comparable_pagerule(pagerule, payload["actions"]),
+        comparable=lambda pagerule, failure: comparable_pagerule(module, pagerule, payload["actions"], failure),
     )
 
 

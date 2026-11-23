@@ -182,6 +182,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_error_context,
     ensure_settings,
     payload_from_params,
+    require_mapping,
     serialize_resource,
     unsupported_fields,
     without_nested_nulls,
@@ -247,16 +248,19 @@ def comparable_policy(policy, payload):
     """Return policy with each route stored without a description matching a requested empty description.
 
     Cloudflare drops a split tunnel route description set to "" and returns
-    the route without it.
+    the route without it. Routes that are not a list of mappings are left
+    unchanged, so they never match the request.
     """
     policy = dict(policy)
     for field in ("exclude", "include"):
         requested, routes = payload.get(field), policy.get(field)
-        if requested is not None and routes:
+        if requested is not None and isinstance(routes, list):
             policy[field] = [
                 (
                     {**route, "description": ""}
-                    if route.get("description") is None and {**route, "description": ""} in requested
+                    if isinstance(route, dict)
+                    and route.get("description") is None
+                    and {**route, "description": ""} in requested
                     else route
                 )
                 for route in routes
@@ -300,8 +304,13 @@ def run(module, client):
         "Cloudflare API request failed while gathering the device policy",
         account_id=account_id,
     ):
-        current = serialize_resource(policy.get(account_id=account_id)) or {}
+        current = serialize_resource(policy.get(account_id=account_id))
 
+    # The SDK types the policy as optional; null counts as no settings.
+    if current is None:
+        current = {}
+
+    require_mapping(module, current, "device policy", {"account_id": account_id})
     if "service_mode_v2" in payload:
         payload["service_mode_v2"] = service_mode(payload["service_mode_v2"], current.get("service_mode_v2"))
 

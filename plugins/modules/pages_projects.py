@@ -279,6 +279,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     path_segment,
     payload_from_params,
     require_applied,
+    require_mapping,
     resource_field,
     resource_list,
     serialize_resource,
@@ -645,6 +646,15 @@ def checked_project(module, project, written=None):
     return project
 
 
+def require_deployment_configs(module, project, context):
+    """Fail when the project's deployment settings are not a mapping, which they are compared and updated as.
+
+    context adds result fields to the failure.
+    """
+    if project.get("deployment_configs") is not None:
+        require_mapping(module, project["deployment_configs"], "Pages project", context)
+
+
 def get_project(module, client, written=None):
     """Return the project, or None; written is passed to checked_project and to a request failure."""
     params = module.params
@@ -747,6 +757,7 @@ def update_project(module, client, current, payload, secrets_requested):
     written = {"changed": True, **project_context(module)}
     project = checked_project(module, project, written)
     context = {**written, "pages_project": project}
+    require_deployment_configs(module, project, context)
     require_applied(
         module,
         comparable_project(project, comparable_payload),
@@ -835,6 +846,9 @@ def ensure_present(module, client, domain_names):
     )
     current = get_project(module, client)
     created = current is None
+    if not created:
+        require_deployment_configs(module, current, project_context(module))
+
     if created and params.get("production_branch") is None:
         module.fail_json(msg="production_branch is required when creating a Pages project", **project_context(module))
 
@@ -855,6 +869,7 @@ def ensure_present(module, client, domain_names):
 
         written = {"changed": True, **project_context(module)}
         current = checked_project(module, current, written)
+        require_deployment_configs(module, current, {**written, "pages_project": current})
         comparable_payload = comparable_pages_payload(payload)
         require_applied(
             module,

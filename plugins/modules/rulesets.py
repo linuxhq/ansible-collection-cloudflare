@@ -151,6 +151,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_absent,
     ensure_resource_present,
     get_or_none,
+    require_mapping_list,
     resource_field,
     serialize_resource,
     unique_match,
@@ -301,6 +302,19 @@ def comparable_nested_mapping(rule, key, desired):
     return {**{name: item for name, item in defaults.items() if name in requested}, **value}
 
 
+def rules_from_resource(module, ruleset, failure):
+    """Return the rules of ruleset, failing when they are not a list of mappings.
+
+    The SDK types rules as optional; null counts as no rules. failure adds
+    result fields to the failure.
+    """
+    rules = ruleset.get("rules")
+    if rules is None:
+        return []
+
+    return require_mapping_list(module, rules, "ruleset", "ruleset rule", failure)
+
+
 def comparable_rules(rules, desired_rules):
     """Project current rules for comparison with the desired rules.
 
@@ -399,8 +413,7 @@ def run(module, client):
         comparable=lambda ruleset, failure: {
             **ruleset,
             "phase": resource_field(module, ruleset, "phase", "ruleset", expected=phase, context=failure),
-            # The SDK types rules as optional; treat null as no rules.
-            "rules": comparable_rules(ruleset.get("rules") or [], payload.get("rules", [])),
+            "rules": comparable_rules(rules_from_resource(module, ruleset, failure), payload.get("rules", [])),
         },
     )
 

@@ -49,7 +49,7 @@ def make_client(lists=(), items=(), created=None, updated=None, fetched=None, de
     api.update.return_value = updated
     api.get.return_value = fetched
     api.delete.return_value = deleted
-    api.items.list.return_value = list(items)
+    api.items.list.return_value.iter_pages.return_value = [Mock(result=list(items))]
     api.items.update.return_value = {"operation_id": "operation"}
     api.bulk_operations.get.return_value = {"id": "operation", "status": "completed"}
     return client, api
@@ -1152,56 +1152,86 @@ class RulesListsTests(TestCase):
             "subpath_matching": False,
         }
         hostname = {"url_hostname": "*.example.com", "exclude_exact_hostname": False}
-        pages = {
-            None: (
-                [{"id": "a", **stamps, "redirect": redirect}, {"id": "b", **stamps, "hostname": hostname}],
-                {"cursors": {"after": "page2"}},
+        cases = (
+            (
+                "redirect",
+                [{"id": "a", **stamps, "redirect": redirect}, {"id": "b", **stamps, "redirect": redirect}],
+                [{"redirect": {"source_url": "example.com/", "target_url": "https://example.net/"}}],
             ),
-            "page2": (
-                [{"id": "c", **stamps, "asn": 13335, "comment": ""}, {"id": "d", **stamps, "ip": "10.0.0.0/8"}],
-                {"cursors": {}},
+            (
+                "hostname",
+                [{"id": "a", **stamps, "hostname": hostname}, {"id": "b", **stamps, "hostname": hostname}],
+                [{"hostname": hostname}],
             ),
-        }
-        requests = []
+            (
+                "asn",
+                [{"id": "a", **stamps, "asn": 13335, "comment": ""}, {"id": "b", **stamps, "asn": 64496}],
+                [{"asn": 13335}, {"asn": 64496}],
+            ),
+            (
+                "ip",
+                [{"id": "a", **stamps, "ip": "10.0.0.0/8"}, {"id": "b", **stamps, "ip": "192.0.2.1/32"}],
+                [{"ip": "10.0.0.0/8"}, {"ip": "192.0.2.1"}],
+            ),
+        )
 
-        def respond(request):
-            requests.append(request)
-            result, result_info = pages[request.url.params.get("cursor")]
-            body = {"success": True, "errors": [], "messages": [], "result": result, "result_info": result_info}
-            return httpx.Response(200, json=body)
+        def cursor_pages(stored, requests):
+            """Return a transport serving one stored item per cursor page and recording each request."""
+            pages = {None: ([stored[0]], {"cursors": {"after": "page2"}}), "page2": ([stored[1]], {"cursors": {}})}
 
-        client = cloudflare.Cloudflare(
-            api_token="EXAMPLE-token",
-            http_client=httpx.Client(transport=httpx.MockTransport(respond)),
-        )
-        with client:
-            items = rules_lists.list_items(client, "account", "list")
+            def respond(request):
+                requests.append(request)
+                result, result_info = pages[request.url.params.get("cursor")]
+                body = {"success": True, "errors": [], "messages": [], "result": result, "result_info": result_info}
+                return httpx.Response(200, json=body)
 
-        self.assertEqual(
-            [(request.url.path, dict(request.url.params)) for request in requests],
-            [
-                ("/client/v4/accounts/account/rules/lists/list/items", {"per_page": "500"}),
-                ("/client/v4/accounts/account/rules/lists/list/items", {"per_page": "500", "cursor": "page2"}),
-            ],
-        )
-        self.assertEqual(
-            items,
-            [
-                {"id": "a", **stamps, "redirect": redirect},
-                {"id": "b", **stamps, "hostname": hostname},
-                {"id": "c", **stamps, "asn": 13335, "comment": ""},
-                {"id": "d", **stamps, "ip": "10.0.0.0/8"},
-            ],
-        )
-        self.assertEqual(
-            rules_lists.normalize_items(items),
-            [
-                {"asn": 13335},
-                {"hostname": hostname},
-                {"ip": "10.0.0.0/8"},
-                {"redirect": {"source_url": "example.com/", "target_url": "https://example.net/"}},
-            ],
-        )
+            return httpx.MockTransport(respond)
+
+        for kind, stored, normalized in cases:
+            requests = []
+            client = cloudflare.Cloudflare(
+                api_token="EXAMPLE-token",
+                http_client=httpx.Client(transport=cursor_pages(stored, requests)),
+            )
+            with self.subTest(kind=kind), client:
+                items = rules_lists.list_items(FakeModule({}), client, "account", "list", kind)
+
+                self.assertEqual(
+                    [(request.url.path, dict(request.url.params)) for request in requests],
+                    [
+                        ("/client/v4/accounts/account/rules/lists/list/items", {"per_page": "500"}),
+                        ("/client/v4/accounts/account/rules/lists/list/items", {"per_page": "500", "cursor": "page2"}),
+                    ],
+                )
+                self.assertEqual(items, stored)
+                self.assertEqual(rules_lists.normalize_items(items), normalized)
+
+    def test_list_items_rejects_malformed_pages_through_the_sdk(self):
+        pages = {None: ([{"id": "a", "ip": "192.0.2.1"}], {"cursors": {"after": "page2"}})}
+        for result in ({}, False, "", 5, ["192.0.2.2"]):
+            pages["page2"] = (result, {"cursors": {}})
+
+            def respond(request):
+                result, result_info = pages[request.url.params.get("cursor")]
+                body = {"success": True, "errors": [], "messages": [], "result": result, "result_info": result_info}
+                return httpx.Response(200, json=body)
+
+            client = cloudflare.Cloudflare(
+                api_token="EXAMPLE-token",
+                http_client=httpx.Client(transport=httpx.MockTransport(respond)),
+            )
+            with self.subTest(result=result), client, self.assertRaises(ModuleFail) as raised:
+                rules_lists.list_items(FakeModule({}), client, "account", "list", "ip", {"changed": True})
+
+            self.assertEqual(
+                raised.exception.values,
+                {
+                    "msg": "Cloudflare API returned malformed Rules list item data",
+                    "account_id": "account",
+                    "rules_list_id": "list",
+                    "changed": True,
+                },
+            )
 
     def test_count_mismatch_skips_item_listing_in_check_mode(self):
         client, api = make_client([CURRENT])
@@ -1438,6 +1468,132 @@ class RulesListsTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertEqual(result["rules_list"], fetched)
         self.assertEqual(result["items_operation"], {"id": "operation", "status": "completed"})
+
+
+ELEMENTS = {
+    "asn": {"asn": 13335},
+    "hostname": {"hostname": {"url_hostname": "example.com"}},
+    "ip": {"ip": "192.0.2.1"},
+    "redirect": {"redirect": {"source_url": "example.com/", "target_url": "https://example.net/"}},
+}
+
+MALFORMED_ITEMS = (
+    ("ip", None),
+    ("ip", "192.0.2.1"),
+    ("ip", {"id": "item"}),
+    ("ip", {"id": "item", "ip": 3221225985}),
+    ("ip", {"id": "item", "ip": "192.0.2.1", "hostname": "example.com"}),
+    ("asn", {"id": "item", "asn": True}),
+    ("asn", {"id": "item", "asn": "13335"}),
+    ("hostname", {"id": "item", "hostname": "example.com"}),
+    ("redirect", {"id": "item"}),
+    ("redirect", {"id": "item", "redirect": ["example.com/"]}),
+)
+
+
+class RulesListsMalformedResponseTests(TestCase):
+    def run_module(self, module, client):
+        with (
+            self.assertRaises((ModuleExit, ModuleFail)) as raised,
+            patch.object(rules_lists.time, "monotonic", return_value=1),
+        ):
+            rules_lists.run(module, client)
+
+        return raised.exception.values
+
+    def test_malformed_item_count_fails_cleanly(self):
+        malformed = "Cloudflare API returned malformed Rules list data"
+        for num_items in (None, "1", True):
+            current = {key: value for key, value in CURRENT.items() if key != "num_items"}
+            if num_items is not None:
+                current["num_items"] = num_items
+
+            with self.subTest(num_items=num_items, write="before"):
+                client, api = make_client([current], items=[{"id": "item", "ip": "192.0.2.1"}])
+
+                result = self.run_module(FakeModule(params(elements=[ELEMENTS["ip"]])), client)
+
+                api.items.update.assert_not_called()
+                self.assertEqual(result, {"msg": malformed, "account_id": "account", "rules_list_id": "list"})
+
+            with self.subTest(num_items=num_items, write="update"):
+                updated = {**current, "description": "new"}
+                client, api = make_client([CURRENT], updated=updated)
+
+                result = self.run_module(FakeModule(params(description="new", elements=[ELEMENTS["ip"]])), client)
+
+                api.update.assert_called_once()
+                api.items.update.assert_not_called()
+                self.assertEqual(result["msg"], malformed)
+                self.assertTrue(result["changed"])
+                self.assertEqual(result["rules_list"], updated)
+
+            with self.subTest(num_items=num_items, write="create"):
+                created = {**current, "description": "addresses"}
+                client, api = make_client(created=created)
+
+                result = self.run_module(FakeModule(params(elements=[ELEMENTS["ip"]])), client)
+
+                api.create.assert_called_once()
+                api.items.update.assert_not_called()
+                self.assertEqual(result["msg"], malformed)
+                self.assertTrue(result["changed"])
+                self.assertEqual(result["rules_list"], created)
+
+    def test_malformed_listed_items_fail_before_any_change(self):
+        for kind, item in MALFORMED_ITEMS:
+            client, api = make_client([{**CURRENT, "kind": kind, "num_items": 1}], items=[item])
+            with self.subTest(kind=kind, item=item):
+                result = self.run_module(FakeModule(params(kind=kind, elements=[ELEMENTS[kind]])), client)
+
+                api.items.update.assert_not_called()
+                self.assertEqual(
+                    result,
+                    {
+                        "msg": "Cloudflare API returned malformed Rules list item data",
+                        "account_id": "account",
+                        "rules_list_id": "list",
+                    },
+                )
+
+    def test_malformed_items_listed_after_the_write_report_the_change(self):
+        for kind, item in MALFORMED_ITEMS:
+            fetched = {**CURRENT, "kind": kind, "num_items": 1}
+            client, api = make_client([{**CURRENT, "kind": kind}], items=[item], fetched=fetched)
+            with self.subTest(kind=kind, item=item):
+                result = self.run_module(FakeModule(params(kind=kind, elements=[ELEMENTS[kind]])), client)
+
+                api.items.update.assert_called_once()
+                self.assertEqual(result["msg"], "Cloudflare API returned malformed Rules list item data")
+                self.assertTrue(result["changed"])
+                self.assertEqual(result["rules_list"], fetched)
+                self.assertEqual(result["rules_list_id"], "list")
+                self.assertEqual(result["items_operation"], {"id": "operation", "status": "completed"})
+
+    def test_malformed_operations_report_the_change(self):
+        for operation in (None, "operation", ["operation"]):
+            client, api = make_client([CURRENT])
+            api.items.update.return_value = operation
+            with self.subTest(operation=operation):
+                result = self.run_module(FakeModule(params(elements=[ELEMENTS["ip"]])), client)
+
+                api.bulk_operations.get.assert_not_called()
+                self.assertEqual(result["msg"], "Cloudflare API returned malformed Rules list items operation data")
+                self.assertTrue(result["changed"])
+                self.assertEqual(result["operation"], operation)
+                self.assertEqual(result["rules_list_id"], "list")
+
+        for status in (None, "completed", ["completed"]):
+            client, api = make_client([CURRENT])
+            api.bulk_operations.get.return_value = status
+            with self.subTest(status=status):
+                result = self.run_module(FakeModule(params(elements=[ELEMENTS["ip"]])), client)
+
+                api.bulk_operations.get.assert_called_once()
+                self.assertEqual(result["msg"], "Cloudflare API returned malformed Rules list operation data")
+                self.assertTrue(result["changed"])
+                self.assertEqual(result["operation"], status)
+                self.assertEqual(result["operation_id"], "operation")
 
 
 class CanonicalIpTests(TestCase):

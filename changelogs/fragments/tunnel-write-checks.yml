@@ -7,6 +7,4 @@ minor_changes:
     ``error`` key.
 trivial:
   - cfd_tunnel, warp_connector - share the check of the resource a write returned with ensure_resource_present.
-  - cfd_tunnel_configurations, cfd_tunnel_configurations_info - drop mapping checks on the configuration Cloudflare
-    returns before a write, which the SDK response model guarantees.
   - zerotrust_connectivity_settings - add unit tests for omitted settings.

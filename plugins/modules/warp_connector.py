@@ -154,7 +154,14 @@ def apply_created_secret(module, connectors, created):
     account_id = params["account_id"]
     connector_id = created["id"]
     try:
-        connector = connectors.edit(connector_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
+        with cloudflare_error_context(
+            "Cloudflare API request failed while applying tunnel_secret to the created WARP Connector",
+            changed=True,
+            account_id=account_id,
+            resource_id=connector_id,
+            warp_connector=created,
+        ):
+            connector = connectors.edit(connector_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
     except cloudflare.APIError as exc:
         module.fail_json(
             msg=(

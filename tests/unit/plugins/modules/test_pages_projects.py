@@ -1526,3 +1526,46 @@ class PagesProjectsTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertEqual(result["message"], "Pages project deleted")
         self.assertEqual(result["pages_project"], PROJECT)
+
+    def test_malformed_deployment_configs_fail_before_any_change(self):
+        for deployment_configs in ("production", ["production"]):
+            client, api = client_with([{**PROJECT, "deployment_configs": deployment_configs}])
+            with self.subTest(deployment_configs=deployment_configs):
+                result = self.run_module(FakeModule(params(production_branch="release")), client)
+
+                api.edit.assert_not_called()
+                self.assertEqual(
+                    result,
+                    {
+                        "msg": "Cloudflare API returned malformed Pages project data",
+                        "account_id": "account",
+                        "name": "docs",
+                    },
+                )
+
+    def test_malformed_written_deployment_configs_report_the_change(self):
+        for deployment_configs in ("production", ["production"]):
+            written = {**PROJECT, "deployment_configs": deployment_configs}
+            for write in ("create", "edit"):
+                if write == "create":
+                    client, api = client_with([None], created=written)
+                else:
+                    client, api = client_with([{**PROJECT, "production_branch": "release"}], edited=written)
+
+                with self.subTest(deployment_configs=deployment_configs, write=write):
+                    result = self.run_module(FakeModule(params()), client)
+
+                    getattr(api, write).assert_called_once()
+                    self.assertEqual(result["msg"], "Cloudflare API returned malformed Pages project data")
+                    self.assertTrue(result["changed"])
+                    self.assertEqual(result["pages_project"], written)
+                    self.assertEqual(result["name"], "docs")
+
+    def test_malformed_deployment_configs_do_not_block_deletion(self):
+        for deployment_configs in ("production", ["production"]):
+            client, api = client_with([{**PROJECT, "deployment_configs": deployment_configs}])
+            with self.subTest(deployment_configs=deployment_configs):
+                result = self.run_module(FakeModule(params(state="absent")), client)
+
+                api.delete.assert_called_once()
+                self.assertEqual(result["message"], "Pages project deleted")

@@ -160,7 +160,7 @@ def comparable_settings(settings):
     return {
         **dict.fromkeys(BOOLEAN_FIELDS, False),
         **settings,
-        "status": PENDING_STATUSES.get(status, status),
+        "status": PENDING_STATUSES.get(status, status) if isinstance(status, str) else status,
     }
 
 

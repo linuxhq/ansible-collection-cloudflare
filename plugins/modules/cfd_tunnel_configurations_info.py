@@ -58,6 +58,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
+    require_mapping,
     resource_list,
     serialize_resource,
 )
@@ -94,7 +95,18 @@ def run(module, client):
             except cloudflare.NotFoundError:
                 continue
 
-        config = (serialize_resource(configuration) or {}).get("config") or {}
+        context = {"account_id": account_id, "tunnel_id": tunnel["id"]}
+        configuration = serialize_resource(configuration)
+        if configuration is None:
+            configuration = {}
+
+        require_mapping(module, configuration, "tunnel configuration", context)
+        config = configuration.get("config")
+        if config is None:
+            config = {}
+        else:
+            require_mapping(module, config, "tunnel configuration", context)
+
         configurations.append({"id": tunnel["id"], "name": tunnel["name"], "config": config})
 
     module.exit_json(changed=False, cfd_tunnel_configurations=configurations)
