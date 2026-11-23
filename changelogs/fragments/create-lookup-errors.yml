@@ -1,0 +1,12 @@
+---
+bugfixes:
+  - modules - fail with the status code of a Cloudflare error response, instead of with a Python traceback, when its
+    JSON body is nested too deeply to decode, including when a delete or a zone request checks the response's error
+    codes.
+  - pagerules, pages_projects, rulesets - report the create error, with its status code and response, when a create
+    of a page rule, ruleset entrypoint, Pages project or Pages project domain fails without a response or with a 5xx
+    status and the follow-up lookup fails, or finds no well-formed resource with the requested page rule targets,
+    phase, project name or domain name. The lookup no longer fails with its own error, and no longer reports
+    ``changed=true`` for a malformed or unrelated resource it took for the created one.
+  - cfd_tunnel_configurations_info - return a tunnel's non-null ``config`` unmodified instead of failing when it is
+    not a mapping; only a null ``config`` is returned as ``{}``.
