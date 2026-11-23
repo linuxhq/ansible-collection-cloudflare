@@ -249,6 +249,12 @@ EMPTY_RULE_FIELDS = {"action_parameters": {}, "description": ""}
 DROPPED_NESTED_DEFAULTS = {"ratelimit": {"requests_to_origin": False}}
 
 
+def action_defaults(defaults, rule):
+    """Return the defaults for the rule's action, or {} when the action is not a string."""
+    action = rule.get("action")
+    return defaults.get(action, {}) if isinstance(action, str) else {}
+
+
 def compared_rule_field(rule, key, desired):
     """Return whether a current rule field takes part in the comparison.
 
@@ -262,7 +268,7 @@ def compared_rule_field(rule, key, desired):
     if key in ASSIGNED_RULE_FIELDS:
         return False
 
-    defaults = RULE_DEFAULTS.get(rule.get("action"), {})
+    defaults = action_defaults(RULE_DEFAULTS, rule)
     return key not in defaults or values_differ(rule[key], defaults[key])
 
 
@@ -275,7 +281,7 @@ def comparable_action_parameters(rule, desired):
     value = rule.get("action_parameters")
     requested = desired.get("action_parameters")
     requested = requested if isinstance(requested, dict) else {}
-    defaults = ACTION_PARAMETER_DEFAULTS.get(rule.get("action"), {})
+    defaults = action_defaults(ACTION_PARAMETER_DEFAULTS, rule)
     if not isinstance(value, dict):
         return value
 

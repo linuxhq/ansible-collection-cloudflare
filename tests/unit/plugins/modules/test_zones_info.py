@@ -5,9 +5,12 @@ from unittest.mock import Mock
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import zones_info
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
+    FALSY_PAGE_RESULTS,
     FakeModule,
     ModuleExit,
     ModuleFail,
+    list_response,
+    sdk_client,
     status_error,
 )
 
@@ -40,3 +43,13 @@ class ZonesInfoTests(TestCase):
             zones_info.run(FakeModule({}), client)
 
         self.assertEqual(raised.exception._cloudflare_message, "Cloudflare API request failed while gathering zones")
+
+
+class MalformedListTests(TestCase):
+    def test_falsy_page_result_fails(self):
+        for result in FALSY_PAGE_RESULTS:
+            with self.subTest(result=result), sdk_client(list_response(result, [])) as client:
+                with self.assertRaises(ModuleFail) as raised:
+                    zones_info.run(FakeModule({}), client)
+
+                self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed zone data")

@@ -7,9 +7,12 @@ import cloudflare
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import access_service_tokens
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
+    FALSY_PAGE_RESULTS,
     FakeModule,
     ModuleExit,
     ModuleFail,
+    list_response,
+    sdk_client,
     status_error,
     timeout_error,
 )
@@ -279,3 +282,18 @@ class AccessServiceTokensTests(TestCase):
         self.assertEqual(result["service_token"], created)
         self.assertEqual(result["resource_id"], "token")
         self.assertEqual(result["account_id"], "account")
+
+
+class MalformedListTests(TestCase):
+    def test_falsy_page_result_fails_without_a_write(self):
+        for state in ("present", "absent"):
+            for result in FALSY_PAGE_RESULTS:
+                requests = []
+                with self.subTest(state=state, result=result), sdk_client(list_response(result, requests)) as client:
+                    with self.assertRaises(ModuleFail) as raised:
+                        access_service_tokens.run(FakeModule(params(state=state)), client)
+
+                    self.assertEqual(
+                        raised.exception.values["msg"], "Cloudflare API returned malformed service token data"
+                    )
+                    self.assertEqual([request.method for request in requests], ["GET"])

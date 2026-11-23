@@ -66,6 +66,27 @@ def malformed_response(*args, **kwargs):
         client.zones.get(zone_id="zone")
 
 
+# Page results the SDK reads as an empty page, which are malformed list data.
+FALSY_PAGE_RESULTS = ({}, "", 0, False)
+
+
+def sdk_client(respond):
+    """Return a Cloudflare client that sends each request once, to respond."""
+    return cloudflare.Cloudflare(
+        api_token="EXAMPLE-token", max_retries=0, http_client=httpx.Client(transport=httpx.MockTransport(respond))
+    )
+
+
+def list_response(result, requests):
+    """Return a respond function that answers each request with result, recording the request in requests."""
+
+    def respond(request):
+        requests.append(request)
+        return httpx.Response(200, json={"success": True, "errors": [], "messages": [], "result": result})
+
+    return respond
+
+
 def connection_error():
     return cloudflare.APIConnectionError(request=REQUEST)
 

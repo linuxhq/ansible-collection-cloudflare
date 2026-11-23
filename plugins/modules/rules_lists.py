@@ -276,6 +276,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     create_once,
     ensure_resource_absent,
     find_resource,
+    listed_items,
     matching_resources,
     require_applied,
     require_mapping,
@@ -373,6 +374,19 @@ REDIRECT_DEFAULTS = {
 }
 
 
+def prefix_length(prefix):
+    """Return a prefix of ASCII digits as an int, or None for any other prefix.
+
+    int() rejects more than 4300 digits, so a prefix with more significant
+    digits than any prefix length has is None too.
+    """
+    digits = prefix.lstrip("0") or "0"
+    if not (prefix.isascii() and prefix.isdigit()) or len(digits) > 3:
+        return None
+
+    return int(digits)
+
+
 def canonical_ip(value):
     # Cloudflare stores addresses in canonical form, such as compressed IPv6,
     # and stores a full-length prefix, such as /32, as the bare address.
@@ -382,11 +396,12 @@ def canonical_ip(value):
     except ValueError:
         return value
 
-    if prefix.isascii() and prefix.isdigit() and int(prefix) == parsed.max_prefixlen:
+    length = prefix_length(prefix)
+    if length == parsed.max_prefixlen:
         return str(parsed)
 
-    if prefix.isascii() and prefix.isdigit():
-        prefix = str(int(prefix))
+    if length is not None:
+        prefix = str(length)
 
     return f"{parsed}{separator}{prefix}"
 
@@ -414,20 +429,22 @@ def valid_item(item, kind):
 def list_items(module, client, account_id, list_id, kind, context=None):
     """Return the items of the list of kind, failing when a page or item is malformed.
 
-    The SDK reads a page whose result is falsy, such as {}, as an empty last
-    page, so each page's result is checked. context adds result fields to a
-    failure.
+    context adds result fields to a failure.
     """
     context = {"account_id": account_id, "rules_list_id": list_id, **(context or {})}
-    items = []
     with cloudflare_error_context("Cloudflare API request failed while gathering Rules list items", **context):
-        pages = client.rules.lists.items.list(list_id, account_id=account_id, per_page=ITEMS_PER_PAGE).iter_pages()
-        for page in pages:
-            result = serialize_resource(page.result)
-            if not isinstance(result, list) or not all(valid_item(item, kind) for item in result):
-                module.fail_json(msg="Cloudflare API returned malformed Rules list item data", **context)
+        items = [
+            serialize_resource(item)
+            for item in listed_items(
+                module,
+                client.rules.lists.items.list(list_id, account_id=account_id, per_page=ITEMS_PER_PAGE),
+                "Rules list item",
+                context,
+            )
+        ]
 
-            items.extend(result)
+    if not all(valid_item(item, kind) for item in items):
+        module.fail_json(msg="Cloudflare API returned malformed Rules list item data", **context)
 
     return items
 
@@ -615,11 +632,12 @@ def valid_ip(value):
     if not separator:
         return True
 
-    if not (prefix.isascii() and prefix.isdigit() and int(prefix) in IP_PREFIX_LENGTHS[parsed.version]):
+    length = prefix_length(prefix)
+    if length not in IP_PREFIX_LENGTHS[parsed.version]:
         return False
 
     try:
-        ip_network(f"{parsed}/{int(prefix)}")
+        ip_network(f"{parsed}/{length}")
     except ValueError:
         return False
 

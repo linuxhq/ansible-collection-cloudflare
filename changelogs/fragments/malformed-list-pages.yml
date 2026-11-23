@@ -1,0 +1,20 @@
+---
+bugfixes:
+  - modules - fail naming the listed resource and its owner when a page of a Cloudflare list is not null and not a
+    list, such as ``{}`` or ``false``, which the SDK reads as an empty page. Such a page no longer lets
+    access_apps, access_groups, access_policies, access_service_tokens, cfd_tunnel, rules_lists, warp_connector
+    and zones create a duplicate resource or report one already absent, pages_projects skip its check for another
+    project owning a domain, or the info modules return an empty list. A null page still counts as empty, also for
+    the items of a Rules list.
+  - modules - report the create error, with its status code and response, when a create fails without a response or
+    with a 5xx status and the follow-up lookup gets a response the SDK cannot read, instead of the lookup's error.
+  - devices_settings_info, zerotrust_connectivity_settings_info, devices_policy_info - return falsy settings other
+    than null unmodified; only null settings are returned as ``{}``.
+  - zones - compare a setting value that is an integer beyond the float range without failing with a Python
+    traceback, whether Cloudflare returns it before any change or it is requested; after a create, the run reports
+    ``changed=true`` and the created zone.
+  - rulesets - compare a rule whose ``action`` is not a string, such as a mapping, without failing with a Python
+    traceback, before any change and in check mode, and after a create or update, which then reports
+    ``changed=true``.
+  - rules_lists - treat an IP prefix of more digits than any prefix length as invalid in requested elements, and
+    keep it as stored when comparing listed items, instead of failing with a Python traceback.
