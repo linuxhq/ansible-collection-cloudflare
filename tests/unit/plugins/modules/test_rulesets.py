@@ -837,3 +837,52 @@ class RulesetRuleFieldTests(TestCase):
 
                 api.phases.update.assert_not_called()
                 self.assertFalse(result["changed"])
+
+
+UNHASHABLE_ACTION = {"not": "a string"}
+
+
+class UnhashableActionTests(TestCase):
+    """A rule whose action is not a string has no action defaults."""
+
+    def run_module(self, module, client):
+        with self.assertRaises((ModuleExit, ModuleFail)) as raised:
+            rulesets.run(module, client)
+
+        return raised.exception.values
+
+    def test_omitted_rules_keep_a_stored_rule_with_an_unhashable_action(self):
+        for action in (UNHASHABLE_ACTION, ["block"]):
+            for check_mode in (False, True):
+                stored = {**CURRENT, "rules": [{**RULES[0], "action": action}]}
+                client, api = make_client(stored)
+                with self.subTest(action=action, check_mode=check_mode):
+                    result = self.run_module(FakeModule(params(), check_mode=check_mode), client)
+
+                    self.assertNotIn("msg", result)
+                    self.assertFalse(result["changed"])
+                    api.phases.update.assert_not_called()
+
+    def test_removing_a_stored_rule_with_an_unhashable_action_is_a_change(self):
+        stored = {**CURRENT, "rules": [*RULES, {**RULES[0], "action": UNHASHABLE_ACTION, "description": "extra"}]}
+        for check_mode in (False, True):
+            client, api = make_client(stored, updated=CURRENT)
+            with self.subTest(check_mode=check_mode):
+                result = self.run_module(FakeModule(params(rules=RULES), check_mode=check_mode), client)
+
+                self.assertNotIn("msg", result)
+                self.assertTrue(result["changed"])
+                self.assertEqual(api.phases.update.call_count, 0 if check_mode else 1)
+
+    def test_created_rule_with_an_unhashable_action_reports_the_change(self):
+        # Fields the request omits are compared with the action's defaults.
+        rule = {**RULES[0], "action": UNHASHABLE_ACTION, "logging": {"enabled": True}, "action_parameters": {}}
+        created = {**CURRENT, "rules": [rule]}
+        client, api = make_client(created=created)
+
+        result = self.run_module(FakeModule(params(rules=RULES)), client)
+
+        api.create.assert_called_once()
+        self.assertIn("did not apply", result["msg"])
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["ruleset"], created)

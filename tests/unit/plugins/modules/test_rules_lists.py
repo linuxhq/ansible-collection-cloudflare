@@ -8,10 +8,13 @@ import httpx
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import rules_lists
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
+    FALSY_PAGE_RESULTS,
     FakeModule,
     ModuleExit,
     ModuleFail,
     connection_error,
+    list_response,
+    sdk_client,
     status_error,
     timeout_error,
 )
@@ -1603,3 +1606,51 @@ class CanonicalIpTests(TestCase):
             rules_lists.normalize_items([{"ip": "2400:d400:11:19::2"}, {"ip": "2001:db8::/32"}]),
         )
         self.assertEqual(rules_lists.canonical_ip("not-an-ip"), "not-an-ip")
+
+
+class MalformedListTests(TestCase):
+    def test_falsy_page_result_fails_without_a_create(self):
+        for result in FALSY_PAGE_RESULTS:
+            requests = []
+            with self.subTest(result=result), sdk_client(list_response(result, requests)) as client:
+                with self.assertRaises(ModuleFail) as raised:
+                    rules_lists.run(FakeModule(params()), client)
+
+                self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed Rules list data")
+                self.assertEqual([request.method for request in requests], ["GET"])
+
+
+class LongPrefixTests(TestCase):
+    """A prefix of more digits than int() reads is not a prefix length."""
+
+    PREFIX = "1" * 5000
+
+    def run_module(self, module, client):
+        with self.assertRaises((ModuleExit, ModuleFail)) as raised:
+            rules_lists.run(module, client)
+
+        return raised.exception.values
+
+    def test_long_requested_prefix_fails_before_any_write(self):
+        value = f"192.0.2.0/{self.PREFIX}"
+        client, api = make_client()
+
+        result = self.run_module(FakeModule(params(elements=[{"ip": value}])), client)
+
+        self.assertIn("elements[0].ip must be an IP address", result["msg"])
+        api.create.assert_not_called()
+        api.items.update.assert_not_called()
+
+    def test_long_stored_prefix_is_replaced(self):
+        stored = [{"id": "a", "ip": f"192.0.2.0/{self.PREFIX}"}]
+        client, api = make_client([{**CURRENT, "num_items": 1}], items=stored)
+        api.items.list.return_value.iter_pages.return_value = [Mock(result=stored)]
+
+        result = self.run_module(FakeModule(params(elements=[{"ip": "192.0.2.1"}])), client)
+
+        api.items.update.assert_called_once()
+        self.assertTrue(result["changed"])
+
+    def test_leading_zeros_are_dropped(self):
+        self.assertTrue(rules_lists.valid_ip(f"10.0.0.0/{'0' * 5000}8"))
+        self.assertEqual(rules_lists.canonical_ip(f"10.0.0.0/{'0' * 5000}8"), "10.0.0.0/8")

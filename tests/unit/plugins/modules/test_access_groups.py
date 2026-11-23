@@ -5,9 +5,12 @@ from unittest.mock import Mock, patch
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import access_groups
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
+    FALSY_PAGE_RESULTS,
     FakeModule,
     ModuleExit,
     ModuleFail,
+    list_response,
+    sdk_client,
     timeout_error,
 )
 
@@ -467,3 +470,15 @@ class AccessGroupsTests(TestCase):
 
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
+
+
+class MalformedListTests(TestCase):
+    def test_falsy_page_result_fails_without_a_create(self):
+        for result in FALSY_PAGE_RESULTS:
+            requests = []
+            with self.subTest(result=result), sdk_client(list_response(result, requests)) as client:
+                with self.assertRaises(ModuleFail) as raised:
+                    access_groups.run(FakeModule(params()), client)
+
+                self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed Access group data")
+                self.assertEqual([request.method for request in requests], ["GET"])

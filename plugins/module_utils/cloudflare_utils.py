@@ -342,6 +342,24 @@ def require_mapping_list(module, value, resource_name, item_name, context=None):
     return value
 
 
+def listed_items(module, items, resource_name, context=None):
+    """Yield the items of a list: an SDK list response, read page by page, or a plain iterable.
+
+    The SDK reads a page whose result is falsy but not null, such as {}, as an
+    empty last page, so each page's result must be a list; a null result is an
+    empty page. context adds result fields to a failure.
+    """
+    if not hasattr(items, "iter_pages"):
+        yield from items
+        return
+
+    for page in items.iter_pages():
+        if page.result is not None and not isinstance(page.result, list):
+            module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data", **(context or {}))
+
+        yield from page.result or ()
+
+
 def resource_list(module, items, resource_name, required_fields=("id",), context=None):
     """Serialize every item of an SDK list, validating its required fields.
 
@@ -349,7 +367,7 @@ def resource_list(module, items, resource_name, required_fields=("id",), context
     whitespace, which must not fail a listing of every resource. context adds
     result fields to a failure, such as the list's owner.
     """
-    resources = [serialize_resource(item) for item in items]
+    resources = [serialize_resource(item) for item in listed_items(module, items, resource_name, context)]
     for resource in resources:
         for field in required_fields:
             resource_field(module, resource, field, resource_name, strict=field != "name", context=context)
@@ -448,7 +466,11 @@ def create_once(create, find):
 
     try:
         matches = list(find())
-    except cloudflare.APIError:
+    except (cloudflare.APIError, *SDK_ERRORS) as exc:
+        # Collection code errors are bugs; keep their traceback.
+        if not isinstance(exc, cloudflare.APIError) and not raised_by_sdk(exc):
+            raise
+
         # Keep the connection failure error_message names, not the lookup error.
         raise error from error.__cause__
 
@@ -502,7 +524,7 @@ def find_resource(module, items, resource_name, field, value, context=None):
     """
     context = {**(context or {}), field: value}
     matches = []
-    for item in items:
+    for item in listed_items(module, items, resource_name, context):
         resource = serialize_resource(item)
         require_mapping(module, resource, resource_name, context)
         if resource.get(field) == value:
@@ -998,8 +1020,11 @@ def exit_resource_list(module, result_key, items, resource_name, required_fields
 
 
 def exit_settings(module, result_key, settings):
-    """Exit an info module with account-wide settings."""
-    settings = serialize_resource(settings) or {}
+    """Exit an info module with account-wide settings; null settings are returned as {}."""
+    settings = serialize_resource(settings)
+    if settings is None:
+        settings = {}
+
     module.exit_json(changed=False, **{result_key: settings})
 
 

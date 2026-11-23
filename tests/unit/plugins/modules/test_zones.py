@@ -740,3 +740,42 @@ class ZonesTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertEqual(result["zone"], edited)
         self.assertEqual(result["zone_id"], "zone")
+
+
+class HugeSettingValueTests(TestCase):
+    """An integer beyond the float range is compared without its float form."""
+
+    def run_module(self, module, client):
+        with self.assertRaises((ModuleExit, ModuleFail)) as raised:
+            zones.run(module, client)
+
+        return raised.exception.values
+
+    def test_huge_current_value_is_a_difference(self):
+        for check_mode in (False, True):
+            updated = {"id": "browser_cache_ttl", "value": 14400}
+            client = client_with([ZONE], setting={"id": "browser_cache_ttl", "value": 10**400}, edited_setting=updated)
+            with self.subTest(check_mode=check_mode):
+                result = self.run_module(
+                    FakeModule(params(settings=[{"id": "browser_cache_ttl", "value": 14400}]), check_mode=check_mode),
+                    client,
+                )
+
+                self.assertNotIn("msg", result)
+                self.assertTrue(result["changed"])
+                self.assertEqual(client.zones.settings.edit.call_count, 0 if check_mode else 1)
+
+    def test_huge_desired_value_after_create_reports_the_created_zone(self):
+        created = {**ZONE, "account": {"id": "account"}}
+        updated = {"id": "browser_cache_ttl", "value": 10**400}
+        client = client_with(
+            created=created, setting={"id": "browser_cache_ttl", "value": 14400}, edited_setting=updated
+        )
+
+        result = self.run_module(FakeModule(params(settings=[{"id": "browser_cache_ttl", "value": 10**400}])), client)
+
+        client.zones.settings.edit.assert_called_once()
+        self.assertEqual(result["message"], "Zone created")
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["zone"], created)
+        self.assertEqual(result["settings"], [updated])

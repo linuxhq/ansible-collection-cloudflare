@@ -45,11 +45,14 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     zone_missing,
 )
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
+    FALSY_PAGE_RESULTS,
     FakeModule,
     ModuleExit,
     ModuleFail,
     connection_error,
+    list_response,
     malformed_response,
+    sdk_client,
     status_error,
     timeout_error,
 )
@@ -978,6 +981,14 @@ class InfoTests(TestCase):
 
         self.assertEqual(raised.exception.values, {"changed": False, "settings": {}})
 
+    def test_exit_settings_returns_other_values_unmodified(self):
+        for settings in ({}, "", 0, False, []):
+            with self.subTest(settings=settings), self.assertRaises(ModuleExit) as raised:
+                exit_settings(FakeModule({}), "settings", settings)
+
+            returned = raised.exception.values["settings"]
+            self.assertEqual((type(returned), returned), (type(settings), settings))
+
     def test_info_failures_carry_the_owner(self):
         context = {"account_id": "account"}
         for call in (
@@ -1472,6 +1483,36 @@ class CreateOnceTests(TestCase):
             cloudflare_error_details(raised.exception)["error"], "Connection error. ConnectError: connection refused"
         )
 
+    def test_malformed_lookup_response_keeps_the_create_error(self):
+        # A JSON body that is not an object, and a body that is not JSON.
+        for lookup in (httpx.Response(200, json=[]), httpx.Response(200, text="<html>OK</html>")):
+            with self.subTest(lookup=lookup.text):
+
+                def respond(request, lookup=lookup):
+                    if request.method == "POST":
+                        return httpx.Response(500, json={"success": False, "errors": [], "messages": []})
+
+                    return lookup
+
+                with sdk_client(respond) as client, self.assertRaises(cloudflare.InternalServerError) as raised:
+                    create_once(
+                        lambda: client.zero_trust.access.groups.create(
+                            account_id="account", name="n", include=[{"everyone": {}}]
+                        ),
+                        lambda: matching_resources(
+                            client.zero_trust.access.groups.list(account_id="account", name="n"), "name", "n"
+                        ),
+                    )
+
+                self.assertEqual(cloudflare_error_details(raised.exception)["status_code"], 500)
+
+    def test_collection_errors_in_the_lookup_keep_their_traceback(self):
+        def find():
+            raise TypeError("collection bug")
+
+        with self.assertRaisesRegex(TypeError, "collection bug"):
+            create_once(Mock(side_effect=status_error(500)), find)
+
     def test_rejected_create_is_not_looked_up(self):
         # Cloudflare answered, so the resource was not created.
         for status_code in (400, 409, 429):
@@ -1685,6 +1726,54 @@ class ListAllPagesTests(TestCase):
             list_all_pages(FakeModule({}), client, "/things", "thing", {"account_id": "account"})
 
         self.assertEqual(raised.exception.values["account_id"], "account")
+
+
+class ListedItemsTests(TestCase):
+    """SDK list responses are read page by page; a falsy page result that is not null is malformed."""
+
+    def listings(self, module, groups):
+        context = {"account_id": "account"}
+        return (
+            lambda: find_resource(module, groups.list(account_id="account"), "group", "name", "n", context),
+            lambda: resource_list(module, groups.list(account_id="account"), "group", context=context),
+            lambda: exit_resource_list(module, "groups", groups.list(account_id="account"), "group", context=context),
+        )
+
+    def test_falsy_page_results_fail(self):
+        for result in FALSY_PAGE_RESULTS:
+            requests = []
+            with sdk_client(list_response(result, requests)) as client:
+                for index, listing in enumerate(self.listings(FakeModule({}), client.zero_trust.access.groups)):
+                    with self.subTest(result=result, listing=index), self.assertRaises(ModuleFail) as raised:
+                        listing()
+
+                    self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed group data")
+                    self.assertEqual(raised.exception.values["account_id"], "account")
+
+    def test_null_page_result_is_empty(self):
+        requests = []
+        with sdk_client(list_response(None, requests)) as client:
+            find, listed, exit_listed = self.listings(FakeModule({}), client.zero_trust.access.groups)
+
+            self.assertIsNone(find())
+            self.assertEqual(listed(), [])
+            with self.assertRaises(ModuleExit) as raised:
+                exit_listed()
+
+        self.assertEqual(raised.exception.values, {"changed": False, "groups": []})
+
+    def test_every_page_is_read(self):
+        pages = {"1": [{"id": "one", "name": "m"}], "2": [{"id": "two", "name": "n"}], "3": []}
+
+        def respond(request):
+            result = pages[request.url.params.get("page", "1")]
+            return httpx.Response(200, json={"success": True, "errors": [], "messages": [], "result": result})
+
+        with sdk_client(respond) as client:
+            find, listed, _exit_listed = self.listings(FakeModule({}), client.zero_trust.access.groups)
+
+            self.assertEqual(find(), {"id": "two", "name": "n"})
+            self.assertEqual([group["id"] for group in listed()], ["one", "two"])
 
 
 class WrittenFailureTests(TestCase):

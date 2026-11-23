@@ -232,8 +232,14 @@ def setting_value_forms(value):
     if isinstance(value, (int, float)):
         # The SDK decodes some integer settings, such as browser_cache_ttl, as
         # floats, while string settings, such as min_tls_version, keep "1.0".
-        forms = {str(value), str(float(value))}
-        if float(value).is_integer():
+        try:
+            number = float(value)
+        except OverflowError:
+            # An integer beyond the float range has no float form.
+            return {str(value)}
+
+        forms = {str(value), str(number)}
+        if number.is_integer():
             forms.add(str(int(value)))
 
         return forms

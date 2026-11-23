@@ -5,9 +5,12 @@ from unittest.mock import Mock
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import rules_lists_info
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
+    FALSY_PAGE_RESULTS,
     FakeModule,
     ModuleExit,
     ModuleFail,
+    list_response,
+    sdk_client,
 )
 
 
@@ -42,3 +45,13 @@ class RulesListsInfoTests(TestCase):
         self.assertEqual(result["msg"], "Cloudflare API returned malformed Rules list data")
         self.assertEqual(result["account_id"], "account")
         self.assertEqual(result["resource_id"], "list")
+
+
+class MalformedListTests(TestCase):
+    def test_falsy_page_result_fails(self):
+        for result in FALSY_PAGE_RESULTS:
+            with self.subTest(result=result), sdk_client(list_response(result, [])) as client:
+                with self.assertRaises(ModuleFail) as raised:
+                    rules_lists_info.run(FakeModule({"account_id": "account"}), client)
+
+                self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed Rules list data")

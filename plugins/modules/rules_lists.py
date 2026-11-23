@@ -373,6 +373,19 @@ REDIRECT_DEFAULTS = {
 }
 
 
+def prefix_length(prefix):
+    """Return a prefix of ASCII digits as an int, or None for any other prefix.
+
+    int() rejects more than 4300 digits, so a prefix with more significant
+    digits than any prefix length has is None too.
+    """
+    digits = prefix.lstrip("0") or "0"
+    if not (prefix.isascii() and prefix.isdigit()) or len(digits) > 3:
+        return None
+
+    return int(digits)
+
+
 def canonical_ip(value):
     # Cloudflare stores addresses in canonical form, such as compressed IPv6,
     # and stores a full-length prefix, such as /32, as the bare address.
@@ -382,11 +395,12 @@ def canonical_ip(value):
     except ValueError:
         return value
 
-    if prefix.isascii() and prefix.isdigit() and int(prefix) == parsed.max_prefixlen:
+    length = prefix_length(prefix)
+    if length == parsed.max_prefixlen:
         return str(parsed)
 
-    if prefix.isascii() and prefix.isdigit():
-        prefix = str(int(prefix))
+    if length is not None:
+        prefix = str(length)
 
     return f"{parsed}{separator}{prefix}"
 
@@ -615,11 +629,12 @@ def valid_ip(value):
     if not separator:
         return True
 
-    if not (prefix.isascii() and prefix.isdigit() and int(prefix) in IP_PREFIX_LENGTHS[parsed.version]):
+    length = prefix_length(prefix)
+    if length not in IP_PREFIX_LENGTHS[parsed.version]:
         return False
 
     try:
-        ip_network(f"{parsed}/{int(prefix)}")
+        ip_network(f"{parsed}/{length}")
     except ValueError:
         return False
 
