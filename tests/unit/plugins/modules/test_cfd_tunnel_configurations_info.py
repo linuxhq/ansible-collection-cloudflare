@@ -76,7 +76,7 @@ class CfdTunnelConfigurationsInfoTests(TestCase):
         self.assertEqual(raised.exception.status_code, 403)
 
     def test_malformed_configuration_fails_naming_the_tunnel(self):
-        for configuration in (["config"], "malformed", [], False, {"config": "malformed"}, {"config": ["ingress"]}):
+        for configuration in (["config"], "malformed", [], False):
             with self.subTest(configuration=configuration):
                 result, _ignored = self.run_module([{"id": "remote", "name": "one"}], configuration)
 
@@ -87,4 +87,13 @@ class CfdTunnelConfigurationsInfoTests(TestCase):
                         "account_id": "account",
                         "tunnel_id": "remote",
                     },
+                )
+
+    def test_returns_non_null_config_unmodified(self):
+        for config in ("x", [], ["ingress"], False):
+            with self.subTest(config=config):
+                result, _ignored = self.run_module([{"id": "remote", "name": "one"}], {"config": config})
+
+                self.assertEqual(
+                    result["cfd_tunnel_configurations"], [{"id": "remote", "name": "one", "config": config}]
                 )

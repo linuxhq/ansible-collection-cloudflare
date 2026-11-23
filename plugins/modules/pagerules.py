@@ -377,6 +377,24 @@ def matching_pagerules(module, client, targets):
     return matches, len(pagerules)
 
 
+def created_pagerules(client, zone_id, targets):
+    """Return the page rules matching targets, for create_once to find a created rule.
+
+    Unlike matching_pagerules, it never fails the module: a malformed list,
+    rule or targets is no match, so create_once raises the create error.
+    """
+    identity = target_identity(targets)
+    pagerules = serialize_resource(client.page_rules.list(zone_id=zone_id))
+    return [
+        pagerule
+        for pagerule in (pagerules if isinstance(pagerules, list) else [])
+        if isinstance(pagerule, dict)
+        and isinstance(pagerule.get("targets"), list)
+        and all(isinstance(target, dict) for target in pagerule["targets"])
+        and not values_differ(target_identity(pagerule["targets"]), identity)
+    ]
+
+
 def find_pagerule(module, client, targets):
     """Return the page rule matching targets, or None, and the zone's rule count."""
     zone_id = module.params["zone_id"]
@@ -453,7 +471,7 @@ def run(module, client):
         payload,
         create=lambda payload: without_retries(client).page_rules.create(zone_id=zone_id, **payload),
         update=lambda pagerule_id, payload: page_rules.update(pagerule_id=pagerule_id, zone_id=zone_id, **payload),
-        find_created=lambda: matching_pagerules(module, client, targets)[0],
+        find_created=lambda: created_pagerules(client, zone_id, targets),
         preserved_fields=FIELDS,
         context={"zone_id": zone_id},
         comparable=lambda pagerule, failure: comparable_pagerule(module, pagerule, payload["actions"], failure),

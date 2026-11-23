@@ -9,6 +9,8 @@ import httpx
 
 from ansible.module_utils import basic
 
+from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudflare_utils
+
 REQUEST = httpx.Request("GET", "https://api.cloudflare.com/client/v4/")
 
 
@@ -109,3 +111,45 @@ def patch_module_args(args):
     else:
         with core_patch_module_args(args):
             yield
+
+
+def failed_create(*reads):
+    """Return a respond function that answers a POST with a 500 status and each other request with the next of reads."""
+    reads = list(reads)
+
+    def respond(request):
+        if request.method == "POST":
+            return httpx.Response(500, json={"success": False, "errors": [], "messages": []})
+
+        return reads.pop(0)
+
+    return respond
+
+
+def run_through_client(run, module, respond):
+    """Run a module's run() inside cloudflare_client, sending each request without SDK retries to respond.
+
+    Return the values the module exited or failed with, and the method and path of each request.
+    """
+    requests = []
+
+    def recorded(request):
+        requests.append((request.method, request.url.path))
+        return respond(request)
+
+    def build(http_client, **kwargs):
+        transport = httpx.MockTransport(recorded)
+        return cloudflare.Cloudflare(
+            **kwargs, max_retries=0, http_client=httpx.Client(transport=transport, event_hooks=http_client.event_hooks)
+        )
+
+    try:
+        with (
+            patch.object(cloudflare_utils, "Cloudflare", side_effect=build),
+            cloudflare_utils.cloudflare_client(module) as client,
+        ):
+            run(module, client)
+    except ModuleResult as exc:
+        return exc.values, requests
+
+    raise AssertionError("the module neither exited nor failed")

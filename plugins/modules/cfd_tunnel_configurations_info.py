@@ -101,11 +101,10 @@ def run(module, client):
             configuration = {}
 
         require_mapping(module, configuration, "tunnel configuration", context)
+        # Only a null config is empty; other values are returned unmodified.
         config = configuration.get("config")
         if config is None:
             config = {}
-        else:
-            require_mapping(module, config, "tunnel configuration", context)
 
         configurations.append({"id": tunnel["id"], "name": tunnel["name"], "config": config})
 

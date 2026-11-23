@@ -221,9 +221,10 @@ def error_response_body(exc):
     if response is None or not hasattr(response, "json"):
         return None
 
+    # A body the SDK already read as an error can be nested too deeply to decode.
     try:
         return response.json()
-    except ValueError:
+    except (RecursionError, ValueError):
         return None
 
 
@@ -401,9 +402,9 @@ def matching_resources(items, field, value):
     return [resource for resource in resources if isinstance(resource, dict) and resource.get(field) == value]
 
 
-def unique_match(resource):
-    """Return the matches of a lookup by a unique key: [resource], or [] when it is None."""
-    return [] if resource is None else [resource]
+def unique_match(resource, field, value):
+    """Return the matches of a lookup by a unique key: [resource] when its field equals value, else []."""
+    return matching_resources([resource], field, value)
 
 
 def retry_delay(exc, attempt):

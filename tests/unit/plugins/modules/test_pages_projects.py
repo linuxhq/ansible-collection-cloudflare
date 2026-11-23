@@ -13,7 +13,9 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleExit,
     ModuleFail,
+    failed_create,
     list_response,
+    run_through_client,
     sdk_client,
     status_error,
     timeout_error,
@@ -1195,6 +1197,68 @@ class PagesProjectsTests(TestCase):
         self.assertEqual(result["message"], "Pages project created")
         self.assertEqual(result["pages_project"], refreshed)
         self.assertEqual(result["domains"], [{"name": "new.example.com"}])
+
+    def test_failed_lookup_after_a_failed_create_reports_the_create_error(self):
+        lookups = (
+            httpx.Response(403, json={"success": False, "errors": [{"code": 10000}], "messages": []}),
+            httpx.Response(200, json={"success": True, "result": "malformed"}),
+            httpx.Response(200, json={"success": True, "result": ["docs"]}),
+            httpx.Response(200, json={"success": True, "result": {"production_branch": "main"}}),
+            httpx.Response(200, json={"success": True, "result": {**PROJECT, "name": "other"}}),
+        )
+        for lookup in lookups:
+            with self.subTest(lookup=lookup.content):
+                result, requests = run_through_client(
+                    pages_projects.run,
+                    FakeModule({**params(), "api_token": "token"}),
+                    failed_create(httpx.Response(404, json={"success": False, "errors": [], "messages": []}), lookup),
+                )
+
+                self.assertEqual([method for method, _path in requests], ["GET", "POST", "GET"])
+                self.assertEqual(result["msg"], "Cloudflare API request failed while creating the Pages project")
+                self.assertEqual(result["status_code"], 500)
+                self.assertNotIn("changed", result)
+
+    def test_failed_domain_lookup_after_a_failed_add_reports_the_add_error(self):
+        lookups = (
+            httpx.Response(403, json={"success": False, "errors": [{"code": 10000}], "messages": []}),
+            httpx.Response(200, json={"success": True, "result": "malformed"}),
+            httpx.Response(200, json={"success": True, "result": ["new.example.com"]}),
+            httpx.Response(200, json={"success": True, "result": {"name": "other.example.com"}}),
+        )
+        for lookup in lookups:
+
+            def respond(request, lookup=lookup):
+                path = request.url.path
+                if request.method == "POST":
+                    return httpx.Response(500, json={"success": False, "errors": [], "messages": []})
+
+                if path.endswith("/domains/new.example.com"):
+                    return lookup
+
+                if path.endswith("/pages/projects/docs"):
+                    return httpx.Response(200, json={"success": True, "result": PROJECT})
+
+                # The account's projects and every domain list are empty.
+                return httpx.Response(200, json={"success": True, "result": [], "result_info": {"total_pages": 1}})
+
+            with self.subTest(lookup=lookup.content):
+                result, requests = run_through_client(
+                    pages_projects.run,
+                    FakeModule({**params(domains=[{"name": "new.example.com"}]), "api_token": "token"}),
+                    respond,
+                )
+
+                self.assertEqual(
+                    requests[-2:],
+                    [
+                        ("POST", "/client/v4/accounts/account/pages/projects/docs/domains"),
+                        ("GET", "/client/v4/accounts/account/pages/projects/docs/domains/new.example.com"),
+                    ],
+                )
+                self.assertEqual(result["msg"], "Cloudflare API request failed while adding the Pages project domain")
+                self.assertEqual(result["status_code"], 500)
+                self.assertNotIn("changed", result)
 
     def test_domain_names_compare_case_insensitively(self):
         client, api = client_with([PROJECT], domains=[{"name": "docs.example.com"}])

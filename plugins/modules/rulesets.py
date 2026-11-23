@@ -411,7 +411,7 @@ def run(module, client):
         create=lambda payload: without_retries(client).rulesets.create(zone_id=zone_id, **payload),
         update=lambda ruleset_id, payload: rulesets.phases.update(phase, zone_id=zone_id, **payload),
         # A zone has at most one entrypoint ruleset per phase.
-        find_created=lambda: unique_match(get_or_none(rulesets.phases.get, phase, zone_id=zone_id)),
+        find_created=lambda: unique_match(get_or_none(rulesets.phases.get, phase, zone_id=zone_id), "phase", phase),
         expected_name=name,
         defaults={"rules": []},
         exact_values=("rules",),

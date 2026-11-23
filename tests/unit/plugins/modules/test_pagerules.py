@@ -4,6 +4,7 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 import cloudflare
+import httpx
 
 from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudflare_utils
 from ansible_collections.linuxhq.cloudflare.plugins.modules import pagerules
@@ -12,6 +13,8 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     ModuleExit,
     ModuleFail,
     connection_error,
+    failed_create,
+    run_through_client,
     status_error,
 )
 
@@ -645,15 +648,28 @@ class PageRulesTests(TestCase):
                     api.delete.assert_not_called()
                     self.assertEqual(result, failure)
 
-    def test_malformed_rules_listed_after_a_lost_create_fail_cleanly(self):
-        client, api = client_with()
-        api.create.side_effect = connection_error()
-        api.list.side_effect = [[], [None]]
+    def test_failed_lookup_after_a_failed_create_reports_the_create_error(self):
+        other = {**TARGETS[0], "constraint": {"operator": "matches", "value": "example.net/*"}}
+        lookups = (
+            httpx.Response(403, json={"success": False, "errors": [{"code": 10000}], "messages": []}),
+            httpx.Response(200, json={"success": True, "result": "malformed"}),
+            httpx.Response(200, json={"success": True, "result": [None, "rule", {"id": "a"}]}),
+            httpx.Response(200, json={"success": True, "result": [{"id": "a", "targets": "url"}]}),
+            httpx.Response(200, json={"success": True, "result": [{"id": "a", "targets": [None]}]}),
+            httpx.Response(200, json={"success": True, "result": [{"id": "a", "targets": [other]}]}),
+        )
+        for lookup in lookups:
+            with self.subTest(lookup=lookup.content):
+                result, requests = run_through_client(
+                    pagerules.run,
+                    FakeModule({**params(), "api_token": "token"}),
+                    failed_create(httpx.Response(200, json={"success": True, "result": []}), lookup),
+                )
 
-        result = self.run_module(FakeModule(params()), client)
-
-        api.create.assert_called_once()
-        self.assertEqual(result, {"msg": "Cloudflare API returned malformed page rule data", "zone_id": "zone"})
+                self.assertEqual([method for method, _path in requests], ["GET", "POST", "GET"])
+                self.assertEqual(result["msg"], "Cloudflare API request failed while creating the page rule")
+                self.assertEqual(result["status_code"], 500)
+                self.assertNotIn("changed", result)
 
     def test_malformed_current_actions_fail_before_any_change(self):
         cases = (

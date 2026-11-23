@@ -358,6 +358,45 @@ class ClientTests(TestCase):
         self.assertEqual(values["status_code"], 502)
         self.assertEqual(values["response"], "<html>502 Bad Gateway</html>")
 
+    def test_client_fails_cleanly_on_an_error_response_nested_too_deeply(self):
+        # The SDK reads the body as an error; it is nested too deeply to decode again.
+        depth = 10000
+        body = b"[" * depth + b"]" * depth
+
+        def respond(request):
+            return httpx.Response(400, content=body, headers={"content-type": "application/json"})
+
+        def delete_zone(client):
+            ensure_resource_absent(
+                FakeModule({}),
+                "zone",
+                "zone",
+                {"id": "zone"},
+                lambda zone_id: client.zones.delete(zone_id=zone_id),
+                deleted_codes=(1001,),
+            )
+
+        def read_zone(client):
+            try:
+                client.zones.get(zone_id="zone")
+            except cloudflare.BadRequestError as exc:
+                self.assertFalse(zone_missing(exc))
+                raise
+
+        for request in (read_zone, delete_zone):
+            with self.subTest(request=request.__name__):
+                with (
+                    patch.object(cloudflare_utils, "Cloudflare", side_effect=sdk_constructor(respond, max_retries=0)),
+                    self.assertRaises(ModuleFail) as raised,
+                    cloudflare_client(FakeModule({"api_token": "secret"})) as client,
+                ):
+                    request(client)
+
+                values = raised.exception.values
+                self.assertEqual(values["status_code"], 400)
+                self.assertEqual(values["response"], body.decode())
+                self.assertNotIn("changed", values)
+
     def test_client_fails_cleanly_on_sdk_errors(self):
         def make_client(body):
             def respond(request):

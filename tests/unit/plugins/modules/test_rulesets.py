@@ -3,6 +3,8 @@
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
+import httpx
+
 from ansible.module_utils import basic
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import rulesets
@@ -10,6 +12,8 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleExit,
     ModuleFail,
+    failed_create,
+    run_through_client,
     status_error,
     timeout_error,
 )
@@ -66,6 +70,28 @@ class RulesetsTests(TestCase):
         api.create.assert_called_once()
         self.assertEqual(result["message"], "Ruleset created")
         self.assertEqual(result["ruleset"], CURRENT)
+
+    def test_failed_lookup_after_a_failed_create_reports_the_create_error(self):
+        lookups = (
+            httpx.Response(403, json={"success": False, "errors": [{"code": 10000}], "messages": []}),
+            httpx.Response(200, json={"success": True, "result": "malformed"}),
+            httpx.Response(200, json={"success": True, "result": ["ruleset"]}),
+            httpx.Response(
+                200, json={"success": True, "result": {**CURRENT, "phase": "http_request_firewall_managed"}}
+            ),
+        )
+        for lookup in lookups:
+            with self.subTest(lookup=lookup.content):
+                result, requests = run_through_client(
+                    rulesets.run,
+                    FakeModule({**params(rules=RULES), "api_token": "token"}),
+                    failed_create(httpx.Response(404, json={"success": False, "errors": [], "messages": []}), lookup),
+                )
+
+                self.assertEqual([method for method, _path in requests], ["GET", "POST", "GET"])
+                self.assertEqual(result["msg"], "Cloudflare API request failed while creating the ruleset")
+                self.assertEqual(result["status_code"], 500)
+                self.assertNotIn("changed", result)
 
     def test_unsupported_kinds_fail_before_opening_client(self):
         for kind in ("custom", "managed", "root"):

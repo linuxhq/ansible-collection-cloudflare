@@ -807,7 +807,9 @@ def add_domain(module, client, domain_name, context):
         domain = serialize_resource(
             create_once(
                 lambda: without_retries(client).pages.projects.domains.create(**query, name=domain_name),
-                lambda: unique_match(get_or_none(client.pages.projects.domains.get, domain_name, **query)),
+                lambda: unique_match(
+                    get_or_none(client.pages.projects.domains.get, domain_name, **query), "name", domain_name
+                ),
             )
         )
 
@@ -864,7 +866,13 @@ def ensure_present(module, client, domain_names):
         ):
             current = create_once(
                 lambda: without_retries(client).pages.projects.create(account_id=params["account_id"], **payload),
-                lambda: unique_match(get_project(module, client)),
+                lambda: unique_match(
+                    get_or_none(
+                        client.pages.projects.get, project_name=params["name"], account_id=params["account_id"]
+                    ),
+                    "name",
+                    params["name"],
+                ),
             )
 
         written = {"changed": True, **project_context(module)}
