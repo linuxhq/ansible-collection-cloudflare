@@ -1,6 +1,6 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from unittest import TestCase
+from unittest import TestCase, skipUnless
 from unittest.mock import Mock, call
 from urllib.parse import unquote
 
@@ -10,6 +10,8 @@ import httpx
 from ansible_collections.linuxhq.cloudflare.plugins.modules import pages_projects
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FALSY_PAGE_RESULTS,
+    OVERLONG_VALUE,
+    URL_LENGTH_LIMITED,
     FakeModule,
     ModuleExit,
     ModuleFail,
@@ -1219,13 +1221,13 @@ class PagesProjectsTests(TestCase):
                 self.assertEqual(result["status_code"], 500)
                 self.assertNotIn("changed", result)
 
+    @skipUnless(URL_LENGTH_LIMITED, "HTTPX builds URLs of any length")
     def test_overlong_name_fails_cleanly(self):
-        # HTTPX refuses to build a request whose URL is longer than 65536 characters.
         def respond(request):
             raise AssertionError("no request can be sent")
 
         result, requests = run_through_client(
-            pages_projects.run, FakeModule({**params(name="a" * 70000), "api_token": "token"}), respond
+            pages_projects.run, FakeModule({**params(name=OVERLONG_VALUE), "api_token": "token"}), respond
         )
 
         self.assertEqual(requests, [])

@@ -1,6 +1,6 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from unittest import TestCase
+from unittest import TestCase, skipUnless
 from unittest.mock import Mock, patch
 
 import cloudflare
@@ -9,6 +9,8 @@ import httpx
 from ansible_collections.linuxhq.cloudflare.plugins.modules import rules_lists
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FALSY_PAGE_RESULTS,
+    OVERLONG_VALUE,
+    URL_LENGTH_LIMITED,
     FakeModule,
     ModuleExit,
     ModuleFail,
@@ -66,9 +68,9 @@ class RulesListsTests(TestCase):
 
         return raised.exception.values
 
+    @skipUnless(URL_LENGTH_LIMITED, "HTTPX builds URLs of any length")
     def test_overlong_list_id_fails_cleanly(self):
-        # HTTPX refuses to build a request whose URL is longer than 65536 characters.
-        list_id = "a" * 70000
+        list_id = OVERLONG_VALUE
         for created in (False, True):
 
             def respond(request, created=created):
