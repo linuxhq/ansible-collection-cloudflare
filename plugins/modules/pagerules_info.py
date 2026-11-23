@@ -77,7 +77,9 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare,
     cloudflare_client,
     cloudflare_error_context,
+    require_mapping_list,
     resource_list,
+    serialize_resource,
     zone_missing,
 )
 
@@ -93,12 +95,7 @@ def run(module, client):
                 "Cloudflare API request failed while gathering page rules",
                 zone_id=zone["id"],
             ):
-                rules = resource_list(
-                    module,
-                    client.page_rules.list(zone_id=zone["id"]) or [],
-                    "page rule",
-                    context={"zone_id": zone["id"]},
-                )
+                rules = serialize_resource(client.page_rules.list(zone_id=zone["id"]))
         except cloudflare.APIStatusError as exc:
             # Skip a zone deleted after it was listed.
             if not zone_missing(exc):
@@ -106,6 +103,13 @@ def run(module, client):
 
             continue
 
+        context = {"zone_id": zone["id"]}
+        # The SDK types this response as optional; treat null as no rules.
+        if rules is None:
+            rules = []
+
+        require_mapping_list(module, rules, "page rule", "page rule", context)
+        rules = resource_list(module, rules, "page rule", context=context)
         pagerules.append({"id": zone["id"], "name": zone["name"], "pagerules": rules})
 
     module.exit_json(changed=False, pagerules=pagerules)

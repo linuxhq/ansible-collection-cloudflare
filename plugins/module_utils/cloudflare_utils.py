@@ -59,14 +59,46 @@ MAX_RETRY_AFTER_SECONDS = 60
 CREATE_RETRY_BACKOFF_SECONDS = 0.5
 
 
+# Errors the SDK raises outside its APIError hierarchy, such as when it reads
+# a 2xx response it cannot parse: a body that is not JSON, an envelope that is
+# not an object, or a list page whose result is not a list.
+SDK_ERRORS = (AttributeError, TypeError, ValueError)
+
+# HTTP methods of the requests that change nothing at Cloudflare.
+READ_METHODS = ("GET", "HEAD")
+
+
+def raised_by_sdk(exc):
+    """Return whether exc was raised inside the cloudflare SDK rather than by collection code."""
+    if cloudflare is None:
+        return False
+
+    package = os.path.join(os.path.dirname(cloudflare.__file__), "")
+    entry = exc.__traceback__
+    while entry is not None:
+        if entry.tb_frame.f_code.co_filename.startswith(package):
+            return True
+
+        entry = entry.tb_next
+
+    return False
+
+
 @contextmanager
 def cloudflare_error_context(message, **context):
+    """Name the operation of a Cloudflare API or SDK failure raised inside the block; context adds result fields."""
     api_error = getattr(cloudflare, "APIError", ())
     try:
         yield
     except api_error as exc:
         exc._cloudflare_message = message
         exc._cloudflare_context = context
+        raise
+    except SDK_ERRORS as exc:
+        if raised_by_sdk(exc):
+            exc._cloudflare_message = message
+            exc._cloudflare_context = context
+
         raise
 
 
@@ -109,8 +141,18 @@ def cloudflare_client(module):
         ):
             headers[header] = cloudflare.omit
 
+    # The last response's status, and whether Cloudflare answered a write of
+    # this run with a 2xx status, so a later failure reports the change.
+    responses = {"applied": False, "status_code": None}
+
+    def record_response(response):
+        responses["status_code"] = response.status_code
+        if response.is_success and response.request.method not in READ_METHODS:
+            responses["applied"] = True
+
+    http_client = cloudflare.DefaultHttpxClient(event_hooks={"response": [record_response]})
     try:
-        with Cloudflare(api_token=api_token, default_headers=headers) as client:
+        with Cloudflare(api_token=api_token, default_headers=headers, http_client=http_client) as client:
             # Constructor values of None load ambient credentials, which take
             # precedence over api_token. Clear them before issuing requests.
             client.api_email = None
@@ -125,13 +167,34 @@ def cloudflare_client(module):
         else:
             default_message = "Cloudflare API error"
 
-        module.fail_json(
-            **{
-                "msg": getattr(exc, "_cloudflare_message", default_message),
-                **getattr(exc, "_cloudflare_context", {}),
-                **cloudflare_error_details(exc),
-            }
-        )
+        failure = {
+            "msg": getattr(exc, "_cloudflare_message", default_message),
+            **getattr(exc, "_cloudflare_context", {}),
+            **cloudflare_error_details(exc),
+        }
+        if responses["applied"]:
+            failure["changed"] = True
+
+        module.fail_json(**failure)
+    except SDK_ERRORS as exc:
+        # Collection code errors are bugs; keep their traceback.
+        if not raised_by_sdk(exc):
+            raise
+
+        failure = {
+            "msg": getattr(exc, "_cloudflare_message", "Cloudflare API request failed"),
+            **getattr(exc, "_cloudflare_context", {}),
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+        # Only a response body raises JSONDecodeError, so it is the last
+        # response's; other errors can be raised before a request is sent.
+        if isinstance(exc, json.JSONDecodeError):
+            failure.update(status_code=responses["status_code"], response=exc.doc)
+
+        if responses["applied"]:
+            failure["changed"] = True
+
+        module.fail_json(**failure)
 
 
 def validate_cloudflare_params(module):
@@ -262,6 +325,21 @@ def require_mapping(module, value, resource_name, context=None):
     """Fail when value is not a mapping; context adds result fields to the failure."""
     if not isinstance(value, dict):
         module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data", **(context or {}))
+
+
+def require_mapping_list(module, value, resource_name, item_name, context=None):
+    """Return value, failing when it is not a list of mappings; context adds result fields to the failure.
+
+    The failure names resource_name for a value that is not a list, and
+    item_name for an item that is not a mapping.
+    """
+    if not isinstance(value, list):
+        module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data", **(context or {}))
+
+    for item in value:
+        require_mapping(module, item, item_name, context)
+
+    return value
 
 
 def resource_list(module, items, resource_name, required_fields=("id",), context=None):
@@ -939,7 +1017,12 @@ def ensure_settings(
     comparable = comparable or (lambda settings, failure: settings)
     context = context or {}
     label = resource_name[0].upper() + resource_name[1:]
-    current = serialize_resource(current) or {}
+    current = serialize_resource(current)
+    # The SDK types settings as optional; null counts as no settings.
+    if current is None:
+        current = {}
+
+    require_mapping(module, current, resource_name, context)
 
     if not differs(comparable(current, context), payload, exact_values=exact_values):
         module.exit_json(changed=False, message=f"{label} already present", **{result_key: current})

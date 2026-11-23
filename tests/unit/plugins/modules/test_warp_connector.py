@@ -1,13 +1,16 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
+from contextlib import nullcontext
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
+from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudflare_utils
 from ansible_collections.linuxhq.cloudflare.plugins.modules import warp_connector
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FakeModule,
     ModuleExit,
     ModuleFail,
+    malformed_response,
     status_error,
 )
 
@@ -246,3 +249,25 @@ class WarpConnectorTests(TestCase):
         self.assertTrue(result["changed"])
         self.assertEqual(result["warp_connector"], edited)
         self.assertEqual(result["resource_id"], "connector-id")
+
+    def test_malformed_secret_edit_response_reports_the_created_connector(self):
+        client, api = client_with(created=CREATED)
+        api.edit.side_effect = malformed_response
+        module = FakeModule({**params(tunnel_secret=SECRET), "api_token": "EXAMPLE-token"})
+
+        with (
+            patch.object(cloudflare_utils, "Cloudflare", return_value=nullcontext(Mock())),
+            self.assertRaises(ModuleFail) as raised,
+            cloudflare_utils.cloudflare_client(module),
+        ):
+            warp_connector.run(module, client)
+
+        api.edit.assert_called_once()
+        values = raised.exception.values
+        self.assertEqual(
+            values["msg"], "Cloudflare API request failed while applying tunnel_secret to the created WARP Connector"
+        )
+        self.assertTrue(values["changed"])
+        self.assertEqual(values["resource_id"], "connector-id")
+        self.assertEqual(values["warp_connector"], CREATED)
+        self.assertIn("error", values)

@@ -407,6 +407,62 @@ class RulesetsTests(TestCase):
         self.assertEqual(result["zone_id"], "zone")
 
 
+class RulesetMalformedRulesTests(TestCase):
+    def run_module(self, module, client):
+        with self.assertRaises((ModuleExit, ModuleFail)) as raised:
+            rulesets.run(module, client)
+
+        return raised.exception.values
+
+    def test_malformed_current_rules_fail_before_any_change(self):
+        cases = (
+            ("rule", "ruleset"),
+            ({"action": "block"}, "ruleset"),
+            ([None], "ruleset rule"),
+            (["rule"], "ruleset rule"),
+        )
+        for rules, name in cases:
+            for desired in (None, RULES):
+                client, api = make_client({**CURRENT, "rules": rules})
+                with self.subTest(rules=rules, desired=desired):
+                    result = self.run_module(FakeModule(params(rules=desired)), client)
+
+                    api.phases.update.assert_not_called()
+                    self.assertEqual(
+                        result,
+                        {"msg": f"Cloudflare API returned malformed {name} data", "zone_id": "zone", "phase": PHASE},
+                    )
+
+    def test_null_rules_count_as_no_rules(self):
+        client, api = make_client({**CURRENT, "rules": None})
+
+        result = self.run_module(FakeModule(params(rules=[])), client)
+
+        api.phases.update.assert_not_called()
+        self.assertFalse(result["changed"])
+
+    def test_malformed_written_rules_report_the_change(self):
+        for rules, name in (("rule", "ruleset"), ([None], "ruleset rule")):
+            written = {**CURRENT, "rules": rules}
+            for write in ("create", "update"):
+                if write == "create":
+                    client, api = make_client(created=written)
+                    sent = api.create
+                else:
+                    client, api = make_client({**CURRENT, "rules": []}, updated=written)
+                    sent = api.phases.update
+
+                with self.subTest(rules=rules, write=write):
+                    result = self.run_module(FakeModule(params(rules=RULES)), client)
+
+                    sent.assert_called_once()
+                    self.assertEqual(result["msg"], f"Cloudflare API returned malformed {name} data")
+                    self.assertTrue(result["changed"])
+                    self.assertEqual(result["ruleset"], written)
+                    self.assertEqual(result["resource_id"], "ruleset")
+                    self.assertEqual(result["zone_id"], "zone")
+
+
 HEADER_RULE = {
     "enabled": True,
     "action": "rewrite",

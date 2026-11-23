@@ -509,3 +509,29 @@ class CfdTunnelConfigurationsTests(TestCase):
         self.assertEqual(api.update.call_args.kwargs["config"], sent)
         self.assertNotIn("msg", result.values)
         self.assertTrue(result.values["changed"])
+
+    def test_malformed_current_configuration_fails_before_any_change(self):
+        config = {"ingress": [{"service": "http_status:404"}]}
+        for current in (["config"], "malformed", [], False, {"config": "malformed"}, {"config": ["ingress"]}):
+            with self.subTest(current=current):
+                result, api = self.run_module(module_for(config), current)
+
+                api.update.assert_not_called()
+                self.assertEqual(
+                    result.values,
+                    {
+                        "msg": "Cloudflare API returned malformed tunnel configuration data",
+                        "account_id": "account",
+                        "tunnel_id": "tunnel",
+                    },
+                )
+
+    def test_null_current_configuration_counts_as_empty(self):
+        config = {"ingress": [{"service": "http_status:404"}]}
+        for current in (None, {"config": None}):
+            with self.subTest(current=current):
+                result, api = self.run_module(module_for(config, check_mode=True), current)
+
+                api.update.assert_not_called()
+                self.assertTrue(result.values["changed"])
+                self.assertNotIn("msg", result.values)

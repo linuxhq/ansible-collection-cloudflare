@@ -54,6 +54,18 @@ def status_error(status_code, body=None):
     return error_class(f"Error code: {status_code}", response=response, body=body)
 
 
+def malformed_response(*args, **kwargs):
+    """Raise the error the SDK raises when a 2xx response body is not JSON.
+
+    Use it as a Mock side_effect for an SDK method.
+    """
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, text="<html>OK</html>"))
+    with cloudflare.Cloudflare(
+        api_token="EXAMPLE-token", max_retries=0, http_client=httpx.Client(transport=transport)
+    ) as client:
+        client.zones.get(zone_id="zone")
+
+
 def connection_error():
     return cloudflare.APIConnectionError(request=REQUEST)
 

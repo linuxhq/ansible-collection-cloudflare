@@ -614,3 +614,90 @@ class PageRulesTests(TestCase):
 
         self.assertNotIn("msg", result)
         api.create.assert_called_once_with(zone_id="zone", actions=actions, status="active", targets=targets)
+
+    def test_malformed_listed_rules_fail_before_any_change(self):
+        malformed = "Cloudflare API returned malformed page rule data"
+        cases = (
+            ("rules", {"msg": malformed, "zone_id": "zone"}),
+            ({}, {"msg": malformed, "zone_id": "zone"}),
+            (False, {"msg": malformed, "zone_id": "zone"}),
+            ([None], {"msg": malformed, "zone_id": "zone"}),
+            (["rule"], {"msg": malformed, "zone_id": "zone"}),
+            ([{"id": "other"}], {"msg": malformed, "zone_id": "zone", "resource_id": "other"}),
+            ([{"id": "other", "targets": "url"}], {"msg": malformed, "zone_id": "zone", "resource_id": "other"}),
+            (
+                [{"id": "other", "targets": [None]}],
+                {
+                    "msg": "Cloudflare API returned malformed page rule target data",
+                    "zone_id": "zone",
+                    "resource_id": "other",
+                },
+            ),
+        )
+        for listed, failure in cases:
+            for state in ("present", "absent"):
+                client, api = client_with()
+                api.list.return_value = listed
+                with self.subTest(listed=listed, state=state):
+                    result = self.run_module(FakeModule(params(state=state)), client)
+
+                    api.create.assert_not_called()
+                    api.delete.assert_not_called()
+                    self.assertEqual(result, failure)
+
+    def test_malformed_rules_listed_after_a_lost_create_fail_cleanly(self):
+        client, api = client_with()
+        api.create.side_effect = connection_error()
+        api.list.side_effect = [[], [None]]
+
+        result = self.run_module(FakeModule(params()), client)
+
+        api.create.assert_called_once()
+        self.assertEqual(result, {"msg": "Cloudflare API returned malformed page rule data", "zone_id": "zone"})
+
+    def test_malformed_current_actions_fail_before_any_change(self):
+        cases = (
+            ({}, "page rule"),
+            ({"actions": "always_use_https"}, "page rule"),
+            ({"actions": {"id": "always_use_https"}}, "page rule"),
+            ({"actions": [None]}, "page rule action"),
+            ({"actions": ["always_use_https"]}, "page rule action"),
+        )
+        for actions, name in cases:
+            client, api = client_with([{"id": "match", "targets": TARGETS, **actions}])
+            with self.subTest(actions=actions):
+                result = self.run_module(FakeModule(params()), client)
+
+                api.update.assert_not_called()
+                self.assertEqual(
+                    result,
+                    {
+                        "msg": f"Cloudflare API returned malformed {name} data",
+                        "zone_id": "zone",
+                        "resource_id": "match",
+                    },
+                )
+
+    def test_malformed_written_actions_report_the_change(self):
+        current = {"id": "rule", "targets": TARGETS, "actions": ACTIONS, "priority": 1, "status": "disabled"}
+        for actions, name in (
+            ({}, "page rule"),
+            ({"actions": "always_use_https"}, "page rule"),
+            ({"actions": [None]}, "page rule action"),
+        ):
+            written = {"id": "rule", "targets": TARGETS, "priority": 1, "status": "active", **actions}
+            for write in ("create", "update"):
+                if write == "create":
+                    client, api = client_with(created=written)
+                else:
+                    client, api = client_with([current], updated=written)
+
+                with self.subTest(actions=actions, write=write):
+                    result = self.run_module(FakeModule(params(status="active")), client)
+
+                    getattr(api, write).assert_called_once()
+                    self.assertEqual(result["msg"], f"Cloudflare API returned malformed {name} data")
+                    self.assertTrue(result["changed"])
+                    self.assertEqual(result["pagerule"], written)
+                    self.assertEqual(result["resource_id"], "rule")
+                    self.assertEqual(result["zone_id"], "zone")

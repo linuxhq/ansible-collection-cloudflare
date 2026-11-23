@@ -4,5 +4,4 @@ trivial:
   - cfd_tunnel_info, warp_connector_info - return the token the SDK returns without a string check.
   - devices_policy - drop nested null keys with ``without_nested_nulls`` instead of two local comprehensions.
   - dnssec_info - drop a mapping check that the status check repeats.
-  - pagerules - read the targets of a listed page rule directly instead of checking it is a mapping.
   - purge_cache - inline the one-line purge payload helper.

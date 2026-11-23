@@ -271,9 +271,18 @@ def run(module, client):
         "Cloudflare API request failed while gathering the tunnel configuration",
         **identifiers,
     ):
-        current = serialize_resource(configurations.get(tunnel_id, account_id=params["account_id"])) or {}
+        current = serialize_resource(configurations.get(tunnel_id, account_id=params["account_id"]))
 
-    current_config = current.get("config") or {}
+    if current is None:
+        current = {}
+
+    require_mapping(module, current, "tunnel configuration", identifiers)
+    current_config = current.get("config")
+    if current_config is None:
+        current_config = {}
+    else:
+        require_mapping(module, current_config, "tunnel configuration", identifiers)
+
     if not values_differ(
         comparable_config(current_config, params["config"]),
         comparable_config(params["config"]),

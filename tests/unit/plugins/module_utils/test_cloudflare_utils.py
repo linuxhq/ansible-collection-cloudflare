@@ -3,7 +3,7 @@
 import os
 from datetime import datetime, timezone
 from unittest import TestCase
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import cloudflare
 import httpx
@@ -49,6 +49,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     ModuleExit,
     ModuleFail,
     connection_error,
+    malformed_response,
     status_error,
     timeout_error,
 )
@@ -75,6 +76,21 @@ EXPECTED_HEADERS = {
     "X-Auth-Key": cloudflare.omit,
     "X-Auth-User-Service-Key": cloudflare.omit,
 }
+
+
+def sdk_constructor(respond, **options):
+    """Return a Cloudflare constructor whose client sends each request to respond.
+
+    The HTTP client keeps the event hooks cloudflare_client gives it.
+    """
+
+    def build(http_client, **kwargs):
+        transport = httpx.MockTransport(respond)
+        return cloudflare.Cloudflare(
+            **kwargs, **options, http_client=httpx.Client(transport=transport, event_hooks=http_client.event_hooks)
+        )
+
+    return build
 
 
 def sdk_context(client):
@@ -124,15 +140,9 @@ class ClientTests(TestCase):
                     record(request)
                     return httpx.Response(200, json={"success": True, "result": {"id": "zone"}})
 
-                def make_client(**kwargs):
-                    return cloudflare.Cloudflare(
-                        **kwargs,
-                        http_client=httpx.Client(transport=httpx.MockTransport(respond)),
-                    )
-
                 with (
                     patch.dict(os.environ, environment, clear=True),
-                    patch.object(cloudflare_utils, "Cloudflare", side_effect=make_client),
+                    patch.object(cloudflare_utils, "Cloudflare", side_effect=sdk_constructor(respond)),
                     cloudflare_client(FakeModule({"api_token": "  EXAMPLE-explicit-token  "})) as client,
                 ):
                     client.zones.get(zone_id="zone")
@@ -169,7 +179,7 @@ class ClientTests(TestCase):
         ):
             self.assertIs(result, client)
 
-        constructor.assert_called_once_with(api_token="secret", default_headers=EXPECTED_HEADERS)
+        constructor.assert_called_once_with(api_token="secret", default_headers=EXPECTED_HEADERS, http_client=ANY)
         context.__exit__.assert_called_once()
 
     def test_client_normalizes_token_and_rejects_empty_identifiers(self):
@@ -181,7 +191,7 @@ class ClientTests(TestCase):
         ):
             pass
 
-        constructor.assert_called_once_with(api_token="secret", default_headers=EXPECTED_HEADERS)
+        constructor.assert_called_once_with(api_token="secret", default_headers=EXPECTED_HEADERS, http_client=ANY)
 
         # The SDK raises ValueError for an empty path parameter.
         for name in ("account_id", "phase", "tunnel_id", "zone_id"):
@@ -298,12 +308,6 @@ class ClientTests(TestCase):
         self.assertEqual(raised.exception.values["msg"], "Cloudflare API connection failed")
 
     def test_client_reports_the_cause_of_a_connection_failure(self):
-        def make_client(transport):
-            def build(**kwargs):
-                return cloudflare.Cloudflare(**kwargs, max_retries=0, http_client=httpx.Client(transport=transport))
-
-            return build
-
         def refuse(request):
             raise httpx.ConnectError("[Errno 8] nodename nor servname provided")
 
@@ -322,7 +326,7 @@ class ClientTests(TestCase):
         for token, respond, error in cases:
             with (
                 self.subTest(error=error),
-                patch.object(cloudflare_utils, "Cloudflare", side_effect=make_client(httpx.MockTransport(respond))),
+                patch.object(cloudflare_utils, "Cloudflare", side_effect=sdk_constructor(respond, max_retries=0)),
                 self.assertRaises(ModuleFail) as raised,
                 cloudflare_client(FakeModule({"api_token": token})) as client,
             ):
@@ -337,13 +341,8 @@ class ClientTests(TestCase):
         def respond(request):
             return httpx.Response(502, text="<html>502 Bad Gateway</html>")
 
-        def make_client(**kwargs):
-            return cloudflare.Cloudflare(
-                **kwargs, max_retries=0, http_client=httpx.Client(transport=httpx.MockTransport(respond))
-            )
-
         with (
-            patch.object(cloudflare_utils, "Cloudflare", side_effect=make_client),
+            patch.object(cloudflare_utils, "Cloudflare", side_effect=sdk_constructor(respond, max_retries=0)),
             self.assertRaises(ModuleFail) as raised,
             cloudflare_client(FakeModule({"api_token": "secret"})) as client,
             cloudflare_error_context("Reading the zone failed", zone_id="zone"),
@@ -355,6 +354,96 @@ class ClientTests(TestCase):
         self.assertEqual(values["zone_id"], "zone")
         self.assertEqual(values["status_code"], 502)
         self.assertEqual(values["response"], "<html>502 Bad Gateway</html>")
+
+    def test_client_fails_cleanly_on_sdk_errors(self):
+        def make_client(body):
+            def respond(request):
+                return httpx.Response(200, content=body, headers={"content-type": "application/json"})
+
+            return sdk_constructor(respond, max_retries=0)
+
+        def create_zone(client):
+            return client.zones.create(account={"id": "account"}, name="example.com")
+
+        def edit_policy(client):
+            # The SDK cannot encode the value, so it sends nothing.
+            return client.zero_trust.devices.policies.default.edit(account_id="account", auto_connect=float("inf"))
+
+        cases = (
+            # The body is not JSON.
+            ("JSONDecodeError", b"<html>OK</html>", lambda client: client.zones.get(zone_id="zone"), False),
+            # The envelope is not an object.
+            ("AttributeError", b'["zone"]', lambda client: client.zones.get(zone_id="zone"), False),
+            # A list page's result is not a list.
+            ("TypeError", b'{"success": true, "result": 5}', lambda client: list(client.zones.list()), False),
+            # Cloudflare answered the write with a 2xx status, so it was applied.
+            ("JSONDecodeError", b"<html>OK</html>", create_zone, True),
+            ("ValueError", b"{}", edit_policy, False),
+        )
+        for error, body, request, changed in cases:
+            with (
+                self.subTest(error=error, request=request),
+                patch.object(cloudflare_utils, "Cloudflare", side_effect=make_client(body)),
+                self.assertRaises(ModuleFail) as raised,
+                cloudflare_client(FakeModule({"api_token": "secret"})) as client,
+                cloudflare_error_context("Reading the zone failed", zone_id="zone"),
+            ):
+                request(client)
+
+            values = raised.exception.values
+            self.assertEqual(values["msg"], "Reading the zone failed")
+            self.assertEqual(values["zone_id"], "zone")
+            self.assertTrue(values["error"].startswith(f"{error}: "))
+            self.assertEqual(values.get("changed"), True if changed else None)
+            if error == "JSONDecodeError":
+                self.assertEqual(values["status_code"], 200)
+                self.assertEqual(values["response"], "<html>OK</html>")
+            else:
+                self.assertNotIn("response", values)
+
+        with (
+            patch.object(cloudflare_utils, "Cloudflare", side_effect=make_client(b"<html>OK</html>")),
+            self.assertRaises(ModuleFail) as raised,
+            cloudflare_client(FakeModule({"api_token": "secret"})) as client,
+        ):
+            client.zones.get(zone_id="zone")
+
+        self.assertEqual(raised.exception.values["msg"], "Cloudflare API request failed")
+
+    def test_client_reports_the_change_of_an_answered_write_on_a_later_api_error(self):
+        def respond(request):
+            if request.method == "PATCH":
+                return httpx.Response(200, json={"success": True, "result": {"id": "zone"}})
+
+            return httpx.Response(500, json={"success": False, "errors": [], "messages": []})
+
+        for write in (False, True):
+            with (
+                self.subTest(write=write),
+                patch.object(cloudflare_utils, "Cloudflare", side_effect=sdk_constructor(respond, max_retries=0)),
+                self.assertRaises(ModuleFail) as raised,
+                cloudflare_client(FakeModule({"api_token": "secret"})) as client,
+            ):
+                if write:
+                    client.zones.edit(zone_id="zone", paused=True)
+
+                client.zones.get(zone_id="zone")
+
+            self.assertEqual(raised.exception.values["status_code"], 500)
+            self.assertEqual(raised.exception.values.get("changed"), True if write else None)
+
+    def test_client_keeps_the_traceback_of_errors_raised_outside_the_sdk(self):
+        for error in (AttributeError("bug"), TypeError("bug"), ValueError("bug")):
+            with (
+                self.subTest(error=type(error).__name__),
+                patch.object(cloudflare_utils, "Cloudflare", return_value=sdk_context(Mock())),
+                self.assertRaises(type(error)) as raised,
+                cloudflare_client(FakeModule({"api_token": "secret"})),
+                cloudflare_error_context("Reading the zone failed", zone_id="zone"),
+            ):
+                raise error
+
+            self.assertFalse(hasattr(raised.exception, "_cloudflare_context"))
 
     def test_error_context_preserves_non_sdk_errors_without_sdk(self):
         with (
@@ -944,6 +1033,26 @@ class EnsureSettingsTests(TestCase):
         result, _ignored = self.run_settings(current, payload, edited=current, exact_values=("routes",))
         self.assertIsInstance(result, ModuleFail)
 
+    def test_malformed_current_settings_fail_before_the_edit(self):
+        for current in (["enabled"], "enabled", [], False, ""):
+            edit = Mock()
+            with self.subTest(current=current), self.assertRaises(ModuleFail) as raised:
+                ensure_settings(
+                    FakeModule({}),
+                    "settings",
+                    "device settings",
+                    current,
+                    {"enabled": True},
+                    edit,
+                    context={"account_id": "acc"},
+                )
+
+            edit.assert_not_called()
+            self.assertEqual(
+                raised.exception.values,
+                {"msg": "Cloudflare API returned malformed device settings data", "account_id": "acc"},
+            )
+
     def test_unchanged_settings_skip_edit(self):
         result, edit = self.run_settings({"enabled": True, "other": 1}, {"enabled": True})
 
@@ -1011,6 +1120,51 @@ class EnsureResourceTests(TestCase):
             )
 
         return raised.exception, create, update
+
+    def test_sdk_errors_of_writes_name_the_operation(self):
+        writes = (
+            (
+                "Cloudflare API request failed while creating the thing",
+                lambda module, write: ensure_resource_present(
+                    module, "thing", "thing", None, {"name": "n"}, write, Mock(), list, expected_name="n"
+                ),
+                {"name": "n"},
+            ),
+            (
+                "Cloudflare API request failed while updating the thing",
+                lambda module, write: ensure_resource_present(
+                    module, "thing", "thing", {"id": "one", "name": "old"}, {"name": "n"}, Mock(), write, list
+                ),
+                {"resource_id": "one"},
+            ),
+            (
+                "Cloudflare API request failed while deleting the thing",
+                lambda module, write: ensure_resource_absent(module, "thing", "thing", {"id": "one"}, write),
+                {"resource_id": "one"},
+            ),
+            (
+                "Cloudflare API request failed while updating device settings",
+                lambda module, write: ensure_settings(
+                    module, "settings", "device settings", {"enabled": False}, {"enabled": True}, write
+                ),
+                {},
+            ),
+        )
+        for message, ensure, context in writes:
+            module = FakeModule({"api_token": "secret"})
+            write = Mock(side_effect=malformed_response)
+            with (
+                self.subTest(message=message),
+                patch.object(cloudflare_utils, "Cloudflare", return_value=sdk_context(Mock())),
+                self.assertRaises(ModuleFail) as raised,
+                cloudflare_client(module),
+            ):
+                ensure(module, write)
+
+            write.assert_called_once()
+            values = raised.exception.values
+            self.assertEqual(values["msg"], message)
+            self.assertLessEqual(context.items(), values.items())
 
     def test_creates_and_verifies(self):
         created = {"id": "one", "name": "n", "enabled": True, "token": "secret"}

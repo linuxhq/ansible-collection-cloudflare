@@ -77,3 +77,15 @@ class PageRulesInfoTests(TestCase):
 
                 with self.assertRaises(error.__class__):
                     pagerules_info.run(FakeModule({}), client)
+
+    def test_malformed_rule_list_fails_naming_the_zone(self):
+        for rules in ("rules", 5, {}, False, [None]):
+            client = client_with(ZONES[:1], {})
+            client.page_rules.list.side_effect = None
+            client.page_rules.list.return_value = rules
+            with self.subTest(rules=rules), self.assertRaises(ModuleFail) as raised:
+                pagerules_info.run(FakeModule({}), client)
+
+            self.assertEqual(
+                raised.exception.values, {"msg": "Cloudflare API returned malformed page rule data", "zone_id": "zone"}
+            )

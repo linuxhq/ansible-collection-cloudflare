@@ -1,5 +1,5 @@
 ---
 trivial:
-  - cloudflare_utils - drop the redundant mapping checks on serialized settings before a write and in settings info modules.
+  - cloudflare_utils - drop the redundant mapping check on serialized settings in settings info modules.
   - rules_lists_info - require only the id and name of each returned list.
   - access_service_tokens - document that the display option prints the service token from every result.
