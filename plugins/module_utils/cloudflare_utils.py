@@ -60,9 +60,10 @@ CREATE_RETRY_BACKOFF_SECONDS = 0.5
 
 
 # Errors the SDK raises outside its APIError hierarchy, such as when it reads
-# a 2xx response it cannot parse: a body that is not JSON, an envelope that is
-# not an object, or a list page whose result is not a list.
-SDK_ERRORS = (AttributeError, TypeError, ValueError)
+# a 2xx response it cannot parse: a body that is not JSON or nested too deeply
+# to decode, an envelope that is not an object, or a list page whose result is
+# not a list; or when it reads an out-of-range Retry-After date before retrying.
+SDK_ERRORS = (AttributeError, OverflowError, RecursionError, TypeError, ValueError)
 
 # HTTP methods of the requests that change nothing at Cloudflare.
 READ_METHODS = ("GET", "HEAD")
@@ -425,7 +426,7 @@ def retry_delay(exc, attempt):
         except (TypeError, ValueError):
             try:
                 retry_at = parsedate_to_datetime(value)
-            except (TypeError, ValueError):
+            except (OverflowError, TypeError, ValueError):
                 retry_at = None
 
             if retry_at is not None:
@@ -485,8 +486,9 @@ def list_all_pages(module, client, path, resource_name, context=None):
 
     Use it for an endpoint whose generated SDK method reads only the first
     page. Each path segment must be encoded with path_segment. Pages are read
-    until result_info.total_pages, or, without it, until a page returns fewer
-    than PAGE_SIZE items. context adds result fields to a failure.
+    until a page returns no items, or until result_info.total_pages, or,
+    without it, until a page returns fewer than PAGE_SIZE items. context adds
+    result fields to a failure.
     """
     items = []
     page = 1
@@ -495,6 +497,10 @@ def list_all_pages(module, client, path, resource_name, context=None):
         result = body.get("result") if isinstance(body, dict) else None
         if not isinstance(result, list):
             module.fail_json(msg=f"Cloudflare API returned malformed {resource_name} data", **(context or {}))
+
+        # As in the SDK pagers, an empty page is the last one.
+        if not result:
+            return items
 
         items.extend(result)
         result_info = body.get("result_info")

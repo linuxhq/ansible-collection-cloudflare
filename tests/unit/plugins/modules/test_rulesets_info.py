@@ -41,6 +41,13 @@ class RulesetsInfoTests(TestCase):
             [{"id": "ruleset", "name": "example.com", "phase": PHASE, "rules": [], "zone_id": "zone"}],
         )
 
+    def test_only_null_rules_count_as_no_rules(self):
+        for rules, expected in ((None, []), ({}, {}), (False, False)):
+            with self.subTest(rules=rules):
+                result, _ignored = self.run_module({"id": "ruleset", "phase": PHASE, "rules": rules})
+
+                self.assertEqual(result["rulesets"][0]["rules"], expected)
+
     def test_not_found_omits_conditional_fields(self):
         result, _ignored = self.run_module(status_error(404))
 
