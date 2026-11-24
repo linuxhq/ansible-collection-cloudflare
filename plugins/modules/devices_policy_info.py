@@ -49,6 +49,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     cloudflare_error_context,
     exit_settings,
+    serialize_resource,
 )
 
 
@@ -58,7 +59,7 @@ def run(module, client):
         "Cloudflare API request failed while gathering the device policy",
         account_id=account_id,
     ):
-        policy = client.zero_trust.devices.policies.default.get(account_id=account_id)
+        policy = serialize_resource(client.zero_trust.devices.policies.default.get(account_id=account_id))
 
     exit_settings(module, "devices_policy", policy)
 

@@ -438,7 +438,7 @@ def edit_zone(module, client, zone, payload, written):
         zone_id=zone["id"],
         **written,
     ):
-        edited = client.zones.edit(zone_id=zone["id"], **payload)
+        edited = serialize_resource(client.zones.edit(zone_id=zone["id"], **payload))
 
     return checked_zone(module, edited, payload, expected_id=zone["id"], written=written)
 
@@ -461,6 +461,7 @@ def create_zone(module, client):
             ),
             lambda: matching_resources(list_zones(module, client), "name", params["name"]),
         )
+        zone = serialize_resource(zone)
 
     return checked_zone(module, zone, payload)
 

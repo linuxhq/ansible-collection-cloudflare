@@ -470,10 +470,12 @@ def submit_items(module, client, account_id, list_id, items, deadline, context=N
             with cloudflare_error_context(
                 "Cloudflare API request failed while submitting the Rules list items", **context
             ):
-                operation = client.with_options(timeout=remaining, max_retries=0).rules.lists.items.update(
-                    list_id,
-                    account_id=account_id,
-                    body=items,
+                operation = serialize_resource(
+                    client.with_options(timeout=remaining, max_retries=0).rules.lists.items.update(
+                        list_id,
+                        account_id=account_id,
+                        body=items,
+                    )
                 )
         except (cloudflare.APIConnectionError, cloudflare.APIStatusError) as exc:
             if (
@@ -487,7 +489,7 @@ def submit_items(module, client, account_id, list_id, items, deadline, context=N
 
         # Cloudflare accepted the operation, so a response received after the
         # deadline is reported by wait_for_operation with its operation id.
-        return serialize_resource(operation)
+        return operation
 
 
 def wait_for_operation(module, client, account_id, list_id, operation, deadline, context=None):
@@ -967,6 +969,7 @@ def ensure_present(module, client, current):
                 lambda: without_retries(client).rules.lists.create(account_id=account_id, **payload),
                 lambda: matching_resources(lists.list(account_id=account_id), "name", params["name"]),
             )
+            rules_list = serialize_resource(rules_list)
 
         current = checked_list(
             module,
@@ -995,7 +998,9 @@ def ensure_present(module, client, current):
                 account_id=account_id,
                 rules_list_id=current_id,
             ):
-                rules_list = lists.update(current_id, account_id=account_id, description=desired_description)
+                rules_list = serialize_resource(
+                    lists.update(current_id, account_id=account_id, description=desired_description)
+                )
 
             current = checked_list(
                 module,
@@ -1046,7 +1051,7 @@ def ensure_present(module, client, current):
             with cloudflare_error_context(
                 "Cloudflare API request failed while reading the updated Rules list", **written
             ):
-                rules_list = lists.get(current_id, account_id=account_id)
+                rules_list = serialize_resource(lists.get(current_id, account_id=account_id))
 
             current = checked_list(module, rules_list, params["name"], current_kind, written, expected_id=current_id)
             written["rules_list"] = current

@@ -49,6 +49,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_client,
     cloudflare_error_context,
     exit_settings,
+    serialize_resource,
 )
 
 
@@ -58,7 +59,7 @@ def run(module, client):
         "Cloudflare API request failed while gathering connectivity settings",
         account_id=account_id,
     ):
-        settings = client.zero_trust.connectivity_settings.get(account_id=account_id)
+        settings = serialize_resource(client.zero_trust.connectivity_settings.get(account_id=account_id))
 
     exit_settings(module, "connectivity_settings", settings)
 

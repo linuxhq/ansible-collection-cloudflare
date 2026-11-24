@@ -3,11 +3,15 @@
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
+import httpx
+
 from ansible_collections.linuxhq.cloudflare.plugins.modules import access_policies
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
+    UNION_MISFIT,
     FakeModule,
     ModuleExit,
     ModuleFail,
+    run_through_client,
     timeout_error,
 )
 
@@ -517,3 +521,27 @@ class AccessPoliciesTests(TestCase):
                 self.assertEqual(call.call_args.kwargs["approval_groups"], sent["approval_groups"])
                 self.assertTrue(result["changed"])
                 self.assertNotIn("msg", result)
+
+    def test_unserializable_updated_policy_fails_naming_the_update(self):
+        # With Pydantic v2 the SDK builds the policy, but fails to serialize an include item that fits no
+        # selector; with v1 it fails to build the policy. Either failure names the update.
+        stored = policy(include=[{"email_domain": {"domain": "example.org"}}])
+
+        def respond(request):
+            if request.method == "GET":
+                # Later pages are empty, which ends the SDK pager.
+                first_page = request.url.params.get("page", "1") == "1"
+                return httpx.Response(200, json={"success": True, "result": [stored] if first_page else []})
+
+            return httpx.Response(200, json={"success": True, "result": policy(include=[UNION_MISFIT])})
+
+        result, requests = run_through_client(
+            access_policies.run, FakeModule({**params(), "api_token": "token"}), respond
+        )
+
+        self.assertEqual([method for method, _path in requests], ["GET", "GET", "PUT"])
+        self.assertEqual(result["msg"], "Cloudflare API request failed while updating the Access policy")
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["resource_id"], "policy")
+        self.assertIn("error", result)
+        self.assertTrue(result["changed"])

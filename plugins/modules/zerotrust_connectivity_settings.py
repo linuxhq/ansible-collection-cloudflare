@@ -70,6 +70,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_error_context,
     ensure_settings,
     payload_from_params,
+    serialize_resource,
 )
 
 FIELDS = ("icmp_proxy_enabled", "offramp_warp_enabled")
@@ -82,7 +83,7 @@ def run(module, client):
         "Cloudflare API request failed while gathering connectivity settings",
         account_id=account_id,
     ):
-        current = settings.get(account_id=account_id)
+        current = serialize_resource(settings.get(account_id=account_id))
 
     ensure_settings(
         module,

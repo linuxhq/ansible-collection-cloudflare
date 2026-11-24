@@ -4,14 +4,17 @@ from unittest import TestCase
 from unittest.mock import Mock
 
 import cloudflare
+import httpx
 
 from ansible_collections.linuxhq.cloudflare.plugins.modules import (
     cfd_tunnel_configurations_info,
 )
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
+    UNION_MISFIT,
     FakeModule,
     ModuleExit,
     ModuleFail,
+    run_through_client,
     status_error,
 )
 
@@ -97,3 +100,25 @@ class CfdTunnelConfigurationsInfoTests(TestCase):
                 self.assertEqual(
                     result["cfd_tunnel_configurations"], [{"id": "remote", "name": "one", "config": config}]
                 )
+
+    def test_unserializable_configuration_fails_naming_the_tunnel(self):
+        # With Pydantic v2 the SDK builds the configuration, but fails to serialize an ingress rule; with v1
+        # it fails to build the configuration. Either failure names the tunnel.
+        def respond(request):
+            if request.url.path.endswith("/configurations"):
+                return httpx.Response(200, json={"success": True, "result": {"config": {"ingress": [UNION_MISFIT]}}})
+
+            # Later pages are empty, which ends the SDK pager.
+            tunnels = [{"id": "remote", "name": "one"}] if request.url.params.get("page", "1") == "1" else []
+            return httpx.Response(200, json={"success": True, "result": tunnels})
+
+        result, requests = run_through_client(
+            cfd_tunnel_configurations_info.run, FakeModule({"account_id": "account", "api_token": "token"}), respond
+        )
+
+        self.assertEqual([method for method, _path in requests], ["GET", "GET", "GET"])
+        self.assertEqual(result["msg"], "Cloudflare API request failed while gathering the tunnel configuration")
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["tunnel_id"], "remote")
+        self.assertIn("error", result)
+        self.assertNotIn("changed", result)

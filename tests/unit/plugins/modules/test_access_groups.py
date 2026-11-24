@@ -3,13 +3,17 @@
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
+import httpx
+
 from ansible_collections.linuxhq.cloudflare.plugins.modules import access_groups
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FALSY_PAGE_RESULTS,
+    UNION_MISFIT,
     FakeModule,
     ModuleExit,
     ModuleFail,
     list_response,
+    run_through_client,
     sdk_client,
     timeout_error,
 )
@@ -470,6 +474,40 @@ class AccessGroupsTests(TestCase):
 
         api.update.assert_not_called()
         self.assertFalse(result["changed"])
+
+    def test_unserializable_written_group_fails_naming_the_write(self):
+        # With Pydantic v2 the SDK builds the group, but fails to serialize an include item that fits no
+        # selector; with v1 it fails to build the group. Either failure names the write.
+        stored = {"id": "group", "name": "admins", "include": [{"email": {"email": "other@example.com"}}]}
+        written = {"id": "group", "name": "admins", "include": [UNION_MISFIT]}
+        for current in (None, stored):
+
+            def respond(request, current=current):
+                if request.method == "GET":
+                    # Later pages are empty, which ends the SDK pager.
+                    first_page = current is not None and request.url.params.get("page", "1") == "1"
+                    return httpx.Response(200, json={"success": True, "result": [current] if first_page else []})
+
+                return httpx.Response(200, json={"success": True, "result": written})
+
+            with self.subTest(created=current is None):
+                result, requests = run_through_client(
+                    access_groups.run, FakeModule({**params(), "api_token": "token"}), respond
+                )
+
+                self.assertEqual(
+                    [method for method, _path in requests],
+                    ["GET", "POST"] if current is None else ["GET", "GET", "PUT"],
+                )
+                self.assertIn("error", result)
+                self.assertEqual(result["account_id"], "account")
+                self.assertTrue(result["changed"])
+                if current is None:
+                    self.assertEqual(result["msg"], "Cloudflare API request failed while creating the Access group")
+                    self.assertEqual(result["name"], "admins")
+                else:
+                    self.assertEqual(result["msg"], "Cloudflare API request failed while updating the Access group")
+                    self.assertEqual(result["resource_id"], "group")
 
 
 class MalformedListTests(TestCase):

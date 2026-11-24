@@ -91,12 +91,11 @@ def run(module, client):
         ):
             # Skip a tunnel deleted after it was listed, which returns 404.
             try:
-                configuration = tunnels.configurations.get(tunnel["id"], account_id=account_id)
+                configuration = serialize_resource(tunnels.configurations.get(tunnel["id"], account_id=account_id))
             except cloudflare.NotFoundError:
                 continue
 
         context = {"account_id": account_id, "tunnel_id": tunnel["id"]}
-        configuration = serialize_resource(configuration)
         if configuration is None:
             configuration = {}
 
