@@ -63,9 +63,11 @@ CREATE_RETRY_BACKOFF_SECONDS = 0.5
 # a 2xx response it cannot parse: a body that is not JSON or nested too deeply
 # to decode, an envelope that is not an object, or a list page whose result is
 # not a list; or when it reads an out-of-range Retry-After date before retrying.
+# It raises RuntimeError, which RecursionError subclasses, when a response fits
+# no variant of a union-typed model.
 # HTTPX raises InvalidURL, outside the SDK's connection errors, while the SDK
 # builds a request whose URL is too long, such as for an overlong name or id.
-SDK_ERRORS = (AttributeError, OverflowError, RecursionError, TypeError, ValueError)
+SDK_ERRORS = (AttributeError, OverflowError, RuntimeError, TypeError, ValueError)
 if httpx is not None:
     SDK_ERRORS += (httpx.InvalidURL,)
 

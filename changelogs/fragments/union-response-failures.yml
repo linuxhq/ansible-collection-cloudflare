@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - modules - fail naming the operation and resource, instead of with a Python traceback, when a response fits none of
+    the shapes the SDK accepts for a resource with several types, such as an Access application or identity provider;
+    after Cloudflare answered a write of the run with a 2xx status, the failure reports ``changed=true``.
