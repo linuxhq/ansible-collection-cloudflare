@@ -13,6 +13,16 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudfla
 
 REQUEST = httpx.Request("GET", "https://api.cloudflare.com/client/v4/")
 
+# A name or id longer than every URL HTTPX builds; only newer HTTPX releases
+# refuse such a URL.
+OVERLONG_VALUE = "a" * 70000
+try:
+    httpx.URL(f"https://api.cloudflare.com/{OVERLONG_VALUE}")
+except httpx.InvalidURL:
+    URL_LENGTH_LIMITED = True
+else:
+    URL_LENGTH_LIMITED = False
+
 
 class ModuleResult(Exception):
     def __init__(self, values):

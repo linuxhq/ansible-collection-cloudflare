@@ -1,6 +1,6 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from unittest import TestCase
+from unittest import TestCase, skipUnless
 from unittest.mock import Mock, call
 from urllib.parse import unquote
 
@@ -10,6 +10,8 @@ import httpx
 from ansible_collections.linuxhq.cloudflare.plugins.modules import pages_projects
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FALSY_PAGE_RESULTS,
+    OVERLONG_VALUE,
+    URL_LENGTH_LIMITED,
     FakeModule,
     ModuleExit,
     ModuleFail,
@@ -1218,6 +1220,21 @@ class PagesProjectsTests(TestCase):
                 self.assertEqual(result["msg"], "Cloudflare API request failed while creating the Pages project")
                 self.assertEqual(result["status_code"], 500)
                 self.assertNotIn("changed", result)
+
+    @skipUnless(URL_LENGTH_LIMITED, "HTTPX builds URLs of any length")
+    def test_overlong_name_fails_cleanly(self):
+        def respond(request):
+            raise AssertionError("no request can be sent")
+
+        result, requests = run_through_client(
+            pages_projects.run, FakeModule({**params(name=OVERLONG_VALUE), "api_token": "token"}), respond
+        )
+
+        self.assertEqual(requests, [])
+        self.assertEqual(result["msg"], "Cloudflare API request failed while gathering the Pages project")
+        self.assertEqual(result["account_id"], "account")
+        self.assertEqual(result["error"], "InvalidURL: URL too long")
+        self.assertNotIn("changed", result)
 
     def test_failed_domain_lookup_after_a_failed_add_reports_the_add_error(self):
         lookups = (
