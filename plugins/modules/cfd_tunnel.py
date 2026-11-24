@@ -112,6 +112,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     payload_from_params,
     resource_field,
     resource_id,
+    serialize_resource,
     without_retries,
 )
 
@@ -175,7 +176,9 @@ def ensure_present(module, client, current):
             account_id=account_id,
             resource_id=current_id,
         ):
-            cfd_tunnel = tunnels.edit(current_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
+            cfd_tunnel = serialize_resource(
+                tunnels.edit(current_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
+            )
 
         cfd_tunnel = checked_tunnel(module, cfd_tunnel, expected_id=current_id)
         module.exit_json(changed=True, message="Cloudflared tunnel updated", cfd_tunnel=cfd_tunnel)
@@ -194,6 +197,7 @@ def ensure_present(module, client, current):
             ),
             lambda: matching_resources(list_tunnels(module, tunnels), "name", params["name"]),
         )
+        cfd_tunnel = serialize_resource(cfd_tunnel)
 
     cfd_tunnel = checked_tunnel(module, cfd_tunnel)
     module.exit_json(changed=True, message="Cloudflared tunnel created", cfd_tunnel=cfd_tunnel)

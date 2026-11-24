@@ -662,7 +662,9 @@ def get_project(module, client, written=None):
         "Cloudflare API request failed while gathering the Pages project",
         **{**project_context(module), **(written or {})},
     ):
-        project = get_or_none(client.pages.projects.get, project_name=params["name"], account_id=params["account_id"])
+        project = serialize_resource(
+            get_or_none(client.pages.projects.get, project_name=params["name"], account_id=params["account_id"])
+        )
 
     return None if project is None else checked_project(module, project, written)
 
@@ -752,7 +754,9 @@ def update_project(module, client, current, payload, secrets_requested):
         "Cloudflare API request failed while updating the Pages project",
         **project_context(module),
     ):
-        project = client.pages.projects.edit(project_name=params["name"], account_id=params["account_id"], **payload)
+        project = serialize_resource(
+            client.pages.projects.edit(project_name=params["name"], account_id=params["account_id"], **payload)
+        )
 
     written = {"changed": True, **project_context(module)}
     project = checked_project(module, project, written)
@@ -874,6 +878,7 @@ def ensure_present(module, client, domain_names):
                     params["name"],
                 ),
             )
+            current = serialize_resource(current)
 
         written = {"changed": True, **project_context(module)}
         current = checked_project(module, current, written)

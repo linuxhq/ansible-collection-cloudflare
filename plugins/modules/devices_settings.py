@@ -85,6 +85,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_error_context,
     ensure_settings,
     payload_from_params,
+    serialize_resource,
 )
 
 FIELDS = (
@@ -103,7 +104,7 @@ def run(module, client):
         "Cloudflare API request failed while gathering device settings",
         account_id=account_id,
     ):
-        current = settings.get(account_id=account_id)
+        current = serialize_resource(settings.get(account_id=account_id))
 
     ensure_settings(
         module,

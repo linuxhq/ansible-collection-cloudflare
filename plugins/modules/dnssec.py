@@ -146,6 +146,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     cloudflare_error_context,
     ensure_settings,
     payload_from_params,
+    serialize_resource,
 )
 
 BOOLEAN_FIELDS = ("dnssec_multi_signer", "dnssec_presigned", "dnssec_use_nsec3")
@@ -170,7 +171,7 @@ def run(module, client):
         "Cloudflare API request failed while gathering DNSSEC settings",
         zone_id=zone_id,
     ):
-        current = client.dns.dnssec.get(zone_id=zone_id)
+        current = serialize_resource(client.dns.dnssec.get(zone_id=zone_id))
 
     ensure_settings(
         module,

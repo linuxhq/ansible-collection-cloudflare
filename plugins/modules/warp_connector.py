@@ -105,6 +105,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     find_resource,
     matching_resources,
     resource_id,
+    serialize_resource,
     without_retries,
 )
 
@@ -161,7 +162,9 @@ def apply_created_secret(module, connectors, created):
             resource_id=connector_id,
             warp_connector=created,
         ):
-            connector = connectors.edit(connector_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
+            connector = serialize_resource(
+                connectors.edit(connector_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
+            )
     except cloudflare.APIError as exc:
         module.fail_json(
             msg=(
@@ -199,7 +202,9 @@ def ensure_present(module, client, current):
             account_id=account_id,
             resource_id=current_id,
         ):
-            warp_connector = connectors.edit(current_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
+            warp_connector = serialize_resource(
+                connectors.edit(current_id, account_id=account_id, tunnel_secret=params["tunnel_secret"])
+            )
 
         warp_connector = checked_connector(module, warp_connector, expected_id=current_id)
         module.exit_json(changed=True, message="WARP Connector updated", warp_connector=warp_connector)
@@ -219,6 +224,7 @@ def ensure_present(module, client, current):
             ),
             lambda: matching_resources(list_connectors(module, connectors), "name", params["name"]),
         )
+        warp_connector = serialize_resource(warp_connector)
 
     warp_connector = checked_connector(module, warp_connector)
     if params.get("tunnel_secret") is not None:

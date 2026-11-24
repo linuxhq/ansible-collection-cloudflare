@@ -163,7 +163,7 @@ def run(module, client):
                 "Cloudflare API request failed while gathering DNSSEC information",
                 zone_id=zone["id"],
             ):
-                dnssec_settings = client.dns.dnssec.get(zone_id=zone["id"])
+                dnssec_settings = serialize_resource(client.dns.dnssec.get(zone_id=zone["id"]))
         except cloudflare.APIStatusError as exc:
             if exc.status_code not in SKIP_STATUSES:
                 raise
@@ -184,7 +184,6 @@ def run(module, client):
             skipped_zones.append(skipped_zone)
             continue
 
-        dnssec_settings = serialize_resource(dnssec_settings)
         context = {"zone_id": zone["id"]}
         resource_field(module, dnssec_settings, "status", "DNSSEC settings", context=context)
 

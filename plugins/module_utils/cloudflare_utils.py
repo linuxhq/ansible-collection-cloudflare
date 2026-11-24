@@ -1011,7 +1011,9 @@ def checked_written(module, resource, resource_name, result_key, context, expect
 
     A failure reports changed=True, context, the resource under result_key,
     and its resource_id, which is expected_id when given. Return the resource
-    and that failure context, for later checks of the write.
+    and that failure context, for later checks of the write. Serialize the
+    response inside the write's cloudflare_error_context first, so an SDK
+    model that fails to serialize names the write and its resource.
     """
     resource = serialize_resource(resource)
     failure = {"changed": True, **context, result_key: resource}
@@ -1140,7 +1142,7 @@ def ensure_resource_present(
             **name_context,
             **context,
         ):
-            created = create_once(lambda: create(payload), find_created)
+            created = serialize_resource(create_once(lambda: create(payload), find_created))
 
         resource = require_written(created, {**name_context, **context})
         module.exit_json(changed=True, message=f"{label} created", **{result_key: resource})
@@ -1166,7 +1168,7 @@ def ensure_resource_present(
         resource_id=current_id,
         **context,
     ):
-        updated = update(current_id, payload)
+        updated = serialize_resource(update(current_id, payload))
 
     resource = require_written(updated, context, expected_id=current_id)
     module.exit_json(changed=True, message=f"{label} updated", **{result_key: resource})

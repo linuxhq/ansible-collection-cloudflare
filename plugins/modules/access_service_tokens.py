@@ -124,6 +124,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     matching_resources,
     payload_from_params,
     resource_id,
+    serialize_resource,
     without_retries,
 )
 
@@ -243,6 +244,7 @@ def run(module, client):
                     service_tokens.list(account_id=account_id, name=params["name"]), "name", params["name"]
                 ),
             )
+            service_token = serialize_resource(service_token)
 
         module.exit_json(
             changed=True,
@@ -266,7 +268,7 @@ def run(module, client):
         account_id=account_id,
         resource_id=current_id,
     ):
-        service_token = service_tokens.update(current_id, account_id=account_id, **payload)
+        service_token = serialize_resource(service_tokens.update(current_id, account_id=account_id, **payload))
 
     module.exit_json(
         changed=True,

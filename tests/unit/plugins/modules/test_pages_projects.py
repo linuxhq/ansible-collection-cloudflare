@@ -11,6 +11,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.modules import pages_project
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FALSY_PAGE_RESULTS,
     OVERLONG_VALUE,
+    UNION_MISFIT,
     URL_LENGTH_LIMITED,
     FakeModule,
     ModuleExit,
@@ -1235,6 +1236,38 @@ class PagesProjectsTests(TestCase):
         self.assertEqual(result["account_id"], "account")
         self.assertEqual(result["error"], "InvalidURL: URL too long")
         self.assertNotIn("changed", result)
+
+    def test_unserializable_project_fails_naming_the_request(self):
+        # The SDK builds the project, but fails to serialize an environment variable that fits no type.
+        unserializable = {**PROJECT, "deployment_configs": {"production": {"env_vars": {"KEY": UNION_MISFIT}}}}
+        cases = (
+            ("gathering", [unserializable], ["GET"]),
+            ("updating", [PROJECT, unserializable], ["GET", "PATCH"]),
+            ("creating", [None, unserializable], ["GET", "POST"]),
+        )
+        for operation, responses, methods in cases:
+            answers = iter(responses)
+
+            def respond(request, answers=answers):
+                project = next(answers)
+                if project is None:
+                    return httpx.Response(404, json={"success": False, "errors": [], "messages": []})
+
+                return httpx.Response(200, json={"success": True, "result": project})
+
+            with self.subTest(operation=operation):
+                result, requests = run_through_client(
+                    pages_projects.run,
+                    FakeModule({**params(build_config={"build_command": "make"}), "api_token": "token"}),
+                    respond,
+                )
+
+                self.assertEqual([method for method, _path in requests], methods)
+                self.assertEqual(result["msg"], f"Cloudflare API request failed while {operation} the Pages project")
+                self.assertEqual(result["account_id"], "account")
+                self.assertEqual(result["name"], "docs")
+                self.assertTrue(result["error"].startswith("TypeError: "))
+                self.assertEqual(result.get("changed"), None if operation == "gathering" else True)
 
     def test_failed_domain_lookup_after_a_failed_add_reports_the_add_error(self):
         lookups = (
