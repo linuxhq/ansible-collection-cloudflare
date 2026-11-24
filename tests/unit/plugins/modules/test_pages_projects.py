@@ -7,6 +7,7 @@ from urllib.parse import unquote
 import cloudflare
 import httpx
 
+from ansible_collections.linuxhq.cloudflare.plugins.module_utils import cloudflare_utils
 from ansible_collections.linuxhq.cloudflare.plugins.modules import pages_projects
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
     FALSY_PAGE_RESULTS,
@@ -1237,6 +1238,7 @@ class PagesProjectsTests(TestCase):
         self.assertEqual(result["error"], "InvalidURL: URL too long")
         self.assertNotIn("changed", result)
 
+    @skipUnless(cloudflare_utils.PYDANTIC_V2, "only Pydantic v2 fails to serialize such a project")
     def test_unserializable_project_fails_naming_the_request(self):
         # The SDK builds the project, but fails to serialize an environment variable that fits no type.
         unserializable = {**PROJECT, "deployment_configs": {"production": {"env_vars": {"KEY": UNION_MISFIT}}}}
