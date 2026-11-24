@@ -137,6 +137,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     find_resource,
     matching_resources,
     payload_from_params,
+    require_present_options,
     validate_access_selectors,
     without_retries,
 )
@@ -156,6 +157,7 @@ def run(module, client):
         if not params["name"]:
             module.fail_json(msg="name must not be empty or only whitespace")
 
+        require_present_options(module, ("include",))
         validate_access_selectors(module)
 
     with cloudflare_error_context(

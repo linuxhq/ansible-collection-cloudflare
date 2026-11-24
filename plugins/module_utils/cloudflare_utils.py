@@ -222,6 +222,16 @@ def validate_cloudflare_params(module):
     return api_token.strip()
 
 
+def require_present_options(module, names):
+    """Fail as required_if does when an option that state=present requires is null.
+
+    required_if counts an option set to null as given.
+    """
+    missing = [name for name in names if module.params[name] is None]
+    if missing:
+        module.fail_json(msg=f"state is present but all of the following are missing: {', '.join(missing)}")
+
+
 def error_response_body(exc):
     response = getattr(exc, "response", None)
     if response is None or not hasattr(response, "json"):

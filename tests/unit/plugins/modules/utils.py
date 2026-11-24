@@ -167,3 +167,51 @@ def run_through_client(run, module, respond):
         return exc.values, requests
 
     raise AssertionError("the module neither exited nor failed")
+
+
+def first_page_response(items):
+    """Return a respond function that lists items on the first page; later pages are empty, which ends the SDK pager."""
+
+    def respond(request):
+        first_page = request.url.params.get("page", "1") == "1"
+        return httpx.Response(200, json={"success": True, "result": items if first_page else []})
+
+    return respond
+
+
+def run_main_through_client(main, args, respond, check_mode=False):
+    """Run a module's main() with args through AnsibleModule argument validation and cloudflare_client.
+
+    Each request is sent without SDK retries to respond. Return the values the
+    module exited or failed with, and the method and path of each request.
+    """
+    requests = []
+
+    def recorded(request):
+        requests.append((request.method, request.url.path))
+        return respond(request)
+
+    def build(http_client, **kwargs):
+        transport = httpx.MockTransport(recorded)
+        return cloudflare.Cloudflare(
+            **kwargs, max_retries=0, http_client=httpx.Client(transport=transport, event_hooks=http_client.event_hooks)
+        )
+
+    def exit_json(_module, **values):
+        raise ModuleExit(values)
+
+    def fail_json(_module, **values):
+        raise ModuleFail(values)
+
+    try:
+        with (
+            patch_module_args({**args, "_ansible_check_mode": check_mode}),
+            patch.object(basic.AnsibleModule, "exit_json", exit_json),
+            patch.object(basic.AnsibleModule, "fail_json", fail_json),
+            patch.object(cloudflare_utils, "Cloudflare", side_effect=build),
+        ):
+            main()
+    except ModuleResult as exc:
+        return exc.values, requests
+
+    raise AssertionError("the module neither exited nor failed")

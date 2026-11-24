@@ -14,6 +14,7 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     ModuleFail,
     connection_error,
     failed_create,
+    run_main_through_client,
     run_through_client,
     status_error,
 )
@@ -717,3 +718,17 @@ class PageRulesTests(TestCase):
                     self.assertEqual(result["pagerule"], written)
                     self.assertEqual(result["resource_id"], "rule")
                     self.assertEqual(result["zone_id"], "zone")
+
+    def test_null_actions_fail_before_any_request(self):
+        current = {"id": "rule", "targets": TARGETS, "actions": ACTIONS, "priority": 1, "status": "active"}
+        for check_mode in (False, True):
+            with self.subTest(check_mode=check_mode):
+                result, requests = run_main_through_client(
+                    pagerules.main,
+                    {"api_token": "token", "zone_id": "zone", "actions": None, "targets": TARGETS},
+                    lambda request: httpx.Response(200, json={"success": True, "result": [current]}),
+                    check_mode=check_mode,
+                )
+
+                self.assertEqual(result["msg"], "state is present but all of the following are missing: actions")
+                self.assertEqual(requests, [])
