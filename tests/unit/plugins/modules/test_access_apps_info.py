@@ -3,11 +3,15 @@
 from unittest import TestCase
 from unittest.mock import Mock
 
+import httpx
+
 from ansible_collections.linuxhq.cloudflare.plugins.modules import access_apps_info
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
+    UNION_MISFIT,
     FakeModule,
     ModuleExit,
     ModuleFail,
+    run_through_client,
 )
 
 
@@ -41,3 +45,17 @@ class AccessAppsInfoTests(TestCase):
             access_apps_info.run(FakeModule({"account_id": "account"}), client)
 
         self.assertEqual(raised.exception.values["account_id"], "account")
+
+    def test_unconvertible_item_fails_cleanly(self):
+        def respond(request):
+            return httpx.Response(200, json={"success": True, "result": [UNION_MISFIT]})
+
+        result, requests = run_through_client(
+            access_apps_info.run, FakeModule({"account_id": "account", "api_token": "token"}), respond
+        )
+
+        self.assertEqual([method for method, _path in requests], ["GET"])
+        self.assertEqual(result["msg"], "Cloudflare API request failed while gathering Access applications")
+        self.assertEqual(result["account_id"], "account")
+        self.assertTrue(result["error"].startswith("RuntimeError: "))
+        self.assertNotIn("changed", result)

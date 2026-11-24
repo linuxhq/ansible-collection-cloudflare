@@ -3,11 +3,15 @@
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
+import httpx
+
 from ansible_collections.linuxhq.cloudflare.plugins.modules import access_apps
 from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils import (
+    UNION_MISFIT,
     FakeModule,
     ModuleExit,
     ModuleFail,
+    run_through_client,
     status_error,
     timeout_error,
 )
@@ -55,6 +59,36 @@ class AccessAppsTests(TestCase):
             access_apps.run(module, client)
 
         return raised.exception.values
+
+    def test_unconvertible_app_fails_cleanly(self):
+        for created in (False, True):
+
+            def respond(request, created=created):
+                if request.method == "POST":
+                    return httpx.Response(200, json={"success": True, "result": UNION_MISFIT})
+
+                apps = [] if created else [UNION_MISFIT]
+                return httpx.Response(200, json={"success": True, "result": apps})
+
+            with self.subTest(created=created):
+                result, requests = run_through_client(
+                    access_apps.run, FakeModule({**params(), "api_token": "token"}), respond
+                )
+
+                self.assertEqual([method for method, _path in requests], ["GET", "POST"] if created else ["GET"])
+                self.assertTrue(result["error"].startswith("RuntimeError: "))
+                self.assertEqual(result["account_id"], "account")
+                if created:
+                    self.assertEqual(
+                        result["msg"], "Cloudflare API request failed while creating the Access application"
+                    )
+                    self.assertTrue(result["changed"])
+                else:
+                    self.assertEqual(
+                        result["msg"], "Cloudflare API request failed while finding the Access application"
+                    )
+                    self.assertEqual(result["name"], "app")
+                    self.assertNotIn("changed", result)
 
     def test_lookup_failures_name_the_account(self):
         for found in ([{"name": "app"}], [{"id": "one", "name": "app"}, {"id": "two", "name": "app"}]):

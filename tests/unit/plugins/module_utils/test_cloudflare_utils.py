@@ -563,6 +563,7 @@ class ClientTests(TestCase):
             AttributeError("bug"),
             OverflowError("bug"),
             RecursionError("bug"),
+            RuntimeError("bug"),
             TypeError("bug"),
             ValueError("bug"),
             httpx.InvalidURL("bug"),

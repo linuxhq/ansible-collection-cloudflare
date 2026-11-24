@@ -23,6 +23,10 @@ except httpx.InvalidURL:
 else:
     URL_LENGTH_LIMITED = False
 
+# A response item that fits no variant of a union-typed SDK model, so the SDK
+# raises RuntimeError while constructing it.
+UNION_MISFIT = {"id": {"x": 1}, "_fields_set": "x"}
+
 
 class ModuleResult(Exception):
     def __init__(self, values):
