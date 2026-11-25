@@ -12,7 +12,9 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleExit,
     ModuleFail,
+    first_page_response,
     list_response,
+    run_main_through_client,
     run_through_client,
     sdk_client,
     timeout_error,
@@ -520,3 +522,19 @@ class MalformedListTests(TestCase):
 
                 self.assertEqual(raised.exception.values["msg"], "Cloudflare API returned malformed Access group data")
                 self.assertEqual([request.method for request in requests], ["GET"])
+
+
+class NullIncludeTests(TestCase):
+    def test_null_include_fails_before_any_request(self):
+        for stored in ([], [{"id": "group", "name": "admins", "include": INCLUDE}]):
+            for check_mode in (False, True):
+                with self.subTest(existing=bool(stored), check_mode=check_mode):
+                    result, requests = run_main_through_client(
+                        access_groups.main,
+                        {**params(include=None), "api_token": "token"},
+                        first_page_response(stored),
+                        check_mode=check_mode,
+                    )
+
+                    self.assertEqual(result["msg"], "state is present but all of the following are missing: include")
+                    self.assertEqual(requests, [])

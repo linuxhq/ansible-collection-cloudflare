@@ -181,6 +181,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     ensure_resource_present,
     payload_from_params,
     require_mapping_list,
+    require_present_options,
     resource_id,
     serialize_resource,
     unsupported_fields,
@@ -214,11 +215,13 @@ def validate_field_names(module):
 
     Targets and actions are not sent when removing a page rule. Null fields
     are ignored, as Cloudflare drops them and the comparison ignores them.
+    Null actions fail as missing ones do.
     """
     params = module.params
     if params["state"] != "present":
         return
 
+    require_present_options(module, ("actions",))
     # Actions are keyed by id, so an id must be hashable.
     invalid = [
         f"actions[{index}].id"

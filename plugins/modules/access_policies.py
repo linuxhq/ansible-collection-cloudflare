@@ -212,6 +212,7 @@ from ansible_collections.linuxhq.cloudflare.plugins.module_utils.cloudflare_util
     find_resource,
     matching_resources,
     payload_from_params,
+    require_present_options,
     unknown_approval_group_fields,
     validate_access_selectors,
     without_nested_nulls,
@@ -273,6 +274,7 @@ def run(module, client):
         if params["name"] == "":
             module.fail_json(msg="name must not be empty")
 
+        require_present_options(module, ("include",))
         validate_field_names(module)
         validate_access_selectors(module)
 

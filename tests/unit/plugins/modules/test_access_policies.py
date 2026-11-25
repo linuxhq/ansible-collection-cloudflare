@@ -11,6 +11,8 @@ from ansible_collections.linuxhq.cloudflare.tests.unit.plugins.modules.utils imp
     FakeModule,
     ModuleExit,
     ModuleFail,
+    first_page_response,
+    run_main_through_client,
     run_through_client,
     timeout_error,
 )
@@ -545,3 +547,19 @@ class AccessPoliciesTests(TestCase):
         self.assertEqual(result["resource_id"], "policy")
         self.assertIn("error", result)
         self.assertTrue(result["changed"])
+
+
+class NullIncludeTests(TestCase):
+    def test_null_include_fails_before_any_request(self):
+        for stored in ([], [policy()]):
+            for check_mode in (False, True):
+                with self.subTest(existing=bool(stored), check_mode=check_mode):
+                    result, requests = run_main_through_client(
+                        access_policies.main,
+                        {**params(include=None), "api_token": "token"},
+                        first_page_response(stored),
+                        check_mode=check_mode,
+                    )
+
+                    self.assertEqual(result["msg"], "state is present but all of the following are missing: include")
+                    self.assertEqual(requests, [])
