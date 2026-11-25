@@ -1633,10 +1633,11 @@ releases:
         including synchronous and inline-polled ones, so ``access_service_tokens_display``
         shows new client secrets for every ``access_service_tokens_async`` and ``access_service_tokens_poll``
         value.
-      - cfd_tunnel_configurations, cfd_tunnel_configurations_info - fail cleanly when
-        Cloudflare returns a tunnel configuration, or its ``config``, that is not
-        a mapping, instead of with a Python traceback; a null ``config`` still counts
-        as empty.
+      - cfd_tunnel_configurations - fail cleanly when Cloudflare returns a tunnel
+        configuration, or its ``config``, that is not a mapping, instead of with a
+        Python traceback; a null ``config`` still counts as empty.
+      - cfd_tunnel_configurations_info - fail cleanly when Cloudflare returns a tunnel
+        configuration that is not a mapping, instead of with a Python traceback.
       - cfd_tunnel_configurations_info - return a tunnel's non-null ``config`` unmodified
         instead of failing when it is not a mapping; only a null ``config`` is returned
         as ``{}``.
