@@ -1,4 +1,0 @@
----
-minor_changes:
-  - cfd_tunnel, warp_connector - add a ``<role>_no_log`` variable, defaulting to ``false``, that sets ``no_log`` on
-    the module and job status tasks to keep connector tokens and tunnel credentials out of output.

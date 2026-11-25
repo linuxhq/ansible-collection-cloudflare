@@ -1,5 +1,0 @@
----
-bugfixes:
-  - modules - fail naming the operation and resource, instead of with a Python traceback, when a request URL is longer
-    than HTTPX allows, such as for an overlong name or id; after Cloudflare answered a write of the run with a 2xx
-    status, the failure reports ``changed=true``.

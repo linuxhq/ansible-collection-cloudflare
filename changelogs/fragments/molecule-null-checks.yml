@@ -1,6 +1,0 @@
----
-trivial:
-  - devices_settings, zerotrust_connectivity_settings, zones - verify in Molecule that a variable left ``null`` keeps
-    the current value.
-  - pages_projects_info - drop the manager module's custom domain check from Molecule.
-  - rules_lists_info - assert the exact name, description, and item count of the Molecule fixture.

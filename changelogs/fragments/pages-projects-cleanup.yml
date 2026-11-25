@@ -1,8 +1,0 @@
----
-minor_changes:
-  - pages_projects - read the project's current custom domains only from the paginated domain listing, which holds
-    every custom domain, instead of also checking the project's ``domains`` field.
-trivial:
-  - pages_projects - list the deployment settings once, check null build settings directly, and build failure
-    contexts with one helper.
-  - pages_projects_info - list projects with the SDK default page size.
