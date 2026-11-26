@@ -1,6 +1,0 @@
----
-trivial:
-  - access_groups, access_service_tokens, cfd_tunnel, warp_connector - merge duplicate unit tests, keeping every
-    assertion.
-  - rules_lists - share one created-list constant, drop no-op ``num_items`` overrides, and retry a 429 on submit in the
-    transient error test.

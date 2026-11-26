@@ -1,9 +1,0 @@
----
-trivial:
-  - roles - list info roles in Molecule verify playbooks without the account ID and API token the shared config sets.
-  - info roles - say in the README that a null account ID or API token skips the query and publishes empty facts.
-  - cfd_tunnel, devices_settings, warp_connector, zerotrust_connectivity_settings roles - drop README sentences that
-    repeat the variables table.
-  - pages_projects_info role - drop the custom domains Molecule fixtures no longer check.
-  - devices_settings_info, zerotrust_connectivity_settings_info roles - leave the settings the manager scenarios leave
-    after Molecule cleanup.

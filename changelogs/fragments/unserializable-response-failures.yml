@@ -1,6 +1,0 @@
----
-bugfixes:
-  - modules - fail naming the operation and resource, instead of only ``Cloudflare API request failed``, when the SDK
-    builds a response it then cannot convert, such as an Access group or policy selector, device policy route, tunnel
-    ingress rule, or Pages environment variable that fits none of the shapes the SDK accepts; after a create or update,
-    the failure still reports ``changed=true``.

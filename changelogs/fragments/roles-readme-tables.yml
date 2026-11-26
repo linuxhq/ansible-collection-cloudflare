@@ -1,4 +1,0 @@
----
-trivial:
-  - roles - tabulate role variables with defaults and descriptions, and link the Cloudflare API reference in each role
-    README.

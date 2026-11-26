@@ -1,5 +1,0 @@
----
-breaking_changes:
-  - devices_settings, zerotrust_connectivity_settings - the setting variables now default to ``null`` and are omitted
-    when unset, so the role leaves the current setting unchanged instead of setting it to ``false`` or ``0``. Set a
-    variable to ``false`` or ``0`` explicitly to keep the previous behavior.

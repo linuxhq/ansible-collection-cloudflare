@@ -4,6 +4,75 @@ linuxhq.cloudflare Release Notes
 
 .. contents:: Topics
 
+v2.2.1
+======
+
+Release Summary
+---------------
+
+Hardening release from a second audit of the collection's plugins. Modules fail cleanly through Ansible, naming the operation and resource, instead of crashing on malformed or unparsable Cloudflare responses, overlong request URLs, out-of-range retry dates, and required options set to null, and keep reporting a change after a write that Cloudflare applied. Review the breaking changes before upgrading; the devices_settings and zerotrust_connectivity_settings roles leave unset settings unchanged, and the purge_cache role fails on incomplete items instead of skipping them.
+
+Minor Changes
+-------------
+
+- access_apps - report an empty ``destinations[].overrides`` list in ``empty_fields`` with the other empty values Cloudflare does not store, instead of in a separate failure.
+- access_apps - send an inline policy selector entry that is neither a mapping nor null, such as ``everyone``, to Cloudflare, which rejects it before any change. A null selector entry, which Cloudflare drops, still fails before any request, now with a message saying so.
+- cfd_tunnel, warp_connector - add a ``<role>_no_log`` variable, defaulting to ``false``, that sets ``no_log`` on the module and job status tasks to keep connector tokens and tunnel credentials out of output.
+- cfd_tunnel, warp_connector - drop the ``cfd_tunnel_id`` and ``warp_connector_id`` failure keys, which repeated ``resource_id``.
+- pages_projects - read the project's current custom domains only from the paginated domain listing, which holds every custom domain, instead of also checking the project's ``domains`` field.
+- rules_lists - check that ``operation_timeout`` is at least 1 second only when ``elements`` is set, still before any change, so ``state=absent`` and runs without ``elements`` no longer fail on a timeout they never use.
+- rules_lists - report a bulk operation without a status as an unknown operation status, with the operation, and read the operation id only from ``operation_id``.
+- rules_lists, rules_lists_info - document the ``description``, ``num_referencing_filters``, ``created_on``, and ``modified_on`` fields Cloudflare returns for a Rules list, and the ``completed`` time of ``items_operation``.
+- warp_connector - check the response of the edit that applies ``tunnel_secret`` to a created connector like every other write, reporting ``Cloudflare API returned the wrong WARP Connector`` or malformed data without the separate ``error`` key.
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- devices_settings, zerotrust_connectivity_settings - the setting variables now default to ``null`` and are omitted when unset, so the role leaves the current setting unchanged instead of setting it to ``false`` or ``0``. Set a variable to ``false`` or ``0`` explicitly to keep the previous behavior.
+- purge_cache role - fail for a ``purge_cache_list`` item without ``zone_id`` or ``cache``, naming the missing option, instead of skipping it silently. The role still does nothing while ``purge_cache_api_token`` is ``null``.
+
+Bugfixes
+--------
+
+- access_apps, access_groups, access_policies, access_service_tokens, cfd_tunnel, cfd_tunnel_configurations, dns, dnssec, pages_projects, purge_cache, rules_lists, rulesets, warp_connector, zones roles - report a change when ``<role>_async`` is ``0``, and wait only for unfinished jobs so a ``<role>_poll`` above ``0`` no longer fails with "could not find job".
+- access_apps, access_groups, access_service_tokens - remove surrounding whitespace from ``name`` before the lookup and every request, as Cloudflare trims it. A padded name created the resource and then failed because Cloudflare returned the trimmed name, and access_service_tokens created another token on every run. An empty or whitespace-only name still fails before any change.
+- access_groups - fail with ``state is present but all of the following are missing`` before any request, instead of a traceback, when ``include`` is set to null with ``state=present``, also in check mode.
+- access_policies - fail with ``state is present but all of the following are missing`` before any request, instead of a traceback, when ``include`` is set to null with ``state=present``, also in check mode.
+- access_service_tokens - fail with ``changed=true`` and the token when a created token has no client secret, as when a create request fails with a timeout or a 5xx status and the token is found by name afterwards. Cloudflare returns the client secret only in the create response, so the module reported the token created without it and the next run reported it present. If the run created such a token, rotate or delete it to obtain a new client secret.
+- access_service_tokens role - print the service token from every job result, including synchronous and inline-polled ones, so ``access_service_tokens_display`` shows new client secrets for every ``access_service_tokens_async`` and ``access_service_tokens_poll`` value.
+- cfd_tunnel_configurations - fail cleanly when Cloudflare returns a tunnel configuration, or its ``config``, that is not a mapping, instead of with a Python traceback; a null ``config`` still counts as empty.
+- cfd_tunnel_configurations_info - fail cleanly when Cloudflare returns a tunnel configuration that is not a mapping, instead of with a Python traceback.
+- cfd_tunnel_configurations_info - return a tunnel's non-null ``config`` unmodified instead of failing when it is not a mapping; only a null ``config`` is returned as ``{}``.
+- devices_policy - treat split tunnel routes Cloudflare returns as something other than a list of mappings as a difference instead of failing with a Python traceback; after the update, such routes fail as not applied with ``changed=true``.
+- devices_policy, devices_settings, dnssec, zerotrust_connectivity_settings - fail cleanly before any change when Cloudflare returns current settings that are not a mapping, instead of with a Python traceback; only null settings count as empty.
+- devices_policy, devices_settings, zerotrust_connectivity_settings, zones - omit a role variable left at ``null`` with an explicit check instead of ``d(omit)``. ``d(omit)`` replaces only undefined values, and ansible-core 2.18 renders a ``null`` as an empty string, so the role sent ``""`` and the module rejected it as a Boolean or number, or, for ``zones_account_id``, as an empty identifier.
+- devices_settings_info, zerotrust_connectivity_settings_info, devices_policy_info - return falsy settings other than null unmodified; only null settings are returned as ``{}``.
+- dnssec - treat a DNSSEC status Cloudflare returns as something other than a string as a difference instead of failing with a Python traceback; after the update, it fails as not applied with ``changed=true``.
+- dnssec_info - return the ``errors`` and ``messages`` of a skipped zone as Cloudflare sent them, instead of replacing a list that holds anything other than mappings with an empty list.
+- modules - fail naming the listed resource and its owner when a page of a Cloudflare list is not null and not a list, such as ``{}`` or ``false``, which the SDK reads as an empty page. Such a page no longer lets access_apps, access_groups, access_policies, access_service_tokens, cfd_tunnel, rules_lists, warp_connector and zones create a duplicate resource or report one already absent, pages_projects skip its check for another project owning a domain, or the info modules return an empty list. A null page still counts as empty.
+- modules - fail naming the operation and resource, instead of only ``Cloudflare API request failed``, when the SDK builds a response it then cannot convert, such as an Access group or policy selector, device policy route, tunnel ingress rule, or Pages environment variable that fits none of the shapes the SDK accepts; after a create or update, the failure still reports ``changed=true``.
+- modules - fail naming the operation and resource, instead of with a Python traceback, when a request URL is longer than HTTPX allows, such as for an overlong name or id; after Cloudflare answered a write of the run with a 2xx status, the failure reports ``changed=true``.
+- modules - fail naming the operation and resource, instead of with a Python traceback, when a response fits none of the shapes the SDK accepts for a resource with several types, such as an Access application or identity provider; after Cloudflare answered a write of the run with a 2xx status, the failure reports ``changed=true``.
+- modules - fail naming the operation and resource, instead of with a Python traceback, when the SDK raises an error outside its API error types, such as for a 2xx response it cannot read (a body that is not JSON, an envelope that is not an object, or a list page whose result is not a list). A body that is not JSON is returned with its status code.
+- modules - fail naming the operation and resource, instead of with a Python traceback, when the SDK reads an out-of-range ``Retry-After`` date before retrying a request, or a response body nested too deeply to decode; after Cloudflare answered a write of the run with a 2xx status, the failure reports ``changed=true``.
+- modules - fail with the status code of a Cloudflare error response, instead of with a Python traceback, when its JSON body is nested too deeply to decode, including when a delete or a zone request checks the response's error codes.
+- modules - report ``changed=true`` on any Cloudflare API or SDK failure after Cloudflare answered a write of the run with a 2xx status.
+- modules - report the create error, with its status code and response, when a create fails without a response or with a 5xx status and the follow-up lookup gets a response the SDK cannot read, instead of the lookup's error.
+- modules - wait the default backoff, instead of failing with a Python traceback, before retrying a create that Cloudflare rejected with a 409 or 429 status and an out-of-range ``Retry-After`` date.
+- pagerules - fail cleanly, instead of with a Python traceback, when a page rule's ``targets`` or ``actions`` are not a list of mappings; after a create or update, the failure reports ``changed=true`` and the page rule.
+- pagerules - fail with ``state is present but all of the following are missing`` before any request, instead of a traceback, when ``actions`` is set to null with ``state=present``, also in check mode.
+- pagerules, pagerules_info - fail cleanly, instead of with a Python traceback, when Cloudflare lists page rules that are not a list of mappings; only a null list counts as no page rules.
+- pagerules, pages_projects, rulesets - report the create error, with its status code and response, when a create of a page rule, ruleset entrypoint, Pages project or Pages project domain fails without a response or with a 5xx status and the follow-up lookup fails, or finds no well-formed resource with the requested page rule targets, phase, project name or domain name. The lookup no longer fails with its own error, and no longer reports ``changed=true`` for a malformed or unrelated resource it took for the created one.
+- pages_projects - fail cleanly, instead of with a Python traceback, when a project's ``deployment_configs`` is not a mapping; after a create or update, the failure reports ``changed=true`` and the project. Deleting such a project still works.
+- pages_projects - report the managed project as ``name`` and the other project as ``project`` when the request for another project's custom domains fails, as a malformed response of the same request already did. The failure used to report the other project as ``name``.
+- pages_projects - stop reading the custom domains of a project at the first empty page, instead of requesting every page up to the ``total_pages`` Cloudflare reports.
+- rules_lists - fail cleanly, instead of with a Python traceback, when a list's ``num_items`` is missing or not a number, when a page of listed items is not a list, which the SDK would read as an empty last page, when a listed item is not a mapping holding a value of the list's kind, or when the items operation or its status is not a mapping; after a write, these failures report ``changed=true``.
+- rules_lists - treat an IP prefix of more digits than any prefix length as invalid in requested elements, and keep it as stored when comparing listed items, instead of failing with a Python traceback.
+- rulesets - compare a rule whose ``action`` is not a string, such as a mapping, without failing with a Python traceback, before any change and in check mode, and after a create or update, which then reports ``changed=true``.
+- rulesets - fail cleanly, instead of with a Python traceback, when a ruleset's ``rules`` are not a list of mappings; a null ``rules`` still counts as no rules, and after a create or update the failure reports ``changed=true`` and the ruleset.
+- rulesets_info - return falsy ruleset ``rules`` other than null unmodified; only null ``rules`` are returned as ``[]``.
+- zones - compare a setting value that is an integer beyond the float range without failing with a Python traceback, whether Cloudflare returns it before any change or it is requested; after a create, the run reports ``changed=true`` and the created zone.
+
 v2.2.0
 ======
 

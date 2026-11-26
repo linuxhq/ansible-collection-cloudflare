@@ -1,3 +1,0 @@
----
-trivial:
-  - cloudflare_utils - check each listed resource once in find_resource and inline fail_from_cloudflare_error.

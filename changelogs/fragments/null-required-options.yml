@@ -1,8 +1,0 @@
----
-bugfixes:
-  - access_groups - fail with ``state is present but all of the following are missing`` before any request, instead of
-    a traceback, when ``include`` is set to null with ``state=present``, also in check mode.
-  - access_policies - fail with ``state is present but all of the following are missing`` before any request, instead
-    of a traceback, when ``include`` is set to null with ``state=present``, also in check mode.
-  - pagerules - fail with ``state is present but all of the following are missing`` before any request, instead of a
-    traceback, when ``actions`` is set to null with ``state=present``, also in check mode.

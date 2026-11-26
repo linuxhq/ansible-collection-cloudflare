@@ -1,7 +1,0 @@
----
-trivial:
-  - cloudflare_utils - ``checked_written`` reports ``expected_id`` as ``resource_id`` itself instead of each caller
-    adding it.
-  - access_service_tokens - check the token a write returned with ``checked_written``; failure keys and messages are
-    unchanged.
-  - cfd_tunnel, warp_connector - stop adding ``resource_id`` to the ``checked_written`` context.

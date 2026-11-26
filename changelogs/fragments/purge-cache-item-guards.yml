@@ -1,4 +1,0 @@
----
-breaking_changes:
-  - purge_cache role - fail for a ``purge_cache_list`` item without ``zone_id`` or ``cache``, naming the missing
-    option, instead of skipping it silently. The role still does nothing while ``purge_cache_api_token`` is ``null``.

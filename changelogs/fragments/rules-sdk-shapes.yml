@@ -1,4 +1,0 @@
----
-trivial:
-  - pagerules - keep one tuple for the fields sent and preserved on update.
-  - rulesets - check the phase of a returned ruleset directly instead of re-serializing it.
